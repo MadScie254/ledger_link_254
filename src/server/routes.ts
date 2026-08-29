@@ -20,12 +20,30 @@ import { GeminiService } from './gemini';
 
 export const apiRouter = Router();
 
-// Middleware to mock orgId/auth for now, until Firebase Auth is hooked up on the frontend
-apiRouter.use((req, res, next) => {
-  // In a real app, extract orgId from JWT token
-  req.body.orgId = req.headers['x-org-id'] || 'default-org-id';
-  (req as any).orgId = req.body.orgId;
-  (req as any).userId = req.headers['x-user-id'] || 'demo-user-id';
+// Auth middleware — reads org from x-org-id header, user from Supabase Bearer JWT
+apiRouter.use(async (req, res, next) => {
+  const orgId = req.headers['x-org-id'] as string | undefined;
+  const authHeader = req.headers['authorization'];
+  const token = authHeader?.startsWith('Bearer ') ? authHeader.slice(7) : null;
+
+  if (!orgId) {
+    return res.status(401).json({ error: 'Missing x-org-id header' });
+  }
+
+  // Decode user_id from Supabase JWT payload (base64url mid-section)
+  let userId = 'anonymous';
+  if (token) {
+    try {
+      const payload = JSON.parse(Buffer.from(token.split('.')[1], 'base64url').toString());
+      userId = payload.sub || 'anonymous';
+    } catch {
+      // malformed token — let individual routes decide if they need auth
+    }
+  }
+
+  (req as any).orgId = orgId;
+  (req as any).userId = userId;
+  req.body.orgId = orgId;
   next();
 });
 

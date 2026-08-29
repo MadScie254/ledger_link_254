@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Search, Menu, Plus, Package, Building2, Users, UserPlus, BookOpen, Sparkles, ChevronDown, Check, Settings, Globe } from 'lucide-react';
+import { Search, Menu, Plus, Building2, ChevronDown, Check, Moon, Sun } from 'lucide-react';
 import { useAppStore } from '../../store';
 import { useQueryClient } from '@tanstack/react-query';
 import { NotificationDropdown } from './NotificationDropdown';
@@ -134,7 +134,7 @@ export function Header() {
             className="p-1.5 text-slate-500 hover:text-ink-900 dark:hover:text-white hover:bg-paper-100 dark:hover:bg-ink-900/50 rounded-sm transition-colors"
             title="Toggle theme"
           >
-            {theme === 'dark' ? <Sparkles className="w-5 h-5" /> : <Sparkles className="w-5 h-5" />}
+            {theme === 'dark' ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
           </button>
 
           {/* Dynamic Notification Bell */}
