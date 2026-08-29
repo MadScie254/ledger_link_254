@@ -1,0 +1,82 @@
+@import "tailwindcss";
+
+@theme {
+  --color-ink-900: var(--ink-900);
+  --color-paper-50: var(--paper-50);
+  --color-paper-100: var(--paper-100);
+  --color-brass-500: var(--brass-500);
+  --color-slate-500: var(--slate-500);
+  --color-ledger-green-700: var(--ledger-green-700);
+  --color-rust-700: var(--rust-700);
+  --color-focus-blue-500: var(--focus-blue-500);
+  --font-sans: "Inter", "IBM Plex Sans", sans-serif;
+  --font-serif: "IBM Plex Serif", "Newsreader", serif;
+  --font-mono: "IBM Plex Mono", monospace;
+}
+
+@layer base {
+  :root {
+    /* Dark mode is now the only mode */
+    --paper-50: #090E17;
+    --paper-100: #111827;
+    --ink-900: #F8FAFC;
+    --slate-500: #94A3B8;
+    --brass-500: #FBBF24;
+    --ledger-green-700: #34D399;
+    --rust-700: #F87171;
+    --focus-blue-500: #60A5FA;
+  }
+
+  body {
+    background-color: var(--color-paper-50);
+    color: var(--color-ink-900);
+    font-family: var(--font-sans);
+  }
+}
+
+@layer utilities {
+  .tabular-currency {
+    font-family: var(--font-mono);
+    font-variant-numeric: tabular-nums;
+  }
+  
+  .ledger-divider {
+    border-bottom: 1px solid var(--color-ink-900);
+    position: relative;
+    margin-bottom: 2px;
+  }
+  .ledger-divider::after {
+    content: '';
+    position: absolute;
+    bottom: -3px;
+    left: 0;
+    right: 0;
+    border-bottom: 1px solid var(--color-ink-900);
+  }
+}
+
+@media print {
+  body {
+    background-color: white !important;
+    color: black !important;
+  }
+  .no-print {
+    display: none !important;
+  }
+  .print-only {
+    display: block !important;
+  }
+  * {
+    box-shadow: none !important;
+  }
+  /* Ensure structural boundaries are visible if needed, but mostly hide UI chrome */
+  nav, header, aside, .action-bar {
+    display: none !important;
+  }
+  .ledger-divider {
+    border-bottom: 1px solid black;
+  }
+  .ledger-divider::after {
+    border-bottom: 1px solid black;
+  }
+}

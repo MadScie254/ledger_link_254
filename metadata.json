@@ -1,0 +1,6 @@
+{
+  "name": "Ledger Link",
+  "description": "Enterprise-grade multi-currency accounting, financial operations, and real-time ledger platform.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
