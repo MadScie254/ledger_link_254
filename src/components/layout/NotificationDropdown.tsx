@@ -291,10 +291,10 @@ export function NotificationDropdown() {
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: 8, scale: 0.98 }}
             transition={{ duration: 0.15 }}
-            className="absolute right-0 mt-2 w-96 sm:w-[420px] bg-white dark:bg-[#111827] border border-ink-900/10 shadow-2xl rounded-sm z-50 overflow-hidden"
+            className="absolute right-0 mt-2 w-96 sm:w-[420px] bg-paper-100 border border-ink-900/10 shadow-2xl rounded-sm z-50 overflow-hidden"
           >
             {/* Header */}
-            <div className="px-4 py-3 border-b border-ink-900/10 bg-paper-50 dark:bg-ink-900/40 flex items-center justify-between">
+            <div className="px-4 py-3 border-b border-ink-900/10 bg-paper-50  flex items-center justify-between">
               <div className="flex items-center space-x-2">
                 <span className="font-serif font-semibold text-ink-900 text-sm">Notifications & Alerts</span>
                 {unreadCount > 0 && (
@@ -322,7 +322,7 @@ export function NotificationDropdown() {
             </div>
 
             {/* Filter Tabs */}
-            <div className="flex items-center space-x-1 px-3 py-2 bg-paper-100/50 dark:bg-ink-900/20 border-b border-ink-900/5 overflow-x-auto text-xs">
+            <div className="flex items-center space-x-1 px-3 py-2 bg-paper-100/50  border-b border-ink-900/5 overflow-x-auto text-xs">
               {[
                 { id: 'ALL', label: 'All' },
                 { id: 'INVOICE', label: 'Invoices' },
@@ -335,7 +335,7 @@ export function NotificationDropdown() {
                   onClick={() => setActiveFilter(tab.id as any)}
                   className={`px-2.5 py-1 rounded-sm font-medium transition-colors whitespace-nowrap ${
                     activeFilter === tab.id
-                      ? 'bg-white dark:bg-ink-900 text-ink-900 shadow-xs'
+                      ? 'bg-paper-100 text-ink-900 shadow-xs'
                       : 'text-slate-500 hover:text-ink-900'
                   }`}
                 >
@@ -412,7 +412,7 @@ export function NotificationDropdown() {
             </div>
 
             {/* Footer */}
-            <div className="p-2.5 bg-paper-50 dark:bg-ink-900/40 border-t border-ink-900/10 flex items-center justify-between text-xs">
+            <div className="p-2.5 bg-paper-50  border-t border-ink-900/10 flex items-center justify-between text-xs">
               <div className="flex items-center text-slate-500">
                 <span className="h-2 w-2 rounded-full bg-ledger-green-700 mr-2"></span>
                 <span>System Monitoring Live</span>

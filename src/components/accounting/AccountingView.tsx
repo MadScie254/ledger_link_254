@@ -181,7 +181,7 @@ export function AccountingView() {
         {activeTab === 'Chart of Accounts' && (
           <button 
             onClick={() => setIsAddingAccount(true)}
-            className="bg-ink-900 text-white dark:text-slate-900 px-4 py-2 text-sm font-medium rounded-sm hover:bg-ink-900/90 transition-colors"
+            className="bg-ink-900 text-white  px-4 py-2 text-sm font-medium rounded-sm hover:bg-ink-900/90 transition-colors"
           >
             Add Account
           </button>
@@ -189,7 +189,7 @@ export function AccountingView() {
         {activeTab === 'Journal Entries' && (
           <button 
             onClick={() => setIsAddingJE(true)}
-            className="bg-ink-900 text-white dark:text-slate-900 px-4 py-2 text-sm font-medium rounded-sm hover:bg-ink-900/90 transition-colors"
+            className="bg-ink-900 text-white  px-4 py-2 text-sm font-medium rounded-sm hover:bg-ink-900/90 transition-colors"
           >
             Post Journal Entry
           </button>
@@ -226,7 +226,7 @@ export function AccountingView() {
             <select 
               value={typeFilter}
               onChange={(e) => setTypeFilter(e.target.value)}
-              className="px-3 py-2 border border-ink-900/20 rounded-sm text-sm focus:outline-none focus:ring-1 focus:ring-focus-blue-500 bg-white dark:bg-[#111827]"
+              className="px-3 py-2 border border-ink-900/20 rounded-sm text-sm focus:outline-none focus:ring-1 focus:ring-focus-blue-500 bg-paper-100"
             >
               <option value="">All Types</option>
               <option value="ASSET">Asset</option>
@@ -237,7 +237,7 @@ export function AccountingView() {
             </select>
           </div>
 
-          <div className="bg-white dark:bg-[#111827] border border-ink-900/10 shadow-sm rounded-sm overflow-hidden">
+          <div className="bg-paper-100 border border-ink-900/10 shadow-sm rounded-sm overflow-hidden">
             {isLoadingAccounts ? (
               <div className="p-16 text-center text-slate-500">Loading accounts...</div>
             ) : accounts.length === 0 ? (
@@ -285,7 +285,7 @@ export function AccountingView() {
 
       {activeTab === 'Journal Entries' && (
         <div className="space-y-6">
-          <div className="bg-white dark:bg-[#111827] border border-ink-900/10 shadow-sm rounded-sm overflow-hidden">
+          <div className="bg-paper-100 border border-ink-900/10 shadow-sm rounded-sm overflow-hidden">
             <table className="w-full text-sm text-left">
               <thead className="bg-paper-100 border-b border-ink-900/10 text-xs uppercase text-slate-500">
                 <tr>
@@ -331,7 +331,7 @@ export function AccountingView() {
 
       {activeTab === 'Settings' && (
         <div className="space-y-6">
-          <div className="bg-white dark:bg-[#111827] border border-ink-900/10 shadow-sm rounded-sm p-6">
+          <div className="bg-paper-100 border border-ink-900/10 shadow-sm rounded-sm p-6">
             <h3 className="text-lg font-medium text-ink-900 mb-4">Data Management</h3>
             <p className="text-sm text-slate-600 mb-6">Import or export your chart of accounts using CSV formatting.</p>
             
@@ -351,7 +351,7 @@ export function AccountingView() {
                   ref={fileInputRef}
                   onChange={handleImportCSV}
                 />
-                <button className="bg-ink-900 text-white dark:text-slate-900 px-4 py-2 text-sm font-medium rounded-sm hover:bg-ink-900/90 transition-colors">
+                <button className="bg-ink-900 text-white  px-4 py-2 text-sm font-medium rounded-sm hover:bg-ink-900/90 transition-colors">
                   Import CSV
                 </button>
               </div>
@@ -363,18 +363,18 @@ export function AccountingView() {
       {/* Manual JE Modal */}
       {isAddingJE && (
         <div className="fixed inset-0 bg-ink-900/20 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-white dark:bg-[#111827] rounded-sm shadow-xl border border-ink-900/10 w-full max-w-3xl p-6">
+          <div className="bg-paper-100 rounded-sm shadow-xl border border-ink-900/10 w-full max-w-3xl p-6">
             <h3 className="text-xl font-serif text-ink-900 mb-4">Post Manual Journal Entry</h3>
             
             <form onSubmit={handlePostJE} className="space-y-6">
               <div className="flex space-x-4">
                 <div className="w-1/3">
                   <label className="block text-xs font-semibold text-slate-500 uppercase mb-1">Date</label>
-                  <input required type="date" value={jeDate} onChange={e => setJeDate(e.target.value)} className="w-full bg-white dark:bg-[#111827] border border-ink-900/20 text-ink-900 text-sm rounded-sm px-3 py-2 outline-none" />
+                  <input required type="date" value={jeDate} onChange={e => setJeDate(e.target.value)} className="w-full bg-paper-100 border border-ink-900/20 text-ink-900 text-sm rounded-sm px-3 py-2 outline-none" />
                 </div>
                 <div className="w-2/3">
                   <label className="block text-xs font-semibold text-slate-500 uppercase mb-1">Memo</label>
-                  <input required type="text" value={jeMemo} onChange={e => setJeMemo(e.target.value)} placeholder="Reason for manual entry..." className="w-full bg-white dark:bg-[#111827] border border-ink-900/20 text-ink-900 text-sm rounded-sm px-3 py-2 outline-none" />
+                  <input required type="text" value={jeMemo} onChange={e => setJeMemo(e.target.value)} placeholder="Reason for manual entry..." className="w-full bg-paper-100 border border-ink-900/20 text-ink-900 text-sm rounded-sm px-3 py-2 outline-none" />
                 </div>
               </div>
 
@@ -400,7 +400,7 @@ export function AccountingView() {
                               newLines[index].accountId = e.target.value;
                               setJeLines(newLines);
                             }}
-                            className="w-full bg-white dark:bg-[#111827] border border-ink-900/20 text-ink-900 text-sm rounded-sm px-3 py-2 outline-none"
+                            className="w-full bg-paper-100 border border-ink-900/20 text-ink-900 text-sm rounded-sm px-3 py-2 outline-none"
                           >
                             <option value="">Select Account</option>
                             {accounts.map((acc: any) => (
@@ -414,7 +414,7 @@ export function AccountingView() {
                               newLines[index].debit = parseFloat(e.target.value) || 0;
                               if (newLines[index].debit > 0) newLines[index].credit = 0;
                               setJeLines(newLines);
-                          }} className="w-full bg-white dark:bg-[#111827] border border-ink-900/20 text-ink-900 text-sm rounded-sm px-3 py-2 outline-none text-right tabular-currency" placeholder="0.00" />
+                          }} className="w-full bg-paper-100 border border-ink-900/20 text-ink-900 text-sm rounded-sm px-3 py-2 outline-none text-right tabular-currency" placeholder="0.00" />
                         </td>
                         <td className="py-2 pr-2">
                           <input type="number" min="0" step="0.01" value={line.credit || ''} onChange={e => {
@@ -422,7 +422,7 @@ export function AccountingView() {
                               newLines[index].credit = parseFloat(e.target.value) || 0;
                               if (newLines[index].credit > 0) newLines[index].debit = 0;
                               setJeLines(newLines);
-                          }} className="w-full bg-white dark:bg-[#111827] border border-ink-900/20 text-ink-900 text-sm rounded-sm px-3 py-2 outline-none text-right tabular-currency" placeholder="0.00" />
+                          }} className="w-full bg-paper-100 border border-ink-900/20 text-ink-900 text-sm rounded-sm px-3 py-2 outline-none text-right tabular-currency" placeholder="0.00" />
                         </td>
                         <td className="py-2 text-right">
                            <button type="button" onClick={() => {
@@ -459,7 +459,7 @@ export function AccountingView() {
 
               <div className="flex justify-end space-x-3 pt-6 border-t border-ink-900/10">
                 <button type="button" onClick={() => setIsAddingJE(false)} className="px-4 py-2 text-sm font-medium text-slate-500 hover:text-ink-900">Cancel</button>
-                <button type="submit" disabled={!isBalanced || addJeMutation.isPending} className="bg-ink-900 text-white dark:text-slate-900 px-4 py-2 text-sm font-medium rounded-sm hover:bg-ink-900/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
+                <button type="submit" disabled={!isBalanced || addJeMutation.isPending} className="bg-ink-900 text-white  px-4 py-2 text-sm font-medium rounded-sm hover:bg-ink-900/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
                   {addJeMutation.isPending ? 'Posting...' : 'Post Entry'}
                 </button>
               </div>

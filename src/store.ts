@@ -41,6 +41,8 @@ interface AppState {
   popUndoAction: () => void;
   isLocked: boolean;
   setLocked: (locked: boolean) => void;
+  theme: 'light' | 'dark';
+  setTheme: (theme: 'light' | 'dark') => void;
 }
 
 export const useAppStore = create<AppState>((set) => ({
@@ -114,5 +116,14 @@ export const useAppStore = create<AppState>((set) => ({
   pushUndoAction: (action) => set((state) => ({ undoStack: [...state.undoStack, action] })),
   popUndoAction: () => set((state) => ({ undoStack: state.undoStack.slice(0, -1) })),
   isLocked: false,
-  setLocked: (locked) => set({ isLocked: locked })
+  setLocked: (locked) => set({ isLocked: locked }),
+  theme: 'light',
+  setTheme: (theme) => {
+    if (theme === 'dark') {
+      document.documentElement.classList.add('dark');
+    } else {
+      document.documentElement.classList.remove('dark');
+    }
+    set({ theme });
+  }
 }));

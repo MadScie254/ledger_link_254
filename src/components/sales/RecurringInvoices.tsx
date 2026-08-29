@@ -48,13 +48,13 @@ export function RecurringInvoices() {
         </div>
         <button
           onClick={() => setIsCreating(true)}
-          className="bg-ink-900 text-white dark:text-slate-900 px-4 py-2 text-sm font-medium rounded-sm hover:bg-ink-900/90 transition-colors flex items-center"
+          className="bg-ink-900 text-white  px-4 py-2 text-sm font-medium rounded-sm hover:bg-ink-900/90 transition-colors flex items-center"
         >
           <Plus className="h-4 w-4 mr-1" /> New Schedule
         </button>
       </div>
 
-      <div className="bg-white dark:bg-[#111827] border border-ink-900/10 shadow-sm rounded-sm overflow-hidden">
+      <div className="bg-paper-100 border border-ink-900/10 shadow-sm rounded-sm overflow-hidden">
         {schedules.length === 0 ? (
           <div className="p-16 text-center text-slate-500">
             <p>No recurring profiles configured.</p>
@@ -105,19 +105,19 @@ export function RecurringInvoices() {
 
       {isCreating && (
         <div className="fixed inset-0 bg-ink-900/40 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-white dark:bg-[#111827] rounded-lg shadow-xl w-full max-w-lg border border-ink-900/10 overflow-hidden">
+          <div className="bg-paper-100 rounded-lg shadow-xl w-full max-w-lg border border-ink-900/10 overflow-hidden">
             <div className="px-6 py-4 border-b border-ink-900/10">
               <h3 className="text-lg font-medium text-ink-900">New Recurring Schedule</h3>
             </div>
             <form onSubmit={handleCreate} className="p-6 space-y-4">
               <div>
                 <label className="block text-sm font-medium text-ink-900 mb-1">Customer Name</label>
-                <input required name="customerName" type="text" className="w-full bg-white dark:bg-[#111827] border border-ink-900/20 text-ink-900 text-sm rounded-sm px-3 py-2 focus:ring-1 focus:ring-focus-blue-500 outline-none" placeholder="e.g. Acme Corp" />
+                <input required name="customerName" type="text" className="w-full bg-paper-100 border border-ink-900/20 text-ink-900 text-sm rounded-sm px-3 py-2 focus:ring-1 focus:ring-focus-blue-500 outline-none" placeholder="e.g. Acme Corp" />
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-ink-900 mb-1">Frequency</label>
-                  <select required name="frequency" className="w-full bg-white dark:bg-[#111827] border border-ink-900/20 text-ink-900 text-sm rounded-sm px-3 py-2 focus:ring-1 focus:ring-focus-blue-500 outline-none">
+                  <select required name="frequency" className="w-full bg-paper-100 border border-ink-900/20 text-ink-900 text-sm rounded-sm px-3 py-2 focus:ring-1 focus:ring-focus-blue-500 outline-none">
                     <option value="Weekly">Weekly</option>
                     <option value="Monthly">Monthly</option>
                     <option value="Quarterly">Quarterly</option>
@@ -126,12 +126,12 @@ export function RecurringInvoices() {
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-ink-900 mb-1">Start Date</label>
-                  <input required name="startDate" type="date" defaultValue={format(new Date(), 'yyyy-MM-dd')} className="w-full bg-white dark:bg-[#111827] border border-ink-900/20 text-ink-900 text-sm rounded-sm px-3 py-2 focus:ring-1 focus:ring-focus-blue-500 outline-none" />
+                  <input required name="startDate" type="date" defaultValue={format(new Date(), 'yyyy-MM-dd')} className="w-full bg-paper-100 border border-ink-900/20 text-ink-900 text-sm rounded-sm px-3 py-2 focus:ring-1 focus:ring-focus-blue-500 outline-none" />
                 </div>
               </div>
               <div>
                 <label className="block text-sm font-medium text-ink-900 mb-1">Base Amount (KES)</label>
-                <input required name="amount" type="number" step="0.01" placeholder="0.00" className="w-full bg-white dark:bg-[#111827] border border-ink-900/20 text-ink-900 text-sm rounded-sm px-3 py-2 focus:ring-1 focus:ring-focus-blue-500 outline-none tabular-currency" />
+                <input required name="amount" type="number" step="0.01" placeholder="0.00" className="w-full bg-paper-100 border border-ink-900/20 text-ink-900 text-sm rounded-sm px-3 py-2 focus:ring-1 focus:ring-focus-blue-500 outline-none tabular-currency" />
               </div>
               <div className="pt-2">
                 <label className="flex items-center space-x-2 text-sm text-ink-900 cursor-pointer">
@@ -142,7 +142,7 @@ export function RecurringInvoices() {
               </div>
               <div className="flex justify-end space-x-3 pt-6">
                 <button type="button" onClick={() => setIsCreating(false)} className="px-4 py-2 text-sm font-medium text-slate-500 hover:text-ink-900">Cancel</button>
-                <button type="submit" className="bg-ink-900 text-white dark:text-slate-900 px-4 py-2 text-sm font-medium rounded-sm hover:bg-ink-900/90 transition-colors">
+                <button type="submit" className="bg-ink-900 text-white  px-4 py-2 text-sm font-medium rounded-sm hover:bg-ink-900/90 transition-colors">
                   Create Profile
                 </button>
               </div>

@@ -14,7 +14,7 @@ export function ConfirmModal({ isOpen, title, message, onConfirm, onCancel, conf
   if (!isOpen) return null;
   return (
     <div className="fixed inset-0 bg-ink-900/40 backdrop-blur-sm z-[200] flex items-center justify-center p-4">
-      <div className="bg-white dark:bg-[#111827] rounded-sm shadow-2xl max-w-sm w-full p-6 border border-ink-900/10">
+      <div className="bg-paper-100 rounded-sm shadow-2xl max-w-sm w-full p-6 border border-ink-900/10">
         <div className="flex items-center space-x-3 mb-4">
           {isDestructive && <AlertTriangle className="w-6 h-6 text-rust-700" />}
           <h3 className="text-lg font-serif text-ink-900">{title}</h3>

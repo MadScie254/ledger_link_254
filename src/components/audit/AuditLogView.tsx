@@ -27,14 +27,14 @@ export function AuditLogView() {
       
       <div className="ledger-divider mb-6"></div>
 
-      <div className="bg-white dark:bg-[#111827] border border-ink-900/10 shadow-sm rounded-sm">
+      <div className="bg-paper-100 border border-ink-900/10 shadow-sm rounded-sm">
         <div className="p-4 border-b border-ink-900/10 flex gap-4">
           <input 
             type="text" 
             placeholder="Search logs..." 
             className="border border-ink-900/20 px-3 py-1.5 rounded-sm w-64 text-sm focus:outline-none focus:ring-1 focus:ring-ink-900"
           />
-          <select className="border border-ink-900/20 px-3 py-1.5 rounded-sm text-sm focus:outline-none focus:ring-1 focus:ring-ink-900 bg-white dark:bg-[#111827]">
+          <select className="border border-ink-900/20 px-3 py-1.5 rounded-sm text-sm focus:outline-none focus:ring-1 focus:ring-ink-900 bg-paper-100">
             <option>All Events</option>
             <option>Journal Entries</option>
             <option>Accounts</option>

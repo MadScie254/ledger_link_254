@@ -6,7 +6,7 @@ export function BusinessFeedView() {
         <p className="text-slate-500">Your financial co-pilot. Natural language querying, anomaly detection, and insights.</p>
       </div>
 
-      <div className="bg-white dark:bg-[#111827] border border-ink-900/10 rounded-sm shadow-sm overflow-hidden mb-8">
+      <div className="bg-paper-100 border border-ink-900/10 rounded-sm shadow-sm overflow-hidden mb-8">
         <div className="p-4 border-b border-ink-900/10 bg-paper-50 flex items-center space-x-3">
            <div className="w-8 h-8 rounded-full bg-ink-900 flex items-center justify-center text-white">✨</div>
            <input 
@@ -14,13 +14,13 @@ export function BusinessFeedView() {
              placeholder="Ask anything (e.g. 'Why did travel expenses spike in March?' or 'Forecast cashflow for Q3')"
              className="flex-1 bg-transparent border-none outline-none text-ink-900 placeholder:text-slate-400"
            />
-           <button className="bg-ink-900 text-white dark:text-slate-900 px-4 py-2 text-sm font-medium rounded-sm">Ask</button>
+           <button className="bg-ink-900 text-white  px-4 py-2 text-sm font-medium rounded-sm">Ask</button>
         </div>
       </div>
 
       <div className="space-y-6">
         {/* Insight Card 1 */}
-        <div className="bg-white dark:bg-[#111827] border border-ink-900/10 rounded-sm shadow-sm p-6 relative overflow-hidden">
+        <div className="bg-paper-100 border border-ink-900/10 rounded-sm shadow-sm p-6 relative overflow-hidden">
           <div className="absolute left-0 top-0 bottom-0 w-1 bg-rust-700"></div>
           <div className="flex items-start justify-between">
             <div>
@@ -42,7 +42,7 @@ export function BusinessFeedView() {
         </div>
 
         {/* Insight Card 2 */}
-        <div className="bg-white dark:bg-[#111827] border border-ink-900/10 rounded-sm shadow-sm p-6 relative overflow-hidden">
+        <div className="bg-paper-100 border border-ink-900/10 rounded-sm shadow-sm p-6 relative overflow-hidden">
           <div className="absolute left-0 top-0 bottom-0 w-1 bg-ledger-green-700"></div>
           <div className="flex items-start justify-between">
             <div>

@@ -30,7 +30,7 @@ export function BulkActionBar({
 
   return (
     <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-40 animate-in fade-in slide-in-from-bottom-5 duration-200">
-      <div className="bg-ink-900 text-white dark:bg-[#111827] dark:border-ink-900/30 border border-ink-900/20 px-4 py-2.5 rounded-sm shadow-2xl flex items-center space-x-3 text-xs sm:text-sm">
+      <div className="bg-ink-900 text-white  dark:border-ink-900/30 border border-ink-900/20 px-4 py-2.5 rounded-sm shadow-2xl flex items-center space-x-3 text-xs sm:text-sm">
         {/* Selection Count */}
         <div className="flex items-center space-x-2 pr-3 border-r border-white/20">
           <span className="bg-brass-500 text-ink-900 font-bold px-2 py-0.5 rounded-full text-xs">

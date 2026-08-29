@@ -33,7 +33,7 @@ export function PayrollView() {
         {activeTab === 'Employees' && (
           <button 
             onClick={() => setIsAddingEmployee(true)}
-            className="bg-ink-900 text-white dark:text-slate-900 px-4 py-2 text-sm font-medium rounded-sm hover:bg-ink-900/90 transition-colors"
+            className="bg-ink-900 text-white  px-4 py-2 text-sm font-medium rounded-sm hover:bg-ink-900/90 transition-colors"
           >
             Add Employee
           </button>
@@ -58,7 +58,7 @@ export function PayrollView() {
       </div>
 
       {activeTab === 'Employees' && (
-        <div className="bg-white dark:bg-[#111827] border border-ink-900/10 shadow-sm rounded-sm overflow-hidden">
+        <div className="bg-paper-100 border border-ink-900/10 shadow-sm rounded-sm overflow-hidden">
           <table className="w-full text-sm text-left">
             <thead className="bg-paper-100 border-b border-ink-900/10 text-xs uppercase text-slate-500">
               <tr>
@@ -101,13 +101,13 @@ export function PayrollView() {
       )}
 
       {activeTab === 'Run payroll' && (
-        <div className="bg-white dark:bg-[#111827] border border-ink-900/10 shadow-sm rounded-sm p-8">
+        <div className="bg-paper-100 border border-ink-900/10 shadow-sm rounded-sm p-8">
           <div className="flex items-center justify-between border-b border-ink-900/10 pb-6 mb-6">
             <div>
               <h3 className="text-lg font-medium text-ink-900">Next Pay Run</h3>
               <p className="text-sm text-slate-500">Period: Current Month</p>
             </div>
-            <button className="bg-ink-900 text-white dark:text-slate-900 px-4 py-2 text-sm font-medium rounded-sm hover:bg-ink-900/90 transition-colors">
+            <button className="bg-ink-900 text-white  px-4 py-2 text-sm font-medium rounded-sm hover:bg-ink-900/90 transition-colors">
               Process Payroll &rarr;
             </button>
           </div>
@@ -150,7 +150,7 @@ export function PayrollView() {
       )}
 
       {activeTab === 'Payslips' && (
-        <div className="bg-white dark:bg-[#111827] border border-ink-900/10 shadow-sm rounded-sm p-8 max-w-4xl mx-auto text-center">
+        <div className="bg-paper-100 border border-ink-900/10 shadow-sm rounded-sm p-8 max-w-4xl mx-auto text-center">
            <h3 className="text-xl font-medium text-ink-900 mb-2">Employee Payslips</h3>
            <p className="text-slate-500 mb-6">View, download, and email generated payslips from past pay runs.</p>
            <div className="p-4 bg-paper-50 border border-ink-900/10 rounded-sm">
@@ -160,7 +160,7 @@ export function PayrollView() {
       )}
       
       {activeTab === 'Statutory filings (PAYE/NSSF/SHIF)' && (
-        <div className="bg-white dark:bg-[#111827] border border-ink-900/10 shadow-sm rounded-sm p-8 max-w-4xl mx-auto">
+        <div className="bg-paper-100 border border-ink-900/10 shadow-sm rounded-sm p-8 max-w-4xl mx-auto">
            <div className="text-center mb-6">
              <h3 className="text-xl font-medium text-ink-900 mb-2">Statutory Deductions Center</h3>
              <p className="text-slate-500">Auto-generated filing templates based on your processed payrolls.</p>

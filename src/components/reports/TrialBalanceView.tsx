@@ -79,7 +79,7 @@ export function TrialBalanceView({ onBack }: { onBack: () => void }) {
   if (isLoading) return <div className="p-16 text-center text-slate-500">Generating trial balance...</div>;
 
   return (
-    <div className="bg-white dark:bg-[#111827] border border-ink-900/10 shadow-sm rounded-sm">
+    <div className="bg-paper-100 border border-ink-900/10 shadow-sm rounded-sm">
       <div className="p-6 border-b border-ink-900/10 flex items-center justify-between bg-paper-50">
         <div>
           <button 
@@ -96,13 +96,13 @@ export function TrialBalanceView({ onBack }: { onBack: () => void }) {
             <CheckCircle2 className="w-3.5 h-3.5 mr-1.5" />
             Equality Verified (Net 0)
           </div>
-          <button onClick={handleExportExcel} className="bg-white dark:bg-[#111827] border border-ink-900/20 text-ink-900 px-3 py-2 text-sm font-medium rounded-sm hover:bg-paper-50 transition-colors">
+          <button onClick={handleExportExcel} className="bg-paper-100 border border-ink-900/20 text-ink-900 px-3 py-2 text-sm font-medium rounded-sm hover:bg-paper-50 transition-colors">
             Excel
           </button>
-          <button onClick={handlePrint} className="bg-white dark:bg-[#111827] border border-ink-900/20 text-ink-900 px-3 py-2 text-sm font-medium rounded-sm hover:bg-paper-50 transition-colors inline-flex items-center">
+          <button onClick={handlePrint} className="bg-paper-100 border border-ink-900/20 text-ink-900 px-3 py-2 text-sm font-medium rounded-sm hover:bg-paper-50 transition-colors inline-flex items-center">
             <Printer className="w-4 h-4 mr-1.5" /> Print
           </button>
-          <button onClick={handleExportPDF} className="bg-ink-900 text-white dark:text-slate-900 px-4 py-2 text-sm font-medium rounded-sm hover:bg-ink-900/90 transition-colors inline-flex items-center">
+          <button onClick={handleExportPDF} className="bg-ink-900 text-white  px-4 py-2 text-sm font-medium rounded-sm hover:bg-ink-900/90 transition-colors inline-flex items-center">
             <Download className="w-4 h-4 mr-1.5" /> Export PDF
           </button>
         </div>
@@ -142,7 +142,7 @@ export function TrialBalanceView({ onBack }: { onBack: () => void }) {
                 </td>
               </tr>
             ))}
-            <tr className="bg-ink-900 text-white dark:text-slate-900 font-bold text-sm">
+            <tr className="bg-ink-900 text-white  font-bold text-sm">
               <td colSpan={3} className="py-3.5 px-4 rounded-l-sm">TOTALS</td>
               <td className="py-3.5 px-4 text-right tabular-currency">{formatCurrency(totalDebit)}</td>
               <td className="py-3.5 px-4 text-right tabular-currency rounded-r-sm">{formatCurrency(totalCredit)}</td>

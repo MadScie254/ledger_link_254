@@ -261,9 +261,9 @@ export function DetailedAddModal({ isOpen, onClose, initialType = 'ITEM', onSucc
 
   return (
     <div className="fixed inset-0 bg-ink-900/40 backdrop-blur-xs z-50 flex items-center justify-center p-4 overflow-y-auto">
-      <div className="bg-white dark:bg-[#111827] rounded-sm shadow-2xl border border-ink-900/10 w-full max-w-3xl my-8 overflow-hidden flex flex-col max-h-[90vh]">
+      <div className="bg-paper-100 rounded-sm shadow-2xl border border-ink-900/10 w-full max-w-3xl my-8 overflow-hidden flex flex-col max-h-[90vh]">
         {/* Header with Entity Type Switcher */}
-        <div className="px-6 py-4 border-b border-ink-900/10 bg-paper-50 dark:bg-ink-900/40 flex items-center justify-between">
+        <div className="px-6 py-4 border-b border-ink-900/10 bg-paper-50  flex items-center justify-between">
           <div className="flex items-center space-x-3">
             <span className="p-2 bg-ink-900 text-white rounded-xs">
               {selectedType === 'ITEM' && <Package className="h-5 w-5" />}
@@ -291,7 +291,7 @@ export function DetailedAddModal({ isOpen, onClose, initialType = 'ITEM', onSucc
                 setActiveSubTab('general');
                 setErrorMessage(null);
               }}
-              className="text-xs font-medium border border-ink-900/20 rounded-sm px-2.5 py-1.5 bg-white dark:bg-[#111827] text-ink-900 focus:outline-none focus:ring-1 focus:ring-focus-blue-500"
+              className="text-xs font-medium border border-ink-900/20 rounded-sm px-2.5 py-1.5 bg-paper-100 text-ink-900 focus:outline-none focus:ring-1 focus:ring-focus-blue-500"
             >
               <option value="ITEM">Add Inventory Item</option>
               <option value="VENDOR">Add Vendor / Supplier</option>
@@ -391,7 +391,7 @@ export function DetailedAddModal({ isOpen, onClose, initialType = 'ITEM', onSucc
                         required
                         name="name"
                         placeholder="e.g., Enterprise Server Rack 42U"
-                        className="w-full bg-white dark:bg-[#111827] border border-ink-900/20 text-ink-900 text-sm rounded-sm px-3 py-2 focus:ring-1 focus:ring-focus-blue-500 outline-none"
+                        className="w-full bg-paper-100 border border-ink-900/20 text-ink-900 text-sm rounded-sm px-3 py-2 focus:ring-1 focus:ring-focus-blue-500 outline-none"
                       />
                     </div>
                     <div>
@@ -401,7 +401,7 @@ export function DetailedAddModal({ isOpen, onClose, initialType = 'ITEM', onSucc
                       <select
                         name="itemType"
                         defaultValue="Physical Product"
-                        className="w-full bg-white dark:bg-[#111827] border border-ink-900/20 text-ink-900 text-sm rounded-sm px-3 py-2 focus:ring-1 focus:ring-focus-blue-500 outline-none"
+                        className="w-full bg-paper-100 border border-ink-900/20 text-ink-900 text-sm rounded-sm px-3 py-2 focus:ring-1 focus:ring-focus-blue-500 outline-none"
                       >
                         <option value="Physical Product">Physical Product (Tracked)</option>
                         <option value="Digital Service">Digital Service (Untracked)</option>
@@ -419,7 +419,7 @@ export function DetailedAddModal({ isOpen, onClose, initialType = 'ITEM', onSucc
                       <input
                         name="sku"
                         placeholder="e.g., SRV-42U-001"
-                        className="w-full bg-white dark:bg-[#111827] border border-ink-900/20 text-ink-900 text-sm rounded-sm px-3 py-2 focus:ring-1 focus:ring-focus-blue-500 outline-none font-mono"
+                        className="w-full bg-paper-100 border border-ink-900/20 text-ink-900 text-sm rounded-sm px-3 py-2 focus:ring-1 focus:ring-focus-blue-500 outline-none font-mono"
                       />
                     </div>
                     <div>
@@ -429,7 +429,7 @@ export function DetailedAddModal({ isOpen, onClose, initialType = 'ITEM', onSucc
                       <input
                         name="barcode"
                         placeholder="e.g., 616110029381"
-                        className="w-full bg-white dark:bg-[#111827] border border-ink-900/20 text-ink-900 text-sm rounded-sm px-3 py-2 focus:ring-1 focus:ring-focus-blue-500 outline-none font-mono"
+                        className="w-full bg-paper-100 border border-ink-900/20 text-ink-900 text-sm rounded-sm px-3 py-2 focus:ring-1 focus:ring-focus-blue-500 outline-none font-mono"
                       />
                     </div>
                     <div>
@@ -439,7 +439,7 @@ export function DetailedAddModal({ isOpen, onClose, initialType = 'ITEM', onSucc
                       <input
                         name="category"
                         placeholder="e.g., Hardware & IT"
-                        className="w-full bg-white dark:bg-[#111827] border border-ink-900/20 text-ink-900 text-sm rounded-sm px-3 py-2 focus:ring-1 focus:ring-focus-blue-500 outline-none"
+                        className="w-full bg-paper-100 border border-ink-900/20 text-ink-900 text-sm rounded-sm px-3 py-2 focus:ring-1 focus:ring-focus-blue-500 outline-none"
                       />
                     </div>
                   </div>
@@ -452,7 +452,7 @@ export function DetailedAddModal({ isOpen, onClose, initialType = 'ITEM', onSucc
                       <select
                         name="unitOfMeasure"
                         defaultValue="Units"
-                        className="w-full bg-white dark:bg-[#111827] border border-ink-900/20 text-ink-900 text-sm rounded-sm px-3 py-2 focus:ring-1 focus:ring-focus-blue-500 outline-none"
+                        className="w-full bg-paper-100 border border-ink-900/20 text-ink-900 text-sm rounded-sm px-3 py-2 focus:ring-1 focus:ring-focus-blue-500 outline-none"
                       >
                         <option value="Units">Units (pcs)</option>
                         <option value="Hours">Hours (hr)</option>
@@ -469,7 +469,7 @@ export function DetailedAddModal({ isOpen, onClose, initialType = 'ITEM', onSucc
                       <input
                         name="location"
                         placeholder="e.g., Warehouse A - Bin 14"
-                        className="w-full bg-white dark:bg-[#111827] border border-ink-900/20 text-ink-900 text-sm rounded-sm px-3 py-2 focus:ring-1 focus:ring-focus-blue-500 outline-none"
+                        className="w-full bg-paper-100 border border-ink-900/20 text-ink-900 text-sm rounded-sm px-3 py-2 focus:ring-1 focus:ring-focus-blue-500 outline-none"
                       />
                     </div>
                     <div>
@@ -478,7 +478,7 @@ export function DetailedAddModal({ isOpen, onClose, initialType = 'ITEM', onSucc
                       </label>
                       <select
                         name="preferredVendorId"
-                        className="w-full bg-white dark:bg-[#111827] border border-ink-900/20 text-ink-900 text-sm rounded-sm px-3 py-2 focus:ring-1 focus:ring-focus-blue-500 outline-none"
+                        className="w-full bg-paper-100 border border-ink-900/20 text-ink-900 text-sm rounded-sm px-3 py-2 focus:ring-1 focus:ring-focus-blue-500 outline-none"
                       >
                         <option value="">None / Unassigned</option>
                         {vendors.map((v: any) => (
@@ -496,7 +496,7 @@ export function DetailedAddModal({ isOpen, onClose, initialType = 'ITEM', onSucc
                       name="description"
                       rows={3}
                       placeholder="Detailed catalog description visible on client invoices..."
-                      className="w-full bg-white dark:bg-[#111827] border border-ink-900/20 text-ink-900 text-sm rounded-sm px-3 py-2 focus:ring-1 focus:ring-focus-blue-500 outline-none resize-none"
+                      className="w-full bg-paper-100 border border-ink-900/20 text-ink-900 text-sm rounded-sm px-3 py-2 focus:ring-1 focus:ring-focus-blue-500 outline-none resize-none"
                     />
                   </div>
                 </div>
@@ -518,7 +518,7 @@ export function DetailedAddModal({ isOpen, onClose, initialType = 'ITEM', onSucc
                         placeholder="0.00"
                         value={itemPrice || ''}
                         onChange={(e) => setItemPrice(parseFloat(e.target.value) || 0)}
-                        className="w-full bg-white dark:bg-[#111827] border border-ink-900/20 text-ink-900 text-sm rounded-sm px-3 py-2 focus:ring-1 focus:ring-focus-blue-500 outline-none tabular-currency"
+                        className="w-full bg-paper-100 border border-ink-900/20 text-ink-900 text-sm rounded-sm px-3 py-2 focus:ring-1 focus:ring-focus-blue-500 outline-none tabular-currency"
                       />
                     </div>
                     <div>
@@ -534,13 +534,13 @@ export function DetailedAddModal({ isOpen, onClose, initialType = 'ITEM', onSucc
                         placeholder="0.00"
                         value={itemCost || ''}
                         onChange={(e) => setItemCost(parseFloat(e.target.value) || 0)}
-                        className="w-full bg-white dark:bg-[#111827] border border-ink-900/20 text-ink-900 text-sm rounded-sm px-3 py-2 focus:ring-1 focus:ring-focus-blue-500 outline-none tabular-currency"
+                        className="w-full bg-paper-100 border border-ink-900/20 text-ink-900 text-sm rounded-sm px-3 py-2 focus:ring-1 focus:ring-focus-blue-500 outline-none tabular-currency"
                       />
                     </div>
                   </div>
 
                   {/* Profit Margin Preview Card */}
-                  <div className="p-3.5 bg-paper-50 dark:bg-ink-900/30 border border-ink-900/10 rounded-sm flex items-center justify-between text-xs">
+                  <div className="p-3.5 bg-paper-50  border border-ink-900/10 rounded-sm flex items-center justify-between text-xs">
                     <div>
                       <span className="text-slate-500">Gross Margin Estimate: </span>
                       <span className="font-semibold text-ink-900 ml-1 font-mono">
@@ -562,7 +562,7 @@ export function DetailedAddModal({ isOpen, onClose, initialType = 'ITEM', onSucc
                       </label>
                       <select
                         name="incomeAccountId"
-                        className="w-full bg-white dark:bg-[#111827] border border-ink-900/20 text-ink-900 text-sm rounded-sm px-3 py-2 focus:ring-1 focus:ring-focus-blue-500 outline-none"
+                        className="w-full bg-paper-100 border border-ink-900/20 text-ink-900 text-sm rounded-sm px-3 py-2 focus:ring-1 focus:ring-focus-blue-500 outline-none"
                       >
                         <option value="">Default: 4000 - Sales Revenue</option>
                         {incomeAccounts.map((a: any) => (
@@ -576,7 +576,7 @@ export function DetailedAddModal({ isOpen, onClose, initialType = 'ITEM', onSucc
                       </label>
                       <select
                         name="expenseAccountId"
-                        className="w-full bg-white dark:bg-[#111827] border border-ink-900/20 text-ink-900 text-sm rounded-sm px-3 py-2 focus:ring-1 focus:ring-focus-blue-500 outline-none"
+                        className="w-full bg-paper-100 border border-ink-900/20 text-ink-900 text-sm rounded-sm px-3 py-2 focus:ring-1 focus:ring-focus-blue-500 outline-none"
                       >
                         <option value="">Default: 5000 - Cost of Goods Sold</option>
                         {expenseAccounts.map((a: any) => (
@@ -596,7 +596,7 @@ export function DetailedAddModal({ isOpen, onClose, initialType = 'ITEM', onSucc
                         type="number"
                         min="0"
                         defaultValue="0"
-                        className="w-full bg-white dark:bg-[#111827] border border-ink-900/20 text-ink-900 text-sm rounded-sm px-3 py-2 focus:ring-1 focus:ring-focus-blue-500 outline-none"
+                        className="w-full bg-paper-100 border border-ink-900/20 text-ink-900 text-sm rounded-sm px-3 py-2 focus:ring-1 focus:ring-focus-blue-500 outline-none"
                       />
                     </div>
                     <div>
@@ -609,7 +609,7 @@ export function DetailedAddModal({ isOpen, onClose, initialType = 'ITEM', onSucc
                         type="number"
                         min="0"
                         defaultValue="5"
-                        className="w-full bg-white dark:bg-[#111827] border border-ink-900/20 text-ink-900 text-sm rounded-sm px-3 py-2 focus:ring-1 focus:ring-focus-blue-500 outline-none"
+                        className="w-full bg-paper-100 border border-ink-900/20 text-ink-900 text-sm rounded-sm px-3 py-2 focus:ring-1 focus:ring-focus-blue-500 outline-none"
                       />
                     </div>
                     <div>
@@ -621,7 +621,7 @@ export function DetailedAddModal({ isOpen, onClose, initialType = 'ITEM', onSucc
                         type="number"
                         min="0"
                         defaultValue="25"
-                        className="w-full bg-white dark:bg-[#111827] border border-ink-900/20 text-ink-900 text-sm rounded-sm px-3 py-2 focus:ring-1 focus:ring-focus-blue-500 outline-none"
+                        className="w-full bg-paper-100 border border-ink-900/20 text-ink-900 text-sm rounded-sm px-3 py-2 focus:ring-1 focus:ring-focus-blue-500 outline-none"
                       />
                     </div>
                   </div>
@@ -638,7 +638,7 @@ export function DetailedAddModal({ isOpen, onClose, initialType = 'ITEM', onSucc
                       <select
                         name="taxRate"
                         defaultValue="16"
-                        className="w-full bg-white dark:bg-[#111827] border border-ink-900/20 text-ink-900 text-sm rounded-sm px-3 py-2 focus:ring-1 focus:ring-focus-blue-500 outline-none"
+                        className="w-full bg-paper-100 border border-ink-900/20 text-ink-900 text-sm rounded-sm px-3 py-2 focus:ring-1 focus:ring-focus-blue-500 outline-none"
                       >
                         <option value="16">16% Standard VAT</option>
                         <option value="8">8% Petroleum / Special Rate</option>
@@ -653,7 +653,7 @@ export function DetailedAddModal({ isOpen, onClose, initialType = 'ITEM', onSucc
                       <input
                         name="notes"
                         placeholder="e.g., 8471.50.00"
-                        className="w-full bg-white dark:bg-[#111827] border border-ink-900/20 text-ink-900 text-sm rounded-sm px-3 py-2 focus:ring-1 focus:ring-focus-blue-500 outline-none font-mono"
+                        className="w-full bg-paper-100 border border-ink-900/20 text-ink-900 text-sm rounded-sm px-3 py-2 focus:ring-1 focus:ring-focus-blue-500 outline-none font-mono"
                       />
                     </div>
                   </div>
@@ -678,7 +678,7 @@ export function DetailedAddModal({ isOpen, onClose, initialType = 'ITEM', onSucc
                         required
                         name="displayName"
                         placeholder="e.g., Safaricom Business Ltd"
-                        className="w-full bg-white dark:bg-[#111827] border border-ink-900/20 text-ink-900 text-sm rounded-sm px-3 py-2 focus:ring-1 focus:ring-focus-blue-500 outline-none"
+                        className="w-full bg-paper-100 border border-ink-900/20 text-ink-900 text-sm rounded-sm px-3 py-2 focus:ring-1 focus:ring-focus-blue-500 outline-none"
                       />
                     </div>
                     <div>
@@ -688,7 +688,7 @@ export function DetailedAddModal({ isOpen, onClose, initialType = 'ITEM', onSucc
                       <input
                         name="legalName"
                         placeholder="e.g., Safaricom PLC"
-                        className="w-full bg-white dark:bg-[#111827] border border-ink-900/20 text-ink-900 text-sm rounded-sm px-3 py-2 focus:ring-1 focus:ring-focus-blue-500 outline-none"
+                        className="w-full bg-paper-100 border border-ink-900/20 text-ink-900 text-sm rounded-sm px-3 py-2 focus:ring-1 focus:ring-focus-blue-500 outline-none"
                       />
                     </div>
                   </div>
@@ -701,7 +701,7 @@ export function DetailedAddModal({ isOpen, onClose, initialType = 'ITEM', onSucc
                       <select
                         name="category"
                         defaultValue="Utilities & Telecoms"
-                        className="w-full bg-white dark:bg-[#111827] border border-ink-900/20 text-ink-900 text-sm rounded-sm px-3 py-2 focus:ring-1 focus:ring-focus-blue-500 outline-none"
+                        className="w-full bg-paper-100 border border-ink-900/20 text-ink-900 text-sm rounded-sm px-3 py-2 focus:ring-1 focus:ring-focus-blue-500 outline-none"
                       >
                         <option value="Direct Supplier">Direct Inventory Supplier</option>
                         <option value="Professional Services">Professional & Legal Services</option>
@@ -718,7 +718,7 @@ export function DetailedAddModal({ isOpen, onClose, initialType = 'ITEM', onSucc
                       <input
                         name="contactPerson"
                         placeholder="e.g., Grace Muthoni"
-                        className="w-full bg-white dark:bg-[#111827] border border-ink-900/20 text-ink-900 text-sm rounded-sm px-3 py-2 focus:ring-1 focus:ring-focus-blue-500 outline-none"
+                        className="w-full bg-paper-100 border border-ink-900/20 text-ink-900 text-sm rounded-sm px-3 py-2 focus:ring-1 focus:ring-focus-blue-500 outline-none"
                       />
                     </div>
                     <div>
@@ -729,7 +729,7 @@ export function DetailedAddModal({ isOpen, onClose, initialType = 'ITEM', onSucc
                         name="email"
                         type="email"
                         placeholder="accounts@vendor.co.ke"
-                        className="w-full bg-white dark:bg-[#111827] border border-ink-900/20 text-ink-900 text-sm rounded-sm px-3 py-2 focus:ring-1 focus:ring-focus-blue-500 outline-none"
+                        className="w-full bg-paper-100 border border-ink-900/20 text-ink-900 text-sm rounded-sm px-3 py-2 focus:ring-1 focus:ring-focus-blue-500 outline-none"
                       />
                     </div>
                   </div>
@@ -742,7 +742,7 @@ export function DetailedAddModal({ isOpen, onClose, initialType = 'ITEM', onSucc
                       <input
                         name="phone"
                         placeholder="+254 700 000000"
-                        className="w-full bg-white dark:bg-[#111827] border border-ink-900/20 text-ink-900 text-sm rounded-sm px-3 py-2 focus:ring-1 focus:ring-focus-blue-500 outline-none"
+                        className="w-full bg-paper-100 border border-ink-900/20 text-ink-900 text-sm rounded-sm px-3 py-2 focus:ring-1 focus:ring-focus-blue-500 outline-none"
                       />
                     </div>
                     <div>
@@ -752,7 +752,7 @@ export function DetailedAddModal({ isOpen, onClose, initialType = 'ITEM', onSucc
                       <input
                         name="mpesaNumber"
                         placeholder="e.g., Paybill 888999 (Acc: 001)"
-                        className="w-full bg-white dark:bg-[#111827] border border-ink-900/20 text-ink-900 text-sm rounded-sm px-3 py-2 focus:ring-1 focus:ring-focus-blue-500 outline-none font-mono"
+                        className="w-full bg-paper-100 border border-ink-900/20 text-ink-900 text-sm rounded-sm px-3 py-2 focus:ring-1 focus:ring-focus-blue-500 outline-none font-mono"
                       />
                     </div>
                   </div>
@@ -769,7 +769,7 @@ export function DetailedAddModal({ isOpen, onClose, initialType = 'ITEM', onSucc
                       <select
                         name="paymentTerms"
                         defaultValue="Net 30"
-                        className="w-full bg-white dark:bg-[#111827] border border-ink-900/20 text-ink-900 text-sm rounded-sm px-3 py-2 focus:ring-1 focus:ring-focus-blue-500 outline-none"
+                        className="w-full bg-paper-100 border border-ink-900/20 text-ink-900 text-sm rounded-sm px-3 py-2 focus:ring-1 focus:ring-focus-blue-500 outline-none"
                       >
                         <option value="Due on Receipt">Due on Receipt</option>
                         <option value="Net 15">Net 15 Days</option>
@@ -784,7 +784,7 @@ export function DetailedAddModal({ isOpen, onClose, initialType = 'ITEM', onSucc
                       <select
                         name="currency"
                         defaultValue="KES"
-                        className="w-full bg-white dark:bg-[#111827] border border-ink-900/20 text-ink-900 text-sm rounded-sm px-3 py-2 focus:ring-1 focus:ring-focus-blue-500 outline-none font-mono"
+                        className="w-full bg-paper-100 border border-ink-900/20 text-ink-900 text-sm rounded-sm px-3 py-2 focus:ring-1 focus:ring-focus-blue-500 outline-none font-mono"
                       >
                         <option value="KES">KES - Kenyan Shilling</option>
                         <option value="USD">USD - US Dollar</option>
@@ -798,7 +798,7 @@ export function DetailedAddModal({ isOpen, onClose, initialType = 'ITEM', onSucc
                       </label>
                       <select
                         name="defaultAccountId"
-                        className="w-full bg-white dark:bg-[#111827] border border-ink-900/20 text-ink-900 text-sm rounded-sm px-3 py-2 focus:ring-1 focus:ring-focus-blue-500 outline-none"
+                        className="w-full bg-paper-100 border border-ink-900/20 text-ink-900 text-sm rounded-sm px-3 py-2 focus:ring-1 focus:ring-focus-blue-500 outline-none"
                       >
                         <option value="">Select Expense Account...</option>
                         {expenseAccounts.map((a: any) => (
@@ -808,7 +808,7 @@ export function DetailedAddModal({ isOpen, onClose, initialType = 'ITEM', onSucc
                     </div>
                   </div>
 
-                  <div className="p-4 bg-paper-50 dark:bg-ink-900/30 border border-ink-900/10 rounded-sm space-y-3">
+                  <div className="p-4 bg-paper-50  border border-ink-900/10 rounded-sm space-y-3">
                     <h4 className="text-xs font-semibold text-ink-900 uppercase tracking-wider">
                       Bank Settlement Details
                     </h4>
@@ -818,7 +818,7 @@ export function DetailedAddModal({ isOpen, onClose, initialType = 'ITEM', onSucc
                         <input
                           name="bankName"
                           placeholder="e.g., Standard Chartered"
-                          className="w-full bg-white dark:bg-[#111827] border border-ink-900/20 text-ink-900 text-sm rounded-sm px-2.5 py-1.5 focus:ring-1 focus:ring-focus-blue-500 outline-none"
+                          className="w-full bg-paper-100 border border-ink-900/20 text-ink-900 text-sm rounded-sm px-2.5 py-1.5 focus:ring-1 focus:ring-focus-blue-500 outline-none"
                         />
                       </div>
                       <div>
@@ -826,7 +826,7 @@ export function DetailedAddModal({ isOpen, onClose, initialType = 'ITEM', onSucc
                         <input
                           name="bankBranch"
                           placeholder="e.g., Westlands"
-                          className="w-full bg-white dark:bg-[#111827] border border-ink-900/20 text-ink-900 text-sm rounded-sm px-2.5 py-1.5 focus:ring-1 focus:ring-focus-blue-500 outline-none"
+                          className="w-full bg-paper-100 border border-ink-900/20 text-ink-900 text-sm rounded-sm px-2.5 py-1.5 focus:ring-1 focus:ring-focus-blue-500 outline-none"
                         />
                       </div>
                       <div>
@@ -834,7 +834,7 @@ export function DetailedAddModal({ isOpen, onClose, initialType = 'ITEM', onSucc
                         <input
                           name="bankAccountNo"
                           placeholder="010203040500"
-                          className="w-full bg-white dark:bg-[#111827] border border-ink-900/20 text-ink-900 text-sm rounded-sm px-2.5 py-1.5 focus:ring-1 focus:ring-focus-blue-500 outline-none font-mono"
+                          className="w-full bg-paper-100 border border-ink-900/20 text-ink-900 text-sm rounded-sm px-2.5 py-1.5 focus:ring-1 focus:ring-focus-blue-500 outline-none font-mono"
                         />
                       </div>
                     </div>
@@ -852,7 +852,7 @@ export function DetailedAddModal({ isOpen, onClose, initialType = 'ITEM', onSucc
                       <input
                         name="kraPin"
                         placeholder="P051234567Z"
-                        className="w-full bg-white dark:bg-[#111827] border border-ink-900/20 text-ink-900 text-sm rounded-sm px-3 py-2 focus:ring-1 focus:ring-focus-blue-500 outline-none font-mono uppercase"
+                        className="w-full bg-paper-100 border border-ink-900/20 text-ink-900 text-sm rounded-sm px-3 py-2 focus:ring-1 focus:ring-focus-blue-500 outline-none font-mono uppercase"
                       />
                     </div>
                     <div>
@@ -862,7 +862,7 @@ export function DetailedAddModal({ isOpen, onClose, initialType = 'ITEM', onSucc
                       <input
                         name="vatNumber"
                         placeholder="VAT-0091238"
-                        className="w-full bg-white dark:bg-[#111827] border border-ink-900/20 text-ink-900 text-sm rounded-sm px-3 py-2 focus:ring-1 focus:ring-focus-blue-500 outline-none font-mono"
+                        className="w-full bg-paper-100 border border-ink-900/20 text-ink-900 text-sm rounded-sm px-3 py-2 focus:ring-1 focus:ring-focus-blue-500 outline-none font-mono"
                       />
                     </div>
                   </div>
@@ -878,7 +878,7 @@ export function DetailedAddModal({ isOpen, onClose, initialType = 'ITEM', onSucc
                     <input
                       name="address"
                       placeholder="e.g., 5th Floor, Delta Corner Tower A, Chiromo Rd"
-                      className="w-full bg-white dark:bg-[#111827] border border-ink-900/20 text-ink-900 text-sm rounded-sm px-3 py-2 focus:ring-1 focus:ring-focus-blue-500 outline-none"
+                      className="w-full bg-paper-100 border border-ink-900/20 text-ink-900 text-sm rounded-sm px-3 py-2 focus:ring-1 focus:ring-focus-blue-500 outline-none"
                     />
                   </div>
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -887,7 +887,7 @@ export function DetailedAddModal({ isOpen, onClose, initialType = 'ITEM', onSucc
                       <input
                         name="city"
                         defaultValue="Nairobi"
-                        className="w-full bg-white dark:bg-[#111827] border border-ink-900/20 text-ink-900 text-sm rounded-sm px-3 py-2 focus:ring-1 focus:ring-focus-blue-500 outline-none"
+                        className="w-full bg-paper-100 border border-ink-900/20 text-ink-900 text-sm rounded-sm px-3 py-2 focus:ring-1 focus:ring-focus-blue-500 outline-none"
                       />
                     </div>
                     <div>
@@ -895,7 +895,7 @@ export function DetailedAddModal({ isOpen, onClose, initialType = 'ITEM', onSucc
                       <input
                         name="postalCode"
                         defaultValue="00100"
-                        className="w-full bg-white dark:bg-[#111827] border border-ink-900/20 text-ink-900 text-sm rounded-sm px-3 py-2 focus:ring-1 focus:ring-focus-blue-500 outline-none"
+                        className="w-full bg-paper-100 border border-ink-900/20 text-ink-900 text-sm rounded-sm px-3 py-2 focus:ring-1 focus:ring-focus-blue-500 outline-none"
                       />
                     </div>
                     <div>
@@ -903,7 +903,7 @@ export function DetailedAddModal({ isOpen, onClose, initialType = 'ITEM', onSucc
                       <input
                         name="country"
                         defaultValue="Kenya"
-                        className="w-full bg-white dark:bg-[#111827] border border-ink-900/20 text-ink-900 text-sm rounded-sm px-3 py-2 focus:ring-1 focus:ring-focus-blue-500 outline-none"
+                        className="w-full bg-paper-100 border border-ink-900/20 text-ink-900 text-sm rounded-sm px-3 py-2 focus:ring-1 focus:ring-focus-blue-500 outline-none"
                       />
                     </div>
                   </div>
@@ -928,7 +928,7 @@ export function DetailedAddModal({ isOpen, onClose, initialType = 'ITEM', onSucc
                         required
                         name="displayName"
                         placeholder="e.g., East Africa Breweries Ltd"
-                        className="w-full bg-white dark:bg-[#111827] border border-ink-900/20 text-ink-900 text-sm rounded-sm px-3 py-2 focus:ring-1 focus:ring-focus-blue-500 outline-none"
+                        className="w-full bg-paper-100 border border-ink-900/20 text-ink-900 text-sm rounded-sm px-3 py-2 focus:ring-1 focus:ring-focus-blue-500 outline-none"
                       />
                     </div>
                     <div>
@@ -938,7 +938,7 @@ export function DetailedAddModal({ isOpen, onClose, initialType = 'ITEM', onSucc
                       <select
                         name="customerType"
                         defaultValue="Corporate"
-                        className="w-full bg-white dark:bg-[#111827] border border-ink-900/20 text-ink-900 text-sm rounded-sm px-3 py-2 focus:ring-1 focus:ring-focus-blue-500 outline-none"
+                        className="w-full bg-paper-100 border border-ink-900/20 text-ink-900 text-sm rounded-sm px-3 py-2 focus:ring-1 focus:ring-focus-blue-500 outline-none"
                       >
                         <option value="Corporate">Corporate / Enterprise</option>
                         <option value="SME">SME / Business</option>
@@ -956,7 +956,7 @@ export function DetailedAddModal({ isOpen, onClose, initialType = 'ITEM', onSucc
                       <input
                         name="contactPerson"
                         placeholder="e.g., David Kamau"
-                        className="w-full bg-white dark:bg-[#111827] border border-ink-900/20 text-ink-900 text-sm rounded-sm px-3 py-2 focus:ring-1 focus:ring-focus-blue-500 outline-none"
+                        className="w-full bg-paper-100 border border-ink-900/20 text-ink-900 text-sm rounded-sm px-3 py-2 focus:ring-1 focus:ring-focus-blue-500 outline-none"
                       />
                     </div>
                     <div>
@@ -968,7 +968,7 @@ export function DetailedAddModal({ isOpen, onClose, initialType = 'ITEM', onSucc
                         name="email"
                         type="email"
                         placeholder="invoices@eabl.co.ke"
-                        className="w-full bg-white dark:bg-[#111827] border border-ink-900/20 text-ink-900 text-sm rounded-sm px-3 py-2 focus:ring-1 focus:ring-focus-blue-500 outline-none"
+                        className="w-full bg-paper-100 border border-ink-900/20 text-ink-900 text-sm rounded-sm px-3 py-2 focus:ring-1 focus:ring-focus-blue-500 outline-none"
                       />
                     </div>
                     <div>
@@ -978,7 +978,7 @@ export function DetailedAddModal({ isOpen, onClose, initialType = 'ITEM', onSucc
                       <input
                         name="phone"
                         placeholder="+254 711 000000"
-                        className="w-full bg-white dark:bg-[#111827] border border-ink-900/20 text-ink-900 text-sm rounded-sm px-3 py-2 focus:ring-1 focus:ring-focus-blue-500 outline-none"
+                        className="w-full bg-paper-100 border border-ink-900/20 text-ink-900 text-sm rounded-sm px-3 py-2 focus:ring-1 focus:ring-focus-blue-500 outline-none"
                       />
                     </div>
                   </div>
@@ -995,7 +995,7 @@ export function DetailedAddModal({ isOpen, onClose, initialType = 'ITEM', onSucc
                       <select
                         name="paymentTerms"
                         defaultValue="Net 30"
-                        className="w-full bg-white dark:bg-[#111827] border border-ink-900/20 text-ink-900 text-sm rounded-sm px-3 py-2 focus:ring-1 focus:ring-focus-blue-500 outline-none"
+                        className="w-full bg-paper-100 border border-ink-900/20 text-ink-900 text-sm rounded-sm px-3 py-2 focus:ring-1 focus:ring-focus-blue-500 outline-none"
                       >
                         <option value="Due on Receipt">Due on Receipt</option>
                         <option value="Net 7">Net 7 Days</option>
@@ -1012,7 +1012,7 @@ export function DetailedAddModal({ isOpen, onClose, initialType = 'ITEM', onSucc
                         type="number"
                         step="1000"
                         placeholder="500000"
-                        className="w-full bg-white dark:bg-[#111827] border border-ink-900/20 text-ink-900 text-sm rounded-sm px-3 py-2 focus:ring-1 focus:ring-focus-blue-500 outline-none tabular-currency"
+                        className="w-full bg-paper-100 border border-ink-900/20 text-ink-900 text-sm rounded-sm px-3 py-2 focus:ring-1 focus:ring-focus-blue-500 outline-none tabular-currency"
                       />
                     </div>
                     <div>
@@ -1026,7 +1026,7 @@ export function DetailedAddModal({ isOpen, onClose, initialType = 'ITEM', onSucc
                         min="0"
                         max="100"
                         defaultValue="0"
-                        className="w-full bg-white dark:bg-[#111827] border border-ink-900/20 text-ink-900 text-sm rounded-sm px-3 py-2 focus:ring-1 focus:ring-focus-blue-500 outline-none"
+                        className="w-full bg-paper-100 border border-ink-900/20 text-ink-900 text-sm rounded-sm px-3 py-2 focus:ring-1 focus:ring-focus-blue-500 outline-none"
                       />
                     </div>
                   </div>
@@ -1043,7 +1043,7 @@ export function DetailedAddModal({ isOpen, onClose, initialType = 'ITEM', onSucc
                       <input
                         name="kraPin"
                         placeholder="P059998881A"
-                        className="w-full bg-white dark:bg-[#111827] border border-ink-900/20 text-ink-900 text-sm rounded-sm px-3 py-2 focus:ring-1 focus:ring-focus-blue-500 outline-none font-mono uppercase"
+                        className="w-full bg-paper-100 border border-ink-900/20 text-ink-900 text-sm rounded-sm px-3 py-2 focus:ring-1 focus:ring-focus-blue-500 outline-none font-mono uppercase"
                       />
                     </div>
                     <div>
@@ -1053,7 +1053,7 @@ export function DetailedAddModal({ isOpen, onClose, initialType = 'ITEM', onSucc
                       <select
                         name="priceTier"
                         defaultValue="Standard"
-                        className="w-full bg-white dark:bg-[#111827] border border-ink-900/20 text-ink-900 text-sm rounded-sm px-3 py-2 focus:ring-1 focus:ring-focus-blue-500 outline-none"
+                        className="w-full bg-paper-100 border border-ink-900/20 text-ink-900 text-sm rounded-sm px-3 py-2 focus:ring-1 focus:ring-focus-blue-500 outline-none"
                       >
                         <option value="Standard">Standard Retail</option>
                         <option value="Wholesale">Wholesale Tier</option>
@@ -1073,7 +1073,7 @@ export function DetailedAddModal({ isOpen, onClose, initialType = 'ITEM', onSucc
                     <input
                       name="billingAddress"
                       placeholder="P.O Box 30161 - 00100, Nairobi"
-                      className="w-full bg-white dark:bg-[#111827] border border-ink-900/20 text-ink-900 text-sm rounded-sm px-3 py-2 focus:ring-1 focus:ring-focus-blue-500 outline-none"
+                      className="w-full bg-paper-100 border border-ink-900/20 text-ink-900 text-sm rounded-sm px-3 py-2 focus:ring-1 focus:ring-focus-blue-500 outline-none"
                     />
                   </div>
                   <div>
@@ -1083,7 +1083,7 @@ export function DetailedAddModal({ isOpen, onClose, initialType = 'ITEM', onSucc
                     <input
                       name="shippingAddress"
                       placeholder="Ruaraka Industrial Complex, Outer Ring Rd, Nairobi"
-                      className="w-full bg-white dark:bg-[#111827] border border-ink-900/20 text-ink-900 text-sm rounded-sm px-3 py-2 focus:ring-1 focus:ring-focus-blue-500 outline-none"
+                      className="w-full bg-paper-100 border border-ink-900/20 text-ink-900 text-sm rounded-sm px-3 py-2 focus:ring-1 focus:ring-focus-blue-500 outline-none"
                     />
                   </div>
                 </div>
@@ -1107,7 +1107,7 @@ export function DetailedAddModal({ isOpen, onClose, initialType = 'ITEM', onSucc
                         required
                         name="firstName"
                         placeholder="e.g., Samuel"
-                        className="w-full bg-white dark:bg-[#111827] border border-ink-900/20 text-ink-900 text-sm rounded-sm px-3 py-2 focus:ring-1 focus:ring-focus-blue-500 outline-none"
+                        className="w-full bg-paper-100 border border-ink-900/20 text-ink-900 text-sm rounded-sm px-3 py-2 focus:ring-1 focus:ring-focus-blue-500 outline-none"
                       />
                     </div>
                     <div>
@@ -1117,7 +1117,7 @@ export function DetailedAddModal({ isOpen, onClose, initialType = 'ITEM', onSucc
                       <input
                         name="middleName"
                         placeholder="e.g., Ochieng"
-                        className="w-full bg-white dark:bg-[#111827] border border-ink-900/20 text-ink-900 text-sm rounded-sm px-3 py-2 focus:ring-1 focus:ring-focus-blue-500 outline-none"
+                        className="w-full bg-paper-100 border border-ink-900/20 text-ink-900 text-sm rounded-sm px-3 py-2 focus:ring-1 focus:ring-focus-blue-500 outline-none"
                       />
                     </div>
                     <div>
@@ -1128,7 +1128,7 @@ export function DetailedAddModal({ isOpen, onClose, initialType = 'ITEM', onSucc
                         required
                         name="lastName"
                         placeholder="e.g., Otieno"
-                        className="w-full bg-white dark:bg-[#111827] border border-ink-900/20 text-ink-900 text-sm rounded-sm px-3 py-2 focus:ring-1 focus:ring-focus-blue-500 outline-none"
+                        className="w-full bg-paper-100 border border-ink-900/20 text-ink-900 text-sm rounded-sm px-3 py-2 focus:ring-1 focus:ring-focus-blue-500 outline-none"
                       />
                     </div>
                   </div>
@@ -1142,7 +1142,7 @@ export function DetailedAddModal({ isOpen, onClose, initialType = 'ITEM', onSucc
                         required
                         name="jobTitle"
                         placeholder="e.g., Senior Accountant"
-                        className="w-full bg-white dark:bg-[#111827] border border-ink-900/20 text-ink-900 text-sm rounded-sm px-3 py-2 focus:ring-1 focus:ring-focus-blue-500 outline-none"
+                        className="w-full bg-paper-100 border border-ink-900/20 text-ink-900 text-sm rounded-sm px-3 py-2 focus:ring-1 focus:ring-focus-blue-500 outline-none"
                       />
                     </div>
                     <div>
@@ -1152,7 +1152,7 @@ export function DetailedAddModal({ isOpen, onClose, initialType = 'ITEM', onSucc
                       <select
                         name="department"
                         defaultValue="Finance"
-                        className="w-full bg-white dark:bg-[#111827] border border-ink-900/20 text-ink-900 text-sm rounded-sm px-3 py-2 focus:ring-1 focus:ring-focus-blue-500 outline-none"
+                        className="w-full bg-paper-100 border border-ink-900/20 text-ink-900 text-sm rounded-sm px-3 py-2 focus:ring-1 focus:ring-focus-blue-500 outline-none"
                       >
                         <option value="Finance">Finance & Accounting</option>
                         <option value="Engineering">Engineering & IT</option>
@@ -1168,7 +1168,7 @@ export function DetailedAddModal({ isOpen, onClose, initialType = 'ITEM', onSucc
                       <select
                         name="employmentType"
                         defaultValue="Full-time"
-                        className="w-full bg-white dark:bg-[#111827] border border-ink-900/20 text-ink-900 text-sm rounded-sm px-3 py-2 focus:ring-1 focus:ring-focus-blue-500 outline-none"
+                        className="w-full bg-paper-100 border border-ink-900/20 text-ink-900 text-sm rounded-sm px-3 py-2 focus:ring-1 focus:ring-focus-blue-500 outline-none"
                       >
                         <option value="Full-time">Full-time Permanent</option>
                         <option value="Contract">Fixed Term Contract</option>
@@ -1187,7 +1187,7 @@ export function DetailedAddModal({ isOpen, onClose, initialType = 'ITEM', onSucc
                         required
                         name="nationalId"
                         placeholder="31234567"
-                        className="w-full bg-white dark:bg-[#111827] border border-ink-900/20 text-ink-900 text-sm rounded-sm px-3 py-2 focus:ring-1 focus:ring-focus-blue-500 outline-none font-mono"
+                        className="w-full bg-paper-100 border border-ink-900/20 text-ink-900 text-sm rounded-sm px-3 py-2 focus:ring-1 focus:ring-focus-blue-500 outline-none font-mono"
                       />
                     </div>
                     <div>
@@ -1198,7 +1198,7 @@ export function DetailedAddModal({ isOpen, onClose, initialType = 'ITEM', onSucc
                         name="email"
                         type="email"
                         placeholder="samuel.o@company.com"
-                        className="w-full bg-white dark:bg-[#111827] border border-ink-900/20 text-ink-900 text-sm rounded-sm px-3 py-2 focus:ring-1 focus:ring-focus-blue-500 outline-none"
+                        className="w-full bg-paper-100 border border-ink-900/20 text-ink-900 text-sm rounded-sm px-3 py-2 focus:ring-1 focus:ring-focus-blue-500 outline-none"
                       />
                     </div>
                     <div>
@@ -1209,7 +1209,7 @@ export function DetailedAddModal({ isOpen, onClose, initialType = 'ITEM', onSucc
                         name="hireDate"
                         type="date"
                         defaultValue={new Date().toISOString().substring(0, 10)}
-                        className="w-full bg-white dark:bg-[#111827] border border-ink-900/20 text-ink-900 text-sm rounded-sm px-3 py-2 focus:ring-1 focus:ring-focus-blue-500 outline-none"
+                        className="w-full bg-paper-100 border border-ink-900/20 text-ink-900 text-sm rounded-sm px-3 py-2 focus:ring-1 focus:ring-focus-blue-500 outline-none"
                       />
                     </div>
                   </div>
@@ -1230,7 +1230,7 @@ export function DetailedAddModal({ isOpen, onClose, initialType = 'ITEM', onSucc
                         step="100"
                         min="0"
                         placeholder="120000"
-                        className="w-full bg-white dark:bg-[#111827] border border-ink-900/20 text-ink-900 text-sm rounded-sm px-3 py-2 focus:ring-1 focus:ring-focus-blue-500 outline-none tabular-currency"
+                        className="w-full bg-paper-100 border border-ink-900/20 text-ink-900 text-sm rounded-sm px-3 py-2 focus:ring-1 focus:ring-focus-blue-500 outline-none tabular-currency"
                       />
                     </div>
                     <div>
@@ -1243,7 +1243,7 @@ export function DetailedAddModal({ isOpen, onClose, initialType = 'ITEM', onSucc
                         step="100"
                         min="0"
                         defaultValue="0"
-                        className="w-full bg-white dark:bg-[#111827] border border-ink-900/20 text-ink-900 text-sm rounded-sm px-3 py-2 focus:ring-1 focus:ring-focus-blue-500 outline-none tabular-currency"
+                        className="w-full bg-paper-100 border border-ink-900/20 text-ink-900 text-sm rounded-sm px-3 py-2 focus:ring-1 focus:ring-focus-blue-500 outline-none tabular-currency"
                       />
                     </div>
                     <div>
@@ -1256,12 +1256,12 @@ export function DetailedAddModal({ isOpen, onClose, initialType = 'ITEM', onSucc
                         step="100"
                         min="0"
                         defaultValue="0"
-                        className="w-full bg-white dark:bg-[#111827] border border-ink-900/20 text-ink-900 text-sm rounded-sm px-3 py-2 focus:ring-1 focus:ring-focus-blue-500 outline-none tabular-currency"
+                        className="w-full bg-paper-100 border border-ink-900/20 text-ink-900 text-sm rounded-sm px-3 py-2 focus:ring-1 focus:ring-focus-blue-500 outline-none tabular-currency"
                       />
                     </div>
                   </div>
 
-                  <div className="p-4 bg-paper-50 dark:bg-ink-900/30 border border-ink-900/10 rounded-sm space-y-3">
+                  <div className="p-4 bg-paper-50  border border-ink-900/10 rounded-sm space-y-3">
                     <h4 className="text-xs font-semibold text-ink-900 uppercase tracking-wider">
                       Salary Disbursement Channel
                     </h4>
@@ -1271,7 +1271,7 @@ export function DetailedAddModal({ isOpen, onClose, initialType = 'ITEM', onSucc
                         <input
                           name="bankName"
                           placeholder="e.g., KCB Bank"
-                          className="w-full bg-white dark:bg-[#111827] border border-ink-900/20 text-ink-900 text-sm rounded-sm px-2.5 py-1.5 focus:ring-1 focus:ring-focus-blue-500 outline-none"
+                          className="w-full bg-paper-100 border border-ink-900/20 text-ink-900 text-sm rounded-sm px-2.5 py-1.5 focus:ring-1 focus:ring-focus-blue-500 outline-none"
                         />
                       </div>
                       <div>
@@ -1279,7 +1279,7 @@ export function DetailedAddModal({ isOpen, onClose, initialType = 'ITEM', onSucc
                         <input
                           name="bankAccountNo"
                           placeholder="1102938475"
-                          className="w-full bg-white dark:bg-[#111827] border border-ink-900/20 text-ink-900 text-sm rounded-sm px-2.5 py-1.5 focus:ring-1 focus:ring-focus-blue-500 outline-none font-mono"
+                          className="w-full bg-paper-100 border border-ink-900/20 text-ink-900 text-sm rounded-sm px-2.5 py-1.5 focus:ring-1 focus:ring-focus-blue-500 outline-none font-mono"
                         />
                       </div>
                       <div>
@@ -1287,7 +1287,7 @@ export function DetailedAddModal({ isOpen, onClose, initialType = 'ITEM', onSucc
                         <input
                           name="mpesaNumber"
                           placeholder="+254 7..."
-                          className="w-full bg-white dark:bg-[#111827] border border-ink-900/20 text-ink-900 text-sm rounded-sm px-2.5 py-1.5 focus:ring-1 focus:ring-focus-blue-500 outline-none font-mono"
+                          className="w-full bg-paper-100 border border-ink-900/20 text-ink-900 text-sm rounded-sm px-2.5 py-1.5 focus:ring-1 focus:ring-focus-blue-500 outline-none font-mono"
                         />
                       </div>
                     </div>
@@ -1306,7 +1306,7 @@ export function DetailedAddModal({ isOpen, onClose, initialType = 'ITEM', onSucc
                         required
                         name="kraPin"
                         placeholder="A012345678X"
-                        className="w-full bg-white dark:bg-[#111827] border border-ink-900/20 text-ink-900 text-sm rounded-sm px-3 py-2 focus:ring-1 focus:ring-focus-blue-500 outline-none font-mono uppercase"
+                        className="w-full bg-paper-100 border border-ink-900/20 text-ink-900 text-sm rounded-sm px-3 py-2 focus:ring-1 focus:ring-focus-blue-500 outline-none font-mono uppercase"
                       />
                     </div>
                     <div>
@@ -1316,7 +1316,7 @@ export function DetailedAddModal({ isOpen, onClose, initialType = 'ITEM', onSucc
                       <input
                         name="nssfNumber"
                         placeholder="NSSF-0091283"
-                        className="w-full bg-white dark:bg-[#111827] border border-ink-900/20 text-ink-900 text-sm rounded-sm px-3 py-2 focus:ring-1 focus:ring-focus-blue-500 outline-none font-mono"
+                        className="w-full bg-paper-100 border border-ink-900/20 text-ink-900 text-sm rounded-sm px-3 py-2 focus:ring-1 focus:ring-focus-blue-500 outline-none font-mono"
                       />
                     </div>
                     <div>
@@ -1326,7 +1326,7 @@ export function DetailedAddModal({ isOpen, onClose, initialType = 'ITEM', onSucc
                       <input
                         name="shifNumber"
                         placeholder="SHIF-883921"
-                        className="w-full bg-white dark:bg-[#111827] border border-ink-900/20 text-ink-900 text-sm rounded-sm px-3 py-2 focus:ring-1 focus:ring-focus-blue-500 outline-none font-mono"
+                        className="w-full bg-paper-100 border border-ink-900/20 text-ink-900 text-sm rounded-sm px-3 py-2 focus:ring-1 focus:ring-focus-blue-500 outline-none font-mono"
                       />
                     </div>
                   </div>
@@ -1349,7 +1349,7 @@ export function DetailedAddModal({ isOpen, onClose, initialType = 'ITEM', onSucc
                     required
                     name="type"
                     defaultValue="EXPENSE"
-                    className="w-full bg-white dark:bg-[#111827] border border-ink-900/20 text-ink-900 text-sm rounded-sm px-3 py-2 focus:ring-1 focus:ring-focus-blue-500 outline-none"
+                    className="w-full bg-paper-100 border border-ink-900/20 text-ink-900 text-sm rounded-sm px-3 py-2 focus:ring-1 focus:ring-focus-blue-500 outline-none"
                   >
                     <option value="ASSET">Asset (1000s)</option>
                     <option value="LIABILITY">Liability (2000s)</option>
@@ -1367,7 +1367,7 @@ export function DetailedAddModal({ isOpen, onClose, initialType = 'ITEM', onSucc
                     required
                     name="code"
                     placeholder="e.g., 6150"
-                    className="w-full bg-white dark:bg-[#111827] border border-ink-900/20 text-ink-900 text-sm rounded-sm px-3 py-2 focus:ring-1 focus:ring-focus-blue-500 outline-none font-mono"
+                    className="w-full bg-paper-100 border border-ink-900/20 text-ink-900 text-sm rounded-sm px-3 py-2 focus:ring-1 focus:ring-focus-blue-500 outline-none font-mono"
                   />
                 </div>
                 <div>
@@ -1378,7 +1378,7 @@ export function DetailedAddModal({ isOpen, onClose, initialType = 'ITEM', onSucc
                     required
                     name="name"
                     placeholder="e.g., Cloud & Hosting Infrastructure"
-                    className="w-full bg-white dark:bg-[#111827] border border-ink-900/20 text-ink-900 text-sm rounded-sm px-3 py-2 focus:ring-1 focus:ring-focus-blue-500 outline-none"
+                    className="w-full bg-paper-100 border border-ink-900/20 text-ink-900 text-sm rounded-sm px-3 py-2 focus:ring-1 focus:ring-focus-blue-500 outline-none"
                   />
                 </div>
               </div>
@@ -1391,7 +1391,7 @@ export function DetailedAddModal({ isOpen, onClose, initialType = 'ITEM', onSucc
                   <input
                     name="subtype"
                     placeholder="e.g., Technology Software & SaaS"
-                    className="w-full bg-white dark:bg-[#111827] border border-ink-900/20 text-ink-900 text-sm rounded-sm px-3 py-2 focus:ring-1 focus:ring-focus-blue-500 outline-none"
+                    className="w-full bg-paper-100 border border-ink-900/20 text-ink-900 text-sm rounded-sm px-3 py-2 focus:ring-1 focus:ring-focus-blue-500 outline-none"
                   />
                 </div>
                 <div>
@@ -1400,7 +1400,7 @@ export function DetailedAddModal({ isOpen, onClose, initialType = 'ITEM', onSucc
                   </label>
                   <select
                     name="parentId"
-                    className="w-full bg-white dark:bg-[#111827] border border-ink-900/20 text-ink-900 text-sm rounded-sm px-3 py-2 focus:ring-1 focus:ring-focus-blue-500 outline-none"
+                    className="w-full bg-paper-100 border border-ink-900/20 text-ink-900 text-sm rounded-sm px-3 py-2 focus:ring-1 focus:ring-focus-blue-500 outline-none"
                   >
                     <option value="">None (Top-level Account)</option>
                     {accounts.map((a: any) => (
@@ -1418,7 +1418,7 @@ export function DetailedAddModal({ isOpen, onClose, initialType = 'ITEM', onSucc
                   name="description"
                   rows={3}
                   placeholder="Notes on which expenses or journal lines post into this ledger code..."
-                  className="w-full bg-white dark:bg-[#111827] border border-ink-900/20 text-ink-900 text-sm rounded-sm px-3 py-2 focus:ring-1 focus:ring-focus-blue-500 outline-none resize-none"
+                  className="w-full bg-paper-100 border border-ink-900/20 text-ink-900 text-sm rounded-sm px-3 py-2 focus:ring-1 focus:ring-focus-blue-500 outline-none resize-none"
                 />
               </div>
             </div>
@@ -1440,7 +1440,7 @@ export function DetailedAddModal({ isOpen, onClose, initialType = 'ITEM', onSucc
               <button
                 type="submit"
                 disabled={createMutation.isPending}
-                className="bg-ink-900 text-white dark:text-slate-900 px-5 py-2 text-sm font-medium rounded-sm hover:bg-ink-900/90 transition-colors disabled:opacity-50 flex items-center shadow-xs"
+                className="bg-ink-900 text-white  px-5 py-2 text-sm font-medium rounded-sm hover:bg-ink-900/90 transition-colors disabled:opacity-50 flex items-center shadow-xs"
               >
                 {createMutation.isPending ? 'Saving Record...' : `Create ${selectedType.charAt(0) + selectedType.slice(1).toLowerCase()}`}
               </button>

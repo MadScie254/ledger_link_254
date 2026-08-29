@@ -290,9 +290,9 @@ export function DynamicQuickAddModal({
 
   return (
     <div className="fixed inset-0 bg-ink-900/40 backdrop-blur-xs z-50 flex items-center justify-center p-4 overflow-y-auto">
-      <div className="bg-white dark:bg-[#111827] rounded-sm shadow-2xl border border-ink-900/10 w-full max-w-3xl my-8 overflow-hidden flex flex-col max-h-[90vh]">
+      <div className="bg-paper-100 rounded-sm shadow-2xl border border-ink-900/10 w-full max-w-3xl my-8 overflow-hidden flex flex-col max-h-[90vh]">
         {/* Dynamic Context Header */}
-        <div className="px-6 py-4 border-b border-ink-900/10 bg-paper-50 dark:bg-ink-900/40 flex items-center justify-between">
+        <div className="px-6 py-4 border-b border-ink-900/10 bg-paper-50  flex items-center justify-between">
           <div className="flex items-center space-x-3">
             <span className="p-2 bg-ink-900 text-white rounded-xs">
               {selectedType === 'ITEM' && <Package className="h-5 w-5" />}
@@ -331,7 +331,7 @@ export function DynamicQuickAddModal({
                 setActiveSubTab('general');
                 setServerError(null);
               }}
-              className="text-xs font-medium border border-ink-900/20 rounded-sm px-2.5 py-1.5 bg-white dark:bg-[#111827] text-ink-900 focus:outline-none focus:ring-1 focus:ring-focus-blue-500"
+              className="text-xs font-medium border border-ink-900/20 rounded-sm px-2.5 py-1.5 bg-paper-100 text-ink-900 focus:outline-none focus:ring-1 focus:ring-focus-blue-500"
             >
               <option value="ITEM">Inventory Item</option>
               <option value="VENDOR">Vendor / Supplier</option>
@@ -452,7 +452,7 @@ export function DynamicQuickAddModal({
                         onChange={handleInputChange}
                         onBlur={handleBlur}
                         placeholder="e.g., Enterprise Server Rack 42U"
-                        className={`w-full bg-white dark:bg-[#111827] border ${errors.name ? 'border-rust-700' : 'border-ink-900/20'} text-ink-900 text-sm rounded-sm px-3 py-2 focus:ring-1 focus:ring-focus-blue-500 outline-none`}
+                        className={`w-full bg-paper-100 border ${errors.name ? 'border-rust-700' : 'border-ink-900/20'} text-ink-900 text-sm rounded-sm px-3 py-2 focus:ring-1 focus:ring-focus-blue-500 outline-none`}
                       />
                       {errors.name && <p className="text-[11px] text-rust-700 mt-1">{errors.name}</p>}
                     </div>
@@ -464,7 +464,7 @@ export function DynamicQuickAddModal({
                         name="itemType"
                         value={values.itemType || 'Physical Product'}
                         onChange={handleInputChange}
-                        className="w-full bg-white dark:bg-[#111827] border border-ink-900/20 text-ink-900 text-sm rounded-sm px-3 py-2 focus:ring-1 focus:ring-focus-blue-500 outline-none"
+                        className="w-full bg-paper-100 border border-ink-900/20 text-ink-900 text-sm rounded-sm px-3 py-2 focus:ring-1 focus:ring-focus-blue-500 outline-none"
                       >
                         <option value="Physical Product">Physical Product (Tracked)</option>
                         <option value="Digital Service">Digital Service (Untracked)</option>
@@ -484,7 +484,7 @@ export function DynamicQuickAddModal({
                         value={values.sku || ''}
                         onChange={handleInputChange}
                         placeholder="e.g., SRV-42U-001"
-                        className="w-full bg-white dark:bg-[#111827] border border-ink-900/20 text-ink-900 text-sm rounded-sm px-3 py-2 focus:ring-1 focus:ring-focus-blue-500 outline-none font-mono"
+                        className="w-full bg-paper-100 border border-ink-900/20 text-ink-900 text-sm rounded-sm px-3 py-2 focus:ring-1 focus:ring-focus-blue-500 outline-none font-mono"
                       />
                     </div>
                     <div>
@@ -496,7 +496,7 @@ export function DynamicQuickAddModal({
                         value={values.barcode || ''}
                         onChange={handleInputChange}
                         placeholder="e.g., 616110029381"
-                        className="w-full bg-white dark:bg-[#111827] border border-ink-900/20 text-ink-900 text-sm rounded-sm px-3 py-2 focus:ring-1 focus:ring-focus-blue-500 outline-none font-mono"
+                        className="w-full bg-paper-100 border border-ink-900/20 text-ink-900 text-sm rounded-sm px-3 py-2 focus:ring-1 focus:ring-focus-blue-500 outline-none font-mono"
                       />
                     </div>
                     <div>
@@ -508,7 +508,7 @@ export function DynamicQuickAddModal({
                         value={values.category || ''}
                         onChange={handleInputChange}
                         placeholder="e.g., Hardware & IT"
-                        className="w-full bg-white dark:bg-[#111827] border border-ink-900/20 text-ink-900 text-sm rounded-sm px-3 py-2 focus:ring-1 focus:ring-focus-blue-500 outline-none"
+                        className="w-full bg-paper-100 border border-ink-900/20 text-ink-900 text-sm rounded-sm px-3 py-2 focus:ring-1 focus:ring-focus-blue-500 outline-none"
                       />
                     </div>
                   </div>
@@ -522,7 +522,7 @@ export function DynamicQuickAddModal({
                         name="unitOfMeasure"
                         value={values.unitOfMeasure || 'Units'}
                         onChange={handleInputChange}
-                        className="w-full bg-white dark:bg-[#111827] border border-ink-900/20 text-ink-900 text-sm rounded-sm px-3 py-2 focus:ring-1 focus:ring-focus-blue-500 outline-none"
+                        className="w-full bg-paper-100 border border-ink-900/20 text-ink-900 text-sm rounded-sm px-3 py-2 focus:ring-1 focus:ring-focus-blue-500 outline-none"
                       >
                         <option value="Units">Units (pcs)</option>
                         <option value="Hours">Hours (hr)</option>
@@ -541,7 +541,7 @@ export function DynamicQuickAddModal({
                         value={values.location || ''}
                         onChange={handleInputChange}
                         placeholder="e.g., Warehouse A - Bin 14"
-                        className="w-full bg-white dark:bg-[#111827] border border-ink-900/20 text-ink-900 text-sm rounded-sm px-3 py-2 focus:ring-1 focus:ring-focus-blue-500 outline-none"
+                        className="w-full bg-paper-100 border border-ink-900/20 text-ink-900 text-sm rounded-sm px-3 py-2 focus:ring-1 focus:ring-focus-blue-500 outline-none"
                       />
                     </div>
                     <div>
@@ -552,7 +552,7 @@ export function DynamicQuickAddModal({
                         name="preferredVendorId"
                         value={values.preferredVendorId || ''}
                         onChange={handleInputChange}
-                        className="w-full bg-white dark:bg-[#111827] border border-ink-900/20 text-ink-900 text-sm rounded-sm px-3 py-2 focus:ring-1 focus:ring-focus-blue-500 outline-none"
+                        className="w-full bg-paper-100 border border-ink-900/20 text-ink-900 text-sm rounded-sm px-3 py-2 focus:ring-1 focus:ring-focus-blue-500 outline-none"
                       >
                         <option value="">None / Unassigned</option>
                         {vendors.map((v: any) => (
@@ -572,7 +572,7 @@ export function DynamicQuickAddModal({
                       value={values.description || ''}
                       onChange={handleInputChange}
                       placeholder="Detailed catalog description visible on client invoices..."
-                      className="w-full bg-white dark:bg-[#111827] border border-ink-900/20 text-ink-900 text-sm rounded-sm px-3 py-2 focus:ring-1 focus:ring-focus-blue-500 outline-none resize-none"
+                      className="w-full bg-paper-100 border border-ink-900/20 text-ink-900 text-sm rounded-sm px-3 py-2 focus:ring-1 focus:ring-focus-blue-500 outline-none resize-none"
                     />
                   </div>
                 </div>
@@ -595,7 +595,7 @@ export function DynamicQuickAddModal({
                         value={values.price || ''}
                         onChange={handleInputChange}
                         onBlur={handleBlur}
-                        className={`w-full bg-white dark:bg-[#111827] border ${errors.price ? 'border-rust-700' : 'border-ink-900/20'} text-ink-900 text-sm rounded-sm px-3 py-2 focus:ring-1 focus:ring-focus-blue-500 outline-none tabular-currency`}
+                        className={`w-full bg-paper-100 border ${errors.price ? 'border-rust-700' : 'border-ink-900/20'} text-ink-900 text-sm rounded-sm px-3 py-2 focus:ring-1 focus:ring-focus-blue-500 outline-none tabular-currency`}
                       />
                       {errors.price && <p className="text-[11px] text-rust-700 mt-1">{errors.price}</p>}
                     </div>
@@ -613,14 +613,14 @@ export function DynamicQuickAddModal({
                         value={values.cost || ''}
                         onChange={handleInputChange}
                         onBlur={handleBlur}
-                        className={`w-full bg-white dark:bg-[#111827] border ${errors.cost ? 'border-rust-700' : 'border-ink-900/20'} text-ink-900 text-sm rounded-sm px-3 py-2 focus:ring-1 focus:ring-focus-blue-500 outline-none tabular-currency`}
+                        className={`w-full bg-paper-100 border ${errors.cost ? 'border-rust-700' : 'border-ink-900/20'} text-ink-900 text-sm rounded-sm px-3 py-2 focus:ring-1 focus:ring-focus-blue-500 outline-none tabular-currency`}
                       />
                       {errors.cost && <p className="text-[11px] text-rust-700 mt-1">{errors.cost}</p>}
                     </div>
                   </div>
 
                   {/* Profit Margin Preview Card */}
-                  <div className="p-3.5 bg-paper-50 dark:bg-ink-900/30 border border-ink-900/10 rounded-sm flex items-center justify-between text-xs">
+                  <div className="p-3.5 bg-paper-50  border border-ink-900/10 rounded-sm flex items-center justify-between text-xs">
                     <div>
                       <span className="text-slate-500">Gross Margin Estimate: </span>
                       <span className="font-semibold text-ink-900 ml-1 font-mono">{marginPct}%</span>
@@ -642,7 +642,7 @@ export function DynamicQuickAddModal({
                         name="incomeAccountId"
                         value={values.incomeAccountId || ''}
                         onChange={handleInputChange}
-                        className="w-full bg-white dark:bg-[#111827] border border-ink-900/20 text-ink-900 text-sm rounded-sm px-3 py-2 focus:ring-1 focus:ring-focus-blue-500 outline-none"
+                        className="w-full bg-paper-100 border border-ink-900/20 text-ink-900 text-sm rounded-sm px-3 py-2 focus:ring-1 focus:ring-focus-blue-500 outline-none"
                       >
                         <option value="">Default: 4000 - Sales Revenue</option>
                         {incomeAccounts.map((a: any) => (
@@ -658,7 +658,7 @@ export function DynamicQuickAddModal({
                         name="expenseAccountId"
                         value={values.expenseAccountId || ''}
                         onChange={handleInputChange}
-                        className="w-full bg-white dark:bg-[#111827] border border-ink-900/20 text-ink-900 text-sm rounded-sm px-3 py-2 focus:ring-1 focus:ring-focus-blue-500 outline-none"
+                        className="w-full bg-paper-100 border border-ink-900/20 text-ink-900 text-sm rounded-sm px-3 py-2 focus:ring-1 focus:ring-focus-blue-500 outline-none"
                       >
                         <option value="">Default: 5000 - Cost of Goods Sold</option>
                         {expenseAccounts.map((a: any) => (
@@ -679,7 +679,7 @@ export function DynamicQuickAddModal({
                         min="0"
                         value={values.quantityOnHand || '0'}
                         onChange={handleInputChange}
-                        className="w-full bg-white dark:bg-[#111827] border border-ink-900/20 text-ink-900 text-sm rounded-sm px-3 py-2 focus:ring-1 focus:ring-focus-blue-500 outline-none"
+                        className="w-full bg-paper-100 border border-ink-900/20 text-ink-900 text-sm rounded-sm px-3 py-2 focus:ring-1 focus:ring-focus-blue-500 outline-none"
                       />
                     </div>
                     <div>
@@ -693,7 +693,7 @@ export function DynamicQuickAddModal({
                         min="0"
                         value={values.reorderPoint || '5'}
                         onChange={handleInputChange}
-                        className="w-full bg-white dark:bg-[#111827] border border-ink-900/20 text-ink-900 text-sm rounded-sm px-3 py-2 focus:ring-1 focus:ring-focus-blue-500 outline-none"
+                        className="w-full bg-paper-100 border border-ink-900/20 text-ink-900 text-sm rounded-sm px-3 py-2 focus:ring-1 focus:ring-focus-blue-500 outline-none"
                       />
                     </div>
                     <div>
@@ -706,7 +706,7 @@ export function DynamicQuickAddModal({
                         min="0"
                         value={values.targetStock || '20'}
                         onChange={handleInputChange}
-                        className="w-full bg-white dark:bg-[#111827] border border-ink-900/20 text-ink-900 text-sm rounded-sm px-3 py-2 focus:ring-1 focus:ring-focus-blue-500 outline-none"
+                        className="w-full bg-paper-100 border border-ink-900/20 text-ink-900 text-sm rounded-sm px-3 py-2 focus:ring-1 focus:ring-focus-blue-500 outline-none"
                       />
                     </div>
                   </div>
@@ -724,7 +724,7 @@ export function DynamicQuickAddModal({
                         name="taxRate"
                         value={values.taxRate || '16'}
                         onChange={handleInputChange}
-                        className="w-full bg-white dark:bg-[#111827] border border-ink-900/20 text-ink-900 text-sm rounded-sm px-3 py-2 focus:ring-1 focus:ring-focus-blue-500 outline-none"
+                        className="w-full bg-paper-100 border border-ink-900/20 text-ink-900 text-sm rounded-sm px-3 py-2 focus:ring-1 focus:ring-focus-blue-500 outline-none"
                       >
                         <option value="16">16% Standard VAT</option>
                         <option value="8">8% Petroleum / Special Rate</option>
@@ -741,7 +741,7 @@ export function DynamicQuickAddModal({
                         value={values.notes || ''}
                         onChange={handleInputChange}
                         placeholder="e.g., 8471.50.00"
-                        className="w-full bg-white dark:bg-[#111827] border border-ink-900/20 text-ink-900 text-sm rounded-sm px-3 py-2 focus:ring-1 focus:ring-focus-blue-500 outline-none font-mono"
+                        className="w-full bg-paper-100 border border-ink-900/20 text-ink-900 text-sm rounded-sm px-3 py-2 focus:ring-1 focus:ring-focus-blue-500 outline-none font-mono"
                       />
                     </div>
                   </div>
@@ -769,7 +769,7 @@ export function DynamicQuickAddModal({
                         onChange={handleInputChange}
                         onBlur={handleBlur}
                         placeholder="e.g., Safaricom Business Ltd"
-                        className={`w-full bg-white dark:bg-[#111827] border ${errors.displayName ? 'border-rust-700' : 'border-ink-900/20'} text-ink-900 text-sm rounded-sm px-3 py-2 focus:ring-1 focus:ring-focus-blue-500 outline-none`}
+                        className={`w-full bg-paper-100 border ${errors.displayName ? 'border-rust-700' : 'border-ink-900/20'} text-ink-900 text-sm rounded-sm px-3 py-2 focus:ring-1 focus:ring-focus-blue-500 outline-none`}
                       />
                       {errors.displayName && <p className="text-[11px] text-rust-700 mt-1">{errors.displayName}</p>}
                     </div>
@@ -782,7 +782,7 @@ export function DynamicQuickAddModal({
                         value={values.legalName || ''}
                         onChange={handleInputChange}
                         placeholder="e.g., Safaricom PLC"
-                        className="w-full bg-white dark:bg-[#111827] border border-ink-900/20 text-ink-900 text-sm rounded-sm px-3 py-2 focus:ring-1 focus:ring-focus-blue-500 outline-none"
+                        className="w-full bg-paper-100 border border-ink-900/20 text-ink-900 text-sm rounded-sm px-3 py-2 focus:ring-1 focus:ring-focus-blue-500 outline-none"
                       />
                     </div>
                   </div>
@@ -796,7 +796,7 @@ export function DynamicQuickAddModal({
                         name="category"
                         value={values.category || 'Direct Supplier'}
                         onChange={handleInputChange}
-                        className="w-full bg-white dark:bg-[#111827] border border-ink-900/20 text-ink-900 text-sm rounded-sm px-3 py-2 focus:ring-1 focus:ring-focus-blue-500 outline-none"
+                        className="w-full bg-paper-100 border border-ink-900/20 text-ink-900 text-sm rounded-sm px-3 py-2 focus:ring-1 focus:ring-focus-blue-500 outline-none"
                       >
                         <option value="Direct Supplier">Direct Inventory Supplier</option>
                         <option value="Professional Services">Professional & Legal Services</option>
@@ -815,7 +815,7 @@ export function DynamicQuickAddModal({
                         value={values.contactPerson || ''}
                         onChange={handleInputChange}
                         placeholder="e.g., Grace Muthoni"
-                        className="w-full bg-white dark:bg-[#111827] border border-ink-900/20 text-ink-900 text-sm rounded-sm px-3 py-2 focus:ring-1 focus:ring-focus-blue-500 outline-none"
+                        className="w-full bg-paper-100 border border-ink-900/20 text-ink-900 text-sm rounded-sm px-3 py-2 focus:ring-1 focus:ring-focus-blue-500 outline-none"
                       />
                     </div>
                     <div>
@@ -829,7 +829,7 @@ export function DynamicQuickAddModal({
                         onChange={handleInputChange}
                         onBlur={handleBlur}
                         placeholder="accounts@vendor.co.ke"
-                        className={`w-full bg-white dark:bg-[#111827] border ${errors.email ? 'border-rust-700' : 'border-ink-900/20'} text-ink-900 text-sm rounded-sm px-3 py-2 focus:ring-1 focus:ring-focus-blue-500 outline-none`}
+                        className={`w-full bg-paper-100 border ${errors.email ? 'border-rust-700' : 'border-ink-900/20'} text-ink-900 text-sm rounded-sm px-3 py-2 focus:ring-1 focus:ring-focus-blue-500 outline-none`}
                       />
                       {errors.email && <p className="text-[11px] text-rust-700 mt-1">{errors.email}</p>}
                     </div>
@@ -845,7 +845,7 @@ export function DynamicQuickAddModal({
                         value={values.phone || ''}
                         onChange={handleInputChange}
                         placeholder="+254 700 000000"
-                        className="w-full bg-white dark:bg-[#111827] border border-ink-900/20 text-ink-900 text-sm rounded-sm px-3 py-2 focus:ring-1 focus:ring-focus-blue-500 outline-none"
+                        className="w-full bg-paper-100 border border-ink-900/20 text-ink-900 text-sm rounded-sm px-3 py-2 focus:ring-1 focus:ring-focus-blue-500 outline-none"
                       />
                     </div>
                     <div>
@@ -857,7 +857,7 @@ export function DynamicQuickAddModal({
                         value={values.mpesaNumber || ''}
                         onChange={handleInputChange}
                         placeholder="e.g., Paybill 888999 (Acc: 001)"
-                        className="w-full bg-white dark:bg-[#111827] border border-ink-900/20 text-ink-900 text-sm rounded-sm px-3 py-2 focus:ring-1 focus:ring-focus-blue-500 outline-none font-mono"
+                        className="w-full bg-paper-100 border border-ink-900/20 text-ink-900 text-sm rounded-sm px-3 py-2 focus:ring-1 focus:ring-focus-blue-500 outline-none font-mono"
                       />
                     </div>
                   </div>
@@ -875,7 +875,7 @@ export function DynamicQuickAddModal({
                         name="paymentTerms"
                         value={values.paymentTerms || 'Net 30'}
                         onChange={handleInputChange}
-                        className="w-full bg-white dark:bg-[#111827] border border-ink-900/20 text-ink-900 text-sm rounded-sm px-3 py-2 focus:ring-1 focus:ring-focus-blue-500 outline-none"
+                        className="w-full bg-paper-100 border border-ink-900/20 text-ink-900 text-sm rounded-sm px-3 py-2 focus:ring-1 focus:ring-focus-blue-500 outline-none"
                       >
                         <option value="Due on Receipt">Due on Receipt</option>
                         <option value="Net 15">Net 15 Days</option>
@@ -891,7 +891,7 @@ export function DynamicQuickAddModal({
                         name="currency"
                         value={values.currency || 'KES'}
                         onChange={handleInputChange}
-                        className="w-full bg-white dark:bg-[#111827] border border-ink-900/20 text-ink-900 text-sm rounded-sm px-3 py-2 focus:ring-1 focus:ring-focus-blue-500 outline-none font-mono"
+                        className="w-full bg-paper-100 border border-ink-900/20 text-ink-900 text-sm rounded-sm px-3 py-2 focus:ring-1 focus:ring-focus-blue-500 outline-none font-mono"
                       >
                         <option value="KES">KES - Kenyan Shilling</option>
                         <option value="USD">USD - US Dollar</option>
@@ -907,7 +907,7 @@ export function DynamicQuickAddModal({
                         name="defaultAccountId"
                         value={values.defaultAccountId || ''}
                         onChange={handleInputChange}
-                        className="w-full bg-white dark:bg-[#111827] border border-ink-900/20 text-ink-900 text-sm rounded-sm px-3 py-2 focus:ring-1 focus:ring-focus-blue-500 outline-none"
+                        className="w-full bg-paper-100 border border-ink-900/20 text-ink-900 text-sm rounded-sm px-3 py-2 focus:ring-1 focus:ring-focus-blue-500 outline-none"
                       >
                         <option value="">Select Expense Account...</option>
                         {expenseAccounts.map((a: any) => (
@@ -917,7 +917,7 @@ export function DynamicQuickAddModal({
                     </div>
                   </div>
 
-                  <div className="p-4 bg-paper-50 dark:bg-ink-900/30 border border-ink-900/10 rounded-sm space-y-3">
+                  <div className="p-4 bg-paper-50  border border-ink-900/10 rounded-sm space-y-3">
                     <h4 className="text-xs font-semibold text-ink-900 uppercase tracking-wider">
                       Bank Settlement Details
                     </h4>
@@ -929,7 +929,7 @@ export function DynamicQuickAddModal({
                           value={values.bankName || ''}
                           onChange={handleInputChange}
                           placeholder="e.g., Standard Chartered"
-                          className="w-full bg-white dark:bg-[#111827] border border-ink-900/20 text-ink-900 text-sm rounded-sm px-2.5 py-1.5 focus:ring-1 focus:ring-focus-blue-500 outline-none"
+                          className="w-full bg-paper-100 border border-ink-900/20 text-ink-900 text-sm rounded-sm px-2.5 py-1.5 focus:ring-1 focus:ring-focus-blue-500 outline-none"
                         />
                       </div>
                       <div>
@@ -939,7 +939,7 @@ export function DynamicQuickAddModal({
                           value={values.bankBranch || ''}
                           onChange={handleInputChange}
                           placeholder="e.g., Westlands"
-                          className="w-full bg-white dark:bg-[#111827] border border-ink-900/20 text-ink-900 text-sm rounded-sm px-2.5 py-1.5 focus:ring-1 focus:ring-focus-blue-500 outline-none"
+                          className="w-full bg-paper-100 border border-ink-900/20 text-ink-900 text-sm rounded-sm px-2.5 py-1.5 focus:ring-1 focus:ring-focus-blue-500 outline-none"
                         />
                       </div>
                       <div>
@@ -949,7 +949,7 @@ export function DynamicQuickAddModal({
                           value={values.bankAccountNo || ''}
                           onChange={handleInputChange}
                           placeholder="010203040500"
-                          className="w-full bg-white dark:bg-[#111827] border border-ink-900/20 text-ink-900 text-sm rounded-sm px-2.5 py-1.5 focus:ring-1 focus:ring-focus-blue-500 outline-none font-mono"
+                          className="w-full bg-paper-100 border border-ink-900/20 text-ink-900 text-sm rounded-sm px-2.5 py-1.5 focus:ring-1 focus:ring-focus-blue-500 outline-none font-mono"
                         />
                       </div>
                     </div>
@@ -970,7 +970,7 @@ export function DynamicQuickAddModal({
                         onChange={handleInputChange}
                         onBlur={handleBlur}
                         placeholder="P051234567Z"
-                        className={`w-full bg-white dark:bg-[#111827] border ${errors.kraPin ? 'border-rust-700' : 'border-ink-900/20'} text-ink-900 text-sm rounded-sm px-3 py-2 focus:ring-1 focus:ring-focus-blue-500 outline-none font-mono uppercase`}
+                        className={`w-full bg-paper-100 border ${errors.kraPin ? 'border-rust-700' : 'border-ink-900/20'} text-ink-900 text-sm rounded-sm px-3 py-2 focus:ring-1 focus:ring-focus-blue-500 outline-none font-mono uppercase`}
                       />
                       {errors.kraPin && <p className="text-[11px] text-rust-700 mt-1">{errors.kraPin}</p>}
                     </div>
@@ -983,7 +983,7 @@ export function DynamicQuickAddModal({
                         value={values.vatNumber || ''}
                         onChange={handleInputChange}
                         placeholder="VAT-0091238"
-                        className="w-full bg-white dark:bg-[#111827] border border-ink-900/20 text-ink-900 text-sm rounded-sm px-3 py-2 focus:ring-1 focus:ring-focus-blue-500 outline-none font-mono"
+                        className="w-full bg-paper-100 border border-ink-900/20 text-ink-900 text-sm rounded-sm px-3 py-2 focus:ring-1 focus:ring-focus-blue-500 outline-none font-mono"
                       />
                     </div>
                   </div>
@@ -1001,7 +1001,7 @@ export function DynamicQuickAddModal({
                       value={values.address || ''}
                       onChange={handleInputChange}
                       placeholder="e.g., 5th Floor, Delta Corner Tower A, Chiromo Rd"
-                      className="w-full bg-white dark:bg-[#111827] border border-ink-900/20 text-ink-900 text-sm rounded-sm px-3 py-2 focus:ring-1 focus:ring-focus-blue-500 outline-none"
+                      className="w-full bg-paper-100 border border-ink-900/20 text-ink-900 text-sm rounded-sm px-3 py-2 focus:ring-1 focus:ring-focus-blue-500 outline-none"
                     />
                   </div>
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -1011,7 +1011,7 @@ export function DynamicQuickAddModal({
                         name="city"
                         value={values.city || 'Nairobi'}
                         onChange={handleInputChange}
-                        className="w-full bg-white dark:bg-[#111827] border border-ink-900/20 text-ink-900 text-sm rounded-sm px-3 py-2 focus:ring-1 focus:ring-focus-blue-500 outline-none"
+                        className="w-full bg-paper-100 border border-ink-900/20 text-ink-900 text-sm rounded-sm px-3 py-2 focus:ring-1 focus:ring-focus-blue-500 outline-none"
                       />
                     </div>
                     <div>
@@ -1020,7 +1020,7 @@ export function DynamicQuickAddModal({
                         name="postalCode"
                         value={values.postalCode || '00100'}
                         onChange={handleInputChange}
-                        className="w-full bg-white dark:bg-[#111827] border border-ink-900/20 text-ink-900 text-sm rounded-sm px-3 py-2 focus:ring-1 focus:ring-focus-blue-500 outline-none"
+                        className="w-full bg-paper-100 border border-ink-900/20 text-ink-900 text-sm rounded-sm px-3 py-2 focus:ring-1 focus:ring-focus-blue-500 outline-none"
                       />
                     </div>
                     <div>
@@ -1029,7 +1029,7 @@ export function DynamicQuickAddModal({
                         name="country"
                         value={values.country || 'Kenya'}
                         onChange={handleInputChange}
-                        className="w-full bg-white dark:bg-[#111827] border border-ink-900/20 text-ink-900 text-sm rounded-sm px-3 py-2 focus:ring-1 focus:ring-focus-blue-500 outline-none"
+                        className="w-full bg-paper-100 border border-ink-900/20 text-ink-900 text-sm rounded-sm px-3 py-2 focus:ring-1 focus:ring-focus-blue-500 outline-none"
                       />
                     </div>
                   </div>
@@ -1057,7 +1057,7 @@ export function DynamicQuickAddModal({
                         onChange={handleInputChange}
                         onBlur={handleBlur}
                         placeholder="e.g., Apex Holdings Kenya"
-                        className={`w-full bg-white dark:bg-[#111827] border ${errors.displayName ? 'border-rust-700' : 'border-ink-900/20'} text-ink-900 text-sm rounded-sm px-3 py-2 focus:ring-1 focus:ring-focus-blue-500 outline-none`}
+                        className={`w-full bg-paper-100 border ${errors.displayName ? 'border-rust-700' : 'border-ink-900/20'} text-ink-900 text-sm rounded-sm px-3 py-2 focus:ring-1 focus:ring-focus-blue-500 outline-none`}
                       />
                       {errors.displayName && <p className="text-[11px] text-rust-700 mt-1">{errors.displayName}</p>}
                     </div>
@@ -1070,7 +1070,7 @@ export function DynamicQuickAddModal({
                         value={values.legalName || ''}
                         onChange={handleInputChange}
                         placeholder="e.g., Apex Holdings Limited"
-                        className="w-full bg-white dark:bg-[#111827] border border-ink-900/20 text-ink-900 text-sm rounded-sm px-3 py-2 focus:ring-1 focus:ring-focus-blue-500 outline-none"
+                        className="w-full bg-paper-100 border border-ink-900/20 text-ink-900 text-sm rounded-sm px-3 py-2 focus:ring-1 focus:ring-focus-blue-500 outline-none"
                       />
                     </div>
                   </div>
@@ -1084,7 +1084,7 @@ export function DynamicQuickAddModal({
                         name="customerType"
                         value={values.customerType || 'Corporate'}
                         onChange={handleInputChange}
-                        className="w-full bg-white dark:bg-[#111827] border border-ink-900/20 text-ink-900 text-sm rounded-sm px-3 py-2 focus:ring-1 focus:ring-focus-blue-500 outline-none"
+                        className="w-full bg-paper-100 border border-ink-900/20 text-ink-900 text-sm rounded-sm px-3 py-2 focus:ring-1 focus:ring-focus-blue-500 outline-none"
                       >
                         <option value="Corporate">Corporate / Enterprise</option>
                         <option value="SME">SME / Small Business</option>
@@ -1101,7 +1101,7 @@ export function DynamicQuickAddModal({
                         value={values.contactPerson || ''}
                         onChange={handleInputChange}
                         placeholder="e.g., Alex Kimani"
-                        className="w-full bg-white dark:bg-[#111827] border border-ink-900/20 text-ink-900 text-sm rounded-sm px-3 py-2 focus:ring-1 focus:ring-focus-blue-500 outline-none"
+                        className="w-full bg-paper-100 border border-ink-900/20 text-ink-900 text-sm rounded-sm px-3 py-2 focus:ring-1 focus:ring-focus-blue-500 outline-none"
                       />
                     </div>
                     <div>
@@ -1115,7 +1115,7 @@ export function DynamicQuickAddModal({
                         onChange={handleInputChange}
                         onBlur={handleBlur}
                         placeholder="billing@apexholdings.co.ke"
-                        className={`w-full bg-white dark:bg-[#111827] border ${errors.email ? 'border-rust-700' : 'border-ink-900/20'} text-ink-900 text-sm rounded-sm px-3 py-2 focus:ring-1 focus:ring-focus-blue-500 outline-none`}
+                        className={`w-full bg-paper-100 border ${errors.email ? 'border-rust-700' : 'border-ink-900/20'} text-ink-900 text-sm rounded-sm px-3 py-2 focus:ring-1 focus:ring-focus-blue-500 outline-none`}
                       />
                       {errors.email && <p className="text-[11px] text-rust-700 mt-1">{errors.email}</p>}
                     </div>
@@ -1138,7 +1138,7 @@ export function DynamicQuickAddModal({
                         value={values.creditLimit || '0'}
                         onChange={handleInputChange}
                         placeholder="0.00 (0 for unlimited)"
-                        className="w-full bg-white dark:bg-[#111827] border border-ink-900/20 text-ink-900 text-sm rounded-sm px-3 py-2 focus:ring-1 focus:ring-focus-blue-500 outline-none tabular-currency"
+                        className="w-full bg-paper-100 border border-ink-900/20 text-ink-900 text-sm rounded-sm px-3 py-2 focus:ring-1 focus:ring-focus-blue-500 outline-none tabular-currency"
                       />
                     </div>
                     <div>
@@ -1149,7 +1149,7 @@ export function DynamicQuickAddModal({
                         name="paymentTerms"
                         value={values.paymentTerms || 'Net 30'}
                         onChange={handleInputChange}
-                        className="w-full bg-white dark:bg-[#111827] border border-ink-900/20 text-ink-900 text-sm rounded-sm px-3 py-2 focus:ring-1 focus:ring-focus-blue-500 outline-none"
+                        className="w-full bg-paper-100 border border-ink-900/20 text-ink-900 text-sm rounded-sm px-3 py-2 focus:ring-1 focus:ring-focus-blue-500 outline-none"
                       >
                         <option value="Due on Receipt">Due on Receipt</option>
                         <option value="Net 15">Net 15 Days</option>
@@ -1169,7 +1169,7 @@ export function DynamicQuickAddModal({
                         max="100"
                         value={values.discountPercent || '0'}
                         onChange={handleInputChange}
-                        className="w-full bg-white dark:bg-[#111827] border border-ink-900/20 text-ink-900 text-sm rounded-sm px-3 py-2 focus:ring-1 focus:ring-focus-blue-500 outline-none font-mono"
+                        className="w-full bg-paper-100 border border-ink-900/20 text-ink-900 text-sm rounded-sm px-3 py-2 focus:ring-1 focus:ring-focus-blue-500 outline-none font-mono"
                       />
                     </div>
                   </div>
@@ -1189,7 +1189,7 @@ export function DynamicQuickAddModal({
                         onChange={handleInputChange}
                         onBlur={handleBlur}
                         placeholder="A012345678Z"
-                        className={`w-full bg-white dark:bg-[#111827] border ${errors.kraPin ? 'border-rust-700' : 'border-ink-900/20'} text-ink-900 text-sm rounded-sm px-3 py-2 focus:ring-1 focus:ring-focus-blue-500 outline-none font-mono uppercase`}
+                        className={`w-full bg-paper-100 border ${errors.kraPin ? 'border-rust-700' : 'border-ink-900/20'} text-ink-900 text-sm rounded-sm px-3 py-2 focus:ring-1 focus:ring-focus-blue-500 outline-none font-mono uppercase`}
                       />
                       {errors.kraPin && <p className="text-[11px] text-rust-700 mt-1">{errors.kraPin}</p>}
                     </div>
@@ -1208,7 +1208,7 @@ export function DynamicQuickAddModal({
                       value={values.billingAddress || ''}
                       onChange={handleInputChange}
                       placeholder="e.g., Riverside Green Square, Building B"
-                      className="w-full bg-white dark:bg-[#111827] border border-ink-900/20 text-ink-900 text-sm rounded-sm px-3 py-2 focus:ring-1 focus:ring-focus-blue-500 outline-none"
+                      className="w-full bg-paper-100 border border-ink-900/20 text-ink-900 text-sm rounded-sm px-3 py-2 focus:ring-1 focus:ring-focus-blue-500 outline-none"
                     />
                   </div>
                 </div>
@@ -1235,7 +1235,7 @@ export function DynamicQuickAddModal({
                         onChange={handleInputChange}
                         onBlur={handleBlur}
                         placeholder="e.g., Kevin"
-                        className={`w-full bg-white dark:bg-[#111827] border ${errors.firstName ? 'border-rust-700' : 'border-ink-900/20'} text-ink-900 text-sm rounded-sm px-3 py-2 focus:ring-1 focus:ring-focus-blue-500 outline-none`}
+                        className={`w-full bg-paper-100 border ${errors.firstName ? 'border-rust-700' : 'border-ink-900/20'} text-ink-900 text-sm rounded-sm px-3 py-2 focus:ring-1 focus:ring-focus-blue-500 outline-none`}
                       />
                       {errors.firstName && <p className="text-[11px] text-rust-700 mt-1">{errors.firstName}</p>}
                     </div>
@@ -1248,7 +1248,7 @@ export function DynamicQuickAddModal({
                         value={values.middleName || ''}
                         onChange={handleInputChange}
                         placeholder="e.g., Omondi"
-                        className="w-full bg-white dark:bg-[#111827] border border-ink-900/20 text-ink-900 text-sm rounded-sm px-3 py-2 focus:ring-1 focus:ring-focus-blue-500 outline-none"
+                        className="w-full bg-paper-100 border border-ink-900/20 text-ink-900 text-sm rounded-sm px-3 py-2 focus:ring-1 focus:ring-focus-blue-500 outline-none"
                       />
                     </div>
                     <div>
@@ -1262,7 +1262,7 @@ export function DynamicQuickAddModal({
                         onChange={handleInputChange}
                         onBlur={handleBlur}
                         placeholder="e.g., Mwangi"
-                        className={`w-full bg-white dark:bg-[#111827] border ${errors.lastName ? 'border-rust-700' : 'border-ink-900/20'} text-ink-900 text-sm rounded-sm px-3 py-2 focus:ring-1 focus:ring-focus-blue-500 outline-none`}
+                        className={`w-full bg-paper-100 border ${errors.lastName ? 'border-rust-700' : 'border-ink-900/20'} text-ink-900 text-sm rounded-sm px-3 py-2 focus:ring-1 focus:ring-focus-blue-500 outline-none`}
                       />
                       {errors.lastName && <p className="text-[11px] text-rust-700 mt-1">{errors.lastName}</p>}
                     </div>
@@ -1278,7 +1278,7 @@ export function DynamicQuickAddModal({
                         value={values.nationalId || ''}
                         onChange={handleInputChange}
                         placeholder="e.g., 28941029"
-                        className="w-full bg-white dark:bg-[#111827] border border-ink-900/20 text-ink-900 text-sm rounded-sm px-3 py-2 focus:ring-1 focus:ring-focus-blue-500 outline-none font-mono"
+                        className="w-full bg-paper-100 border border-ink-900/20 text-ink-900 text-sm rounded-sm px-3 py-2 focus:ring-1 focus:ring-focus-blue-500 outline-none font-mono"
                       />
                     </div>
                     <div>
@@ -1290,7 +1290,7 @@ export function DynamicQuickAddModal({
                         value={values.jobTitle || ''}
                         onChange={handleInputChange}
                         placeholder="e.g., Financial Accountant"
-                        className="w-full bg-white dark:bg-[#111827] border border-ink-900/20 text-ink-900 text-sm rounded-sm px-3 py-2 focus:ring-1 focus:ring-focus-blue-500 outline-none"
+                        className="w-full bg-paper-100 border border-ink-900/20 text-ink-900 text-sm rounded-sm px-3 py-2 focus:ring-1 focus:ring-focus-blue-500 outline-none"
                       />
                     </div>
                     <div>
@@ -1301,7 +1301,7 @@ export function DynamicQuickAddModal({
                         name="department"
                         value={values.department || 'Finance & Accounting'}
                         onChange={handleInputChange}
-                        className="w-full bg-white dark:bg-[#111827] border border-ink-900/20 text-ink-900 text-sm rounded-sm px-3 py-2 focus:ring-1 focus:ring-focus-blue-500 outline-none"
+                        className="w-full bg-paper-100 border border-ink-900/20 text-ink-900 text-sm rounded-sm px-3 py-2 focus:ring-1 focus:ring-focus-blue-500 outline-none"
                       >
                         <option value="Finance & Accounting">Finance & Accounting</option>
                         <option value="Engineering & IT">Engineering & IT</option>
@@ -1331,7 +1331,7 @@ export function DynamicQuickAddModal({
                         onChange={handleInputChange}
                         onBlur={handleBlur}
                         placeholder="0.00"
-                        className={`w-full bg-white dark:bg-[#111827] border ${errors.baseSalary ? 'border-rust-700' : 'border-ink-900/20'} text-ink-900 text-sm rounded-sm px-3 py-2 focus:ring-1 focus:ring-focus-blue-500 outline-none tabular-currency`}
+                        className={`w-full bg-paper-100 border ${errors.baseSalary ? 'border-rust-700' : 'border-ink-900/20'} text-ink-900 text-sm rounded-sm px-3 py-2 focus:ring-1 focus:ring-focus-blue-500 outline-none tabular-currency`}
                       />
                       {errors.baseSalary && <p className="text-[11px] text-rust-700 mt-1">{errors.baseSalary}</p>}
                     </div>
@@ -1346,7 +1346,7 @@ export function DynamicQuickAddModal({
                         min="0"
                         value={values.housingAllowance || '0'}
                         onChange={handleInputChange}
-                        className="w-full bg-white dark:bg-[#111827] border border-ink-900/20 text-ink-900 text-sm rounded-sm px-3 py-2 focus:ring-1 focus:ring-focus-blue-500 outline-none tabular-currency"
+                        className="w-full bg-paper-100 border border-ink-900/20 text-ink-900 text-sm rounded-sm px-3 py-2 focus:ring-1 focus:ring-focus-blue-500 outline-none tabular-currency"
                       />
                     </div>
                     <div>
@@ -1360,7 +1360,7 @@ export function DynamicQuickAddModal({
                         min="0"
                         value={values.transportAllowance || '0'}
                         onChange={handleInputChange}
-                        className="w-full bg-white dark:bg-[#111827] border border-ink-900/20 text-ink-900 text-sm rounded-sm px-3 py-2 focus:ring-1 focus:ring-focus-blue-500 outline-none tabular-currency"
+                        className="w-full bg-paper-100 border border-ink-900/20 text-ink-900 text-sm rounded-sm px-3 py-2 focus:ring-1 focus:ring-focus-blue-500 outline-none tabular-currency"
                       />
                     </div>
                   </div>
@@ -1380,7 +1380,7 @@ export function DynamicQuickAddModal({
                         onChange={handleInputChange}
                         onBlur={handleBlur}
                         placeholder="A012345678Z"
-                        className={`w-full bg-white dark:bg-[#111827] border ${errors.kraPin ? 'border-rust-700' : 'border-ink-900/20'} text-ink-900 text-sm rounded-sm px-3 py-2 focus:ring-1 focus:ring-focus-blue-500 outline-none font-mono uppercase`}
+                        className={`w-full bg-paper-100 border ${errors.kraPin ? 'border-rust-700' : 'border-ink-900/20'} text-ink-900 text-sm rounded-sm px-3 py-2 focus:ring-1 focus:ring-focus-blue-500 outline-none font-mono uppercase`}
                       />
                       {errors.kraPin && <p className="text-[11px] text-rust-700 mt-1">{errors.kraPin}</p>}
                     </div>
@@ -1393,7 +1393,7 @@ export function DynamicQuickAddModal({
                         value={values.nssfNumber || ''}
                         onChange={handleInputChange}
                         placeholder="e.g., 00192841"
-                        className="w-full bg-white dark:bg-[#111827] border border-ink-900/20 text-ink-900 text-sm rounded-sm px-3 py-2 focus:ring-1 focus:ring-focus-blue-500 outline-none font-mono"
+                        className="w-full bg-paper-100 border border-ink-900/20 text-ink-900 text-sm rounded-sm px-3 py-2 focus:ring-1 focus:ring-focus-blue-500 outline-none font-mono"
                       />
                     </div>
                     <div>
@@ -1405,7 +1405,7 @@ export function DynamicQuickAddModal({
                         value={values.shifNumber || ''}
                         onChange={handleInputChange}
                         placeholder="e.g., 8839210"
-                        className="w-full bg-white dark:bg-[#111827] border border-ink-900/20 text-ink-900 text-sm rounded-sm px-3 py-2 focus:ring-1 focus:ring-focus-blue-500 outline-none font-mono"
+                        className="w-full bg-paper-100 border border-ink-900/20 text-ink-900 text-sm rounded-sm px-3 py-2 focus:ring-1 focus:ring-focus-blue-500 outline-none font-mono"
                       />
                     </div>
                   </div>
@@ -1431,7 +1431,7 @@ export function DynamicQuickAddModal({
                     onChange={handleInputChange}
                     onBlur={handleBlur}
                     placeholder="e.g. 5210"
-                    className={`w-full bg-white dark:bg-[#111827] border ${errors.code ? 'border-rust-700' : 'border-ink-900/20'} text-ink-900 text-sm rounded-sm px-3 py-2 focus:ring-1 focus:ring-focus-blue-500 outline-none font-mono`}
+                    className={`w-full bg-paper-100 border ${errors.code ? 'border-rust-700' : 'border-ink-900/20'} text-ink-900 text-sm rounded-sm px-3 py-2 focus:ring-1 focus:ring-focus-blue-500 outline-none font-mono`}
                   />
                   {errors.code && <p className="text-[11px] text-rust-700 mt-1">{errors.code}</p>}
                 </div>
@@ -1446,7 +1446,7 @@ export function DynamicQuickAddModal({
                     onChange={handleInputChange}
                     onBlur={handleBlur}
                     placeholder="e.g., Software & Cloud Subscriptions"
-                    className={`w-full bg-white dark:bg-[#111827] border ${errors.name ? 'border-rust-700' : 'border-ink-900/20'} text-ink-900 text-sm rounded-sm px-3 py-2 focus:ring-1 focus:ring-focus-blue-500 outline-none`}
+                    className={`w-full bg-paper-100 border ${errors.name ? 'border-rust-700' : 'border-ink-900/20'} text-ink-900 text-sm rounded-sm px-3 py-2 focus:ring-1 focus:ring-focus-blue-500 outline-none`}
                   />
                   {errors.name && <p className="text-[11px] text-rust-700 mt-1">{errors.name}</p>}
                 </div>
@@ -1461,7 +1461,7 @@ export function DynamicQuickAddModal({
                     name="type"
                     value={values.type || 'EXPENSE'}
                     onChange={handleInputChange}
-                    className="w-full bg-white dark:bg-[#111827] border border-ink-900/20 text-ink-900 text-sm rounded-sm px-3 py-2 focus:ring-1 focus:ring-focus-blue-500 outline-none"
+                    className="w-full bg-paper-100 border border-ink-900/20 text-ink-900 text-sm rounded-sm px-3 py-2 focus:ring-1 focus:ring-focus-blue-500 outline-none"
                   >
                     <option value="ASSET">ASSET (Debit Normal)</option>
                     <option value="LIABILITY">LIABILITY (Credit Normal)</option>
@@ -1479,7 +1479,7 @@ export function DynamicQuickAddModal({
                     value={values.subtype || ''}
                     onChange={handleInputChange}
                     placeholder="e.g., Operating Expense / Current Asset"
-                    className="w-full bg-white dark:bg-[#111827] border border-ink-900/20 text-ink-900 text-sm rounded-sm px-3 py-2 focus:ring-1 focus:ring-focus-blue-500 outline-none"
+                    className="w-full bg-paper-100 border border-ink-900/20 text-ink-900 text-sm rounded-sm px-3 py-2 focus:ring-1 focus:ring-focus-blue-500 outline-none"
                   />
                 </div>
               </div>
@@ -1494,7 +1494,7 @@ export function DynamicQuickAddModal({
                   value={values.description || ''}
                   onChange={handleInputChange}
                   placeholder="Internal audit and financial accounting guidelines for this ledger code..."
-                  className="w-full bg-white dark:bg-[#111827] border border-ink-900/20 text-ink-900 text-sm rounded-sm px-3 py-2 focus:ring-1 focus:ring-focus-blue-500 outline-none resize-none"
+                  className="w-full bg-paper-100 border border-ink-900/20 text-ink-900 text-sm rounded-sm px-3 py-2 focus:ring-1 focus:ring-focus-blue-500 outline-none resize-none"
                 />
               </div>
             </div>
@@ -1521,7 +1521,7 @@ export function DynamicQuickAddModal({
               <button
                 type="submit"
                 disabled={createMutation.isPending}
-                className="bg-ink-900 text-white dark:text-slate-900 px-5 py-2 text-sm font-medium rounded-sm hover:bg-ink-900/90 transition-colors disabled:opacity-50 flex items-center space-x-2"
+                className="bg-ink-900 text-white  px-5 py-2 text-sm font-medium rounded-sm hover:bg-ink-900/90 transition-colors disabled:opacity-50 flex items-center space-x-2"
               >
                 <span>{createMutation.isPending ? 'Saving Record...' : `Create ${selectedType.charAt(0) + selectedType.slice(1).toLowerCase()}`}</span>
               </button>

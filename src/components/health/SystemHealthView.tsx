@@ -19,7 +19,7 @@ export function SystemHealthView() {
         <h1 className="text-2xl font-serif text-ink-900">System Health</h1>
         <button 
           onClick={clearMetrics}
-          className="bg-white dark:bg-[#111827] border border-ink-900/20 text-ink-900 px-4 py-2 text-sm font-medium rounded-sm hover:bg-paper-50 transition-colors"
+          className="bg-paper-100 border border-ink-900/20 text-ink-900 px-4 py-2 text-sm font-medium rounded-sm hover:bg-paper-50 transition-colors"
         >
           Clear Logs
         </button>
@@ -27,7 +27,7 @@ export function SystemHealthView() {
       <div className="ledger-divider mb-6"></div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <div className="bg-white dark:bg-[#111827] border border-ink-900/10 p-6 rounded-sm shadow-sm flex flex-col justify-between">
+        <div className="bg-paper-100 border border-ink-900/10 p-6 rounded-sm shadow-sm flex flex-col justify-between">
           <div className="flex items-center space-x-3 mb-2">
             <Server className="w-5 h-5 text-focus-blue-500" />
             <h3 className="text-sm font-semibold text-slate-500 uppercase tracking-wider">Avg API Latency</h3>
@@ -37,7 +37,7 @@ export function SystemHealthView() {
           </p>
         </div>
 
-        <div className="bg-white dark:bg-[#111827] border border-ink-900/10 p-6 rounded-sm shadow-sm flex flex-col justify-between">
+        <div className="bg-paper-100 border border-ink-900/10 p-6 rounded-sm shadow-sm flex flex-col justify-between">
           <div className="flex items-center space-x-3 mb-2">
             <Activity className="w-5 h-5 text-focus-blue-500" />
             <h3 className="text-sm font-semibold text-slate-500 uppercase tracking-wider">Avg Render Time</h3>
@@ -47,7 +47,7 @@ export function SystemHealthView() {
           </p>
         </div>
 
-        <div className="bg-white dark:bg-[#111827] border border-ink-900/10 p-6 rounded-sm shadow-sm flex flex-col justify-between">
+        <div className="bg-paper-100 border border-ink-900/10 p-6 rounded-sm shadow-sm flex flex-col justify-between">
           <div className="flex items-center space-x-3 mb-2">
             <Clock className="w-5 h-5 text-focus-blue-500" />
             <h3 className="text-sm font-semibold text-slate-500 uppercase tracking-wider">Total Traces</h3>
@@ -59,7 +59,7 @@ export function SystemHealthView() {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-6">
-        <div className="bg-white dark:bg-[#111827] border border-ink-900/10 rounded-sm shadow-sm overflow-hidden">
+        <div className="bg-paper-100 border border-ink-900/10 rounded-sm shadow-sm overflow-hidden">
           <h3 className="text-lg font-medium text-ink-900 p-6 border-b border-ink-900/10">Recent API Calls</h3>
           <ul className="divide-y divide-ink-900/5 max-h-96 overflow-y-auto">
             {apiMetrics.length === 0 ? (
@@ -81,7 +81,7 @@ export function SystemHealthView() {
           </ul>
         </div>
 
-        <div className="bg-white dark:bg-[#111827] border border-ink-900/10 rounded-sm shadow-sm overflow-hidden">
+        <div className="bg-paper-100 border border-ink-900/10 rounded-sm shadow-sm overflow-hidden">
           <h3 className="text-lg font-medium text-ink-900 p-6 border-b border-ink-900/10">Component Renders</h3>
           <ul className="divide-y divide-ink-900/5 max-h-96 overflow-y-auto">
             {renderMetrics.length === 0 ? (

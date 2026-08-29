@@ -60,10 +60,10 @@ export function ReportsView() {
         >
           &larr; Back to Reports
         </button>
-        <div className="bg-white dark:bg-[#111827] border border-ink-900/10 shadow-sm rounded-sm p-16 text-center">
+        <div className="bg-paper-100 border border-ink-900/10 shadow-sm rounded-sm p-16 text-center">
           <h3 className="text-xl font-medium text-ink-900 mb-2">{activeReport}</h3>
           <p className="text-slate-500 mb-6">This report template is configured but awaiting direct ledger aggregation.</p>
-          <button className="bg-ink-900 text-white dark:text-slate-900 px-6 py-2 text-sm font-medium rounded-sm hover:bg-ink-900/90 transition-colors">
+          <button className="bg-ink-900 text-white  px-6 py-2 text-sm font-medium rounded-sm hover:bg-ink-900/90 transition-colors">
             Generate Export (Excel)
           </button>
         </div>
@@ -80,7 +80,7 @@ export function ReportsView() {
           <select 
             value={displayCurrency}
             onChange={(e) => setDisplayCurrency(e.target.value)}
-            className="bg-white dark:bg-[#111827] border border-ink-900/20 text-ink-900 text-sm rounded-sm px-2 py-1 outline-none focus:ring-1 focus:ring-focus-blue-500"
+            className="bg-paper-100 border border-ink-900/20 text-ink-900 text-sm rounded-sm px-2 py-1 outline-none focus:ring-1 focus:ring-focus-blue-500"
           >
             <option value="KES">KES - Kenyan Shilling</option>
             <option value="USD">USD - US Dollar</option>
@@ -122,7 +122,7 @@ export function ReportsView() {
                   <div 
                     key={report.name} 
                     onClick={() => setActiveReport(report.name)}
-                    className="group bg-white dark:bg-[#111827] border border-ink-900/10 rounded-sm p-4 shadow-sm hover:shadow transition-shadow hover:border-focus-blue-500/50 cursor-pointer flex flex-col h-full"
+                    className="group bg-paper-100 border border-ink-900/10 rounded-sm p-4 shadow-sm hover:shadow transition-shadow hover:border-focus-blue-500/50 cursor-pointer flex flex-col h-full"
                   >
                     <h3 className="text-base font-semibold text-focus-blue-500 group-hover:text-ink-900 transition-colors mb-2">
                       {report.name}
@@ -139,23 +139,23 @@ export function ReportsView() {
       )}
 
       {activeTab === 'Custom report builder' && (
-        <div className="bg-white dark:bg-[#111827] border border-ink-900/10 shadow-sm rounded-sm p-8 max-w-4xl mx-auto text-center">
+        <div className="bg-paper-100 border border-ink-900/10 shadow-sm rounded-sm p-8 max-w-4xl mx-auto text-center">
            <h3 className="text-xl font-medium text-ink-900 mb-2">Custom Report Builder</h3>
            <p className="text-slate-500 mb-6">Design tailored financial reports with custom dimension tagging and multi-period comparatives.</p>
-           <button className="bg-ink-900 text-white dark:text-slate-900 px-6 py-2 text-sm font-medium rounded-sm hover:bg-ink-900/90 transition-colors">
+           <button className="bg-ink-900 text-white  px-6 py-2 text-sm font-medium rounded-sm hover:bg-ink-900/90 transition-colors">
              Create Custom Report
            </button>
         </div>
       )}
 
       {activeTab === 'Management report packs' && (
-        <div className="bg-white dark:bg-[#111827] border border-ink-900/10 shadow-sm rounded-sm p-8 max-w-4xl mx-auto">
+        <div className="bg-paper-100 border border-ink-900/10 shadow-sm rounded-sm p-8 max-w-4xl mx-auto">
            <div className="flex justify-between items-center mb-6">
              <div>
                <h3 className="text-lg font-medium text-ink-900">Management Packs</h3>
                <p className="text-sm text-slate-500">Curated collections of reports (Cover page, Executive Summary, P&L, Balance Sheet) exported as a single PDF.</p>
              </div>
-             <button className="bg-ink-900 text-white dark:text-slate-900 px-4 py-2 text-sm font-medium rounded-sm hover:bg-ink-900/90 transition-colors">
+             <button className="bg-ink-900 text-white  px-4 py-2 text-sm font-medium rounded-sm hover:bg-ink-900/90 transition-colors">
                Build New Pack
              </button>
            </div>
@@ -165,7 +165,7 @@ export function ReportsView() {
                 <p className="font-semibold text-ink-900">Monthly Board Reporting Pack</p>
                 <p className="text-xs text-slate-500 mt-1">Contains: Executive Summary, P&L, Balance Sheet, Cashflow</p>
               </div>
-              <button className="text-sm font-medium text-focus-blue-500 border border-focus-blue-500/30 px-3 py-1.5 rounded-sm hover:bg-white dark:bg-[#111827] transition-colors">
+              <button className="text-sm font-medium text-focus-blue-500 border border-focus-blue-500/30 px-3 py-1.5 rounded-sm hover:bg-paper-100 transition-colors">
                 Export PDF
               </button>
            </div>
@@ -173,10 +173,10 @@ export function ReportsView() {
       )}
 
       {activeTab === 'Scheduled/emailed reports' && (
-        <div className="bg-white dark:bg-[#111827] border border-ink-900/10 shadow-sm rounded-sm p-8 max-w-4xl mx-auto text-center">
+        <div className="bg-paper-100 border border-ink-900/10 shadow-sm rounded-sm p-8 max-w-4xl mx-auto text-center">
            <h3 className="text-xl font-medium text-ink-900 mb-2">Scheduled Delivery</h3>
            <p className="text-slate-500 mb-6">Automate your reporting. Set up standard reports or management packs to be emailed to stakeholders weekly or monthly.</p>
-           <button className="bg-ink-900 text-white dark:text-slate-900 px-6 py-2 text-sm font-medium rounded-sm hover:bg-ink-900/90 transition-colors">
+           <button className="bg-ink-900 text-white  px-6 py-2 text-sm font-medium rounded-sm hover:bg-ink-900/90 transition-colors">
              + New Schedule
            </button>
         </div>

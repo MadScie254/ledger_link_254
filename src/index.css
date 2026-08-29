@@ -16,7 +16,19 @@
 
 @layer base {
   :root {
-    /* Dark mode is now the only mode */
+    /* Light mode (default corporate theme) */
+    --paper-50: #F8FAFC;
+    --paper-100: #FFFFFF;
+    --ink-900: #0F172A;
+    --slate-500: #64748B;
+    --brass-500: #D97706;
+    --ledger-green-700: #15803D;
+    --rust-700: #B91C1C;
+    --focus-blue-500: #2563EB;
+  }
+
+  .dark {
+    /* Dark mode */
     --paper-50: #090E17;
     --paper-100: #111827;
     --ink-900: #F8FAFC;

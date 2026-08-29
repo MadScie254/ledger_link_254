@@ -55,7 +55,7 @@ export function BudgetPlanner() {
 
   return (
     <div className="space-y-6">
-      <div className="flex justify-between items-center bg-white dark:bg-[#111827] border border-ink-900/10 shadow-sm rounded-sm p-4">
+      <div className="flex justify-between items-center bg-paper-100 border border-ink-900/10 shadow-sm rounded-sm p-4">
         <div className="flex items-center space-x-3">
           <div className="bg-focus-blue-500/10 p-2 rounded-full">
             <PieChart className="h-6 w-6 text-focus-blue-500" />
@@ -67,7 +67,7 @@ export function BudgetPlanner() {
         </div>
         <button 
           onClick={() => setIsAdding(true)}
-          className="bg-ink-900 text-white dark:text-slate-900 px-4 py-2 text-sm font-medium rounded-sm hover:bg-ink-900/90 transition-colors flex items-center"
+          className="bg-ink-900 text-white  px-4 py-2 text-sm font-medium rounded-sm hover:bg-ink-900/90 transition-colors flex items-center"
         >
           <Plus className="h-4 w-4 mr-2" /> New Budget
         </button>
@@ -79,7 +79,7 @@ export function BudgetPlanner() {
           const isOver = budget.spentCents > budget.limitCents;
           
           return (
-            <div key={budget.id} className="bg-white dark:bg-[#111827] border border-ink-900/10 shadow-sm rounded-sm p-5 flex flex-col relative overflow-hidden">
+            <div key={budget.id} className="bg-paper-100 border border-ink-900/10 shadow-sm rounded-sm p-5 flex flex-col relative overflow-hidden">
               <div className="flex justify-between items-start mb-4">
                 <h4 className="font-medium text-ink-900">{budget.categoryName}</h4>
                 <div className="flex space-x-2">
@@ -116,7 +116,7 @@ export function BudgetPlanner() {
 
       {isAdding && (
         <div className="fixed inset-0 bg-ink-900/20 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-white dark:bg-[#111827] rounded-sm shadow-xl border border-ink-900/10 w-full max-w-md p-6">
+          <div className="bg-paper-100 rounded-sm shadow-xl border border-ink-900/10 w-full max-w-md p-6">
             <h3 className="text-xl font-serif text-ink-900 mb-4">Create New Budget</h3>
             
             <form onSubmit={handleAddBudget} className="space-y-4">
@@ -126,7 +126,7 @@ export function BudgetPlanner() {
                   required
                   value={newBudget.categoryId}
                   onChange={(e) => setNewBudget({ ...newBudget, categoryId: e.target.value })}
-                  className="w-full border border-ink-900/20 rounded-sm px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-ink-900 bg-white dark:bg-[#111827]"
+                  className="w-full border border-ink-900/20 rounded-sm px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-ink-900 bg-paper-100"
                 >
                   <option value="">Select an expense account...</option>
                   {expenses.map((acc: any) => (
@@ -144,7 +144,7 @@ export function BudgetPlanner() {
                   step="0.01"
                   value={newBudget.amountCents || ''}
                   onChange={(e) => setNewBudget({ ...newBudget, amountCents: parseFloat(e.target.value) })}
-                  className="w-full border border-ink-900/20 rounded-sm px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-ink-900 bg-white dark:bg-[#111827]"
+                  className="w-full border border-ink-900/20 rounded-sm px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-ink-900 bg-paper-100"
                 />
               </div>
 
@@ -158,7 +158,7 @@ export function BudgetPlanner() {
                 </button>
                 <button
                   type="submit"
-                  className="bg-ink-900 text-white dark:text-slate-900 px-4 py-2 text-sm font-medium rounded-sm hover:bg-ink-900/90 transition-colors"
+                  className="bg-ink-900 text-white  px-4 py-2 text-sm font-medium rounded-sm hover:bg-ink-900/90 transition-colors"
                 >
                   Save Budget
                 </button>

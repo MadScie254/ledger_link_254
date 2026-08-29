@@ -448,7 +448,7 @@ export function CommandPalette() {
       />
 
       {/* Modal Dialog */}
-      <div className="relative w-full max-w-2xl bg-white dark:bg-[#111827] rounded-sm shadow-2xl overflow-hidden border border-ink-900/20 z-10 flex flex-col max-h-[80vh]">
+      <div className="relative w-full max-w-2xl bg-paper-100 rounded-sm shadow-2xl overflow-hidden border border-ink-900/20 z-10 flex flex-col max-h-[80vh]">
         {/* Search Bar Header */}
         <div className="flex items-center px-4 py-3 border-b border-ink-900/10 bg-paper-50 dark:bg-[#0e1420]">
           <Search className="h-5 w-5 text-slate-400 mr-3 shrink-0" />
@@ -464,7 +464,7 @@ export function CommandPalette() {
             }}
             onKeyDown={handleKeyDown}
           />
-          <kbd className="hidden sm:inline-flex items-center px-2 py-1 text-[11px] font-mono font-medium text-slate-400 bg-white dark:bg-[#111827] border border-ink-900/10 rounded-sm">
+          <kbd className="hidden sm:inline-flex items-center px-2 py-1 text-[11px] font-mono font-medium text-slate-400 bg-paper-100 border border-ink-900/10 rounded-sm">
             ESC
           </kbd>
         </div>
@@ -492,20 +492,20 @@ export function CommandPalette() {
                   onClick={() => item.action()}
                   className={`px-4 py-2.5 cursor-pointer transition-colors flex items-center justify-between group ${
                     isSelected 
-                      ? 'bg-focus-blue-500 text-white dark:text-slate-900' 
+                      ? 'bg-focus-blue-500 text-white ' 
                       : 'hover:bg-paper-50 text-ink-900'
                   }`}
                 >
                   <div className="flex items-center space-x-3 min-w-0 pr-2">
                     <div className={`p-2 rounded-sm shrink-0 ${
                       isSelected 
-                        ? 'bg-white/20 text-white dark:text-slate-900' 
+                        ? 'bg-white/20 text-white ' 
                         : 'bg-paper-100 text-slate-600'
                     }`}>
                       <Icon className="h-4 w-4" />
                     </div>
                     <div className="min-w-0">
-                      <p className={`font-semibold truncate text-sm ${isSelected ? 'text-white dark:text-slate-900' : 'text-ink-900'}`}>
+                      <p className={`font-semibold truncate text-sm ${isSelected ? 'text-white ' : 'text-ink-900'}`}>
                         {item.title}
                       </p>
                       {item.subtitle && (
@@ -520,7 +520,7 @@ export function CommandPalette() {
                     {item.badge && (
                       <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
                         isSelected 
-                          ? 'bg-white/30 text-white dark:text-slate-900' 
+                          ? 'bg-white/30 text-white ' 
                           : 'bg-ink-900/5 text-slate-600'
                       }`}>
                         {item.badge}
@@ -550,12 +550,12 @@ export function CommandPalette() {
         <div className="px-4 py-2 border-t border-ink-900/10 bg-paper-50 dark:bg-[#0e1420] flex items-center justify-between text-[11px] text-slate-500">
           <div className="flex items-center space-x-4">
             <span className="flex items-center space-x-1">
-              <kbd className="px-1 py-0.5 bg-white dark:bg-[#111827] border border-ink-900/10 rounded">↑</kbd>
-              <kbd className="px-1 py-0.5 bg-white dark:bg-[#111827] border border-ink-900/10 rounded">↓</kbd>
+              <kbd className="px-1 py-0.5 bg-paper-100 border border-ink-900/10 rounded">↑</kbd>
+              <kbd className="px-1 py-0.5 bg-paper-100 border border-ink-900/10 rounded">↓</kbd>
               <span className="ml-1">Navigate</span>
             </span>
             <span className="flex items-center space-x-1">
-              <kbd className="px-1.5 py-0.5 bg-white dark:bg-[#111827] border border-ink-900/10 rounded">↵</kbd>
+              <kbd className="px-1.5 py-0.5 bg-paper-100 border border-ink-900/10 rounded">↵</kbd>
               <span className="ml-1">Select</span>
             </span>
           </div>

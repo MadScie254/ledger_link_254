@@ -103,7 +103,7 @@ export function CashFlowView({ onBack }: { onBack: () => void }) {
   if (isLoading) return <div className="p-16 text-center text-slate-500">Generating cash flow statement...</div>;
 
   return (
-    <div className="bg-white dark:bg-[#111827] border border-ink-900/10 shadow-sm rounded-sm">
+    <div className="bg-paper-100 border border-ink-900/10 shadow-sm rounded-sm">
       <div className="p-6 border-b border-ink-900/10 flex items-center justify-between bg-paper-50">
         <div>
           <button 
@@ -119,20 +119,20 @@ export function CashFlowView({ onBack }: { onBack: () => void }) {
           <select 
             value={dateRange}
             onChange={(e) => setDateRange(e.target.value)}
-            className="bg-white dark:bg-[#111827] border border-ink-900/20 text-ink-900 text-sm rounded-sm px-3 py-2 focus:ring-1 focus:ring-focus-blue-500 outline-none"
+            className="bg-paper-100 border border-ink-900/20 text-ink-900 text-sm rounded-sm px-3 py-2 focus:ring-1 focus:ring-focus-blue-500 outline-none"
           >
             <option>This Month</option>
             <option>This Quarter</option>
             <option>This Year-to-date</option>
             <option>Last Financial Year</option>
           </select>
-          <button onClick={handleExportExcel} className="bg-white dark:bg-[#111827] border border-ink-900/20 text-ink-900 px-3 py-2 text-sm font-medium rounded-sm hover:bg-paper-50 transition-colors">
+          <button onClick={handleExportExcel} className="bg-paper-100 border border-ink-900/20 text-ink-900 px-3 py-2 text-sm font-medium rounded-sm hover:bg-paper-50 transition-colors">
             Excel
           </button>
-          <button onClick={handlePrint} className="bg-white dark:bg-[#111827] border border-ink-900/20 text-ink-900 px-3 py-2 text-sm font-medium rounded-sm hover:bg-paper-50 transition-colors inline-flex items-center">
+          <button onClick={handlePrint} className="bg-paper-100 border border-ink-900/20 text-ink-900 px-3 py-2 text-sm font-medium rounded-sm hover:bg-paper-50 transition-colors inline-flex items-center">
             <Printer className="w-4 h-4 mr-1.5" /> Print
           </button>
-          <button onClick={handleExportPDF} className="bg-ink-900 text-white dark:text-slate-900 px-4 py-2 text-sm font-medium rounded-sm hover:bg-ink-900/90 transition-colors inline-flex items-center">
+          <button onClick={handleExportPDF} className="bg-ink-900 text-white  px-4 py-2 text-sm font-medium rounded-sm hover:bg-ink-900/90 transition-colors inline-flex items-center">
             <Download className="w-4 h-4 mr-1.5" /> Export PDF
           </button>
         </div>
@@ -206,7 +206,7 @@ export function CashFlowView({ onBack }: { onBack: () => void }) {
               <td className="py-2 pl-4 text-slate-600">Cash balance at beginning of period</td>
               <td className="py-2 pr-4 text-right tabular-currency text-slate-600">{formatCurrency(beginningCashCents)}</td>
             </tr>
-            <tr className="bg-ink-900 text-white dark:text-slate-900">
+            <tr className="bg-ink-900 text-white ">
               <td className="py-4 pl-4 font-bold rounded-l-sm">ENDING CASH & BANK BALANCE</td>
               <td className="py-4 pr-4 text-right tabular-currency font-bold rounded-r-sm">{formatCurrency(endingCashCents)}</td>
             </tr>

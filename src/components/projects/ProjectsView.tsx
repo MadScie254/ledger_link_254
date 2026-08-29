@@ -46,7 +46,7 @@ export function ProjectsView() {
         {activeTab === 'Project list' && (
           <button 
             onClick={() => setIsAddingProject(true)}
-            className="bg-ink-900 text-white dark:text-slate-900 px-4 py-2 text-sm font-medium rounded-sm hover:bg-ink-900/90 transition-colors"
+            className="bg-ink-900 text-white  px-4 py-2 text-sm font-medium rounded-sm hover:bg-ink-900/90 transition-colors"
           >
             Create Project
           </button>
@@ -71,7 +71,7 @@ export function ProjectsView() {
       </div>
 
       {activeTab === 'Project list' && (
-        <div className="bg-white dark:bg-[#111827] border border-ink-900/10 shadow-sm rounded-sm overflow-hidden">
+        <div className="bg-paper-100 border border-ink-900/10 shadow-sm rounded-sm overflow-hidden">
           <table className="w-full text-sm text-left">
             <thead className="bg-paper-100 border-b border-ink-900/10 text-xs uppercase text-slate-500">
               <tr>
@@ -118,7 +118,7 @@ export function ProjectsView() {
       )}
 
       {activeTab === 'Job costing' && (
-        <div className="bg-white dark:bg-[#111827] border border-ink-900/10 shadow-sm rounded-sm p-8 max-w-4xl mx-auto">
+        <div className="bg-paper-100 border border-ink-900/10 shadow-sm rounded-sm p-8 max-w-4xl mx-auto">
           <div className="text-center mb-8">
              <h3 className="text-lg font-medium text-ink-900">Job Costing Analysis</h3>
              <p className="text-sm text-slate-500">Compare actual expenses against project budgets in real-time.</p>
@@ -166,10 +166,10 @@ export function ProjectsView() {
       )}
 
       {activeTab === 'Time tracking' && (
-        <div className="bg-white dark:bg-[#111827] border border-ink-900/10 shadow-sm rounded-sm p-8 max-w-4xl mx-auto text-center">
+        <div className="bg-paper-100 border border-ink-900/10 shadow-sm rounded-sm p-8 max-w-4xl mx-auto text-center">
            <h3 className="text-xl font-medium text-ink-900 mb-2">Timesheets & Hours</h3>
            <p className="text-slate-500 mb-6">Log billable hours against specific projects and auto-sync them to payroll or invoices.</p>
-           <button className="bg-ink-900 text-white dark:text-slate-900 px-6 py-2 text-sm font-medium rounded-sm hover:bg-ink-900/90 transition-colors">
+           <button className="bg-ink-900 text-white  px-6 py-2 text-sm font-medium rounded-sm hover:bg-ink-900/90 transition-colors">
              Submit Timesheet
            </button>
         </div>
@@ -178,7 +178,7 @@ export function ProjectsView() {
       {/* Add Project Modal */}
       {isAddingProject && (
         <div className="fixed inset-0 bg-ink-900/20 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-white dark:bg-[#111827] rounded-sm shadow-xl border border-ink-900/10 w-full max-w-md p-6">
+          <div className="bg-paper-100 rounded-sm shadow-xl border border-ink-900/10 w-full max-w-md p-6">
             <h3 className="text-xl font-serif text-ink-900 mb-4">Create Project</h3>
             <form onSubmit={(e) => {
               e.preventDefault();
@@ -191,20 +191,20 @@ export function ProjectsView() {
             }} className="space-y-4">
               <div>
                 <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">Project Name *</label>
-                <input required name="name" type="text" className="w-full bg-white dark:bg-[#111827] border border-ink-900/20 text-ink-900 text-sm rounded-sm px-3 py-2 focus:ring-1 focus:ring-focus-blue-500 outline-none" />
+                <input required name="name" type="text" className="w-full bg-paper-100 border border-ink-900/20 text-ink-900 text-sm rounded-sm px-3 py-2 focus:ring-1 focus:ring-focus-blue-500 outline-none" />
               </div>
               <div>
                 <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">Client Name</label>
-                <input name="clientName" type="text" className="w-full bg-white dark:bg-[#111827] border border-ink-900/20 text-ink-900 text-sm rounded-sm px-3 py-2 focus:ring-1 focus:ring-focus-blue-500 outline-none" />
+                <input name="clientName" type="text" className="w-full bg-paper-100 border border-ink-900/20 text-ink-900 text-sm rounded-sm px-3 py-2 focus:ring-1 focus:ring-focus-blue-500 outline-none" />
               </div>
               <div>
                 <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">Project Budget *</label>
-                <input required name="budget" type="number" step="0.01" min="0" placeholder="0.00" className="w-full bg-white dark:bg-[#111827] border border-ink-900/20 text-ink-900 text-sm rounded-sm px-3 py-2 focus:ring-1 focus:ring-focus-blue-500 outline-none tabular-currency" />
+                <input required name="budget" type="number" step="0.01" min="0" placeholder="0.00" className="w-full bg-paper-100 border border-ink-900/20 text-ink-900 text-sm rounded-sm px-3 py-2 focus:ring-1 focus:ring-focus-blue-500 outline-none tabular-currency" />
               </div>
 
               <div className="flex justify-end space-x-3 pt-6 border-t border-ink-900/10 mt-6">
                 <button type="button" onClick={() => setIsAddingProject(false)} className="px-4 py-2 text-sm font-medium text-slate-500 hover:text-ink-900">Cancel</button>
-                <button type="submit" disabled={addProjectMutation.isPending} className="bg-ink-900 text-white dark:text-slate-900 px-4 py-2 text-sm font-medium rounded-sm hover:bg-ink-900/90 transition-colors disabled:opacity-50">
+                <button type="submit" disabled={addProjectMutation.isPending} className="bg-ink-900 text-white  px-4 py-2 text-sm font-medium rounded-sm hover:bg-ink-900/90 transition-colors disabled:opacity-50">
                   {addProjectMutation.isPending ? 'Saving...' : 'Save Project'}
                 </button>
               </div>

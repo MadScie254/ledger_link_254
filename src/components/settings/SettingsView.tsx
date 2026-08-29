@@ -136,7 +136,7 @@ export function SettingsView() {
               setEditingOrg(null);
               setIsCompanyModalOpen(true);
             }}
-            className="inline-flex items-center space-x-1.5 px-3.5 py-1.5 bg-ink-900 text-white dark:text-slate-900 rounded-sm text-xs font-medium hover:bg-ink-900/90 transition-colors shadow-xs shrink-0"
+            className="inline-flex items-center space-x-1.5 px-3.5 py-1.5 bg-ink-900 text-white  rounded-sm text-xs font-medium hover:bg-ink-900/90 transition-colors shadow-xs shrink-0"
           >
             <Plus className="w-3.5 h-3.5" />
             <span>Add New Company</span>
@@ -200,7 +200,7 @@ export function SettingsView() {
       {/* TAB 1: Companies & Legal Entities */}
       {activeTab === 'companies' && (
         <div className="space-y-6">
-          <div className="bg-paper-50 dark:bg-ink-900/30 p-4 border border-ink-900/10 rounded-sm">
+          <div className="bg-paper-50  p-4 border border-ink-900/10 rounded-sm">
             <div className="flex items-start justify-between">
               <div>
                 <h3 className="text-sm font-semibold text-ink-900">Active Company Context</h3>
@@ -220,14 +220,14 @@ export function SettingsView() {
               return (
                 <div
                   key={org.id}
-                  className={`bg-white dark:bg-[#111827] border rounded-sm p-5 transition-all shadow-xs flex flex-col justify-between ${
+                  className={`bg-paper-100 border rounded-sm p-5 transition-all shadow-xs flex flex-col justify-between ${
                     isActive ? 'border-focus-blue-600 ring-1 ring-focus-blue-600' : 'border-ink-900/10 hover:border-slate-300'
                   }`}
                 >
                   <div>
                     <div className="flex items-start justify-between mb-3">
                       <div className="flex items-center space-x-2.5">
-                        <div className="w-9 h-9 rounded bg-paper-100 dark:bg-ink-900/40 flex items-center justify-center text-ink-900 font-bold font-serif text-sm">
+                        <div className="w-9 h-9 rounded bg-paper-100  flex items-center justify-center text-ink-900 font-bold font-serif text-sm">
                           {org.name.substring(0, 2).toUpperCase()}
                         </div>
                         <div>
@@ -305,7 +305,7 @@ export function SettingsView() {
       {activeTab === 'currencies' && (
         <div className="space-y-6">
           {/* Live Rate Synchronizer Card */}
-          <div className="bg-white dark:bg-[#111827] border border-ink-900/10 rounded-sm p-5 shadow-xs">
+          <div className="bg-paper-100 border border-ink-900/10 rounded-sm p-5 shadow-xs">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
               <div>
                 <div className="flex items-center space-x-2">
@@ -336,7 +336,7 @@ export function SettingsView() {
               </div>
             )}
 
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 p-3 bg-paper-50 dark:bg-ink-900/30 rounded-sm text-xs">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 p-3 bg-paper-50  rounded-sm text-xs">
               <div>
                 <span className="text-slate-400 block text-[10px]">Entity Base Currency</span>
                 <span className="font-bold text-ink-900 text-sm font-mono">{activeCompany?.baseCurrency || 'KES'}</span>
@@ -354,7 +354,7 @@ export function SettingsView() {
 
           {/* Unrealized Gain/Loss Status Card */}
           {unrealizedFXData && (
-            <div className="bg-white dark:bg-[#111827] border border-ink-900/10 rounded-sm p-5 shadow-xs">
+            <div className="bg-paper-100 border border-ink-900/10 rounded-sm p-5 shadow-xs">
               <div className="flex items-center justify-between mb-3">
                 <div>
                   <h3 className="text-sm font-semibold text-ink-900">Unrealized FX Revaluation Summary</h3>
@@ -371,7 +371,7 @@ export function SettingsView() {
               <div className="overflow-x-auto">
                 <table className="w-full text-left text-xs border-collapse">
                   <thead>
-                    <tr className="border-b border-ink-900/10 bg-paper-50 dark:bg-ink-900/30 text-slate-500 font-semibold">
+                    <tr className="border-b border-ink-900/10 bg-paper-50  text-slate-500 font-semibold">
                       <th className="py-2 px-3">Item / Party</th>
                       <th className="py-2 px-3">Type</th>
                       <th className="py-2 px-3">Foreign Amount</th>
@@ -390,7 +390,7 @@ export function SettingsView() {
                             <span className="text-[10px] text-slate-400 font-mono">{item.referenceNo}</span>
                           </td>
                           <td className="py-2 px-3">
-                            <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-paper-100 dark:bg-ink-900/50 text-slate-600">
+                            <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-paper-100  text-slate-600">
                               {item.entityType}
                             </span>
                           </td>
@@ -416,7 +416,7 @@ export function SettingsView() {
           )}
 
           {/* Live Currency Exchange Rate Matrix */}
-          <div className="bg-white dark:bg-[#111827] border border-ink-900/10 rounded-sm p-5 shadow-xs">
+          <div className="bg-paper-100 border border-ink-900/10 rounded-sm p-5 shadow-xs">
             <h3 className="text-sm font-semibold text-ink-900 mb-3">Live Exchange Rate Matrix (vs. {activeCompany?.baseCurrency || 'KES'})</h3>
             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
               {SUPPORTED_CURRENCIES.map((curr) => {
@@ -425,7 +425,7 @@ export function SettingsView() {
                 const inverse = rate > 0 ? 1 / rate : 0;
                 
                 return (
-                  <div key={curr.code} className="p-3 bg-paper-50 dark:bg-ink-900/30 rounded-sm border border-ink-900/5">
+                  <div key={curr.code} className="p-3 bg-paper-50  rounded-sm border border-ink-900/5">
                     <div className="flex items-center justify-between mb-1">
                       <div className="flex items-center space-x-1.5">
                         <span className="text-base">{curr.flag}</span>
@@ -448,7 +448,7 @@ export function SettingsView() {
           </div>
 
           {/* Manual Exchange Rate Override */}
-          <div className="bg-white dark:bg-[#111827] border border-ink-900/10 rounded-sm p-5 shadow-xs">
+          <div className="bg-paper-100 border border-ink-900/10 rounded-sm p-5 shadow-xs">
             <h3 className="text-sm font-semibold text-ink-900 mb-1">Set Manual Rate Override</h3>
             <p className="text-xs text-slate-500 mb-3">
               Override an automated exchange rate for internal transactions or customs declaration valuations.
@@ -457,7 +457,7 @@ export function SettingsView() {
               <select
                 value={customRateCurrency}
                 onChange={(e) => setCustomRateCurrency(e.target.value)}
-                className="text-xs border border-ink-900/20 rounded-sm px-3 py-1.5 bg-white dark:bg-ink-900 text-ink-900"
+                className="text-xs border border-ink-900/20 rounded-sm px-3 py-1.5 bg-paper-100 text-ink-900"
                 required
               >
                 <option value="">Select Currency...</option>
@@ -472,7 +472,7 @@ export function SettingsView() {
                 placeholder={`Rate (e.g. 0.00775 for USD)`}
                 value={customRateValue}
                 onChange={(e) => setCustomRateValue(e.target.value)}
-                className="text-xs border border-ink-900/20 rounded-sm px-3 py-1.5 bg-white dark:bg-ink-900 text-ink-900 w-52 font-mono"
+                className="text-xs border border-ink-900/20 rounded-sm px-3 py-1.5 bg-paper-100 text-ink-900 w-52 font-mono"
                 required
               />
 
@@ -490,49 +490,49 @@ export function SettingsView() {
       {/* TAB 3: Accounting Defaults & FX Rules */}
       {activeTab === 'accounting' && (
         <div className="space-y-6">
-          <div className="bg-white dark:bg-[#111827] border border-ink-900/10 rounded-sm p-5 shadow-xs">
+          <div className="bg-paper-100 border border-ink-900/10 rounded-sm p-5 shadow-xs">
             <h3 className="text-base font-semibold text-ink-900 mb-1">Chart of Accounts & FX Accounting Rules</h3>
             <p className="text-xs text-slate-500 mb-4">
               Configure standard ledger accounts mapped for double-entry posting and FX revaluation.
             </p>
 
             <div className="space-y-4 text-xs">
-              <div className="flex items-center justify-between p-3 bg-paper-50 dark:bg-ink-900/30 rounded-sm border border-ink-900/5">
+              <div className="flex items-center justify-between p-3 bg-paper-50  rounded-sm border border-ink-900/5">
                 <div>
                   <p className="font-semibold text-ink-900">Unrealized FX Gain / Loss Account</p>
                   <p className="text-slate-500 text-[11px]">IAS 21 temporary revaluations of open foreign invoices & bills</p>
                 </div>
-                <span className="font-mono bg-paper-100 dark:bg-ink-900/60 px-2.5 py-1 rounded text-ink-900 font-bold">
+                <span className="font-mono bg-paper-100  px-2.5 py-1 rounded text-ink-900 font-bold">
                   8000 - Unrealized FX Gain / Loss
                 </span>
               </div>
 
-              <div className="flex items-center justify-between p-3 bg-paper-50 dark:bg-ink-900/30 rounded-sm border border-ink-900/5">
+              <div className="flex items-center justify-between p-3 bg-paper-50  rounded-sm border border-ink-900/5">
                 <div>
                   <p className="font-semibold text-ink-900">Realized FX Gain / Loss Account</p>
                   <p className="text-slate-500 text-[11px]">Settlement variances when invoices/bills are settled at payment date</p>
                 </div>
-                <span className="font-mono bg-paper-100 dark:bg-ink-900/60 px-2.5 py-1 rounded text-ink-900 font-bold">
+                <span className="font-mono bg-paper-100  px-2.5 py-1 rounded text-ink-900 font-bold">
                   8100 - Realized FX Gain / Loss
                 </span>
               </div>
 
-              <div className="flex items-center justify-between p-3 bg-paper-50 dark:bg-ink-900/30 rounded-sm border border-ink-900/5">
+              <div className="flex items-center justify-between p-3 bg-paper-50  rounded-sm border border-ink-900/5">
                 <div>
                   <p className="font-semibold text-ink-900">Default Accounts Receivable (A/R)</p>
                   <p className="text-slate-500 text-[11px]">Customer billing ledger account</p>
                 </div>
-                <span className="font-mono bg-paper-100 dark:bg-ink-900/60 px-2.5 py-1 rounded text-ink-900 font-bold">
+                <span className="font-mono bg-paper-100  px-2.5 py-1 rounded text-ink-900 font-bold">
                   1100 - Accounts Receivable (A/R)
                 </span>
               </div>
 
-              <div className="flex items-center justify-between p-3 bg-paper-50 dark:bg-ink-900/30 rounded-sm border border-ink-900/5">
+              <div className="flex items-center justify-between p-3 bg-paper-50  rounded-sm border border-ink-900/5">
                 <div>
                   <p className="font-semibold text-ink-900">Default Accounts Payable (A/P)</p>
                   <p className="text-slate-500 text-[11px]">Vendor invoices & bills payable ledger account</p>
                 </div>
-                <span className="font-mono bg-paper-100 dark:bg-ink-900/60 px-2.5 py-1 rounded text-ink-900 font-bold">
+                <span className="font-mono bg-paper-100  px-2.5 py-1 rounded text-ink-900 font-bold">
                   2000 - Accounts Payable (A/P)
                 </span>
               </div>
@@ -544,7 +544,7 @@ export function SettingsView() {
       {/* TAB 4: Security & System */}
       {activeTab === 'security' && (
         <div className="space-y-6">
-          <div className="bg-white dark:bg-[#111827] border border-ink-900/10 rounded-sm p-5 shadow-xs">
+          <div className="bg-paper-100 border border-ink-900/10 rounded-sm p-5 shadow-xs">
             <h3 className="text-base font-semibold text-ink-900 mb-1">Session & Inactivity Lock</h3>
             <p className="text-xs text-slate-500 mb-4">
               Automatic screen lock protects financial data when the computer is left unattended.
@@ -556,7 +556,7 @@ export function SettingsView() {
             </div>
           </div>
 
-          <div className="bg-white dark:bg-[#111827] border border-ink-900/10 rounded-sm p-5 shadow-xs">
+          <div className="bg-paper-100 border border-ink-900/10 rounded-sm p-5 shadow-xs">
             <h3 className="text-base font-semibold text-ink-900 mb-1">Financial Data Export</h3>
             <p className="text-xs text-slate-500 mb-4">
               Export verified journal entries, trial balance, and multi-currency records in CSV format.
@@ -657,7 +657,7 @@ function CompanyModal({ isOpen, initialData, onClose, onSuccess }: CompanyModalP
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-xs p-4 animate-in fade-in">
-      <div className="bg-white dark:bg-[#111827] border border-ink-900/10 rounded-sm shadow-xl max-w-lg w-full p-6 max-h-[90vh] overflow-y-auto">
+      <div className="bg-paper-100 border border-ink-900/10 rounded-sm shadow-xl max-w-lg w-full p-6 max-h-[90vh] overflow-y-auto">
         <div className="flex items-center justify-between border-b border-ink-900/10 pb-3 mb-4">
           <div className="flex items-center space-x-2">
             <Building2 className="w-5 h-5 text-focus-blue-600" />
@@ -684,7 +684,7 @@ function CompanyModal({ isOpen, initialData, onClose, onSuccess }: CompanyModalP
               value={name}
               onChange={(e) => setName(e.target.value)}
               placeholder="e.g. Acme East Africa Ltd."
-              className="w-full border border-ink-900/20 rounded-sm px-3 py-1.5 bg-white dark:bg-ink-900 text-ink-900"
+              className="w-full border border-ink-900/20 rounded-sm px-3 py-1.5 bg-paper-100 text-ink-900"
             />
           </div>
 
@@ -695,7 +695,7 @@ function CompanyModal({ isOpen, initialData, onClose, onSuccess }: CompanyModalP
               value={legalName}
               onChange={(e) => setLegalName(e.target.value)}
               placeholder="e.g. Acme Corporation Kenya Limited"
-              className="w-full border border-ink-900/20 rounded-sm px-3 py-1.5 bg-white dark:bg-ink-900 text-ink-900"
+              className="w-full border border-ink-900/20 rounded-sm px-3 py-1.5 bg-paper-100 text-ink-900"
             />
           </div>
 
@@ -705,7 +705,7 @@ function CompanyModal({ isOpen, initialData, onClose, onSuccess }: CompanyModalP
               <select
                 value={baseCurrency}
                 onChange={(e) => setBaseCurrency(e.target.value)}
-                className="w-full border border-ink-900/20 rounded-sm px-3 py-1.5 bg-white dark:bg-ink-900 text-ink-900"
+                className="w-full border border-ink-900/20 rounded-sm px-3 py-1.5 bg-paper-100 text-ink-900"
               >
                 {SUPPORTED_CURRENCIES.map((c) => (
                   <option key={c.code} value={c.code}>
@@ -722,7 +722,7 @@ function CompanyModal({ isOpen, initialData, onClose, onSuccess }: CompanyModalP
                 value={country}
                 onChange={(e) => setCountry(e.target.value)}
                 placeholder="e.g. Kenya, US, UK"
-                className="w-full border border-ink-900/20 rounded-sm px-3 py-1.5 bg-white dark:bg-ink-900 text-ink-900"
+                className="w-full border border-ink-900/20 rounded-sm px-3 py-1.5 bg-paper-100 text-ink-900"
               />
             </div>
           </div>
@@ -735,7 +735,7 @@ function CompanyModal({ isOpen, initialData, onClose, onSuccess }: CompanyModalP
                 value={taxId}
                 onChange={(e) => setTaxId(e.target.value)}
                 placeholder="e.g. P051234567Z"
-                className="w-full border border-ink-900/20 rounded-sm px-3 py-1.5 bg-white dark:bg-ink-900 text-ink-900 font-mono"
+                className="w-full border border-ink-900/20 rounded-sm px-3 py-1.5 bg-paper-100 text-ink-900 font-mono"
               />
             </div>
 
@@ -744,7 +744,7 @@ function CompanyModal({ isOpen, initialData, onClose, onSuccess }: CompanyModalP
               <select
                 value={fiscalYearStart}
                 onChange={(e) => setFiscalYearStart(e.target.value)}
-                className="w-full border border-ink-900/20 rounded-sm px-3 py-1.5 bg-white dark:bg-ink-900 text-ink-900"
+                className="w-full border border-ink-900/20 rounded-sm px-3 py-1.5 bg-paper-100 text-ink-900"
               >
                 {['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'].map(m => (
                   <option key={m} value={m}>{m}</option>
@@ -761,7 +761,7 @@ function CompanyModal({ isOpen, initialData, onClose, onSuccess }: CompanyModalP
                 value={industry}
                 onChange={(e) => setIndustry(e.target.value)}
                 placeholder="e.g. Logistics, FinTech"
-                className="w-full border border-ink-900/20 rounded-sm px-3 py-1.5 bg-white dark:bg-ink-900 text-ink-900"
+                className="w-full border border-ink-900/20 rounded-sm px-3 py-1.5 bg-paper-100 text-ink-900"
               />
             </div>
 
@@ -772,7 +772,7 @@ function CompanyModal({ isOpen, initialData, onClose, onSuccess }: CompanyModalP
                 value={city}
                 onChange={(e) => setCity(e.target.value)}
                 placeholder="e.g. Nairobi"
-                className="w-full border border-ink-900/20 rounded-sm px-3 py-1.5 bg-white dark:bg-ink-900 text-ink-900"
+                className="w-full border border-ink-900/20 rounded-sm px-3 py-1.5 bg-paper-100 text-ink-900"
               />
             </div>
           </div>
@@ -784,7 +784,7 @@ function CompanyModal({ isOpen, initialData, onClose, onSuccess }: CompanyModalP
               value={address}
               onChange={(e) => setAddress(e.target.value)}
               placeholder="e.g. Riverside Square, 4th Floor"
-              className="w-full border border-ink-900/20 rounded-sm px-3 py-1.5 bg-white dark:bg-ink-900 text-ink-900"
+              className="w-full border border-ink-900/20 rounded-sm px-3 py-1.5 bg-paper-100 text-ink-900"
             />
           </div>
 
@@ -796,7 +796,7 @@ function CompanyModal({ isOpen, initialData, onClose, onSuccess }: CompanyModalP
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="finance@company.com"
-                className="w-full border border-ink-900/20 rounded-sm px-3 py-1.5 bg-white dark:bg-ink-900 text-ink-900"
+                className="w-full border border-ink-900/20 rounded-sm px-3 py-1.5 bg-paper-100 text-ink-900"
               />
             </div>
 
@@ -807,7 +807,7 @@ function CompanyModal({ isOpen, initialData, onClose, onSuccess }: CompanyModalP
                 value={phone}
                 onChange={(e) => setPhone(e.target.value)}
                 placeholder="+254 700 000 000"
-                className="w-full border border-ink-900/20 rounded-sm px-3 py-1.5 bg-white dark:bg-ink-900 text-ink-900"
+                className="w-full border border-ink-900/20 rounded-sm px-3 py-1.5 bg-paper-100 text-ink-900"
               />
             </div>
           </div>

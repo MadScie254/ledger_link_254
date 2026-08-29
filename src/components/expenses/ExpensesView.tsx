@@ -138,13 +138,13 @@ export function ExpensesView() {
         <div className="space-x-3">
           <button 
             onClick={() => setIsCreatingVendor(true)}
-            className="text-ink-900 bg-white dark:bg-[#111827] border border-ink-900/20 px-4 py-2 text-sm font-medium rounded-sm hover:bg-paper-50 transition-colors"
+            className="text-ink-900 bg-paper-100 border border-ink-900/20 px-4 py-2 text-sm font-medium rounded-sm hover:bg-paper-50 transition-colors"
           >
             + Add Vendor
           </button>
           <button 
             onClick={() => setIsCreatingBill(true)}
-            className="bg-ink-900 text-white dark:text-slate-900 px-4 py-2 text-sm font-medium rounded-sm hover:bg-ink-900/90 transition-colors"
+            className="bg-ink-900 text-white  px-4 py-2 text-sm font-medium rounded-sm hover:bg-ink-900/90 transition-colors"
           >
             Create Bill
           </button>
@@ -174,7 +174,7 @@ export function ExpensesView() {
       </div>
 
       {activeTab === 'Bills' && (
-        <div className="bg-white dark:bg-[#111827] border border-ink-900/10 shadow-sm rounded-sm overflow-hidden">
+        <div className="bg-paper-100 border border-ink-900/10 shadow-sm rounded-sm overflow-hidden">
           <table className="w-full text-sm text-left">
             <thead className="bg-paper-100 border-b border-ink-900/10 text-xs uppercase text-slate-500">
               <tr>
@@ -251,7 +251,7 @@ export function ExpensesView() {
       )}
 
       {activeTab === 'Vendors' && (
-        <div className="bg-white dark:bg-[#111827] border border-ink-900/10 shadow-sm rounded-sm overflow-hidden">
+        <div className="bg-paper-100 border border-ink-900/10 shadow-sm rounded-sm overflow-hidden">
           <table className="w-full text-sm text-left">
             <thead className="bg-paper-100 border-b border-ink-900/10 text-xs uppercase text-slate-500">
               <tr>
@@ -317,12 +317,12 @@ export function ExpensesView() {
       )}
 
       {activeTab === 'Expenses' && (
-        <div className="bg-white dark:bg-[#111827] border border-ink-900/10 shadow-sm rounded-sm p-8 max-w-4xl mx-auto text-center">
+        <div className="bg-paper-100 border border-ink-900/10 shadow-sm rounded-sm p-8 max-w-4xl mx-auto text-center">
            <h3 className="text-xl font-medium text-ink-900 mb-2">Direct Expense Logging</h3>
            <p className="text-slate-500 mb-6">Quickly log cash or card expenses that don't require an A/P bill.</p>
            <button 
              onClick={() => setIsCreatingBill(true)}
-             className="bg-ink-900 text-white dark:text-slate-900 px-6 py-2 text-sm font-medium rounded-sm hover:bg-ink-900/90 transition-colors"
+             className="bg-ink-900 text-white  px-6 py-2 text-sm font-medium rounded-sm hover:bg-ink-900/90 transition-colors"
            >
              + Record Expense
            </button>
@@ -330,12 +330,12 @@ export function ExpensesView() {
       )}
 
       {activeTab === 'Purchase orders' && (
-        <div className="bg-white dark:bg-[#111827] border border-ink-900/10 shadow-sm rounded-sm p-8 max-w-4xl mx-auto text-center">
+        <div className="bg-paper-100 border border-ink-900/10 shadow-sm rounded-sm p-8 max-w-4xl mx-auto text-center">
            <h3 className="text-xl font-medium text-ink-900 mb-2">Purchase Orders</h3>
            <p className="text-slate-500 mb-6">Issue POs to vendors and convert them into bills upon receipt.</p>
            <button 
              onClick={() => setIsCreatingBill(true)}
-             className="bg-ink-900 text-white dark:text-slate-900 px-6 py-2 text-sm font-medium rounded-sm hover:bg-ink-900/90 transition-colors"
+             className="bg-ink-900 text-white  px-6 py-2 text-sm font-medium rounded-sm hover:bg-ink-900/90 transition-colors"
            >
              + Create Purchase Order
            </button>
@@ -343,12 +343,12 @@ export function ExpensesView() {
       )}
 
       {activeTab === 'Bill payments' && (
-        <div className="bg-white dark:bg-[#111827] border border-ink-900/10 shadow-sm rounded-sm p-8 max-w-4xl mx-auto text-center">
+        <div className="bg-paper-100 border border-ink-900/10 shadow-sm rounded-sm p-8 max-w-4xl mx-auto text-center">
            <h3 className="text-xl font-medium text-ink-900 mb-2">Batch Bill Disbursements</h3>
            <p className="text-slate-500 mb-6">Pay multiple suppliers in a single automated M-Pesa B2B or RTGS run.</p>
            <button 
              onClick={() => alert('Batch Payment Gateway Ready')}
-             className="bg-ink-900 text-white dark:text-slate-900 px-6 py-2 text-sm font-medium rounded-sm hover:bg-ink-900/90 transition-colors"
+             className="bg-ink-900 text-white  px-6 py-2 text-sm font-medium rounded-sm hover:bg-ink-900/90 transition-colors"
            >
              Schedule Batch Run
            </button>
@@ -419,7 +419,7 @@ export function ExpensesView() {
       {/* Basic Create Bill Modal */}
       {isCreatingBill && (
         <div className="fixed inset-0 bg-ink-900/20 backdrop-blur-sm z-50 flex items-center justify-center">
-          <div className="bg-white dark:bg-[#111827] rounded-sm shadow-xl border border-ink-900/10 w-full max-w-2xl p-6">
+          <div className="bg-paper-100 rounded-sm shadow-xl border border-ink-900/10 w-full max-w-2xl p-6">
             <h3 className="text-xl font-serif text-ink-900 mb-4">Record New Bill</h3>
             {createBillMutation.isError && (
               <div className="mb-4 p-3 bg-rust-700/10 border border-rust-700/20 text-rust-700 text-sm rounded-sm">
@@ -443,7 +443,7 @@ export function ExpensesView() {
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">Vendor *</label>
-                  <select required name="vendorId" className="w-full bg-white dark:bg-[#111827] border border-ink-900/20 text-ink-900 text-sm rounded-sm px-3 py-2 focus:ring-1 focus:ring-focus-blue-500 outline-none">
+                  <select required name="vendorId" className="w-full bg-paper-100 border border-ink-900/20 text-ink-900 text-sm rounded-sm px-3 py-2 focus:ring-1 focus:ring-focus-blue-500 outline-none">
                     <option value="">Select a vendor...</option>
                     {vendors.map((v: any) => (
                       <option key={v.id} value={v.id}>{v.displayName}</option>
@@ -452,7 +452,7 @@ export function ExpensesView() {
                 </div>
                 <div>
                   <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">Expense Account *</label>
-                  <select required name="accountId" className="w-full bg-white dark:bg-[#111827] border border-ink-900/20 text-ink-900 text-sm rounded-sm px-3 py-2 focus:ring-1 focus:ring-focus-blue-500 outline-none">
+                  <select required name="accountId" className="w-full bg-paper-100 border border-ink-900/20 text-ink-900 text-sm rounded-sm px-3 py-2 focus:ring-1 focus:ring-focus-blue-500 outline-none">
                     <option value="">Select expense category...</option>
                     {expenseAccounts.map((a: any) => (
                       <option key={a.id} value={a.id}>{a.code} - {a.name}</option>
@@ -463,27 +463,27 @@ export function ExpensesView() {
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">Bill Date *</label>
-                  <input required name="billDate" type="date" defaultValue={scannedData?.date || format(new Date(), 'yyyy-MM-dd')} className="w-full bg-white dark:bg-[#111827] border border-ink-900/20 text-ink-900 text-sm rounded-sm px-3 py-2 focus:ring-1 focus:ring-focus-blue-500 outline-none" />
+                  <input required name="billDate" type="date" defaultValue={scannedData?.date || format(new Date(), 'yyyy-MM-dd')} className="w-full bg-paper-100 border border-ink-900/20 text-ink-900 text-sm rounded-sm px-3 py-2 focus:ring-1 focus:ring-focus-blue-500 outline-none" />
                 </div>
                 <div>
                   <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">Due Date *</label>
-                  <input required name="dueDate" type="date" defaultValue={format(new Date(Date.now() + 30 * 86400000), 'yyyy-MM-dd')} className="w-full bg-white dark:bg-[#111827] border border-ink-900/20 text-ink-900 text-sm rounded-sm px-3 py-2 focus:ring-1 focus:ring-focus-blue-500 outline-none" />
+                  <input required name="dueDate" type="date" defaultValue={format(new Date(Date.now() + 30 * 86400000), 'yyyy-MM-dd')} className="w-full bg-paper-100 border border-ink-900/20 text-ink-900 text-sm rounded-sm px-3 py-2 focus:ring-1 focus:ring-focus-blue-500 outline-none" />
                 </div>
               </div>
               <div className="grid grid-cols-4 gap-4 items-end">
                 <div className="col-span-3">
                   <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">Description</label>
-                  <input name="description" type="text" defaultValue={scannedData?.vendor ? `Receipt from ${scannedData.vendor}` : ''} placeholder="What was this for?" className="w-full bg-white dark:bg-[#111827] border border-ink-900/20 text-ink-900 text-sm rounded-sm px-3 py-2 focus:ring-1 focus:ring-focus-blue-500 outline-none" />
+                  <input name="description" type="text" defaultValue={scannedData?.vendor ? `Receipt from ${scannedData.vendor}` : ''} placeholder="What was this for?" className="w-full bg-paper-100 border border-ink-900/20 text-ink-900 text-sm rounded-sm px-3 py-2 focus:ring-1 focus:ring-focus-blue-500 outline-none" />
                 </div>
                 <div className="col-span-1">
                   <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">Amount *</label>
-                  <input required name="amount" type="number" step="0.01" min="0.01" defaultValue={scannedData?.amount || ''} placeholder="0.00" className="w-full bg-white dark:bg-[#111827] border border-ink-900/20 text-ink-900 text-sm rounded-sm px-3 py-2 focus:ring-1 focus:ring-focus-blue-500 outline-none tabular-currency text-right" />
+                  <input required name="amount" type="number" step="0.01" min="0.01" defaultValue={scannedData?.amount || ''} placeholder="0.00" className="w-full bg-paper-100 border border-ink-900/20 text-ink-900 text-sm rounded-sm px-3 py-2 focus:ring-1 focus:ring-focus-blue-500 outline-none tabular-currency text-right" />
                 </div>
               </div>
 
               <div className="flex justify-end space-x-3 pt-6 border-t border-ink-900/10 mt-6">
                 <button type="button" onClick={() => { setIsCreatingBill(false); setScannedData(null); }} className="px-4 py-2 text-sm font-medium text-slate-500 hover:text-ink-900">Cancel</button>
-                <button type="submit" disabled={createBillMutation.isPending} className="bg-ink-900 text-white dark:text-slate-900 px-4 py-2 text-sm font-medium rounded-sm hover:bg-ink-900/90 transition-colors disabled:opacity-50">
+                <button type="submit" disabled={createBillMutation.isPending} className="bg-ink-900 text-white  px-4 py-2 text-sm font-medium rounded-sm hover:bg-ink-900/90 transition-colors disabled:opacity-50">
                   {createBillMutation.isPending ? 'Saving...' : 'Save Bill'}
                 </button>
               </div>

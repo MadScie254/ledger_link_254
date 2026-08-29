@@ -17,7 +17,7 @@ export function AppsView() {
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {integrations.map(app => (
-          <div key={app.name} className="bg-white dark:bg-[#111827] border border-ink-900/10 rounded-sm p-6 flex flex-col h-full shadow-sm">
+          <div key={app.name} className="bg-paper-100 border border-ink-900/10 rounded-sm p-6 flex flex-col h-full shadow-sm">
              <div className="flex justify-between items-start mb-4">
                <h3 className="text-lg font-medium text-ink-900">{app.name}</h3>
                {app.active && (
@@ -28,7 +28,7 @@ export function AppsView() {
              <button className={`w-full py-2 text-sm font-medium rounded-sm border transition-colors ${
                app.active 
                  ? 'bg-paper-50 border-ink-900/10 text-ink-900 hover:bg-paper-100' 
-                 : 'bg-white dark:bg-[#111827] border-ink-900/20 text-ink-900 hover:bg-ink-900 hover:text-white'
+                 : 'bg-paper-100 border-ink-900/20 text-ink-900 hover:bg-ink-900 hover:text-white'
              }`}>
                {app.status}
              </button>

@@ -69,7 +69,7 @@ export function InventoryView() {
         {activeTab === 'Items' && (
           <button 
             onClick={() => setIsAddingItem(true)}
-            className="bg-ink-900 text-white dark:text-slate-900 px-4 py-2 text-sm font-medium rounded-sm hover:bg-ink-900/90 transition-colors"
+            className="bg-ink-900 text-white  px-4 py-2 text-sm font-medium rounded-sm hover:bg-ink-900/90 transition-colors"
           >
             Add Item
           </button>
@@ -97,7 +97,7 @@ export function InventoryView() {
       </div>
 
       {activeTab === 'Items' && (
-        <div className="bg-white dark:bg-[#111827] border border-ink-900/10 shadow-sm rounded-sm overflow-hidden">
+        <div className="bg-paper-100 border border-ink-900/10 shadow-sm rounded-sm overflow-hidden">
           <table className="w-full text-sm text-left">
             <thead className="bg-paper-100 border-b border-ink-900/10 text-xs uppercase text-slate-500">
               <tr>
@@ -173,12 +173,12 @@ export function InventoryView() {
       )}
 
       {activeTab === 'Stock adjustments' && (
-        <div className="bg-white dark:bg-[#111827] border border-ink-900/10 shadow-sm rounded-sm p-8 max-w-4xl mx-auto text-center">
+        <div className="bg-paper-100 border border-ink-900/10 shadow-sm rounded-sm p-8 max-w-4xl mx-auto text-center">
            <h3 className="text-xl font-medium text-ink-900 mb-2">Manual Stock Adjustments</h3>
            <p className="text-slate-500 mb-6">Record breakages, theft, or physical audit discrepancies directly into the ledger.</p>
            <button 
              onClick={() => setIsAddingItem(true)}
-             className="bg-ink-900 text-white dark:text-slate-900 px-6 py-2 text-sm font-medium rounded-sm hover:bg-ink-900/90 transition-colors"
+             className="bg-ink-900 text-white  px-6 py-2 text-sm font-medium rounded-sm hover:bg-ink-900/90 transition-colors"
            >
              + New Adjustment
            </button>
@@ -186,7 +186,7 @@ export function InventoryView() {
       )}
 
       {activeTab === 'Reorder alerts' && (
-        <div className="bg-white dark:bg-[#111827] border border-ink-900/10 shadow-sm rounded-sm p-8 max-w-4xl mx-auto">
+        <div className="bg-paper-100 border border-ink-900/10 shadow-sm rounded-sm p-8 max-w-4xl mx-auto">
            <h3 className="text-lg font-medium text-ink-900 mb-4">Low Stock Notifications</h3>
            {items.filter((i: any) => i.quantityOnHand <= i.reorderPoint).length === 0 ? (
              <div className="p-8 border border-ink-900/10 bg-paper-50 rounded-sm text-center text-slate-500">
@@ -202,7 +202,7 @@ export function InventoryView() {
                    </div>
                    <button 
                      onClick={() => setSelectedItem(item)}
-                     className="text-sm font-medium text-ink-900 bg-white dark:bg-[#111827] border border-ink-900/20 px-4 py-2 rounded-sm hover:bg-paper-50"
+                     className="text-sm font-medium text-ink-900 bg-paper-100 border border-ink-900/20 px-4 py-2 rounded-sm hover:bg-paper-50"
                    >
                      View Item 360°
                    </button>

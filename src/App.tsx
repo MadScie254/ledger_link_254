@@ -28,6 +28,7 @@ import { fetchWithTenant } from "./utils/api";
 import { UndoToast } from "./components/layout/UndoToast";
 import { LockScreen } from "./components/layout/LockScreen";
 import { fetchExchangeRates } from "./utils/currency";
+import { AuthProvider } from "./context/AuthProvider";
 
 export default function App() {
   const queryClient = useQueryClient();
@@ -126,12 +127,12 @@ export default function App() {
   };
 
   return (
-    <>
+    <AuthProvider>
       {isLocked && <LockScreen />}
       <TenantProvider>
         <AppLayout>{renderContent()}</AppLayout>
       </TenantProvider>
       <UndoToast />
-    </>
+    </AuthProvider>
   );
 }

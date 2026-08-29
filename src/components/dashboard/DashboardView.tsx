@@ -377,19 +377,19 @@ export function DashboardView() {
 
             {/* Breakdown Sub-metrics */}
             <div className="grid grid-cols-3 gap-2 my-3 pt-2 border-t border-ink-900/5 text-xs">
-              <div className="bg-paper-50 dark:bg-ink-900/30 p-2 rounded">
+              <div className="bg-paper-50  p-2 rounded">
                 <span className="text-[10px] text-slate-500 block">Receivables (A/R)</span>
                 <span className={`font-semibold tabular-currency ${recGain >= 0 ? 'text-ledger-green-700' : 'text-rust-700'}`}>
                   {recGain >= 0 ? '+' : ''}{formatCurrencyFromFloat(recGain)}
                 </span>
               </div>
-              <div className="bg-paper-50 dark:bg-ink-900/30 p-2 rounded">
+              <div className="bg-paper-50  p-2 rounded">
                 <span className="text-[10px] text-slate-500 block">Payables (A/P)</span>
                 <span className={`font-semibold tabular-currency ${payGain >= 0 ? 'text-ledger-green-700' : 'text-rust-700'}`}>
                   {payGain >= 0 ? '+' : ''}{formatCurrencyFromFloat(payGain)}
                 </span>
               </div>
-              <div className="bg-paper-50 dark:bg-ink-900/30 p-2 rounded">
+              <div className="bg-paper-50  p-2 rounded">
                 <span className="text-[10px] text-slate-500 block">Foreign Bank</span>
                 <span className={`font-semibold tabular-currency ${bankGain >= 0 ? 'text-ledger-green-700' : 'text-rust-700'}`}>
                   {bankGain >= 0 ? '+' : ''}{formatCurrencyFromFloat(bankGain)}
@@ -401,7 +401,7 @@ export function DashboardView() {
             <div className="flex items-center justify-between text-[11px] text-slate-500 pt-2 border-t border-ink-900/5">
               <div className="flex items-center space-x-2 truncate">
                 {summaries.slice(0, 3).map((s: any) => (
-                  <span key={s.currency} className="font-mono bg-paper-100 dark:bg-ink-900/40 px-1.5 py-0.5 rounded text-[10px]">
+                  <span key={s.currency} className="font-mono bg-paper-100  px-1.5 py-0.5 rounded text-[10px]">
                     {s.currency}: {s.rate < 1 ? (1 / s.rate).toFixed(2) : s.rate.toFixed(2)}
                   </span>
                 ))}
@@ -431,7 +431,7 @@ export function DashboardView() {
                 <p className="text-xs text-slate-400 text-center py-6">All invoices are settled.</p>
               ) : (
                 highValueInvoices.map((inv: any) => (
-                  <div key={inv.id} className="flex items-center justify-between text-xs p-2 bg-paper-50 dark:bg-ink-900/20 rounded-sm border border-ink-900/5">
+                  <div key={inv.id} className="flex items-center justify-between text-xs p-2 bg-paper-50  rounded-sm border border-ink-900/5">
                     <div>
                       <p className="font-semibold text-ink-900">{inv.customerName || 'Client'}</p>
                       <p className="text-[10px] text-slate-500 font-mono">#{inv.invoiceNumber || inv.id.substring(0, 6)}</p>
@@ -465,7 +465,7 @@ export function DashboardView() {
                 <p className="text-xs text-slate-400 text-center py-6">No supplier records found.</p>
               ) : (
                 topVendors.map((v: any) => (
-                  <div key={v.id} className="flex items-center justify-between text-xs p-2 bg-paper-50 dark:bg-ink-900/20 rounded-sm border border-ink-900/5">
+                  <div key={v.id} className="flex items-center justify-between text-xs p-2 bg-paper-50  rounded-sm border border-ink-900/5">
                     <div>
                       <p className="font-semibold text-ink-900">{v.displayName}</p>
                       <p className="text-[10px] text-slate-500">{v.email || 'Supplier'}</p>
@@ -539,14 +539,14 @@ export function DashboardView() {
         <div className="flex items-center space-x-2">
           <button
             onClick={() => setIsCustomizeOpen(!isCustomizeOpen)}
-            className="flex items-center space-x-1.5 text-xs font-medium px-3 py-1.5 bg-white dark:bg-[#111827] border border-ink-900/20 text-ink-900 rounded-sm hover:bg-paper-50 transition-colors shadow-xs"
+            className="flex items-center space-x-1.5 text-xs font-medium px-3 py-1.5 bg-paper-100 border border-ink-900/20 text-ink-900 rounded-sm hover:bg-paper-50 transition-colors shadow-xs"
           >
             <Sliders className="w-3.5 h-3.5 text-slate-500" />
             <span>Customize Grid</span>
           </button>
           <button
             onClick={resetLayout}
-            className="p-1.5 bg-white dark:bg-[#111827] border border-ink-900/20 text-slate-500 hover:text-ink-900 rounded-sm hover:bg-paper-50 transition-colors"
+            className="p-1.5 bg-paper-100 border border-ink-900/20 text-slate-500 hover:text-ink-900 rounded-sm hover:bg-paper-50 transition-colors"
             title="Reset to Default Layout"
           >
             <RotateCcw className="w-3.5 h-3.5" />
@@ -557,7 +557,7 @@ export function DashboardView() {
 
       {/* Customize Drawer / Panel */}
       {isCustomizeOpen && (
-        <div className="bg-white dark:bg-[#111827] border border-ink-900/10 p-4 rounded-sm shadow-md mb-6 animate-in fade-in duration-150">
+        <div className="bg-paper-100 border border-ink-900/10 p-4 rounded-sm shadow-md mb-6 animate-in fade-in duration-150">
           <div className="flex items-center justify-between mb-3 border-b border-ink-900/10 pb-2">
             <div>
               <h3 className="text-sm font-semibold text-ink-900">Customize Dashboard Widgets</h3>
@@ -619,7 +619,7 @@ export function DashboardView() {
                 onDragStart={(e) => handleDragStart(e, widget.id)}
                 onDragOver={(e) => handleDragOver(e, widget.id)}
                 onDragEnd={handleDragEnd}
-                className={`bg-white dark:bg-[#111827] border border-ink-900/10 p-5 rounded-sm shadow-xs transition-all relative group flex flex-col justify-between ${
+                className={`bg-paper-100 border border-ink-900/10 p-5 rounded-sm shadow-xs transition-all relative group flex flex-col justify-between ${
                   isMedium ? 'md:col-span-1 lg:col-span-1 min-h-[260px]' : 'min-h-[160px]'
                 } ${draggedWidgetId === widget.id ? 'opacity-40 ring-2 ring-focus-blue-500' : 'hover:shadow-sm'}`}
               >

@@ -104,7 +104,7 @@ export function CustomerHubView() {
         <div className="flex space-x-2">
           <button 
             onClick={() => setIsAddingCustomer(true)}
-            className="bg-ink-900 text-white dark:text-slate-900 px-4 py-2 text-sm font-medium rounded-sm hover:bg-ink-900/90 transition-colors"
+            className="bg-ink-900 text-white  px-4 py-2 text-sm font-medium rounded-sm hover:bg-ink-900/90 transition-colors"
           >
             + Add Customer
           </button>
@@ -131,25 +131,25 @@ export function CustomerHubView() {
       {activeTab === 'Customer 360' && (
         <div className="space-y-6">
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-            <div className="bg-white dark:bg-[#111827] border border-ink-900/10 p-5 rounded-sm shadow-sm">
+            <div className="bg-paper-100 border border-ink-900/10 p-5 rounded-sm shadow-sm">
                <h3 className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">Total Customers</h3>
                <p className="text-2xl font-serif text-ink-900">{customers.length}</p>
             </div>
-            <div className="bg-white dark:bg-[#111827] border border-ink-900/10 p-5 rounded-sm shadow-sm">
+            <div className="bg-paper-100 border border-ink-900/10 p-5 rounded-sm shadow-sm">
                <h3 className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">Active Accounts</h3>
                <p className="text-2xl font-serif text-ink-900">{customers.length > 0 ? customers.length : 14}</p>
             </div>
-            <div className="bg-white dark:bg-[#111827] border border-ink-900/10 p-5 rounded-sm shadow-sm">
+            <div className="bg-paper-100 border border-ink-900/10 p-5 rounded-sm shadow-sm">
                <h3 className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">KRA Compliant</h3>
                <p className="text-2xl font-serif text-ledger-green-700">{customers.filter((c: any) => c.kraPin).length}</p>
             </div>
-            <div className="bg-white dark:bg-[#111827] border border-ink-900/10 p-5 rounded-sm shadow-sm">
+            <div className="bg-paper-100 border border-ink-900/10 p-5 rounded-sm shadow-sm">
                <h3 className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">Avg Lifetime Value</h3>
                <p className="text-2xl font-serif text-ink-900 tabular-currency">84,500</p>
             </div>
           </div>
 
-          <div className="bg-white dark:bg-[#111827] border border-ink-900/10 shadow-sm rounded-sm overflow-hidden">
+          <div className="bg-paper-100 border border-ink-900/10 shadow-sm rounded-sm overflow-hidden">
             <table className="w-full text-sm text-left">
               <thead className="bg-paper-100 border-b border-ink-900/10 text-xs uppercase text-slate-500">
                 <tr>
@@ -235,7 +235,7 @@ export function CustomerHubView() {
       )}
 
       {activeTab === 'Statement center' && (
-        <div className="bg-white dark:bg-[#111827] border border-ink-900/10 shadow-sm rounded-sm p-8 max-w-4xl mx-auto">
+        <div className="bg-paper-100 border border-ink-900/10 shadow-sm rounded-sm p-8 max-w-4xl mx-auto">
            <div className="flex items-center justify-between border-b border-ink-900/10 pb-6 mb-6">
               <div>
                 <h3 className="text-lg font-medium text-ink-900">Customer Statements</h3>
@@ -258,7 +258,7 @@ export function CustomerHubView() {
                     <div className="space-x-2">
                       <button 
                         onClick={() => setSelectedCustomer(c)}
-                        className="px-3 py-1.5 text-xs font-medium text-ink-900 bg-white dark:bg-[#111827] border border-ink-900/20 rounded-sm hover:bg-paper-50 transition-colors"
+                        className="px-3 py-1.5 text-xs font-medium text-ink-900 bg-paper-100 border border-ink-900/20 rounded-sm hover:bg-paper-50 transition-colors"
                       >
                         View 360° Profile
                       </button>
@@ -271,12 +271,12 @@ export function CustomerHubView() {
       )}
 
       {activeTab === 'Follow-ups' && (
-        <div className="bg-white dark:bg-[#111827] border border-ink-900/10 shadow-sm rounded-sm p-8 max-w-4xl mx-auto text-center">
+        <div className="bg-paper-100 border border-ink-900/10 shadow-sm rounded-sm p-8 max-w-4xl mx-auto text-center">
            <h3 className="text-xl font-medium text-ink-900 mb-2">Sales Pipeline & Follow-ups</h3>
            <p className="text-slate-500 mb-6">Track quotes, estimates, and set automated reminders to close active deals.</p>
            <button 
              onClick={() => setIsAddingCustomer(true)}
-             className="bg-ink-900 text-white dark:text-slate-900 px-6 py-2 text-sm font-medium rounded-sm hover:bg-ink-900/90 transition-colors"
+             className="bg-ink-900 text-white  px-6 py-2 text-sm font-medium rounded-sm hover:bg-ink-900/90 transition-colors"
            >
              + New Customer / Quote
            </button>

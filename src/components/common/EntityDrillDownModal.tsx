@@ -207,9 +207,9 @@ export function EntityDrillDownModal({
 
   return (
     <div className="fixed inset-0 bg-ink-900/50 backdrop-blur-xs z-50 flex items-center justify-center p-4 overflow-y-auto">
-      <div className="bg-white dark:bg-[#111827] rounded-sm shadow-2xl border border-ink-900/10 w-full max-w-4xl my-6 overflow-hidden flex flex-col max-h-[92vh] animate-in fade-in zoom-in-95 duration-150">
+      <div className="bg-paper-100 rounded-sm shadow-2xl border border-ink-900/10 w-full max-w-4xl my-6 overflow-hidden flex flex-col max-h-[92vh] animate-in fade-in zoom-in-95 duration-150">
         {/* Top Header Hero */}
-        <div className="px-6 py-5 border-b border-ink-900/10 bg-paper-50 dark:bg-ink-900/40">
+        <div className="px-6 py-5 border-b border-ink-900/10 bg-paper-50 ">
           <div className="flex items-start justify-between">
             <div className="flex items-center space-x-4">
               <div className="w-12 h-12 rounded-sm bg-ink-900 text-white flex items-center justify-center shadow-xs">
@@ -233,7 +233,7 @@ export function EntityDrillDownModal({
                     onClose();
                     onEdit(data);
                   }}
-                  className="bg-white dark:bg-[#111827] border border-ink-900/20 text-ink-900 hover:bg-paper-50 px-3 py-1.5 rounded-sm text-xs font-medium flex items-center space-x-1.5 transition-colors"
+                  className="bg-paper-100 border border-ink-900/20 text-ink-900 hover:bg-paper-50 px-3 py-1.5 rounded-sm text-xs font-medium flex items-center space-x-1.5 transition-colors"
                 >
                   <Edit3 className="h-3.5 w-3.5" />
                   <span>Edit</span>
@@ -252,25 +252,25 @@ export function EntityDrillDownModal({
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-4 pt-4 border-t border-ink-900/10 text-xs">
             {entityType === 'ITEM' && (
               <>
-                <div className="bg-white dark:bg-[#111827] p-2.5 rounded-sm border border-ink-900/10">
+                <div className="bg-paper-100 p-2.5 rounded-sm border border-ink-900/10">
                   <div className="text-slate-400 text-[10px] uppercase tracking-wider font-semibold">Selling Price</div>
                   <div className="text-base font-semibold text-ink-900 mt-0.5 tabular-currency">
                     {formatCurrency(data.priceCents || 0)}
                   </div>
                 </div>
-                <div className="bg-white dark:bg-[#111827] p-2.5 rounded-sm border border-ink-900/10">
+                <div className="bg-paper-100 p-2.5 rounded-sm border border-ink-900/10">
                   <div className="text-slate-400 text-[10px] uppercase tracking-wider font-semibold">Unit Cost</div>
                   <div className="text-base font-semibold text-ink-900 mt-0.5 tabular-currency">
                     {formatCurrency(data.costCents || 0)}
                   </div>
                 </div>
-                <div className="bg-white dark:bg-[#111827] p-2.5 rounded-sm border border-ink-900/10">
+                <div className="bg-paper-100 p-2.5 rounded-sm border border-ink-900/10">
                   <div className="text-slate-400 text-[10px] uppercase tracking-wider font-semibold">Gross Margin</div>
                   <div className="text-base font-semibold text-ledger-green-700 mt-0.5 font-mono">
                     {marginPct}% ({formatCurrency(Math.round(unitProfit * 100))})
                   </div>
                 </div>
-                <div className="bg-white dark:bg-[#111827] p-2.5 rounded-sm border border-ink-900/10">
+                <div className="bg-paper-100 p-2.5 rounded-sm border border-ink-900/10">
                   <div className="text-slate-400 text-[10px] uppercase tracking-wider font-semibold">Inventory Valuation</div>
                   <div className="text-base font-semibold text-ink-900 mt-0.5 tabular-currency">
                     {formatCurrency((data.quantityOnHand || 0) * (data.costCents || 0))}
@@ -281,19 +281,19 @@ export function EntityDrillDownModal({
 
             {entityType === 'VENDOR' && (
               <>
-                <div className="bg-white dark:bg-[#111827] p-2.5 rounded-sm border border-ink-900/10">
+                <div className="bg-paper-100 p-2.5 rounded-sm border border-ink-900/10">
                   <div className="text-slate-400 text-[10px] uppercase tracking-wider font-semibold">Payment Terms</div>
                   <div className="text-sm font-semibold text-ink-900 mt-0.5">{data.paymentTerms || 'Net 30'}</div>
                 </div>
-                <div className="bg-white dark:bg-[#111827] p-2.5 rounded-sm border border-ink-900/10">
+                <div className="bg-paper-100 p-2.5 rounded-sm border border-ink-900/10">
                   <div className="text-slate-400 text-[10px] uppercase tracking-wider font-semibold">Settlement Currency</div>
                   <div className="text-sm font-semibold text-ink-900 mt-0.5 font-mono">{data.currency || 'KES'}</div>
                 </div>
-                <div className="bg-white dark:bg-[#111827] p-2.5 rounded-sm border border-ink-900/10">
+                <div className="bg-paper-100 p-2.5 rounded-sm border border-ink-900/10">
                   <div className="text-slate-400 text-[10px] uppercase tracking-wider font-semibold">KRA PIN Status</div>
                   <div className="text-sm font-semibold text-ink-900 mt-0.5 font-mono">{data.kraPin || 'Not Set'}</div>
                 </div>
-                <div className="bg-white dark:bg-[#111827] p-2.5 rounded-sm border border-ink-900/10">
+                <div className="bg-paper-100 p-2.5 rounded-sm border border-ink-900/10">
                   <div className="text-slate-400 text-[10px] uppercase tracking-wider font-semibold">Total Linked Bills</div>
                   <div className="text-sm font-semibold text-focus-blue-600 mt-0.5">
                     {transactionsData?.length || 0} Bills Logged
@@ -304,21 +304,21 @@ export function EntityDrillDownModal({
 
             {entityType === 'CUSTOMER' && (
               <>
-                <div className="bg-white dark:bg-[#111827] p-2.5 rounded-sm border border-ink-900/10">
+                <div className="bg-paper-100 p-2.5 rounded-sm border border-ink-900/10">
                   <div className="text-slate-400 text-[10px] uppercase tracking-wider font-semibold">Credit Limit</div>
                   <div className="text-sm font-semibold text-ink-900 mt-0.5 tabular-currency">
                     {data.creditLimitCents ? formatCurrency(data.creditLimitCents) : 'Unrestricted'}
                   </div>
                 </div>
-                <div className="bg-white dark:bg-[#111827] p-2.5 rounded-sm border border-ink-900/10">
+                <div className="bg-paper-100 p-2.5 rounded-sm border border-ink-900/10">
                   <div className="text-slate-400 text-[10px] uppercase tracking-wider font-semibold">Price Tier</div>
                   <div className="text-sm font-semibold text-ink-900 mt-0.5">{data.priceTier || 'Standard Tier'}</div>
                 </div>
-                <div className="bg-white dark:bg-[#111827] p-2.5 rounded-sm border border-ink-900/10">
+                <div className="bg-paper-100 p-2.5 rounded-sm border border-ink-900/10">
                   <div className="text-slate-400 text-[10px] uppercase tracking-wider font-semibold">Discount Rate</div>
                   <div className="text-sm font-semibold text-ledger-green-700 mt-0.5 font-mono">{data.discountPercent || 0}% Off</div>
                 </div>
-                <div className="bg-white dark:bg-[#111827] p-2.5 rounded-sm border border-ink-900/10">
+                <div className="bg-paper-100 p-2.5 rounded-sm border border-ink-900/10">
                   <div className="text-slate-400 text-[10px] uppercase tracking-wider font-semibold">Invoices Generated</div>
                   <div className="text-sm font-semibold text-focus-blue-600 mt-0.5">
                     {transactionsData?.length || 0} Invoices
@@ -329,25 +329,25 @@ export function EntityDrillDownModal({
 
             {entityType === 'EMPLOYEE' && (
               <>
-                <div className="bg-white dark:bg-[#111827] p-2.5 rounded-sm border border-ink-900/10">
+                <div className="bg-paper-100 p-2.5 rounded-sm border border-ink-900/10">
                   <div className="text-slate-400 text-[10px] uppercase tracking-wider font-semibold">Monthly Base Salary</div>
                   <div className="text-sm font-semibold text-ink-900 mt-0.5 tabular-currency">
                     {formatCurrency(data.baseSalaryCents || 0)}
                   </div>
                 </div>
-                <div className="bg-white dark:bg-[#111827] p-2.5 rounded-sm border border-ink-900/10">
+                <div className="bg-paper-100 p-2.5 rounded-sm border border-ink-900/10">
                   <div className="text-slate-400 text-[10px] uppercase tracking-wider font-semibold">Statutory Allowances</div>
                   <div className="text-sm font-semibold text-ink-900 mt-0.5 tabular-currency">
                     {formatCurrency((data.housingAllowanceCents || 0) + (data.transportAllowanceCents || 0))}
                   </div>
                 </div>
-                <div className="bg-white dark:bg-[#111827] p-2.5 rounded-sm border border-ink-900/10">
+                <div className="bg-paper-100 p-2.5 rounded-sm border border-ink-900/10">
                   <div className="text-slate-400 text-[10px] uppercase tracking-wider font-semibold">Total Gross Pay</div>
                   <div className="text-sm font-semibold text-ledger-green-700 mt-0.5 tabular-currency">
                     {formatCurrency((data.baseSalaryCents || 0) + (data.housingAllowanceCents || 0) + (data.transportAllowanceCents || 0))}
                   </div>
                 </div>
-                <div className="bg-white dark:bg-[#111827] p-2.5 rounded-sm border border-ink-900/10">
+                <div className="bg-paper-100 p-2.5 rounded-sm border border-ink-900/10">
                   <div className="text-slate-400 text-[10px] uppercase tracking-wider font-semibold">National ID</div>
                   <div className="text-sm font-semibold text-ink-900 mt-0.5 font-mono">{data.nationalId || 'N/A'}</div>
                 </div>
@@ -356,21 +356,21 @@ export function EntityDrillDownModal({
 
             {entityType === 'ACCOUNT' && (
               <>
-                <div className="bg-white dark:bg-[#111827] p-2.5 rounded-sm border border-ink-900/10">
+                <div className="bg-paper-100 p-2.5 rounded-sm border border-ink-900/10">
                   <div className="text-slate-400 text-[10px] uppercase tracking-wider font-semibold">GL Account Code</div>
                   <div className="text-base font-semibold text-ink-900 mt-0.5 font-mono">{data.code}</div>
                 </div>
-                <div className="bg-white dark:bg-[#111827] p-2.5 rounded-sm border border-ink-900/10">
+                <div className="bg-paper-100 p-2.5 rounded-sm border border-ink-900/10">
                   <div className="text-slate-400 text-[10px] uppercase tracking-wider font-semibold">Account Class</div>
                   <div className="text-sm font-semibold text-ink-900 mt-0.5">{data.type}</div>
                 </div>
-                <div className="bg-white dark:bg-[#111827] p-2.5 rounded-sm border border-ink-900/10">
+                <div className="bg-paper-100 p-2.5 rounded-sm border border-ink-900/10">
                   <div className="text-slate-400 text-[10px] uppercase tracking-wider font-semibold">Current Balance</div>
                   <div className="text-base font-semibold text-ink-900 mt-0.5 tabular-currency">
                     {formatCurrency(data.balanceCents || 0)}
                   </div>
                 </div>
-                <div className="bg-white dark:bg-[#111827] p-2.5 rounded-sm border border-ink-900/10">
+                <div className="bg-paper-100 p-2.5 rounded-sm border border-ink-900/10">
                   <div className="text-slate-400 text-[10px] uppercase tracking-wider font-semibold">Sub-Classification</div>
                   <div className="text-sm font-semibold text-ink-900 mt-0.5">{data.subtype || 'Primary'}</div>
                 </div>
@@ -428,7 +428,7 @@ export function EntityDrillDownModal({
               {entityType === 'ITEM' && (
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div className="space-y-4">
-                    <div className="bg-paper-50 dark:bg-ink-900/30 p-4 rounded-sm border border-ink-900/10 space-y-3">
+                    <div className="bg-paper-50  p-4 rounded-sm border border-ink-900/10 space-y-3">
                       <h4 className="text-xs font-semibold uppercase text-slate-400 tracking-wider">Inventory Tracking</h4>
                       <div className="grid grid-cols-2 gap-3 text-xs">
                         <div>
@@ -450,7 +450,7 @@ export function EntityDrillDownModal({
                       </div>
                     </div>
 
-                    <div className="bg-paper-50 dark:bg-ink-900/30 p-4 rounded-sm border border-ink-900/10 space-y-3">
+                    <div className="bg-paper-50  p-4 rounded-sm border border-ink-900/10 space-y-3">
                       <h4 className="text-xs font-semibold uppercase text-slate-400 tracking-wider">Product Identifiers</h4>
                       <div className="space-y-2 text-xs">
                         <div className="flex justify-between items-center py-1 border-b border-ink-900/5">
@@ -477,7 +477,7 @@ export function EntityDrillDownModal({
                   </div>
 
                   <div className="space-y-4">
-                    <div className="bg-paper-50 dark:bg-ink-900/30 p-4 rounded-sm border border-ink-900/10 space-y-3">
+                    <div className="bg-paper-50  p-4 rounded-sm border border-ink-900/10 space-y-3">
                       <h4 className="text-xs font-semibold uppercase text-slate-400 tracking-wider">General Ledger Accounts</h4>
                       <div className="space-y-2 text-xs">
                         <div className="flex justify-between items-center py-1 border-b border-ink-900/5">
@@ -495,7 +495,7 @@ export function EntityDrillDownModal({
                       </div>
                     </div>
 
-                    <div className="bg-paper-50 dark:bg-ink-900/30 p-4 rounded-sm border border-ink-900/10 space-y-2">
+                    <div className="bg-paper-50  p-4 rounded-sm border border-ink-900/10 space-y-2">
                       <h4 className="text-xs font-semibold uppercase text-slate-400 tracking-wider">Item Catalog Description</h4>
                       <p className="text-xs text-ink-900 leading-relaxed">
                         {data.description || 'No detailed catalog description provided for this item.'}
@@ -509,7 +509,7 @@ export function EntityDrillDownModal({
               {entityType === 'VENDOR' && (
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div className="space-y-4">
-                    <div className="bg-paper-50 dark:bg-ink-900/30 p-4 rounded-sm border border-ink-900/10 space-y-3">
+                    <div className="bg-paper-50  p-4 rounded-sm border border-ink-900/10 space-y-3">
                       <h4 className="text-xs font-semibold uppercase text-slate-400 tracking-wider">Contact Profile</h4>
                       <div className="space-y-2 text-xs">
                         <div className="flex items-center space-x-2 py-1 border-b border-ink-900/5">
@@ -535,7 +535,7 @@ export function EntityDrillDownModal({
                       </div>
                     </div>
 
-                    <div className="bg-paper-50 dark:bg-ink-900/30 p-4 rounded-sm border border-ink-900/10 space-y-3">
+                    <div className="bg-paper-50  p-4 rounded-sm border border-ink-900/10 space-y-3">
                       <h4 className="text-xs font-semibold uppercase text-slate-400 tracking-wider">Physical Address</h4>
                       <p className="text-xs text-ink-900">
                         {data.address || 'Nairobi Business District'}, {data.city || 'Nairobi'}, {data.country || 'Kenya'} ({data.postalCode || '00100'})
@@ -544,7 +544,7 @@ export function EntityDrillDownModal({
                   </div>
 
                   <div className="space-y-4">
-                    <div className="bg-paper-50 dark:bg-ink-900/30 p-4 rounded-sm border border-ink-900/10 space-y-3">
+                    <div className="bg-paper-50  p-4 rounded-sm border border-ink-900/10 space-y-3">
                       <h4 className="text-xs font-semibold uppercase text-slate-400 tracking-wider">Settlement & Bank Details</h4>
                       <div className="space-y-2 text-xs">
                         <div className="flex justify-between items-center py-1 border-b border-ink-900/5">
@@ -573,7 +573,7 @@ export function EntityDrillDownModal({
               {entityType === 'CUSTOMER' && (
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div className="space-y-4">
-                    <div className="bg-paper-50 dark:bg-ink-900/30 p-4 rounded-sm border border-ink-900/10 space-y-3">
+                    <div className="bg-paper-50  p-4 rounded-sm border border-ink-900/10 space-y-3">
                       <h4 className="text-xs font-semibold uppercase text-slate-400 tracking-wider">Customer Overview</h4>
                       <div className="space-y-2 text-xs">
                         <div className="flex justify-between items-center py-1 border-b border-ink-900/5">
@@ -595,7 +595,7 @@ export function EntityDrillDownModal({
                       </div>
                     </div>
 
-                    <div className="bg-paper-50 dark:bg-ink-900/30 p-4 rounded-sm border border-ink-900/10 space-y-3">
+                    <div className="bg-paper-50  p-4 rounded-sm border border-ink-900/10 space-y-3">
                       <h4 className="text-xs font-semibold uppercase text-slate-400 tracking-wider">Billing Address</h4>
                       <p className="text-xs text-ink-900">
                         {data.billingAddress || data.shippingAddress || 'Nairobi CBD'}, {data.city || 'Nairobi'}, {data.country || 'Kenya'}
@@ -604,7 +604,7 @@ export function EntityDrillDownModal({
                   </div>
 
                   <div className="space-y-4">
-                    <div className="bg-paper-50 dark:bg-ink-900/30 p-4 rounded-sm border border-ink-900/10 space-y-3">
+                    <div className="bg-paper-50  p-4 rounded-sm border border-ink-900/10 space-y-3">
                       <h4 className="text-xs font-semibold uppercase text-slate-400 tracking-wider">Credit & Commercial Terms</h4>
                       <div className="space-y-2 text-xs">
                         <div className="flex justify-between items-center py-1 border-b border-ink-900/5">
@@ -635,7 +635,7 @@ export function EntityDrillDownModal({
               {entityType === 'EMPLOYEE' && (
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div className="space-y-4">
-                    <div className="bg-paper-50 dark:bg-ink-900/30 p-4 rounded-sm border border-ink-900/10 space-y-3">
+                    <div className="bg-paper-50  p-4 rounded-sm border border-ink-900/10 space-y-3">
                       <h4 className="text-xs font-semibold uppercase text-slate-400 tracking-wider">Employment Details</h4>
                       <div className="space-y-2 text-xs">
                         <div className="flex justify-between items-center py-1 border-b border-ink-900/5">
@@ -659,7 +659,7 @@ export function EntityDrillDownModal({
                   </div>
 
                   <div className="space-y-4">
-                    <div className="bg-paper-50 dark:bg-ink-900/30 p-4 rounded-sm border border-ink-900/10 space-y-3">
+                    <div className="bg-paper-50  p-4 rounded-sm border border-ink-900/10 space-y-3">
                       <h4 className="text-xs font-semibold uppercase text-slate-400 tracking-wider">Statutory Deductions & Payroll</h4>
                       <div className="space-y-2 text-xs">
                         <div className="flex justify-between items-center py-1 border-b border-ink-900/5">
@@ -687,7 +687,7 @@ export function EntityDrillDownModal({
               {/* ACCOUNT DETAILS */}
               {entityType === 'ACCOUNT' && (
                 <div className="space-y-4">
-                  <div className="bg-paper-50 dark:bg-ink-900/30 p-4 rounded-sm border border-ink-900/10 space-y-3">
+                  <div className="bg-paper-50  p-4 rounded-sm border border-ink-900/10 space-y-3">
                     <h4 className="text-xs font-semibold uppercase text-slate-400 tracking-wider">General Ledger Specification</h4>
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs">
                       <div>
@@ -730,9 +730,9 @@ export function EntityDrillDownModal({
                   <p className="text-xs text-slate-500">No linked transactions recorded yet.</p>
                 </div>
               ) : (
-                <div className="border border-ink-900/10 rounded-sm overflow-hidden bg-white dark:bg-[#111827]">
+                <div className="border border-ink-900/10 rounded-sm overflow-hidden bg-paper-100">
                   <table className="w-full text-xs text-left">
-                    <thead className="bg-paper-100 dark:bg-ink-900/40 text-slate-500 uppercase">
+                    <thead className="bg-paper-100  text-slate-500 uppercase">
                       <tr>
                         <th className="px-3.5 py-2.5">Date</th>
                         <th className="px-3.5 py-2.5">Reference</th>
@@ -769,7 +769,7 @@ export function EntityDrillDownModal({
           {/* COMPLIANCE & AUDIT TAB */}
           {activeTab === 'compliance' && (
             <div className="space-y-4">
-              <div className="bg-paper-50 dark:bg-ink-900/30 p-4 rounded-sm border border-ink-900/10 space-y-3">
+              <div className="bg-paper-50  p-4 rounded-sm border border-ink-900/10 space-y-3">
                 <div className="flex items-center space-x-2 text-ledger-green-700">
                   <ShieldCheck className="h-5 w-5" />
                   <span className="font-semibold text-xs uppercase tracking-wider">Statutory & Regulatory Audit Verification</span>
@@ -796,14 +796,14 @@ export function EntityDrillDownModal({
         </div>
 
         {/* Footer Actions */}
-        <div className="px-6 py-3.5 border-t border-ink-900/10 bg-paper-50 dark:bg-ink-900/40 flex items-center justify-between text-xs">
+        <div className="px-6 py-3.5 border-t border-ink-900/10 bg-paper-50  flex items-center justify-between text-xs">
           <span className="text-slate-400 font-mono text-[11px]">
             ID: {entityId || data.id || 'SYS-NEW'}
           </span>
           <div className="flex space-x-2">
             <button
               onClick={onClose}
-              className="bg-ink-900 text-white dark:text-slate-900 px-4 py-1.5 rounded-sm font-medium hover:bg-ink-900/90 transition-colors"
+              className="bg-ink-900 text-white  px-4 py-1.5 rounded-sm font-medium hover:bg-ink-900/90 transition-colors"
             >
               Close
             </button>

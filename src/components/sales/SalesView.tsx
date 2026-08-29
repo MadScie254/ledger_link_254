@@ -194,21 +194,21 @@ export function SalesView() {
         <div className="ledger-divider mb-6"></div>
 
         {!hasCustomers ? (
-          <div className="bg-white dark:bg-[#111827] p-8 border border-ink-900/10 rounded-sm text-center">
+          <div className="bg-paper-100 p-8 border border-ink-900/10 rounded-sm text-center">
             <p className="text-slate-500 mb-4">You need a customer to create an invoice.</p>
             <button 
               onClick={handleCreateMockCustomer}
-              className="bg-ink-900 text-white dark:text-slate-900 px-4 py-2 rounded-sm text-sm font-medium"
+              className="bg-ink-900 text-white  px-4 py-2 rounded-sm text-sm font-medium"
             >
               Add Sample Customer
             </button>
           </div>
         ) : (
-          <form onSubmit={handleCreateInvoice} className="bg-white dark:bg-[#111827] border border-ink-900/10 shadow-sm rounded-sm p-6 space-y-6">
+          <form onSubmit={handleCreateInvoice} className="bg-paper-100 border border-ink-900/10 shadow-sm rounded-sm p-6 space-y-6">
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
               <div>
                 <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">Customer *</label>
-                <select name="customerId" required className="w-full border border-ink-900/20 rounded-sm p-2 text-xs focus:ring-1 focus:ring-focus-blue-500 outline-none bg-white dark:bg-ink-900">
+                <select name="customerId" required className="w-full border border-ink-900/20 rounded-sm p-2 text-xs focus:ring-1 focus:ring-focus-blue-500 outline-none bg-paper-100">
                   {customersData?.customers?.map((c: any) => (
                     <option key={c.id} value={c.id}>{c.displayName}</option>
                   ))}
@@ -221,7 +221,7 @@ export function SalesView() {
                   name="currency" 
                   value={invoiceCurrency} 
                   onChange={(e) => handleCurrencyChange(e.target.value)}
-                  className="w-full border border-ink-900/20 rounded-sm p-2 text-xs focus:ring-1 focus:ring-focus-blue-500 outline-none bg-white dark:bg-ink-900"
+                  className="w-full border border-ink-900/20 rounded-sm p-2 text-xs focus:ring-1 focus:ring-focus-blue-500 outline-none bg-paper-100"
                 >
                   {SUPPORTED_CURRENCIES.map((c) => (
                     <option key={c.code} value={c.code}>{c.flag} {c.code} - {c.name}</option>
@@ -237,14 +237,14 @@ export function SalesView() {
                   name="exchangeRate" 
                   value={invoiceExchangeRate}
                   onChange={(e) => setInvoiceExchangeRate(e.target.value)}
-                  className="w-full border border-ink-900/20 rounded-sm p-2 text-xs focus:ring-1 focus:ring-focus-blue-500 outline-none font-mono bg-white dark:bg-ink-900"
+                  className="w-full border border-ink-900/20 rounded-sm p-2 text-xs focus:ring-1 focus:ring-focus-blue-500 outline-none font-mono bg-paper-100"
                 />
               </div>
             </div>
 
             <div className="border border-ink-900/10 rounded-sm overflow-hidden">
               <table className="w-full text-sm text-left">
-                <thead className="bg-paper-100 dark:bg-ink-900/40 border-b border-ink-900/10 text-xs uppercase text-slate-500">
+                <thead className="bg-paper-100  border-b border-ink-900/10 text-xs uppercase text-slate-500">
                   <tr>
                     <th className="px-4 py-3 font-semibold w-1/2">Description</th>
                     <th className="px-4 py-3 font-semibold">Income Account</th>
@@ -252,12 +252,12 @@ export function SalesView() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-ink-900/5">
-                  <tr className="bg-white dark:bg-[#111827]">
+                  <tr className="bg-paper-100">
                     <td className="p-2">
                       <input name="description" required placeholder="Consulting services / export..." className="w-full border border-ink-900/20 rounded-sm p-2 outline-none focus:ring-1 focus:ring-focus-blue-500 text-xs" />
                     </td>
                     <td className="p-2">
-                      <select name="accountId" required className="w-full border border-ink-900/20 rounded-sm p-2 outline-none focus:ring-1 focus:ring-focus-blue-500 text-xs bg-white dark:bg-ink-900">
+                      <select name="accountId" required className="w-full border border-ink-900/20 rounded-sm p-2 outline-none focus:ring-1 focus:ring-focus-blue-500 text-xs bg-paper-100">
                         {incomeAccounts.map((a: any) => (
                           <option key={a.id} value={a.id}>{a.code} - {a.name}</option>
                         ))}
@@ -290,13 +290,13 @@ export function SalesView() {
           <div className="flex space-x-2">
             <button 
               onClick={handleExportCSV}
-              className="bg-white dark:bg-[#111827] border border-ink-900/20 text-ink-900 px-4 py-2 text-sm font-medium rounded-sm hover:bg-paper-50 transition-colors flex items-center"
+              className="bg-paper-100 border border-ink-900/20 text-ink-900 px-4 py-2 text-sm font-medium rounded-sm hover:bg-paper-50 transition-colors flex items-center"
             >
               <Download className="h-4 w-4 mr-2" /> Export
             </button>
             <button 
               onClick={() => setIsBuilding(true)}
-              className="bg-ink-900 text-white dark:text-slate-900 px-4 py-2 text-sm font-medium rounded-sm hover:bg-ink-900/90 transition-colors"
+              className="bg-ink-900 text-white  px-4 py-2 text-sm font-medium rounded-sm hover:bg-ink-900/90 transition-colors"
             >
               Create Invoice
             </button>
@@ -334,7 +334,7 @@ export function SalesView() {
       ) : (
 
 
-      <div className="bg-white dark:bg-[#111827] border border-ink-900/10 shadow-sm rounded-sm overflow-hidden">
+      <div className="bg-paper-100 border border-ink-900/10 shadow-sm rounded-sm overflow-hidden">
         {loadingInvoices ? (
           <div className="p-16 text-center text-slate-500">Loading invoices...</div>
         ) : invoicesData?.invoices?.length === 0 ? (

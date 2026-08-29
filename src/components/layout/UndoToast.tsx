@@ -46,7 +46,7 @@ export function UndoToast() {
 
   return (
     <div className={`fixed bottom-4 right-4 z-50 transition-all duration-300 transform ${isVisible ? 'translate-y-0 opacity-100' : 'translate-y-4 opacity-0'}`}>
-      <div className="bg-ink-900 text-white dark:text-slate-900 rounded-md shadow-lg p-4 flex items-center gap-4 border border-ink-900/20">
+      <div className="bg-ink-900 text-white  rounded-md shadow-lg p-4 flex items-center gap-4 border border-ink-900/20">
         <p className="text-sm">{action?.message || 'Action completed'}</p>
         <button 
           onClick={handleUndo}

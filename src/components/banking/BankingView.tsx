@@ -189,14 +189,14 @@ export function BankingView() {
         <div className="flex items-center space-x-3">
           <button 
             onClick={handleExportCSV}
-            className="bg-white dark:bg-[#111827] border border-ink-900/20 text-ink-900 px-3 py-2 text-sm font-medium rounded-sm hover:bg-paper-50 transition-colors flex items-center"
+            className="bg-paper-100 border border-ink-900/20 text-ink-900 px-3 py-2 text-sm font-medium rounded-sm hover:bg-paper-50 transition-colors flex items-center"
           >
             <Download className="h-4 w-4 mr-1.5" /> Export CSV
           </button>
           <button 
             onClick={() => syncMutation.mutate()}
             disabled={syncMutation.isPending}
-            className="bg-ink-900 text-white dark:text-slate-900 px-4 py-2 text-sm font-medium rounded-sm hover:bg-ink-900/90 transition-colors flex items-center disabled:opacity-50"
+            className="bg-ink-900 text-white  px-4 py-2 text-sm font-medium rounded-sm hover:bg-ink-900/90 transition-colors flex items-center disabled:opacity-50"
           >
             <RefreshCw className={`h-4 w-4 mr-1.5 ${syncMutation.isPending ? 'animate-spin' : ''}`} />
             {syncMutation.isPending ? 'Syncing...' : 'Sync Feed'}
@@ -209,7 +209,7 @@ export function BankingView() {
       {unreviewedCount > 0 && (
         <div className="bg-gradient-to-r from-amber-500/10 via-focus-blue-500/10 to-ledger-green-700/10 border border-amber-500/30 rounded-sm p-4 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
           <div className="flex items-start space-x-3">
-            <div className="p-2 rounded-sm bg-amber-500 text-white dark:text-slate-900 mt-0.5">
+            <div className="p-2 rounded-sm bg-amber-500 text-white  mt-0.5">
               <Sparkles className="w-5 h-5" />
             </div>
             <div>
@@ -227,14 +227,14 @@ export function BankingView() {
           <div className="flex items-center space-x-2">
             <button
               onClick={() => setActiveTab('AI Match Assistant')}
-              className="px-3 py-1.5 text-xs font-semibold text-focus-blue-500 border border-focus-blue-500/30 rounded-sm hover:bg-white dark:bg-[#111827] transition-colors"
+              className="px-3 py-1.5 text-xs font-semibold text-focus-blue-500 border border-focus-blue-500/30 rounded-sm hover:bg-paper-100 transition-colors"
             >
               Review Matches ({aiMatches.length})
             </button>
             <button
               onClick={() => autoReconcileMutation.mutate(85)}
               disabled={autoReconcileMutation.isPending || highConfidenceCount === 0}
-              className="px-4 py-1.5 text-xs font-bold bg-ink-900 text-white dark:text-slate-900 rounded-sm hover:bg-ink-900/90 transition-colors flex items-center disabled:opacity-50"
+              className="px-4 py-1.5 text-xs font-bold bg-ink-900 text-white  rounded-sm hover:bg-ink-900/90 transition-colors flex items-center disabled:opacity-50"
             >
               <CheckCheck className="w-4 h-4 mr-1.5" />
               {autoReconcileMutation.isPending ? 'Reconciling...' : `Auto-Reconcile (${highConfidenceCount})`}
@@ -267,7 +267,7 @@ export function BankingView() {
       </div>
 
       {activeTab === 'Bank transactions' && (
-        <div className="bg-white dark:bg-[#111827] border border-ink-900/10 shadow-sm rounded-sm overflow-hidden">
+        <div className="bg-paper-100 border border-ink-900/10 shadow-sm rounded-sm overflow-hidden">
           {/* Filters Bar */}
           <div className="p-4 border-b border-ink-900/10 bg-paper-50 flex flex-wrap items-center justify-between gap-3">
             <div className="flex items-center space-x-3 flex-1 min-w-[240px]">
@@ -278,13 +278,13 @@ export function BankingView() {
                   placeholder="Filter by description, reference, vendor..."
                   value={filterSearch}
                   onChange={(e) => setFilterSearch(e.target.value)}
-                  className="w-full pl-9 pr-3 py-1.5 text-sm bg-white dark:bg-[#111827] border border-ink-900/20 rounded-sm focus:outline-none focus:ring-1 focus:ring-focus-blue-500"
+                  className="w-full pl-9 pr-3 py-1.5 text-sm bg-paper-100 border border-ink-900/20 rounded-sm focus:outline-none focus:ring-1 focus:ring-focus-blue-500"
                 />
               </div>
               <select
                 value={filterDirection}
                 onChange={(e) => setFilterDirection(e.target.value)}
-                className="bg-white dark:bg-[#111827] border border-ink-900/20 text-xs rounded-sm px-2.5 py-2 text-ink-900 outline-none"
+                className="bg-paper-100 border border-ink-900/20 text-xs rounded-sm px-2.5 py-2 text-ink-900 outline-none"
               >
                 <option value="ALL">All Flows</option>
                 <option value="IN">Money In (Credits)</option>
@@ -293,7 +293,7 @@ export function BankingView() {
               <select
                 value={filterStatus}
                 onChange={(e) => setFilterStatus(e.target.value)}
-                className="bg-white dark:bg-[#111827] border border-ink-900/20 text-xs rounded-sm px-2.5 py-2 text-ink-900 outline-none"
+                className="bg-paper-100 border border-ink-900/20 text-xs rounded-sm px-2.5 py-2 text-ink-900 outline-none"
               >
                 <option value="ALL">All Statuses</option>
                 <option value="UNMATCHED">Unmatched</option>
@@ -378,7 +378,7 @@ export function BankingView() {
                           <button
                             onClick={() => handleAcceptAIMatch(match)}
                             disabled={matchMutation.isPending}
-                            className="bg-ledger-green-700 hover:bg-ledger-green-800 text-white dark:text-slate-900 px-3 py-1 text-xs font-semibold rounded-sm transition-colors shadow-sm"
+                            className="bg-ledger-green-700 hover:bg-ledger-green-800 text-white  px-3 py-1 text-xs font-semibold rounded-sm transition-colors shadow-sm"
                           >
                             Accept Match
                           </button>
@@ -403,7 +403,7 @@ export function BankingView() {
       {/* AI Match Assistant Dedicated Tab */}
       {activeTab === 'AI Match Assistant' && (
         <div className="space-y-4">
-          <div className="bg-white dark:bg-[#111827] border border-ink-900/10 rounded-sm p-6 shadow-sm">
+          <div className="bg-paper-100 border border-ink-900/10 rounded-sm p-6 shadow-sm">
             <div className="flex justify-between items-center mb-6">
               <div>
                 <h3 className="text-lg font-bold text-ink-900 flex items-center">
@@ -417,7 +417,7 @@ export function BankingView() {
               <button
                 onClick={() => autoReconcileMutation.mutate(85)}
                 disabled={autoReconcileMutation.isPending || highConfidenceCount === 0}
-                className="bg-ink-900 text-white dark:text-slate-900 px-4 py-2 text-sm font-semibold rounded-sm hover:bg-ink-900/90 transition-colors flex items-center disabled:opacity-50"
+                className="bg-ink-900 text-white  px-4 py-2 text-sm font-semibold rounded-sm hover:bg-ink-900/90 transition-colors flex items-center disabled:opacity-50"
               >
                 <CheckCheck className="w-4 h-4 mr-2" />
                 Auto-Reconcile All High Confidence ({highConfidenceCount})
@@ -442,8 +442,8 @@ export function BankingView() {
                       <div className="flex items-center space-x-2">
                         <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${
                           candidate.confidence >= 90 
-                            ? 'bg-ledger-green-700 text-white dark:text-slate-900' 
-                            : 'bg-amber-500 text-white dark:text-slate-900'
+                            ? 'bg-ledger-green-700 text-white ' 
+                            : 'bg-amber-500 text-white '
                         }`}>
                           {candidate.confidence}% Confidence
                         </span>
@@ -481,7 +481,7 @@ export function BankingView() {
                       <button
                         onClick={() => handleAcceptAIMatch(candidate)}
                         disabled={matchMutation.isPending}
-                        className="bg-ledger-green-700 hover:bg-ledger-green-800 text-white dark:text-slate-900 px-4 py-2 text-xs font-bold rounded-sm transition-colors"
+                        className="bg-ledger-green-700 hover:bg-ledger-green-800 text-white  px-4 py-2 text-xs font-bold rounded-sm transition-colors"
                       >
                         Accept & Reconcile
                       </button>
@@ -495,13 +495,13 @@ export function BankingView() {
       )}
 
       {activeTab === 'Rules' && (
-        <div className="bg-white dark:bg-[#111827] border border-ink-900/10 shadow-sm rounded-sm p-8 max-w-4xl mx-auto">
+        <div className="bg-paper-100 border border-ink-900/10 shadow-sm rounded-sm p-8 max-w-4xl mx-auto">
            <div className="flex justify-between items-center mb-6">
              <div>
                <h3 className="text-lg font-medium text-ink-900">Auto-Categorization Rules</h3>
                <p className="text-sm text-slate-500">Automatically map recurring bank lines to your ledger accounts.</p>
              </div>
-             <button className="bg-ink-900 text-white dark:text-slate-900 px-4 py-2 text-sm font-medium rounded-sm hover:bg-ink-900/90 transition-colors">
+             <button className="bg-ink-900 text-white  px-4 py-2 text-sm font-medium rounded-sm hover:bg-ink-900/90 transition-colors">
                Create Rule
              </button>
            </div>
@@ -533,7 +533,7 @@ export function BankingView() {
       )}
 
       {activeTab === 'Reconcile' && (
-        <div className="bg-white dark:bg-[#111827] border border-ink-900/10 shadow-sm rounded-sm p-8 max-w-4xl mx-auto text-center">
+        <div className="bg-paper-100 border border-ink-900/10 shadow-sm rounded-sm p-8 max-w-4xl mx-auto text-center">
            <h3 className="text-xl font-medium text-ink-900 mb-2">Month-End Bank Reconciliation</h3>
            <p className="text-slate-500 mb-6">Verify statement balances against double-entry general ledger journals.</p>
            
@@ -556,7 +556,7 @@ export function BankingView() {
            <div>
              <button 
               onClick={() => alert('Official Reconciliation Statement Generated')}
-              className="bg-ink-900 text-white dark:text-slate-900 px-6 py-3 text-sm font-medium rounded-sm hover:bg-ink-900/90 transition-colors shadow-sm"
+              className="bg-ink-900 text-white  px-6 py-3 text-sm font-medium rounded-sm hover:bg-ink-900/90 transition-colors shadow-sm"
              >
                Publish Reconciliation Report
              </button>
@@ -565,7 +565,7 @@ export function BankingView() {
       )}
 
       {activeTab === 'Bank connections' && (
-        <div className="bg-white dark:bg-[#111827] border border-ink-900/10 shadow-sm rounded-sm p-8 max-w-4xl mx-auto">
+        <div className="bg-paper-100 border border-ink-900/10 shadow-sm rounded-sm p-8 max-w-4xl mx-auto">
            <h3 className="text-lg font-medium text-ink-900 mb-6">Linked Accounts & Gateways</h3>
            
            <div className="space-y-4">
@@ -600,7 +600,7 @@ export function BankingView() {
       {/* Match Modal */}
       {matchingTx && (
         <div className="fixed inset-0 bg-ink-900/20 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-white dark:bg-[#111827] rounded-sm shadow-xl border border-ink-900/10 w-full max-w-2xl p-6">
+          <div className="bg-paper-100 rounded-sm shadow-xl border border-ink-900/10 w-full max-w-2xl p-6">
             <h3 className="text-xl font-serif text-ink-900 mb-4">Reconcile Transaction</h3>
             
             <div className="p-4 border border-ink-900/10 bg-paper-50 rounded-sm mb-6 flex justify-between items-center">
@@ -623,7 +623,7 @@ export function BankingView() {
                 <button 
                   onClick={() => handleMatchNew(matchingTx)}
                   disabled={matchMutation.isPending}
-                  className="w-full bg-ink-900 text-white dark:text-slate-900 px-4 py-2 text-sm font-medium rounded-sm hover:bg-ink-900/90 transition-colors"
+                  className="w-full bg-ink-900 text-white  px-4 py-2 text-sm font-medium rounded-sm hover:bg-ink-900/90 transition-colors"
                 >
                   Confirm & Post Entry
                 </button>
@@ -639,7 +639,7 @@ export function BankingView() {
                     {journalsData.entries.slice(0, 6).map((je: any) => (
                       <div 
                         key={je.id} 
-                        className="p-3 border border-ink-900/10 rounded-sm bg-white dark:bg-[#111827] hover:border-focus-blue-500 cursor-pointer flex justify-between items-center"
+                        className="p-3 border border-ink-900/10 rounded-sm bg-paper-100 hover:border-focus-blue-500 cursor-pointer flex justify-between items-center"
                         onClick={() => matchMutation.mutate({ transactionId: matchingTx.id, existingJournalEntryId: je.id })}
                       >
                         <div>

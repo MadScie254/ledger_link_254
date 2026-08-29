@@ -16,6 +16,7 @@ import { TeamService } from './team';
 import { ReportsService } from './reports';
 import { OrganizationService } from './organizations';
 import { CurrencyService } from './currency';
+import { GeminiService } from './gemini';
 
 export const apiRouter = Router();
 
@@ -363,6 +364,17 @@ apiRouter.post('/bills', async (req, res) => {
     res.json({ id });
   } catch (err: any) {
     res.status(400).json({ error: err.message });
+  }
+});
+
+apiRouter.post('/expenses/scan', async (req, res) => {
+  try {
+    const { image, mimeType } = req.body;
+    if (!image) throw new Error('Image data is required');
+    const result = await GeminiService.scanReceipt(image, mimeType || 'image/jpeg');
+    res.json(result);
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
   }
 });
 

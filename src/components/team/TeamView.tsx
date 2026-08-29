@@ -30,13 +30,13 @@ export function TeamView() {
     <div className="max-w-6xl mx-auto">
       <div className="flex items-center justify-between mb-2">
         <h1 className="text-2xl font-serif text-ink-900">Team & Permissions</h1>
-        <button className="bg-ink-900 text-white dark:text-slate-900 px-4 py-2 text-sm font-medium rounded-sm hover:bg-ink-900/90 transition-colors">
+        <button className="bg-ink-900 text-white  px-4 py-2 text-sm font-medium rounded-sm hover:bg-ink-900/90 transition-colors">
           Invite Member
         </button>
       </div>
       <div className="ledger-divider mb-6"></div>
 
-      <div className="bg-white dark:bg-[#111827] border border-ink-900/10 shadow-sm rounded-sm overflow-hidden">
+      <div className="bg-paper-100 border border-ink-900/10 shadow-sm rounded-sm overflow-hidden">
         <table className="w-full text-sm text-left">
           <thead className="bg-paper-100 border-b border-ink-900/10 text-xs uppercase text-slate-500">
             <tr>
@@ -59,7 +59,7 @@ export function TeamView() {
                     <div className="text-slate-500 text-xs">{m.email}</div>
                   </td>
                   <td className="px-4 py-3">
-                    <span className={`inline-flex items-center px-2 py-1 rounded text-xs font-medium ${m.role === 'Admin' ? 'bg-ink-900 text-white dark:text-slate-900' : 'bg-paper-100 text-slate-700 border border-ink-900/10'}`}>
+                    <span className={`inline-flex items-center px-2 py-1 rounded text-xs font-medium ${m.role === 'Admin' ? 'bg-ink-900 text-white ' : 'bg-paper-100 text-slate-700 border border-ink-900/10'}`}>
                       {m.role}
                     </span>
                   </td>
@@ -78,7 +78,7 @@ export function TeamView() {
                 <div className="text-slate-500 text-xs">danieleinstein1998@gmail.com</div>
               </td>
               <td className="px-4 py-3">
-                <span className="inline-flex items-center px-2 py-1 rounded text-xs font-medium bg-ink-900 text-white dark:text-slate-900">
+                <span className="inline-flex items-center px-2 py-1 rounded text-xs font-medium bg-ink-900 text-white ">
                   Owner / Super Admin
                 </span>
               </td>
@@ -95,12 +95,12 @@ export function TeamView() {
             <h3 className="text-lg font-medium text-ink-900 mb-1">Audit Log</h3>
             <p className="text-sm text-slate-500">Enterprise audit trailing is enabled. All structural ledger modifications are permanently recorded.</p>
           </div>
-          <button className="text-sm font-medium text-focus-blue-500 border border-focus-blue-500/30 px-4 py-2 rounded-sm hover:bg-white dark:bg-[#111827] transition-colors">
+          <button className="text-sm font-medium text-focus-blue-500 border border-focus-blue-500/30 px-4 py-2 rounded-sm hover:bg-paper-100 transition-colors">
             Export Audit Trail (CSV)
           </button>
         </div>
 
-        <div className="bg-white dark:bg-[#111827] border border-ink-900/10 rounded-sm overflow-hidden">
+        <div className="bg-paper-100 border border-ink-900/10 rounded-sm overflow-hidden">
           <table className="w-full text-sm text-left">
             <thead className="bg-paper-100 border-b border-ink-900/10 text-xs uppercase text-slate-500">
               <tr>

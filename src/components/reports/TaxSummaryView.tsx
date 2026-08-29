@@ -103,7 +103,7 @@ export function TaxSummaryView({ onBack }: { onBack: () => void }) {
   if (isLoading) return <div className="p-16 text-center text-slate-500">Generating tax summary...</div>;
 
   return (
-    <div className="bg-white dark:bg-[#111827] border border-ink-900/10 shadow-sm rounded-sm">
+    <div className="bg-paper-100 border border-ink-900/10 shadow-sm rounded-sm">
       <div className="p-6 border-b border-ink-900/10 flex items-center justify-between bg-paper-50">
         <div>
           <button 
@@ -119,7 +119,7 @@ export function TaxSummaryView({ onBack }: { onBack: () => void }) {
           <select 
             value={period}
             onChange={(e) => setPeriod(e.target.value)}
-            className="bg-white dark:bg-[#111827] border border-ink-900/20 text-ink-900 text-sm rounded-sm px-3 py-2 focus:ring-1 focus:ring-focus-blue-500 outline-none"
+            className="bg-paper-100 border border-ink-900/20 text-ink-900 text-sm rounded-sm px-3 py-2 focus:ring-1 focus:ring-focus-blue-500 outline-none"
           >
             <option>August 2026</option>
             <option>July 2026</option>
@@ -127,13 +127,13 @@ export function TaxSummaryView({ onBack }: { onBack: () => void }) {
             <option>Q2 2026</option>
             <option>Q1 2026</option>
           </select>
-          <button onClick={handleExportExcel} className="bg-white dark:bg-[#111827] border border-ink-900/20 text-ink-900 px-3 py-2 text-sm font-medium rounded-sm hover:bg-paper-50 transition-colors">
+          <button onClick={handleExportExcel} className="bg-paper-100 border border-ink-900/20 text-ink-900 px-3 py-2 text-sm font-medium rounded-sm hover:bg-paper-50 transition-colors">
             Excel
           </button>
-          <button onClick={handlePrint} className="bg-white dark:bg-[#111827] border border-ink-900/20 text-ink-900 px-3 py-2 text-sm font-medium rounded-sm hover:bg-paper-50 transition-colors inline-flex items-center">
+          <button onClick={handlePrint} className="bg-paper-100 border border-ink-900/20 text-ink-900 px-3 py-2 text-sm font-medium rounded-sm hover:bg-paper-50 transition-colors inline-flex items-center">
             <Printer className="w-4 h-4 mr-1.5" /> Print
           </button>
-          <button onClick={handleExportPDF} className="bg-ink-900 text-white dark:text-slate-900 px-4 py-2 text-sm font-medium rounded-sm hover:bg-ink-900/90 transition-colors inline-flex items-center">
+          <button onClick={handleExportPDF} className="bg-ink-900 text-white  px-4 py-2 text-sm font-medium rounded-sm hover:bg-ink-900/90 transition-colors inline-flex items-center">
             <Download className="w-4 h-4 mr-1.5" /> Export PDF
           </button>
         </div>
@@ -148,7 +148,7 @@ export function TaxSummaryView({ onBack }: { onBack: () => void }) {
               <p className="text-xs text-slate-500">42 validated eTIMS invoices & cryptographically signed QR receipts on file.</p>
             </div>
           </div>
-          <span className="text-xs font-mono font-bold px-2 py-1 bg-white dark:bg-[#111827] rounded text-slate-700 border border-ink-900/10">
+          <span className="text-xs font-mono font-bold px-2 py-1 bg-paper-100 rounded text-slate-700 border border-ink-900/10">
             PIN: {data?.kraPin || 'P051239847Z'}
           </span>
         </div>
@@ -193,7 +193,7 @@ export function TaxSummaryView({ onBack }: { onBack: () => void }) {
           </div>
 
           {/* Final Net Tax */}
-          <div className="p-5 bg-ink-900 text-white dark:text-slate-900 flex justify-between items-center">
+          <div className="p-5 bg-ink-900 text-white  flex justify-between items-center">
             <div>
               <p className="text-xs uppercase tracking-widest text-slate-300">Net Tax Payable to KRA</p>
               <p className="text-xs text-slate-400 mt-0.5">Due by 20th of the following month</p>

@@ -100,7 +100,7 @@ export function BalanceSheetView({ onBack }: { onBack: () => void }) {
   if (isLoading) return <div className="p-16 text-center text-slate-500">Generating balance sheet...</div>;
 
   return (
-    <div className="bg-white dark:bg-[#111827] border border-ink-900/10 shadow-sm rounded-sm">
+    <div className="bg-paper-100 border border-ink-900/10 shadow-sm rounded-sm">
       <div className="p-6 border-b border-ink-900/10 flex items-center justify-between bg-paper-50">
         <div>
           <button 
@@ -117,15 +117,15 @@ export function BalanceSheetView({ onBack }: { onBack: () => void }) {
             type="date"
             value={asOfDate}
             onChange={(e) => setAsOfDate(e.target.value)}
-            className="bg-white dark:bg-[#111827] border border-ink-900/20 text-ink-900 text-sm rounded-sm px-3 py-2 focus:ring-1 focus:ring-focus-blue-500 outline-none"
+            className="bg-paper-100 border border-ink-900/20 text-ink-900 text-sm rounded-sm px-3 py-2 focus:ring-1 focus:ring-focus-blue-500 outline-none"
           />
-          <button onClick={handleExportExcel} className="bg-white dark:bg-[#111827] border border-ink-900/20 text-ink-900 px-3 py-2 text-sm font-medium rounded-sm hover:bg-paper-50 transition-colors">
+          <button onClick={handleExportExcel} className="bg-paper-100 border border-ink-900/20 text-ink-900 px-3 py-2 text-sm font-medium rounded-sm hover:bg-paper-50 transition-colors">
             Excel
           </button>
-          <button onClick={handlePrint} className="bg-white dark:bg-[#111827] border border-ink-900/20 text-ink-900 px-3 py-2 text-sm font-medium rounded-sm hover:bg-paper-50 transition-colors inline-flex items-center">
+          <button onClick={handlePrint} className="bg-paper-100 border border-ink-900/20 text-ink-900 px-3 py-2 text-sm font-medium rounded-sm hover:bg-paper-50 transition-colors inline-flex items-center">
             <Printer className="w-4 h-4 mr-1.5" /> Print
           </button>
-          <button onClick={handleExportPDF} className="bg-ink-900 text-white dark:text-slate-900 px-4 py-2 text-sm font-medium rounded-sm hover:bg-ink-900/90 transition-colors inline-flex items-center">
+          <button onClick={handleExportPDF} className="bg-ink-900 text-white  px-4 py-2 text-sm font-medium rounded-sm hover:bg-ink-900/90 transition-colors inline-flex items-center">
             <Download className="w-4 h-4 mr-1.5" /> Export PDF
           </button>
         </div>
@@ -206,7 +206,7 @@ export function BalanceSheetView({ onBack }: { onBack: () => void }) {
             </tr>
 
             {/* TOTAL LIABILITIES & EQUITY */}
-            <tr className="bg-ink-900 text-white dark:text-slate-900">
+            <tr className="bg-ink-900 text-white ">
               <td className="py-4 pl-4 font-bold rounded-l-sm">TOTAL LIABILITIES & EQUITY</td>
               <td className="py-4 pr-4 text-right tabular-currency font-bold rounded-r-sm">{formatCurrency(totalLiabilitiesAndEquity)}</td>
             </tr>

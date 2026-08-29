@@ -113,7 +113,7 @@ export function ProfitAndLossView({ onBack }: { onBack: () => void }) {
   if (isLoading) return <div className="p-16 text-center text-slate-500">Loading report...</div>;
 
   return (
-    <div className="bg-white dark:bg-[#111827] border border-ink-900/10 shadow-sm rounded-sm relative">
+    <div className="bg-paper-100 border border-ink-900/10 shadow-sm rounded-sm relative">
       <div className="p-6 border-b border-ink-900/10 flex items-center justify-between bg-paper-50">
         <div>
           <button 
@@ -129,20 +129,20 @@ export function ProfitAndLossView({ onBack }: { onBack: () => void }) {
           <select 
             value={dateRange}
             onChange={(e) => setDateRange(e.target.value)}
-            className="bg-white dark:bg-[#111827] border border-ink-900/20 text-ink-900 text-sm rounded-sm px-3 py-2 focus:ring-1 focus:ring-focus-blue-500 outline-none"
+            className="bg-paper-100 border border-ink-900/20 text-ink-900 text-sm rounded-sm px-3 py-2 focus:ring-1 focus:ring-focus-blue-500 outline-none"
           >
             <option>This Month</option>
             <option>This Quarter</option>
             <option>This Year-to-date</option>
             <option>Last Year</option>
           </select>
-          <button onClick={handleExportExcel} className="bg-white dark:bg-[#111827] border border-ink-900/20 text-ink-900 px-3 py-2 text-sm font-medium rounded-sm hover:bg-paper-50 transition-colors">
+          <button onClick={handleExportExcel} className="bg-paper-100 border border-ink-900/20 text-ink-900 px-3 py-2 text-sm font-medium rounded-sm hover:bg-paper-50 transition-colors">
             Excel
           </button>
-          <button onClick={handlePrint} className="bg-white dark:bg-[#111827] border border-ink-900/20 text-ink-900 px-3 py-2 text-sm font-medium rounded-sm hover:bg-paper-50 transition-colors inline-flex items-center">
+          <button onClick={handlePrint} className="bg-paper-100 border border-ink-900/20 text-ink-900 px-3 py-2 text-sm font-medium rounded-sm hover:bg-paper-50 transition-colors inline-flex items-center">
             <Printer className="w-4 h-4 mr-1.5" /> Print
           </button>
-          <button onClick={handleExportPDF} className="bg-ink-900 text-white dark:text-slate-900 px-4 py-2 text-sm font-medium rounded-sm hover:bg-ink-900/90 transition-colors inline-flex items-center">
+          <button onClick={handleExportPDF} className="bg-ink-900 text-white  px-4 py-2 text-sm font-medium rounded-sm hover:bg-ink-900/90 transition-colors inline-flex items-center">
             <Download className="w-4 h-4 mr-1.5" /> Export PDF
           </button>
         </div>
@@ -222,7 +222,7 @@ export function ProfitAndLossView({ onBack }: { onBack: () => void }) {
               </tr>
 
               {/* NET PROFIT */}
-              <tr className="bg-ink-900 text-white dark:text-slate-900">
+              <tr className="bg-ink-900 text-white ">
                 <td className="py-4 pl-4 font-bold rounded-l-sm">Net Profit</td>
                 <td className="py-4 pr-4 text-right tabular-currency font-bold rounded-r-sm">{formatCurrency(netProfit)}</td>
               </tr>
@@ -233,7 +233,7 @@ export function ProfitAndLossView({ onBack }: { onBack: () => void }) {
 
       {drillDownAccount && (
         <div className="fixed inset-0 bg-ink-900/20 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-white dark:bg-[#111827] rounded-sm shadow-xl border border-ink-900/10 w-full max-w-4xl p-6">
+          <div className="bg-paper-100 rounded-sm shadow-xl border border-ink-900/10 w-full max-w-4xl p-6">
             <div className="flex justify-between items-center mb-4 border-b border-ink-900/10 pb-4">
               <div>
                 <h3 className="text-xl font-serif text-ink-900">General Ledger Details</h3>
@@ -274,7 +274,7 @@ export function ProfitAndLossView({ onBack }: { onBack: () => void }) {
             </table>
             
             <div className="flex justify-end">
-               <button onClick={() => setDrillDownAccount(null)} className="px-4 py-2 bg-ink-900 text-white dark:text-slate-900 text-sm font-medium rounded-sm hover:bg-ink-900/90 transition-colors">
+               <button onClick={() => setDrillDownAccount(null)} className="px-4 py-2 bg-ink-900 text-white  text-sm font-medium rounded-sm hover:bg-ink-900/90 transition-colors">
                  Close
                </button>
             </div>

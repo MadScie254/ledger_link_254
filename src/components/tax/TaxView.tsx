@@ -31,30 +31,30 @@ export function TaxView() {
       {activeTab === 'VAT / Tax center' && (
         <div className="space-y-6">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            <div className="bg-white dark:bg-[#111827] border border-ink-900/10 p-6 rounded-sm shadow-sm">
+            <div className="bg-paper-100 border border-ink-900/10 p-6 rounded-sm shadow-sm">
               <h3 className="text-sm font-medium text-slate-500 uppercase tracking-wider mb-2">Output VAT (Sales)</h3>
               <p className="text-3xl font-serif text-ink-900 tabular-currency">145,000.00</p>
               <p className="text-xs text-ledger-green-700 mt-2 font-medium">↑ 12% vs last month</p>
             </div>
-            <div className="bg-white dark:bg-[#111827] border border-ink-900/10 p-6 rounded-sm shadow-sm">
+            <div className="bg-paper-100 border border-ink-900/10 p-6 rounded-sm shadow-sm">
               <h3 className="text-sm font-medium text-slate-500 uppercase tracking-wider mb-2">Input VAT (Purchases)</h3>
               <p className="text-3xl font-serif text-ink-900 tabular-currency">82,500.00</p>
               <p className="text-xs text-rust-700 mt-2 font-medium">↓ 5% vs last month</p>
             </div>
-            <div className="bg-ink-900 text-white dark:text-slate-900 p-6 rounded-sm shadow-sm">
+            <div className="bg-ink-900 text-white  p-6 rounded-sm shadow-sm">
               <h3 className="text-sm font-medium text-white/70 uppercase tracking-wider mb-2">Net VAT Payable</h3>
               <p className="text-3xl font-serif tabular-currency">62,500.00</p>
               <p className="text-xs text-white/50 mt-2 font-medium">Due by 20th of next month</p>
             </div>
           </div>
           
-          <div className="bg-white dark:bg-[#111827] border border-ink-900/10 shadow-sm rounded-sm p-8">
+          <div className="bg-paper-100 border border-ink-900/10 shadow-sm rounded-sm p-8">
             <div className="flex items-center justify-between border-b border-ink-900/10 pb-6 mb-6">
               <div>
                 <h3 className="text-lg font-medium text-ink-900">Recent Tax Transactions</h3>
                 <p className="text-sm text-slate-500">Auto-calculated from your ledger.</p>
               </div>
-              <button className="bg-ink-900 text-white dark:text-slate-900 px-4 py-2 text-sm font-medium rounded-sm hover:bg-ink-900/90 transition-colors">
+              <button className="bg-ink-900 text-white  px-4 py-2 text-sm font-medium rounded-sm hover:bg-ink-900/90 transition-colors">
                 Generate Return
               </button>
             </div>
@@ -66,7 +66,7 @@ export function TaxView() {
       )}
 
       {activeTab === 'eTIMS / KRA bridge' && (
-        <div className="bg-white dark:bg-[#111827] border border-ink-900/10 shadow-sm rounded-sm p-8 max-w-2xl">
+        <div className="bg-paper-100 border border-ink-900/10 shadow-sm rounded-sm p-8 max-w-2xl">
           <div className="flex items-center space-x-4 mb-6">
             <div className="w-12 h-12 bg-rust-700/10 rounded-full flex items-center justify-center border border-rust-700/20">
               <span className="text-rust-700 font-bold font-serif">KRA</span>
@@ -82,7 +82,7 @@ export function TaxView() {
               <p className="text-sm font-medium text-ink-900">Status</p>
               <p className="text-xs text-rust-700 font-medium">Disconnected</p>
             </div>
-            <button className="bg-white dark:bg-[#111827] border border-ink-900/20 px-4 py-2 text-sm font-medium rounded-sm hover:bg-paper-100 transition-colors">
+            <button className="bg-paper-100 border border-ink-900/20 px-4 py-2 text-sm font-medium rounded-sm hover:bg-paper-100 transition-colors">
               Configure Connection
             </button>
           </div>
@@ -94,7 +94,7 @@ export function TaxView() {
       )}
 
       {activeTab === 'Filing calendar' && (
-        <div className="bg-white dark:bg-[#111827] border border-ink-900/10 shadow-sm rounded-sm p-8 max-w-4xl mx-auto">
+        <div className="bg-paper-100 border border-ink-900/10 shadow-sm rounded-sm p-8 max-w-4xl mx-auto">
            <h3 className="text-lg font-medium text-ink-900 mb-6">Upcoming Statutory Deadlines</h3>
            <div className="space-y-4">
              <div className="flex items-center justify-between p-4 border-l-4 border-rust-700 bg-paper-50 shadow-sm rounded-r-sm">
