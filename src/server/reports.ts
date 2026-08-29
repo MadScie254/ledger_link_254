@@ -35,21 +35,6 @@ export class ReportsService {
       }
     });
 
-    if (Object.keys(incomeMap).length === 0) {
-      incomeMap['Sales Revenue'] = 48500000;
-      incomeMap['Consulting & Professional Services'] = 12400000;
-    }
-    if (Object.keys(cogsMap).length === 0) {
-      cogsMap['Direct Cost of Materials'] = 18200000;
-      cogsMap['Subcontractor Freight & Delivery'] = 3400000;
-    }
-    if (Object.keys(expenseMap).length === 0) {
-      expenseMap['Salaries & Wages'] = 14500000;
-      expenseMap['Rent & Facilities'] = 4500000;
-      expenseMap['Utilities & Internet'] = 850000;
-      expenseMap['Marketing & Advertising'] = 1200000;
-    }
-
     return {
       income: Object.entries(incomeMap).map(([name, amountCents]) => ({ name, amountCents })),
       costOfSales: Object.entries(cogsMap).map(([name, amountCents]) => ({ name, amountCents })),
@@ -66,9 +51,10 @@ export class ReportsService {
         debit,
         credit,
         account:accounts!inner(name, type, code),
-        journal_entry:journal_entries!inner(org_id)
+        journal_entry:journal_entries!inner(org_id, entry_date)
       `)
-      .eq('journal_entries.org_id', orgId);
+      .eq('journal_entries.org_id', orgId)
+      .lte('journal_entries.entry_date', asOfDate || new Date().toISOString());
 
     if (error) throw error;
 
@@ -89,22 +75,6 @@ export class ReportsService {
       }
     });
 
-    if (Object.keys(assetMap).length === 0) {
-      assetMap['Cash & Bank Equivalents (Equity/Till)'] = 34500000;
-      assetMap['Accounts Receivable (A/R)'] = 18900000;
-      assetMap['Merchandise Inventory'] = 14200000;
-      assetMap['Equipment & Office Assets'] = 8500000;
-    }
-    if (Object.keys(liabilityMap).length === 0) {
-      liabilityMap['Accounts Payable (A/P)'] = 12400000;
-      liabilityMap['KRA VAT & Statutory Payables'] = 3100000;
-      liabilityMap['Short-term Bank Facility'] = 5000000;
-    }
-    if (Object.keys(equityMap).length === 0) {
-      equityMap["Owner's Equity & Share Capital"] = 35000000;
-      equityMap['Retained Earnings (YTD)'] = 20600000;
-    }
-
     return {
       currentAssets: Object.entries(assetMap).filter(([k]) => !k.includes('Equipment')).map(([name, amountCents]) => ({ name, amountCents })),
       nonCurrentAssets: Object.entries(assetMap).filter(([k]) => k.includes('Equipment')).map(([name, amountCents]) => ({ name, amountCents })),
@@ -114,68 +84,140 @@ export class ReportsService {
   }
 
   static async getCashFlow(orgId: string, dateRange: string) {
+    const supabase = getSupabase();
+    
+    const { data: lines, error } = await supabase
+      .from('journal_lines')
+      .select(`
+        debit,
+        credit,
+        account:accounts!inner(name, type, code),
+        journal_entry:journal_entries!inner(org_id)
+      `)
+      .eq('journal_entries.org_id', orgId);
+
+    if (error) throw error;
+
+    let netIncome = 0;
+    lines.forEach((line: any) => {
+      const acc = line.account;
+      if (!acc) return;
+      if (acc.type === 'INCOME') netIncome += (line.credit || 0) - (line.debit || 0);
+      if (acc.type === 'EXPENSE' || acc.type === 'COGS') netIncome -= ((line.debit || 0) - (line.credit || 0));
+    });
+
+    const operating = netIncome !== 0 ? [{ name: 'Net Income from Operations', amountCents: netIncome }] : [];
+
     return {
-      operating: [
-        { name: 'Net Income from Operations', amountCents: 23850000 },
-        { name: 'Change in Accounts Receivable', amountCents: -4200000 },
-        { name: 'Change in Inventory', amountCents: -1800000 },
-        { name: 'Change in Accounts Payable', amountCents: 3100000 },
-        { name: 'Depreciation & Non-Cash Adjustments', amountCents: 950000 }
-      ],
-      investing: [
-        { name: 'Purchase of Equipment & Hardware', amountCents: -3500000 },
-        { name: 'Capital Improvements', amountCents: -1200000 }
-      ],
-      financing: [
-        { name: 'Repayment of Short-Term Bank Loan', amountCents: -2500000 },
-        { name: 'Owner Capital Injection / Drawings', amountCents: 5000000 }
-      ],
-      beginningCashCents: 19700000
+      operating,
+      investing: [],
+      financing: [],
+      beginningCashCents: 0
     };
   }
 
   static async getTrialBalance(orgId: string) {
-    const rows = [
-      { code: '1000', name: 'Cash and Bank Equivalents', debitCents: 34500000, creditCents: 0, type: 'ASSET' },
-      { code: '1100', name: 'Accounts Receivable (A/R)', debitCents: 18900000, creditCents: 0, type: 'ASSET' },
-      { code: '1200', name: 'Merchandise Inventory', debitCents: 14200000, creditCents: 0, type: 'ASSET' },
-      { code: '1500', name: 'Office & Computer Equipment', debitCents: 8500000, creditCents: 0, type: 'ASSET' },
-      { code: '2000', name: 'Accounts Payable (A/P)', debitCents: 0, creditCents: 12400000, type: 'LIABILITY' },
-      { code: '2100', name: 'VAT & Statutory Withholding Payable', debitCents: 0, creditCents: 3100000, type: 'LIABILITY' },
-      { code: '2500', name: 'Short-term Bank Facilities', debitCents: 0, creditCents: 5000000, type: 'LIABILITY' },
-      { code: '3000', name: "Owner's Equity & Paid-in Capital", debitCents: 0, creditCents: 35000000, type: 'EQUITY' },
-      { code: '4000', name: 'Sales & Invoicing Revenue', debitCents: 0, creditCents: 60900000, type: 'INCOME' },
-      { code: '5000', name: 'Cost of Goods Sold (COGS)', debitCents: 21600000, creditCents: 0, type: 'COGS' },
-      { code: '6000', name: 'Salaries & Staff Expenses', debitCents: 14500000, creditCents: 0, type: 'EXPENSE' },
-      { code: '6100', name: 'Rent & Facility Expenses', debitCents: 4500000, creditCents: 0, type: 'EXPENSE' },
-      { code: '6200', name: 'Utilities & Communication', debitCents: 850000, creditCents: 0, type: 'EXPENSE' },
-      { code: '6300', name: 'Marketing & Sales Promotion', debitCents: 1200000, creditCents: 0, type: 'EXPENSE' },
-      { code: '3900', name: 'Retained Earnings Balance', debitCents: 0, creditCents: 17350000, type: 'EQUITY' }
-    ];
+    const supabase = getSupabase();
+    
+    const { data: lines, error } = await supabase
+      .from('journal_lines')
+      .select(`
+        debit,
+        credit,
+        account:accounts!inner(code, name, type),
+        journal_entry:journal_entries!inner(org_id)
+      `)
+      .eq('journal_entries.org_id', orgId);
+
+    if (error) throw error;
+
+    const accountMap: Record<string, any> = {};
+
+    lines.forEach((line: any) => {
+      const accountInfo = line.account;
+      if (!accountInfo) return;
+
+      const code = accountInfo.code;
+      if (!accountMap[code]) {
+        accountMap[code] = {
+          code,
+          name: accountInfo.name,
+          type: accountInfo.type,
+          debitCents: 0,
+          creditCents: 0
+        };
+      }
+      
+      accountMap[code].debitCents += (line.debit || 0);
+      accountMap[code].creditCents += (line.credit || 0);
+    });
+
+    const rows = Object.values(accountMap).map((row: any) => {
+      if (row.debitCents > row.creditCents) {
+        row.debitCents -= row.creditCents;
+        row.creditCents = 0;
+      } else {
+        row.creditCents -= row.debitCents;
+        row.debitCents = 0;
+      }
+      return row;
+    }).sort((a: any, b: any) => a.code.localeCompare(b.code));
 
     return { rows };
   }
 
   static async getTaxSummary(orgId: string, period: string) {
+    const supabase = getSupabase();
+    
+    const { data: invoices, error: invError } = await supabase
+      .from('invoices')
+      .select('subtotal_cents, tax_cents')
+      .eq('org_id', orgId)
+      .neq('status', 'VOID');
+      
+    if (invError) throw invError;
+    
+    const { data: bills, error: billError } = await supabase
+      .from('bills')
+      .select('subtotal_cents, tax_cents')
+      .eq('org_id', orgId)
+      .neq('status', 'VOID');
+      
+    if (billError) throw billError;
+
+    let outputVat = 0;
+    let standardRatedSales = 0;
+    (invoices || []).forEach((inv: any) => {
+      outputVat += (inv.tax_cents || 0);
+      standardRatedSales += (inv.subtotal_cents || 0);
+    });
+
+    let inputVat = 0;
+    let claimablePurchases = 0;
+    (bills || []).forEach((bill: any) => {
+      inputVat += (bill.tax_cents || 0);
+      claimablePurchases += (bill.subtotal_cents || 0);
+    });
+
     return {
-      period: period || 'August 2026',
+      period: period || new Date().toISOString().substring(0, 7),
       kraPin: 'P051239847Z',
       outputVat: {
-        standardRatedSalesCents: 48500000,
+        standardRatedSalesCents: standardRatedSales,
         vatRatePercent: 16,
-        taxAmountCents: 7760000
+        taxAmountCents: outputVat
       },
       inputVat: {
-        claimablePurchasesCents: 24200000,
+        claimablePurchasesCents: claimablePurchases,
         vatRatePercent: 16,
-        taxAmountCents: 3872000
+        taxAmountCents: inputVat
       },
       withholdingTaxVat: {
         withholdingRatePercent: 2,
-        withheldAmountCents: 450000
+        withheldAmountCents: 0
       },
-      netVatPayableCents: 7760000 - 3872000 - 450000,
-      etimsVerifiedCount: 42,
+      netVatPayableCents: outputVat - inputVat,
+      etimsVerifiedCount: (invoices || []).length,
       etimsPendingCount: 0
     };
   }

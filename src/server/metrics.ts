@@ -55,11 +55,12 @@ export class DashboardService {
       // Let's do it by querying journal_entries with lines and account types.
       ;
       
-    // Better way: query journal_entries, inner join lines, inner join accounts
+      // Better way: query journal_entries, inner join lines, inner join accounts
     const { data: entries, error: entriesError } = await supabase
       .from('journal_entries')
       .select(`
         id,
+        entry_date,
         lines:journal_lines (
           debit,
           credit,
@@ -75,7 +76,14 @@ export class DashboardService {
     let totalCogsCents = 0;
     let totalExpenseCents = 0;
 
+    const monthlyData: Record<string, { revenue: number, expense: number }> = {};
+
     entries.forEach(entry => {
+      const monthStr = entry.entry_date ? new Date(entry.entry_date).toLocaleString('default', { month: 'short' }) : 'Unknown';
+      if (!monthlyData[monthStr]) {
+        monthlyData[monthStr] = { revenue: 0, expense: 0 };
+      }
+
       (entry.lines || []).forEach((line: any) => {
         const accType = line.account?.type;
         
@@ -83,13 +91,17 @@ export class DashboardService {
           cashPositionCents += (line.debit || 0) - (line.credit || 0);
         }
         if (accType === 'INCOME') {
-          totalIncomeCents += (line.credit || 0) - (line.debit || 0);
+          const rev = (line.credit || 0) - (line.debit || 0);
+          totalIncomeCents += rev;
+          monthlyData[monthStr].revenue += Math.round(rev / 100);
         }
         if (accType === 'COGS') {
           totalCogsCents += (line.debit || 0) - (line.credit || 0);
         }
         if (accType === 'EXPENSE') {
-          totalExpenseCents += (line.debit || 0) - (line.credit || 0);
+          const exp = (line.debit || 0) - (line.credit || 0);
+          totalExpenseCents += exp;
+          monthlyData[monthStr].expense += Math.round(exp / 100);
         }
       });
     });
@@ -104,17 +116,11 @@ export class DashboardService {
       console.warn('Failed to calculate unrealized FX:', e);
     }
 
-    // 5. Generate some mock trend data for the chart based on the totals
-    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun'];
-    const monthlyTrends = months.map((month, idx) => {
-      // Create some variation based on the actual totals
-      const variation = 0.8 + (Math.random() * 0.4); // 0.8 to 1.2
-      return {
-        month,
-        revenue: Math.round((totalIncomeCents / 100 / 6) * variation) || (Math.random() * 50000 + 10000),
-        expense: Math.round((totalExpenseCents / 100 / 6) * variation) || (Math.random() * 30000 + 5000),
-      };
-    });
+    // 5. Generate trend data for the chart based on the totals
+    const monthsOrder = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    const monthlyTrends = Object.entries(monthlyData)
+      .map(([month, data]) => ({ month, revenue: data.revenue, expense: data.expense }))
+      .sort((a, b) => monthsOrder.indexOf(a.month) - monthsOrder.indexOf(b.month));
 
 
     return {

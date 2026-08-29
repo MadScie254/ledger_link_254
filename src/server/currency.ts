@@ -292,38 +292,6 @@ export class CurrencyService {
       });
     }
 
-    // If no items, provide demo items like before
-    if (breakdownItems.length === 0) {
-      const demoCurrencies = ['USD', 'EUR', 'GBP'];
-      for (const curr of demoCurrencies) {
-        if (curr !== baseCurrency.toUpperCase()) {
-          const currentRate = rates[curr] || DEFAULT_KES_RATES[curr] || 0.00775;
-          const bookedRate = currentRate * 1.022;
-          const foreignAmountCents = curr === 'USD' ? 850000 : curr === 'EUR' ? 420000 : 250000;
-          
-          const bookedBaseCents = Math.round(foreignAmountCents * getBaseMultiplier(curr, bookedRate));
-          const currentBaseCents = Math.round(foreignAmountCents * getBaseMultiplier(curr, currentRate));
-          const gainLossCents = currentBaseCents - bookedBaseCents;
-
-          receivablesGainLossCents += gainLossCents;
-          breakdownItems.push({
-            id: `demo-inv-${curr.toLowerCase()}`,
-            entityType: 'INVOICE',
-            referenceNo: `INV-FX-${curr}-01`,
-            partyName: `${curr} Enterprise Client`,
-            foreignCurrency: curr,
-            foreignAmountCents,
-            bookedRate,
-            currentRate,
-            bookedBaseCents,
-            currentBaseCents,
-            gainLossCents,
-            status: 'SENT'
-          });
-        }
-      }
-    }
-
     const totalUnrealizedGainLossCents = receivablesGainLossCents + payablesGainLossCents + bankHoldingsGainLossCents;
 
     // Currency Summaries

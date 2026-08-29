@@ -1,3 +1,4 @@
+import 'dotenv/config';
 import { getSupabase } from '../src/server/supabase';
 import { CustomerService } from '../src/server/customers';
 import { VendorService } from '../src/server/vendors';
@@ -5,14 +6,6 @@ import { InvoiceService } from '../src/server/invoices';
 import { BillService } from '../src/server/bills';
 import { LedgerService } from '../src/server/ledger';
 import { AccountService } from '../src/server/accounts';
-import { config } from 'dotenv';
-import { fileURLToPath } from 'url';
-import { dirname, join } from 'path';
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = dirname(__filename);
-
-config({ path: join(__dirname, '../.env') });
 const supabase = getSupabase();
 
 async function delay(ms: number) {
@@ -51,8 +44,8 @@ async function seedDemoOrg() {
 
   // 2. Customers
   const customers = [
-    { name: 'Safaricom PLC', email: 'billing@safaricom.co.ke', currency: 'KES' },
-    { name: 'Equity Bank', email: 'vendors@equitybank.co.ke', currency: 'KES' }
+    { displayName: 'Safaricom PLC', email: 'billing@safaricom.co.ke', currency: 'KES' },
+    { displayName: 'Equity Bank', email: 'vendors@equitybank.co.ke', currency: 'KES' }
   ];
   
   const customerIds = [];
@@ -64,8 +57,8 @@ async function seedDemoOrg() {
 
   // 3. Vendors
   const vendors = [
-    { name: 'Kenya Power', email: 'billing@kplc.co.ke', currency: 'KES' },
-    { name: 'Shell Petrol', email: 'invoicing@shell.co.ke', currency: 'KES' }
+    { displayName: 'Kenya Power', email: 'billing@kplc.co.ke', currency: 'KES' },
+    { displayName: 'Shell Petrol', email: 'invoicing@shell.co.ke', currency: 'KES' }
   ];
 
   const vendorIds = [];

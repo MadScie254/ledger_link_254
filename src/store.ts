@@ -15,6 +15,7 @@ export interface OrganizationData {
   email?: string;
   website?: string;
   isDefault?: boolean;
+  isDemo?: boolean;
 }
 
 interface AppState {
@@ -70,7 +71,8 @@ export const useAppStore = create<AppState>((set) => ({
       city: 'Nairobi',
       phone: '+254 700 123 456',
       email: 'finance@acmecorp.co.ke',
-      isDefault: true
+      isDefault: true,
+      isDemo: true
     },
     {
       id: 'org-apex-holdings',
@@ -102,7 +104,8 @@ export const useAppStore = create<AppState>((set) => ({
     city: 'Nairobi',
     phone: '+254 700 123 456',
     email: 'finance@acmecorp.co.ke',
-    isDefault: true
+    isDefault: true,
+    isDemo: true
   },
   setActiveCompany: (company) => set({ 
     activeCompany: company, 
