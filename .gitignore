@@ -6,3 +6,8 @@ coverage/
 *.log
 .env*
 !.env.example
+
+# Never commit secrets or service credentials
+*-config.json
+*-credentials.json
+*-service-account.json
