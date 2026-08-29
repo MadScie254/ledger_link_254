@@ -98,7 +98,9 @@ export class BillService {
       });
     }
 
-    const billNo = `BILL-${Math.floor(1000 + Math.random() * 9000)}`;
+    const { data: counterData, error: counterError } = await supabase.rpc('increment_and_get', { p_org_id: input.orgId, p_doc_type: 'BILL' });
+    if (counterError) throw counterError;
+    const billNo = `BILL-${new Date(input.billDate).getFullYear()}-${String(counterData).padStart(4, '0')}`;
 
     // 4. Save Bill Record (we save it first to get the ID for the ledger)
     const { data: bill, error: billError } = await supabase
@@ -137,5 +139,79 @@ export class BillService {
     });
 
     return billRefId;
+  }
+
+  static async voidBill(orgId: string, billId: string, voidedBy: string) {
+    const supabase = getSupabase();
+    
+    // Get bill to void
+    const { data: bill, error: billError } = await supabase
+      .from('bills')
+      .select('*')
+      .eq('id', billId)
+      .eq('org_id', orgId)
+      .single();
+      
+    if (billError || !bill) {
+      throw new Error('Bill not found or already voided');
+    }
+    
+    if (bill.status === 'VOID') {
+      return; // Already voided
+    }
+
+    // Update bill status
+    const { error: updateError } = await supabase
+      .from('bills')
+      .update({ status: 'VOID' })
+      .eq('id', billId);
+      
+    if (updateError) throw updateError;
+    
+    // Reverse the journal entries
+    const journalEntries = await LedgerService.getJournalEntries(orgId);
+    const originalEntry = journalEntries.find(je => je.sourceType === 'BILL' && je.sourceId === billId);
+    
+    if (originalEntry) {
+      const reversingLines = originalEntry.lines.map(line => ({
+        accountId: line.accountId,
+        debit: line.credit,
+        credit: line.debit,
+        description: `VOID: ${line.description || ''}`,
+        entityType: line.entityType,
+        entityId: line.entityId
+      }));
+      
+      await LedgerService.postJournalEntry({
+        orgId: orgId,
+        entryDate: new Date().toISOString().split('T')[0],
+        memo: `Void Bill ${bill.bill_number}`,
+        sourceType: 'BILL',
+        sourceId: billId,
+        referenceNo: `VOID-${bill.bill_number}`,
+        createdBy: voidedBy,
+        lines: reversingLines
+      });
+    }
+  }
+
+  static async updateBill(orgId: string, id: string, input: any) {
+    const supabase = getSupabase();
+    
+    // Only allow metadata updates
+    const updateData: any = {};
+    if (input.dueDate !== undefined) updateData.due_date = input.dueDate;
+    if (input.status !== undefined) updateData.status = input.status;
+    if (input.notes !== undefined) updateData.notes = input.notes;
+    
+    if (Object.keys(updateData).length > 0) {
+      const { error } = await supabase
+        .from('bills')
+        .update(updateData)
+        .eq('id', id)
+        .eq('org_id', orgId);
+        
+      if (error) throw error;
+    }
   }
 }

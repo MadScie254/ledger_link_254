@@ -63,4 +63,30 @@ export class PayrollService {
     if (error) throw error;
     return data.id;
   }
+
+  static async updateEmployee(orgId: string, id: string, input: any) {
+    const supabase = getSupabase();
+    const updateData: any = {};
+    if (input.firstName !== undefined) updateData.first_name = input.firstName;
+    if (input.lastName !== undefined) updateData.last_name = input.lastName;
+    if (input.email !== undefined) updateData.email = input.email;
+    if (input.phone !== undefined) updateData.phone = input.phone;
+    if (input.department !== undefined) updateData.department = input.department;
+    if (input.jobTitle !== undefined) updateData.job_title = input.jobTitle;
+    if (input.hireDate !== undefined) updateData.hire_date = input.hireDate;
+    if (input.baseSalaryCents !== undefined) updateData.base_salary = input.baseSalaryCents;
+    if (input.kraPin !== undefined) updateData.kra_pin = input.kraPin;
+    if (input.nssfNumber !== undefined) updateData.nssf_number = input.nssfNumber;
+    if (input.shifNumber !== undefined) updateData.nhif_number = input.shifNumber;
+    if (input.bankName !== undefined) updateData.bank_name = input.bankName;
+    if (input.bankAccountNo !== undefined) updateData.bank_account = input.bankAccountNo;
+
+    const { error } = await supabase
+      .from('employees')
+      .update(updateData)
+      .eq('id', id)
+      .eq('org_id', orgId);
+      
+    if (error) throw error;
+  }
 }

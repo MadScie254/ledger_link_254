@@ -1,23 +1,29 @@
+import { getSupabase } from './supabase';
+
 export class EtimsService {
   static async submitInvoice(orgId: string, invoiceId: string, invoiceData: any) {
-    // Mock network delay
-    await new Promise(resolve => setTimeout(resolve, 800));
+    const supabase = getSupabase();
     
-    // Mock response from eTIMS
-    const isSuccess = Math.random() > 0.1; // 90% success rate
-    
-    if (!isSuccess) {
-      throw new Error('KRA eTIMS Error: 503 Service Unavailable');
+    // Log the submission attempt but note that integration is pending
+    const { data, error } = await supabase
+      .from('etims_submissions')
+      .insert({
+        org_id: orgId,
+        invoice_id: invoiceId,
+        status: 'NOT_CONFIGURED',
+      })
+      .select('*')
+      .single();
+
+    if (error) {
+      console.error('Failed to log eTIMS submission', error);
+      throw error;
     }
 
-    const controlCode = 'KRA-' + Math.random().toString(36).substring(2, 10).toUpperCase();
-    const qrCodeUrl = `https://etims.kra.go.ke/verify?c=${controlCode}`;
-
     return {
-      success: true,
-      controlCode,
-      qrCodeUrl,
-      submittedAt: new Date().toISOString()
+      success: false,
+      status: 'NOT_CONFIGURED',
+      submittedAt: data.submitted_at
     };
   }
 }

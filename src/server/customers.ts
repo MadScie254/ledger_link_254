@@ -69,4 +69,37 @@ export class CustomerService {
     if (error) throw error;
     return data.id;
   }
+
+  static async updateCustomer(orgId: string, id: string, input: any) {
+    const supabase = getSupabase();
+    
+    // Map input camelCase to snake_case
+    const updateData: any = {};
+    if (input.displayName !== undefined) updateData.display_name = input.displayName;
+    if (input.legalName !== undefined) updateData.legal_name = input.legalName;
+    if (input.customerType !== undefined) updateData.customer_type = input.customerType;
+    if (input.contactPerson !== undefined) updateData.contact_person = input.contactPerson;
+    if (input.email !== undefined) updateData.email = input.email;
+    if (input.phone !== undefined) updateData.phone = input.phone;
+    if (input.kraPin !== undefined) updateData.kra_pin = input.kraPin;
+    if (input.paymentTerms !== undefined) updateData.payment_terms = input.paymentTerms;
+    if (input.creditLimitCents !== undefined) updateData.credit_limit_cents = input.creditLimitCents;
+    if (input.currency !== undefined) updateData.currency = input.currency;
+    if (input.discountPercent !== undefined) updateData.discount_percent = input.discountPercent;
+    if (input.priceTier !== undefined) updateData.price_tier = input.priceTier;
+    if (input.billingAddress !== undefined) updateData.billing_address = input.billingAddress;
+    if (input.shippingAddress !== undefined) updateData.shipping_address = input.shippingAddress;
+    if (input.city !== undefined) updateData.city = input.city;
+    if (input.postalCode !== undefined) updateData.postal_code = input.postalCode;
+    if (input.country !== undefined) updateData.country = input.country;
+    if (input.notes !== undefined) updateData.notes = input.notes;
+
+    const { error } = await supabase
+      .from('customers')
+      .update(updateData)
+      .eq('id', id)
+      .eq('org_id', orgId);
+      
+    if (error) throw error;
+  }
 }

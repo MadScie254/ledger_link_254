@@ -45,4 +45,25 @@ export class ProjectService {
     if (error) throw error;
     return data.id;
   }
+
+  static async updateProject(orgId: string, id: string, input: any) {
+    const supabase = getSupabase();
+    const updateData: any = {};
+    if (input.name !== undefined) updateData.name = input.name;
+    if (input.projectCode !== undefined) updateData.project_code = input.projectCode;
+    if (input.customerId !== undefined) updateData.customer_id = input.customerId;
+    if (input.status !== undefined) updateData.status = input.status;
+    if (input.startDate !== undefined) updateData.start_date = input.startDate;
+    if (input.endDate !== undefined) updateData.end_date = input.endDate;
+    if (input.budgetCents !== undefined) updateData.budget_cents = input.budgetCents;
+    if (input.managerId !== undefined) updateData.manager_id = input.managerId;
+
+    const { error } = await supabase
+      .from('projects')
+      .update(updateData)
+      .eq('id', id)
+      .eq('org_id', orgId);
+      
+    if (error) throw error;
+  }
 }

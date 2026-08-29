@@ -56,4 +56,28 @@ export class InventoryService {
     if (error) throw error;
     return data.id;
   }
+
+  static async updateItem(orgId: string, id: string, input: any) {
+    const supabase = getSupabase();
+    const updateData: any = {};
+    if (input.name !== undefined) updateData.name = input.name;
+    if (input.itemType !== undefined) updateData.type = input.itemType;
+    if (input.sku !== undefined) updateData.sku = input.sku;
+    if (input.category !== undefined) updateData.category = input.category;
+    if (input.description !== undefined) updateData.description = input.description;
+    if (input.priceCents !== undefined) updateData.unit_price_cents = input.priceCents;
+    if (input.costCents !== undefined) updateData.cost_price_cents = input.costCents;
+    if (input.incomeAccountId !== undefined) updateData.income_account_id = input.incomeAccountId;
+    if (input.expenseAccountId !== undefined) updateData.cogs_account_id = input.expenseAccountId;
+    if (input.quantityOnHand !== undefined) updateData.quantity_on_hand = input.quantityOnHand;
+    if (input.reorderPoint !== undefined) updateData.reorder_point = input.reorderPoint;
+
+    const { error } = await supabase
+      .from('inventory_items')
+      .update(updateData)
+      .eq('id', id)
+      .eq('org_id', orgId);
+      
+    if (error) throw error;
+  }
 }

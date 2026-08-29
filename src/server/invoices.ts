@@ -99,7 +99,9 @@ export class InvoiceService {
       });
     }
 
-    const invoiceNo = `INV-${Math.floor(1000 + Math.random() * 9000)}`;
+    const { data: counterData, error: counterError } = await supabase.rpc('increment_and_get', { p_org_id: input.orgId, p_doc_type: 'INV' });
+    if (counterError) throw counterError;
+    const invoiceNo = `INV-${new Date(input.issueDate).getFullYear()}-${String(counterData).padStart(4, '0')}`;
 
     // 4. Save Invoice Record first to get the ID
     const { data: invoice, error: invoiceError } = await supabase
@@ -153,5 +155,79 @@ export class InvoiceService {
     // but the original code was keeping this simple. Let's just return.
 
     return invoiceRefId;
+  }
+
+  static async voidInvoice(orgId: string, invoiceId: string, voidedBy: string) {
+    const supabase = getSupabase();
+    
+    // Get invoice to void
+    const { data: invoice, error: invoiceError } = await supabase
+      .from('invoices')
+      .select('*')
+      .eq('id', invoiceId)
+      .eq('org_id', orgId)
+      .single();
+      
+    if (invoiceError || !invoice) {
+      throw new Error('Invoice not found or already voided');
+    }
+    
+    if (invoice.status === 'VOID') {
+      return; // Already voided
+    }
+
+    // Update invoice status
+    const { error: updateError } = await supabase
+      .from('invoices')
+      .update({ status: 'VOID' })
+      .eq('id', invoiceId);
+      
+    if (updateError) throw updateError;
+    
+    // Reverse the journal entries
+    const journalEntries = await LedgerService.getJournalEntries(orgId);
+    const originalEntry = journalEntries.find(je => je.sourceType === 'INVOICE' && je.sourceId === invoiceId);
+    
+    if (originalEntry) {
+      const reversingLines = originalEntry.lines.map(line => ({
+        accountId: line.accountId,
+        debit: line.credit,
+        credit: line.debit,
+        description: `VOID: ${line.description || ''}`,
+        entityType: line.entityType,
+        entityId: line.entityId
+      }));
+      
+      await LedgerService.postJournalEntry({
+        orgId: orgId,
+        entryDate: new Date().toISOString().split('T')[0],
+        memo: `Void Invoice ${invoice.invoice_number}`,
+        sourceType: 'INVOICE',
+        sourceId: invoiceId, // Reference the same invoice ID
+        referenceNo: `VOID-${invoice.invoice_number}`,
+        createdBy: voidedBy,
+        lines: reversingLines
+      });
+    }
+  }
+
+  static async updateInvoice(orgId: string, id: string, input: any) {
+    const supabase = getSupabase();
+    
+    // Only allow metadata updates
+    const updateData: any = {};
+    if (input.dueDate !== undefined) updateData.due_date = input.dueDate;
+    if (input.status !== undefined) updateData.status = input.status;
+    if (input.notes !== undefined) updateData.notes = input.notes;
+    
+    if (Object.keys(updateData).length > 0) {
+      const { error } = await supabase
+        .from('invoices')
+        .update(updateData)
+        .eq('id', id)
+        .eq('org_id', orgId);
+        
+      if (error) throw error;
+    }
   }
 }

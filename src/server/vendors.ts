@@ -61,4 +61,33 @@ export class VendorService {
     if (error) throw error;
     return data.id;
   }
+
+  static async updateVendor(orgId: string, id: string, input: any) {
+    const supabase = getSupabase();
+    
+    // Map input camelCase to snake_case
+    const updateData: any = {};
+    if (input.displayName !== undefined) updateData.display_name = input.displayName;
+    if (input.legalName !== undefined) updateData.legal_name = input.legalName;
+    if (input.vendorType !== undefined) updateData.vendor_type = input.vendorType;
+    if (input.contactPerson !== undefined) updateData.contact_person = input.contactPerson;
+    if (input.email !== undefined) updateData.email = input.email;
+    if (input.phone !== undefined) updateData.phone = input.phone;
+    if (input.kraPin !== undefined) updateData.kra_pin = input.kraPin;
+    if (input.paymentTerms !== undefined) updateData.payment_terms = input.paymentTerms;
+    if (input.currency !== undefined) updateData.currency = input.currency;
+    if (input.billingAddress !== undefined) updateData.billing_address = input.billingAddress;
+    if (input.city !== undefined) updateData.city = input.city;
+    if (input.postalCode !== undefined) updateData.postal_code = input.postalCode;
+    if (input.country !== undefined) updateData.country = input.country;
+    if (input.notes !== undefined) updateData.notes = input.notes;
+
+    const { error } = await supabase
+      .from('vendors')
+      .update(updateData)
+      .eq('id', id)
+      .eq('org_id', orgId);
+      
+    if (error) throw error;
+  }
 }

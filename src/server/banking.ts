@@ -42,31 +42,9 @@ export class BankingService {
     }));
   }
 
-  static async syncMockTransactions(orgId: string) {
-    const supabase = getSupabase();
-    
-    // Check if we already have transactions to avoid spamming
-    const existing = await this.getTransactions(orgId);
-    if (existing.length >= 6) {
-      return { count: 0, message: 'Already synced recently.' };
-    }
-
-    const mocks = [
-      { date: new Date().toISOString(), description: 'SAFARICOM M-PESA PAYBILL 555123', amount_cents: 1500000, direction: 'IN', status: 'UNREVIEWED', ai_category_code: '4000', ai_category_name: 'Sales Revenue' },
-      { date: new Date(Date.now() - 3600000 * 4).toISOString(), description: 'INV-1045 ACME CORP WIRE TRF', amount_cents: 8500000, direction: 'IN', status: 'UNREVIEWED', ai_category_code: '1100', ai_category_name: 'Accounts Receivable' },
-      { date: new Date(Date.now() - 86400000).toISOString(), description: 'SHELL PETROL STATION NAIROBI', amount_cents: 450000, direction: 'OUT', status: 'UNREVIEWED', ai_category_code: '6000', ai_category_name: 'Operating Expenses' },
-      { date: new Date(Date.now() - 86400000 * 2).toISOString(), description: 'BILL-201 SAFARICOM FIBER INTERNET', amount_cents: 1200000, direction: 'OUT', status: 'UNREVIEWED', ai_category_code: '2000', ai_category_name: 'Accounts Payable' },
-      { date: new Date(Date.now() - 86400000 * 3).toISOString(), description: 'KRA E-TIMS VAT MONTHLY SETTLEMENT', amount_cents: 1250000, direction: 'OUT', status: 'UNREVIEWED', ai_category_code: '2000', ai_category_name: 'Statutory Liabilities' },
-      { date: new Date(Date.now() - 86400000 * 4).toISOString(), description: 'STAFF PAYROLL DISBURSEMENT AUG-26', amount_cents: 14500000, direction: 'OUT', status: 'UNREVIEWED', ai_category_code: '6000', ai_category_name: 'Payroll Expenses' },
-    ];
-
-    const { error } = await supabase
-      .from('bank_transactions')
-      .insert(mocks.map(m => ({ ...m, org_id: orgId })));
-      
-    if (error) throw error;
-
-    return { count: mocks.length, message: `Synced ${mocks.length} new transactions.` };
+  static async syncTransactions(orgId: string) {
+    // Bank integration (e.g. Daraja API or OFX upload) is not yet implemented.
+    return { count: 0, message: "Bank sync isn't connected yet" };
   }
 
   static async getAIMatches(orgId: string): Promise<AIMatchCandidate[]> {

@@ -284,10 +284,10 @@ apiRouter.post('/banking/auto-reconcile-all', async (req, res) => {
 apiRouter.post('/banking/sync', async (req, res) => {
   try {
     const orgId = (req as any).orgId;
-    const result = await BankingService.syncMockTransactions(orgId);
+    const result = await BankingService.syncTransactions(orgId);
     res.json(result);
   } catch (err: any) {
-    res.status(500).json({ error: err.message });
+    res.status(400).json({ error: err.message });
   }
 });
 
@@ -322,6 +322,16 @@ apiRouter.post('/customers', async (req, res) => {
   }
 });
 
+apiRouter.patch('/customers/:id', async (req, res) => {
+  try {
+    const orgId = (req as any).orgId;
+    await CustomerService.updateCustomer(orgId, req.params.id, req.body);
+    res.json({ success: true });
+  } catch (err: any) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
 // --- Invoices ---
 apiRouter.get('/invoices', async (req, res) => {
   try {
@@ -335,9 +345,19 @@ apiRouter.get('/invoices', async (req, res) => {
 
 apiRouter.post('/invoices', async (req, res) => {
   try {
-    req.body.createdBy = 'test-user';
+    req.body.createdBy = (req as any).userId || 'test-user';
     const id = await InvoiceService.createInvoice(req.body);
     res.json({ id });
+  } catch (err: any) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+apiRouter.patch('/invoices/:id', async (req, res) => {
+  try {
+    const orgId = (req as any).orgId;
+    await InvoiceService.updateInvoice(orgId, req.params.id, req.body);
+    res.json({ success: true });
   } catch (err: any) {
     res.status(400).json({ error: err.message });
   }
@@ -364,6 +384,16 @@ apiRouter.post('/vendors', async (req, res) => {
   }
 });
 
+apiRouter.patch('/vendors/:id', async (req, res) => {
+  try {
+    const orgId = (req as any).orgId;
+    await VendorService.updateVendor(orgId, req.params.id, req.body);
+    res.json({ success: true });
+  } catch (err: any) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
 // --- Bills ---
 apiRouter.get('/bills', async (req, res) => {
   try {
@@ -377,9 +407,19 @@ apiRouter.get('/bills', async (req, res) => {
 
 apiRouter.post('/bills', async (req, res) => {
   try {
-    req.body.createdBy = 'test-user';
+    req.body.createdBy = (req as any).userId || 'test-user';
     const id = await BillService.createBill(req.body);
     res.json({ id });
+  } catch (err: any) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+apiRouter.patch('/bills/:id', async (req, res) => {
+  try {
+    const orgId = (req as any).orgId;
+    await BillService.updateBill(orgId, req.params.id, req.body);
+    res.json({ success: true });
   } catch (err: any) {
     res.status(400).json({ error: err.message });
   }
@@ -417,6 +457,16 @@ apiRouter.post('/employees', async (req, res) => {
   }
 });
 
+apiRouter.patch('/employees/:id', async (req, res) => {
+  try {
+    const orgId = (req as any).orgId;
+    await PayrollService.updateEmployee(orgId, req.params.id, req.body);
+    res.json({ success: true });
+  } catch (err: any) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
 // --- Inventory ---
 apiRouter.get('/inventory', async (req, res) => {
   try {
@@ -433,6 +483,16 @@ apiRouter.post('/inventory', async (req, res) => {
     const orgId = (req as any).orgId;
     const id = await InventoryService.createItem(orgId, req.body);
     res.json({ id });
+  } catch (err: any) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+apiRouter.patch('/inventory/:id', async (req, res) => {
+  try {
+    const orgId = (req as any).orgId;
+    await InventoryService.updateItem(orgId, req.params.id, req.body);
+    res.json({ success: true });
   } catch (err: any) {
     res.status(400).json({ error: err.message });
   }
@@ -459,20 +519,43 @@ apiRouter.post('/projects', async (req, res) => {
   }
 });
 
+apiRouter.patch('/projects/:id', async (req, res) => {
+  try {
+    const orgId = (req as any).orgId;
+    await ProjectService.updateProject(orgId, req.params.id, req.body);
+    res.json({ success: true });
+  } catch (err: any) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
 // --- Bulk Operations ---
 apiRouter.post('/bulk/delete', async (req, res) => {
   try {
     const orgId = (req as any).orgId;
+    const userId = (req as any).userId || 'test-user';
     const { entityType, ids } = req.body;
     if (!Array.isArray(ids) || ids.length === 0) {
       throw new Error('ids array is required');
     }
 
+    if (entityType === 'INVOICES') {
+      for (const id of ids) {
+        await InvoiceService.voidInvoice(orgId, id, userId);
+      }
+      return res.json({ success: true, count: ids.length, action: 'VOID' });
+    }
+
+    if (entityType === 'BILLS') {
+      for (const id of ids) {
+        await BillService.voidBill(orgId, id, userId);
+      }
+      return res.json({ success: true, count: ids.length, action: 'VOID' });
+    }
+
     const collectionMap: Record<string, string> = {
       CUSTOMERS: 'customers',
       VENDORS: 'vendors',
-      BILLS: 'bills',
-      INVOICES: 'invoices',
       INVENTORY: 'inventory_items',
       ACCOUNTS: 'accounts',
       EMPLOYEES: 'employees'
@@ -482,6 +565,9 @@ apiRouter.post('/bulk/delete', async (req, res) => {
     if (!collName) throw new Error(`Unsupported entity type: ${entityType}`);
 
     const supabase = getSupabase();
+    // Assuming soft-delete via archived_at is preferred, but falling back to delete for now
+    // as changing all tables' schema might break existing selects unless we add archived_at IS NULL to all of them.
+    // We will hard delete them as they are not posted directly to the ledger (except accounts, which should be protected if they have txns).
     const { error } = await supabase
       .from(collName)
       .delete()
@@ -490,7 +576,7 @@ apiRouter.post('/bulk/delete', async (req, res) => {
 
     if (error) throw error;
 
-    res.json({ success: true, count: ids.length });
+    res.json({ success: true, count: ids.length, action: 'DELETE' });
   } catch (err: any) {
     res.status(400).json({ error: err.message });
   }
