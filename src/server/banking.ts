@@ -1,9 +1,8 @@
-import { getDb } from './db';
+import { getSupabase } from './supabase';
 import { LedgerService } from './ledger';
 import { AccountService } from './accounts';
 import { InvoiceService } from './invoices';
 import { BillService } from './bills';
-import { collection, doc, setDoc, getDocs, getDoc, query, where, orderBy, updateDoc, serverTimestamp } from 'firebase/firestore';
 
 export interface AIMatchCandidate {
   transactionId: string;
@@ -20,43 +19,54 @@ export interface AIMatchCandidate {
 
 export class BankingService {
   static async getTransactions(orgId: string) {
-    const db = getDb();
-    const txRef = collection(db, 'organizations', orgId, 'bank_transactions');
-    const q = query(txRef, orderBy('date', 'desc'));
-    const snapshot = await getDocs(q);
-    return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+    const supabase = getSupabase();
+    const { data, error } = await supabase
+      .from('bank_transactions')
+      .select('*')
+      .eq('org_id', orgId)
+      .order('date', { ascending: false });
+      
+    if (error) throw error;
+    
+    return (data || []).map(row => ({
+      id: row.id,
+      orgId: row.org_id,
+      date: row.date,
+      description: row.description,
+      amountCents: row.amount_cents,
+      direction: row.direction,
+      status: row.status,
+      aiCategoryCode: row.ai_category_code,
+      aiCategoryName: row.ai_category_name,
+      createdAt: row.created_at
+    }));
   }
 
   static async syncMockTransactions(orgId: string) {
-    const db = getDb();
-    const txRef = collection(db, 'organizations', orgId, 'bank_transactions');
+    const supabase = getSupabase();
     
     // Check if we already have transactions to avoid spamming
-    const existing = await getDocs(query(txRef, orderBy('date', 'desc')));
-    if (!existing.empty && existing.docs.length >= 6) {
+    const existing = await this.getTransactions(orgId);
+    if (existing.length >= 6) {
       return { count: 0, message: 'Already synced recently.' };
     }
 
     const mocks = [
-      { date: new Date().toISOString(), description: 'SAFARICOM M-PESA PAYBILL 555123', amountCents: 1500000, direction: 'IN', status: 'UNREVIEWED', aiCategoryCode: '4000', aiCategoryName: 'Sales Revenue' },
-      { date: new Date(Date.now() - 3600000 * 4).toISOString(), description: 'INV-1045 ACME CORP WIRE TRF', amountCents: 8500000, direction: 'IN', status: 'UNREVIEWED', aiCategoryCode: '1100', aiCategoryName: 'Accounts Receivable' },
-      { date: new Date(Date.now() - 86400000).toISOString(), description: 'SHELL PETROL STATION NAIROBI', amountCents: 450000, direction: 'OUT', status: 'UNREVIEWED', aiCategoryCode: '6000', aiCategoryName: 'Operating Expenses' },
-      { date: new Date(Date.now() - 86400000 * 2).toISOString(), description: 'BILL-201 SAFARICOM FIBER INTERNET', amountCents: 1200000, direction: 'OUT', status: 'UNREVIEWED', aiCategoryCode: '2000', aiCategoryName: 'Accounts Payable' },
-      { date: new Date(Date.now() - 86400000 * 3).toISOString(), description: 'KRA E-TIMS VAT MONTHLY SETTLEMENT', amountCents: 1250000, direction: 'OUT', status: 'UNREVIEWED', aiCategoryCode: '2000', aiCategoryName: 'Statutory Liabilities' },
-      { date: new Date(Date.now() - 86400000 * 4).toISOString(), description: 'STAFF PAYROLL DISBURSEMENT AUG-26', amountCents: 14500000, direction: 'OUT', status: 'UNREVIEWED', aiCategoryCode: '6000', aiCategoryName: 'Payroll Expenses' },
+      { date: new Date().toISOString(), description: 'SAFARICOM M-PESA PAYBILL 555123', amount_cents: 1500000, direction: 'IN', status: 'UNREVIEWED', ai_category_code: '4000', ai_category_name: 'Sales Revenue' },
+      { date: new Date(Date.now() - 3600000 * 4).toISOString(), description: 'INV-1045 ACME CORP WIRE TRF', amount_cents: 8500000, direction: 'IN', status: 'UNREVIEWED', ai_category_code: '1100', ai_category_name: 'Accounts Receivable' },
+      { date: new Date(Date.now() - 86400000).toISOString(), description: 'SHELL PETROL STATION NAIROBI', amount_cents: 450000, direction: 'OUT', status: 'UNREVIEWED', ai_category_code: '6000', ai_category_name: 'Operating Expenses' },
+      { date: new Date(Date.now() - 86400000 * 2).toISOString(), description: 'BILL-201 SAFARICOM FIBER INTERNET', amount_cents: 1200000, direction: 'OUT', status: 'UNREVIEWED', ai_category_code: '2000', ai_category_name: 'Accounts Payable' },
+      { date: new Date(Date.now() - 86400000 * 3).toISOString(), description: 'KRA E-TIMS VAT MONTHLY SETTLEMENT', amount_cents: 1250000, direction: 'OUT', status: 'UNREVIEWED', ai_category_code: '2000', ai_category_name: 'Statutory Liabilities' },
+      { date: new Date(Date.now() - 86400000 * 4).toISOString(), description: 'STAFF PAYROLL DISBURSEMENT AUG-26', amount_cents: 14500000, direction: 'OUT', status: 'UNREVIEWED', ai_category_code: '6000', ai_category_name: 'Payroll Expenses' },
     ];
 
-    let count = 0;
-    for (const tx of mocks) {
-      const newDoc = doc(txRef);
-      await setDoc(newDoc, {
-        ...tx,
-        createdAt: serverTimestamp()
-      });
-      count++;
-    }
+    const { error } = await supabase
+      .from('bank_transactions')
+      .insert(mocks.map(m => ({ ...m, org_id: orgId })));
+      
+    if (error) throw error;
 
-    return { count, message: `Synced ${count} new transactions.` };
+    return { count: mocks.length, message: `Synced ${mocks.length} new transactions.` };
   }
 
   static async getAIMatches(orgId: string): Promise<AIMatchCandidate[]> {
@@ -239,13 +249,16 @@ export class BankingService {
   }
 
   static async matchTransaction(orgId: string, transactionId: string, targetAccountId: string | undefined, existingJournalEntryId: string | undefined, userId: string) {
-    const db = getDb();
-    const txRef = doc(db, 'organizations', orgId, 'bank_transactions', transactionId);
-    const txSnap = await getDoc(txRef);
+    const supabase = getSupabase();
     
-    if (!txSnap.exists()) throw new Error('Transaction not found');
-    const tx = txSnap.data();
-
+    const { data: tx, error: txError } = await supabase
+      .from('bank_transactions')
+      .select('*')
+      .eq('org_id', orgId)
+      .eq('id', transactionId)
+      .single();
+      
+    if (txError) throw new Error('Transaction not found');
     if (tx.status === 'MATCHED') throw new Error('Transaction is already matched');
 
     let finalJournalEntryId = existingJournalEntryId;
@@ -260,11 +273,11 @@ export class BankingService {
       // Prepare ledger lines
       const lines = [];
       if (tx.direction === 'IN') {
-        lines.push({ accountId: bankAccount.id, debit: tx.amountCents, credit: 0, description: tx.description });
-        lines.push({ accountId: targetAccountId, debit: 0, credit: tx.amountCents, description: tx.description });
+        lines.push({ accountId: bankAccount.id, debit: tx.amount_cents, credit: 0, description: tx.description });
+        lines.push({ accountId: targetAccountId, debit: 0, credit: tx.amount_cents, description: tx.description });
       } else {
-        lines.push({ accountId: targetAccountId, debit: tx.amountCents, credit: 0, description: tx.description });
-        lines.push({ accountId: bankAccount.id, debit: 0, credit: tx.amountCents, description: tx.description });
+        lines.push({ accountId: targetAccountId, debit: tx.amount_cents, credit: 0, description: tx.description });
+        lines.push({ accountId: bankAccount.id, debit: 0, credit: tx.amount_cents, description: tx.description });
       }
 
       // Post to ledger
@@ -280,13 +293,14 @@ export class BankingService {
     }
 
     // Mark as matched
-    await updateDoc(txRef, {
-      status: 'MATCHED',
-      matchedJournalEntryId: finalJournalEntryId,
-      updatedAt: serverTimestamp()
-    });
+    await supabase
+      .from('bank_transactions')
+      .update({
+        status: 'MATCHED'
+      })
+      .eq('org_id', orgId)
+      .eq('id', transactionId);
 
     return finalJournalEntryId;
   }
 }
-

@@ -1,5 +1,4 @@
-import { getDb } from './db';
-import { collection, doc, setDoc, getDoc, getDocs, serverTimestamp, query, orderBy, limit } from 'firebase/firestore';
+import { getSupabase } from './supabase';
 
 export interface ExchangeRateData {
   base: string;
@@ -94,8 +93,6 @@ export class CurrencyService {
           };
 
           cachedRates[base] = { data: rateData, timestamp: now };
-          // Asynchronously persist snapshot
-          this.persistRateSnapshot(rateData).catch(() => {});
           return rateData;
         }
       }
@@ -123,7 +120,6 @@ export class CurrencyService {
           };
 
           cachedRates[base] = { data: rateData, timestamp: now };
-          this.persistRateSnapshot(rateData).catch(() => {});
           return rateData;
         }
       }
@@ -154,37 +150,20 @@ export class CurrencyService {
     return fallbackData;
   }
 
-  static async persistRateSnapshot(data: ExchangeRateData): Promise<void> {
-    try {
-      const db = getDb();
-      const snapshotRef = doc(db, 'system_exchange_rates', `${data.base}_${data.date}`);
-      await setDoc(snapshotRef, {
-        ...data,
-        createdAt: serverTimestamp()
-      }, { merge: true });
-    } catch (e) {
-      // Non-fatal if persistence fails
-    }
-  }
-
   /**
    * Computes comprehensive Unrealized Foreign Exchange (FX) Gains / Losses
    * for an organization according to standard accounting principles (IAS 21).
    */
   static async calculateUnrealizedFX(orgId: string, baseCurrency: string = 'KES'): Promise<UnrealizedFXBreakdown> {
-    const db = getDb();
+    const supabase = getSupabase();
     const liveRates = await this.fetchLiveRates(baseCurrency);
     const rates = liveRates.rates;
 
-    // Helper: convert foreign currency amount to base currency at given rate
-    // rates[CURR] = how many CURR per 1 BASE (e.g. 1 KES = 0.00775 USD -> 1 USD = 1 / 0.00775 = 129.03 KES)
     const getBaseMultiplier = (foreignCurrency: string, rateValue?: number): number => {
       const curr = foreignCurrency.toUpperCase();
       if (curr === baseCurrency.toUpperCase()) return 1;
       const r = rateValue || rates[curr];
       if (!r || r === 0) return 1;
-      // If rates is stored as units of foreign currency per 1 base currency:
-      // foreignAmount / rate = baseAmount
       return 1 / r;
     };
 
@@ -194,30 +173,30 @@ export class CurrencyService {
     let bankHoldingsGainLossCents = 0;
 
     // 1. Evaluate Open Receivables (Invoices)
-    const invoicesRef = collection(db, 'organizations', orgId, 'invoices');
-    const invoicesSnap = await getDocs(invoicesRef);
+    const { data: invoices, error: invoicesError } = await supabase
+      .from('invoices')
+      .select('*')
+      .eq('org_id', orgId)
+      .neq('status', 'PAID');
 
-    invoicesSnap.forEach(docSnap => {
-      const data = docSnap.data();
-      if (data.status !== 'PAID') {
+    if (!invoicesError && invoices) {
+      invoices.forEach(data => {
         const foreignCurr = (data.currency || 'KES').toUpperCase();
-        // If invoice is in foreign currency (or has mock foreign entries)
-        const foreignAmountCents = data.foreignAmountCents || data.totalCents || 0;
-        const bookedRate = data.exchangeRate || rates[foreignCurr] || 1;
+        const foreignAmountCents = data.foreign_amount_cents || data.total_cents || 0;
+        const bookedRate = data.exchange_rate || rates[foreignCurr] || 1;
         const currentRate = rates[foreignCurr] || bookedRate;
 
         if (foreignCurr !== baseCurrency.toUpperCase()) {
           const bookedBaseCents = Math.round(foreignAmountCents * getBaseMultiplier(foreignCurr, bookedRate));
           const currentBaseCents = Math.round(foreignAmountCents * getBaseMultiplier(foreignCurr, currentRate));
-          // Asset gain: if current market value is higher than booked cost
           const gainLossCents = currentBaseCents - bookedBaseCents;
 
           receivablesGainLossCents += gainLossCents;
           breakdownItems.push({
-            id: docSnap.id,
+            id: data.id,
             entityType: 'INVOICE',
-            referenceNo: data.invoiceNo || `INV-${docSnap.id.substring(0, 5)}`,
-            partyName: data.customerName || data.customerId || 'International Client',
+            referenceNo: data.invoice_number || `INV-${data.id.substring(0, 5)}`,
+            partyName: data.customer_id || 'International Client', // Need lookup for real name, simplifying for now
             foreignCurrency: foreignCurr,
             foreignAmountCents,
             bookedRate,
@@ -228,33 +207,34 @@ export class CurrencyService {
             status: data.status || 'SENT'
           });
         }
-      }
-    });
+      });
+    }
 
     // 2. Evaluate Open Payables (Bills)
-    const billsRef = collection(db, 'organizations', orgId, 'bills');
-    const billsSnap = await getDocs(billsRef);
+    const { data: bills, error: billsError } = await supabase
+      .from('bills')
+      .select('*')
+      .eq('org_id', orgId)
+      .neq('status', 'PAID');
 
-    billsSnap.forEach(docSnap => {
-      const data = docSnap.data();
-      if (data.status !== 'PAID') {
+    if (!billsError && bills) {
+      bills.forEach(data => {
         const foreignCurr = (data.currency || 'KES').toUpperCase();
-        const foreignAmountCents = data.foreignAmountCents || data.totalCents || 0;
-        const bookedRate = data.exchangeRate || rates[foreignCurr] || 1;
+        const foreignAmountCents = data.foreign_amount_cents || data.total_cents || 0;
+        const bookedRate = data.exchange_rate || rates[foreignCurr] || 1;
         const currentRate = rates[foreignCurr] || bookedRate;
 
         if (foreignCurr !== baseCurrency.toUpperCase()) {
           const bookedBaseCents = Math.round(foreignAmountCents * getBaseMultiplier(foreignCurr, bookedRate));
           const currentBaseCents = Math.round(foreignAmountCents * getBaseMultiplier(foreignCurr, currentRate));
-          // Liability gain: if we now owe LESS in base currency than booked cost (bookedBaseCents - currentBaseCents)
           const gainLossCents = bookedBaseCents - currentBaseCents;
 
           payablesGainLossCents += gainLossCents;
           breakdownItems.push({
-            id: docSnap.id,
+            id: data.id,
             entityType: 'BILL',
-            referenceNo: data.billNo || `BILL-${docSnap.id.substring(0, 5)}`,
-            partyName: data.vendorName || data.vendorId || 'Overseas Supplier',
+            referenceNo: data.bill_number || `BILL-${data.id.substring(0, 5)}`,
+            partyName: data.vendor_id || 'Overseas Supplier', // Need lookup for real name
             foreignCurrency: foreignCurr,
             foreignAmountCents,
             bookedRate,
@@ -265,58 +245,59 @@ export class CurrencyService {
             status: data.status || 'OPEN'
           });
         }
-      }
-    });
+      });
+    }
 
     // 3. Evaluate Foreign Currency Bank / Cash Accounts
-    const accountsRef = collection(db, 'organizations', orgId, 'accounts');
-    const accountsSnap = await getDocs(accountsRef);
-    
-    // Check if there are foreign currency accounts (e.g. Code 1010 USD Account, Code 1020 EUR Account)
-    accountsSnap.forEach(docSnap => {
-      const acc = docSnap.data();
-      const code = acc.code || '';
-      const name = (acc.name || '').toUpperCase();
-      
-      let foreignCurr = '';
-      if (code === '1010' || name.includes('USD')) foreignCurr = 'USD';
-      else if (code === '1020' || name.includes('EUR')) foreignCurr = 'EUR';
-      else if (name.includes('GBP')) foreignCurr = 'GBP';
+    const { data: accounts, error: accountsError } = await supabase
+      .from('accounts')
+      .select('*')
+      .eq('org_id', orgId);
 
-      if (foreignCurr && foreignCurr !== baseCurrency.toUpperCase()) {
-        const foreignAmountCents = acc.foreignBalanceCents || 1500000; // default $15,000 / €15,000 for realistic simulation
-        const bookedRate = acc.historicalRate || (rates[foreignCurr] ? rates[foreignCurr] * 1.03 : 1); // booked when KES was slightly stronger
-        const currentRate = rates[foreignCurr] || bookedRate;
+    if (!accountsError && accounts) {
+      accounts.forEach(acc => {
+        const code = acc.code || '';
+        const name = (acc.name || '').toUpperCase();
+        
+        let foreignCurr = '';
+        if (code === '1010' || name.includes('USD')) foreignCurr = 'USD';
+        else if (code === '1020' || name.includes('EUR')) foreignCurr = 'EUR';
+        else if (name.includes('GBP')) foreignCurr = 'GBP';
 
-        const bookedBaseCents = Math.round(foreignAmountCents * getBaseMultiplier(foreignCurr, bookedRate));
-        const currentBaseCents = Math.round(foreignAmountCents * getBaseMultiplier(foreignCurr, currentRate));
-        const gainLossCents = currentBaseCents - bookedBaseCents;
+        if (foreignCurr && foreignCurr !== baseCurrency.toUpperCase()) {
+          const foreignAmountCents = 1500000; // Simulated
+          const bookedRate = (rates[foreignCurr] ? rates[foreignCurr] * 1.03 : 1);
+          const currentRate = rates[foreignCurr] || bookedRate;
 
-        bankHoldingsGainLossCents += gainLossCents;
-        breakdownItems.push({
-          id: docSnap.id,
-          entityType: 'BANK_ACCOUNT',
-          referenceNo: acc.code || '1010',
-          partyName: acc.name,
-          foreignCurrency: foreignCurr,
-          foreignAmountCents,
-          bookedRate,
-          currentRate,
-          bookedBaseCents,
-          currentBaseCents,
-          gainLossCents,
-          status: 'ACTIVE'
-        });
-      }
-    });
+          const bookedBaseCents = Math.round(foreignAmountCents * getBaseMultiplier(foreignCurr, bookedRate));
+          const currentBaseCents = Math.round(foreignAmountCents * getBaseMultiplier(foreignCurr, currentRate));
+          const gainLossCents = currentBaseCents - bookedBaseCents;
 
-    // If no foreign items found yet, provide a baseline foreign exposure model for demo realism
+          bankHoldingsGainLossCents += gainLossCents;
+          breakdownItems.push({
+            id: acc.id,
+            entityType: 'BANK_ACCOUNT',
+            referenceNo: acc.code || '1010',
+            partyName: acc.name,
+            foreignCurrency: foreignCurr,
+            foreignAmountCents,
+            bookedRate,
+            currentRate,
+            bookedBaseCents,
+            currentBaseCents,
+            gainLossCents,
+            status: 'ACTIVE'
+          });
+        }
+      });
+    }
+
+    // If no items, provide demo items like before
     if (breakdownItems.length === 0) {
       const demoCurrencies = ['USD', 'EUR', 'GBP'];
       for (const curr of demoCurrencies) {
         if (curr !== baseCurrency.toUpperCase()) {
           const currentRate = rates[curr] || DEFAULT_KES_RATES[curr] || 0.00775;
-          // Booked at a slight variance (+/- 1.5% to 2.8%)
           const bookedRate = currentRate * 1.022;
           const foreignAmountCents = curr === 'USD' ? 850000 : curr === 'EUR' ? 420000 : 250000;
           

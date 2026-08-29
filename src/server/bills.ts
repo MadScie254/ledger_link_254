@@ -1,7 +1,6 @@
-import { getDb } from './db';
+import { getSupabase } from './supabase';
 import { LedgerService } from './ledger';
 import { AccountService } from './accounts';
-import { collection, doc, setDoc, getDocs, query, orderBy, serverTimestamp } from 'firebase/firestore';
 
 export interface BillInput {
   orgId: string;
@@ -23,15 +22,36 @@ export interface BillInput {
 
 export class BillService {
   static async getBills(orgId: string) {
-    const db = getDb();
-    const billsRef = collection(db, 'organizations', orgId, 'bills');
-    const q = query(billsRef, orderBy('createdAt', 'desc'));
-    const snapshot = await getDocs(q);
-    return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+    const supabase = getSupabase();
+    const { data, error } = await supabase
+      .from('bills')
+      .select('*')
+      .eq('org_id', orgId)
+      .order('created_at', { ascending: false });
+      
+    if (error) throw error;
+    
+    return (data || []).map(row => ({
+      id: row.id,
+      orgId: row.org_id,
+      billNumber: row.bill_number,
+      vendorId: row.vendor_id,
+      date: row.date,
+      dueDate: row.due_date,
+      subtotalCents: row.subtotal_cents,
+      taxCents: row.tax_cents,
+      totalCents: row.total_cents,
+      amountDueCents: row.amount_due_cents,
+      status: row.status,
+      currency: row.currency,
+      notes: row.notes,
+      createdBy: row.created_by,
+      createdAt: row.created_at
+    }));
   }
 
   static async createBill(input: BillInput) {
-    const db = getDb();
+    const supabase = getSupabase();
     const currency = (input.currency || 'KES').toUpperCase();
     const exchangeRate = input.exchangeRate && input.exchangeRate > 0 ? input.exchangeRate : 1;
     
@@ -78,38 +98,44 @@ export class BillService {
       });
     }
 
-    const billsRef = collection(db, 'organizations', input.orgId, 'bills');
-    const billRef = doc(billsRef);
     const billNo = `BILL-${Math.floor(1000 + Math.random() * 9000)}`;
 
-    // 4. Post to Ledger Core (Asserts double-entry integrity)
-    const journalEntryId = await LedgerService.postJournalEntry({
+    // 4. Save Bill Record (we save it first to get the ID for the ledger)
+    const { data: bill, error: billError } = await supabase
+      .from('bills')
+      .insert({
+        org_id: input.orgId,
+        vendor_id: input.vendorId,
+        bill_number: billNo,
+        date: input.billDate,
+        due_date: input.dueDate,
+        subtotal_cents: totalCents,
+        tax_cents: 0,
+        total_cents: totalCents,
+        amount_due_cents: totalCents,
+        status: 'OPEN',
+        currency: currency,
+        notes: null,
+        created_by: input.createdBy || null
+      })
+      .select('id')
+      .single();
+      
+    if (billError) throw billError;
+    const billRefId = bill.id;
+
+    // 5. Post to Ledger Core (Asserts double-entry integrity)
+    await LedgerService.postJournalEntry({
       orgId: input.orgId,
       entryDate: input.billDate,
       memo: `Bill ${billNo}${currency !== 'KES' ? ` [${currency}]` : ''}`,
       sourceType: 'BILL',
-      sourceId: billRef.id,
+      sourceId: billRefId,
       referenceNo: billNo,
       createdBy: input.createdBy,
       lines: journalLines
     });
 
-    // 5. Save Bill Record
-    await setDoc(billRef, {
-      vendorId: input.vendorId,
-      vendorName: input.vendorName || null,
-      billNo,
-      billDate: input.billDate,
-      dueDate: input.dueDate,
-      status: 'OPEN',
-      currency,
-      exchangeRate,
-      foreignAmountCents: totalForeignCents || totalCents,
-      totalCents,
-      journalEntryId,
-      createdAt: serverTimestamp()
-    });
-
-    return billRef.id;
+    return billRefId;
   }
 }

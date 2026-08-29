@@ -1,6 +1,5 @@
 import { Router } from 'express';
-import { getDb } from './db';
-import { doc, deleteDoc, updateDoc, serverTimestamp } from 'firebase/firestore';
+import { getSupabase } from './supabase';
 import { AccountService } from './accounts';
 import { CustomerService } from './customers';
 import { InvoiceService } from './invoices';
@@ -452,15 +451,16 @@ apiRouter.post('/bulk/delete', async (req, res) => {
     const collName = collectionMap[entityType];
     if (!collName) throw new Error(`Unsupported entity type: ${entityType}`);
 
-    const db = getDb();
-    let deletedCount = 0;
-    for (const id of ids) {
-      const docRef = doc(db, 'organizations', orgId, collName, id);
-      await deleteDoc(docRef);
-      deletedCount++;
-    }
+    const supabase = getSupabase();
+    const { error } = await supabase
+      .from(collName)
+      .delete()
+      .eq('org_id', orgId)
+      .in('id', ids);
 
-    res.json({ success: true, count: deletedCount });
+    if (error) throw error;
+
+    res.json({ success: true, count: ids.length });
   } catch (err: any) {
     res.status(400).json({ error: err.message });
   }
@@ -486,18 +486,16 @@ apiRouter.post('/bulk/status-update', async (req, res) => {
     const collName = collectionMap[entityType];
     if (!collName) throw new Error(`Unsupported entity type: ${entityType}`);
 
-    const db = getDb();
-    let updatedCount = 0;
-    for (const id of ids) {
-      const docRef = doc(db, 'organizations', orgId, collName, id);
-      await updateDoc(docRef, {
-        status,
-        updatedAt: serverTimestamp()
-      });
-      updatedCount++;
-    }
+    const supabase = getSupabase();
+    const { error } = await supabase
+      .from(collName)
+      .update({ status })
+      .eq('org_id', orgId)
+      .in('id', ids);
 
-    res.json({ success: true, count: updatedCount });
+    if (error) throw error;
+
+    res.json({ success: true, count: ids.length });
   } catch (err: any) {
     res.status(400).json({ error: err.message });
   }
@@ -573,6 +571,3 @@ apiRouter.get('/currency/unrealized-fx', async (req, res) => {
     res.status(500).json({ error: err.message });
   }
 });
-
-
-

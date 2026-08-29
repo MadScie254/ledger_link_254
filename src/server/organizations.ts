@@ -1,5 +1,4 @@
-import { getDb } from './db';
-import { collection, doc, setDoc, getDoc, getDocs, updateDoc, serverTimestamp, query, orderBy } from 'firebase/firestore';
+import { getSupabase } from './supabase';
 import { AccountService } from './accounts';
 
 export interface Organization {
@@ -21,118 +20,140 @@ export interface Organization {
   updatedAt?: any;
 }
 
-const DEFAULT_ORGANIZATIONS: Omit<Organization, 'createdAt' | 'updatedAt'>[] = [
-  {
-    id: 'default-org-id',
-    name: 'Acme Corp Ltd.',
-    legalName: 'Acme Global Corporation Kenya Ltd',
-    baseCurrency: 'KES',
-    country: 'Kenya',
-    taxId: 'P051234567Z',
-    fiscalYearStart: 'January',
-    industry: 'Technology & Logistics',
-    address: 'Riverside Square, 4th Floor, Riverside Drive',
-    city: 'Nairobi',
-    phone: '+254 700 123 456',
-    email: 'finance@acmecorp.co.ke',
-    website: 'https://acmecorp.co.ke',
-    isDefault: true,
-  },
-  {
-    id: 'org-apex-holdings',
-    name: 'Apex Holdings East Africa',
-    legalName: 'Apex Regional Holdings Ltd',
-    baseCurrency: 'USD',
-    country: 'United States / Regional',
-    taxId: 'US-987654321',
-    fiscalYearStart: 'January',
-    industry: 'Investment & Consulting',
-    address: '100 Financial District Blvd, Suite 2200',
-    city: 'Delaware / Nairobi',
-    phone: '+1 (555) 349-2000',
-    email: 'treasury@apexholdings.com',
-    website: 'https://apexholdings.com',
-    isDefault: false,
-  }
-];
-
 export class OrganizationService {
   static async getOrganizations(): Promise<Organization[]> {
-    const db = getDb();
-    const orgsRef = collection(db, 'system_organizations');
-    const snapshot = await getDocs(orgsRef);
+    const supabase = getSupabase();
+    // We only fetch organizations the user has access to, handled by RLS.
+    // However, this is a service-role query, so it fetches all unless we pass a user ID.
+    // But wait, the Express routes are calling this. The routes should ideally use a user-scoped client.
+    // Since we use the service role, we should filter by memberships if we have the userId.
+    // For now, we fetch all orgs (which matches previous behavior without proper auth).
+    // In routes.ts, we will enforce access.
+    
+    const { data, error } = await supabase
+      .from('organizations')
+      .select('*')
+      .order('name');
 
-    if (snapshot.empty) {
-      // Seed default initial organizations
-      for (const org of DEFAULT_ORGANIZATIONS) {
-        const docRef = doc(db, 'system_organizations', org.id);
-        await setDoc(docRef, {
-          ...org,
-          createdAt: serverTimestamp(),
-          updatedAt: serverTimestamp()
-        });
-        // Seed default chart of accounts for this organization
-        await this.seedDefaultAccounts(org.id);
-      }
-      return DEFAULT_ORGANIZATIONS.map(o => ({ ...o }));
-    }
-
-    return snapshot.docs.map(d => ({ id: d.id, ...d.data() } as Organization));
+    if (error) throw error;
+    
+    return (data || []).map(d => ({
+      id: d.id,
+      name: d.name,
+      legalName: d.legal_name,
+      baseCurrency: d.base_currency,
+      country: d.country,
+      taxId: d.tax_id,
+      fiscalYearStart: d.fiscal_year_start,
+      industry: d.industry,
+      address: d.address,
+      city: d.city,
+      phone: d.phone,
+      email: d.email,
+      website: d.website,
+      isDefault: d.is_default,
+      createdAt: d.created_at,
+      updatedAt: d.updated_at
+    }));
   }
 
   static async getOrganization(orgId: string): Promise<Organization | null> {
-    const db = getDb();
-    const docRef = doc(db, 'system_organizations', orgId);
-    const snap = await getDoc(docRef);
-    if (!snap.exists()) {
-      // Fallback search in default orgs if not migrated
-      const found = DEFAULT_ORGANIZATIONS.find(o => o.id === orgId);
-      if (found) return found as Organization;
-      return null;
+    const supabase = getSupabase();
+    const { data, error } = await supabase
+      .from('organizations')
+      .select('*')
+      .eq('id', orgId)
+      .single();
+      
+    if (error) {
+      if (error.code === 'PGRST116') return null; // No rows
+      throw error;
     }
-    return { id: snap.id, ...snap.data() } as Organization;
+    
+    return {
+      id: data.id,
+      name: data.name,
+      legalName: data.legal_name,
+      baseCurrency: data.base_currency,
+      country: data.country,
+      taxId: data.tax_id,
+      fiscalYearStart: data.fiscal_year_start,
+      industry: data.industry,
+      address: data.address,
+      city: data.city,
+      phone: data.phone,
+      email: data.email,
+      website: data.website,
+      isDefault: data.is_default,
+      createdAt: data.created_at,
+      updatedAt: data.updated_at
+    };
   }
 
-  static async createOrganization(data: Omit<Organization, 'id' | 'createdAt' | 'updatedAt'>): Promise<string> {
-    const db = getDb();
-    const orgsRef = collection(db, 'system_organizations');
-    const newDocRef = doc(orgsRef);
-    const orgId = newDocRef.id;
+  static async createOrganization(data: Omit<Organization, 'id' | 'createdAt' | 'updatedAt'>, ownerId?: string): Promise<string> {
+    const supabase = getSupabase();
+    
+    const { data: newOrg, error } = await supabase
+      .from('organizations')
+      .insert({
+        name: data.name,
+        legal_name: data.legalName || data.name,
+        base_currency: data.baseCurrency || 'KES',
+        country: data.country || 'Kenya',
+        tax_id: data.taxId || '',
+        fiscal_year_start: data.fiscalYearStart || 'January',
+        industry: data.industry || 'General Business',
+        address: data.address || '',
+        city: data.city || '',
+        phone: data.phone || '',
+        email: data.email || '',
+        website: data.website || '',
+        is_default: false
+      })
+      .select('id')
+      .single();
 
-    const orgData: Organization = {
-      id: orgId,
-      name: data.name,
-      legalName: data.legalName || data.name,
-      baseCurrency: data.baseCurrency || 'KES',
-      country: data.country || 'Kenya',
-      taxId: data.taxId || '',
-      fiscalYearStart: data.fiscalYearStart || 'January',
-      industry: data.industry || 'General Business',
-      address: data.address || '',
-      city: data.city || '',
-      phone: data.phone || '',
-      email: data.email || '',
-      website: data.website || '',
-      isDefault: false,
-      createdAt: serverTimestamp(),
-      updatedAt: serverTimestamp()
-    };
+    if (error) throw error;
+    const orgId = newOrg.id;
 
-    await setDoc(newDocRef, orgData);
+    if (ownerId) {
+      await supabase.from('memberships').insert({
+        org_id: orgId,
+        user_id: ownerId,
+        role: 'owner'
+      });
+    }
 
-    // Initialize Standard Chart of Accounts with Multi-Currency & FX Gain/Loss accounts
+    // Initialize Standard Chart of Accounts
     await this.seedDefaultAccounts(orgId);
 
     return orgId;
   }
 
   static async updateOrganization(orgId: string, data: Partial<Organization>): Promise<void> {
-    const db = getDb();
-    const docRef = doc(db, 'system_organizations', orgId);
-    await updateDoc(docRef, {
-      ...data,
-      updatedAt: serverTimestamp()
-    });
+    const supabase = getSupabase();
+    const updateData: any = {};
+    if (data.name !== undefined) updateData.name = data.name;
+    if (data.legalName !== undefined) updateData.legal_name = data.legalName;
+    if (data.baseCurrency !== undefined) updateData.base_currency = data.baseCurrency;
+    if (data.country !== undefined) updateData.country = data.country;
+    if (data.taxId !== undefined) updateData.tax_id = data.taxId;
+    if (data.fiscalYearStart !== undefined) updateData.fiscal_year_start = data.fiscalYearStart;
+    if (data.industry !== undefined) updateData.industry = data.industry;
+    if (data.address !== undefined) updateData.address = data.address;
+    if (data.city !== undefined) updateData.city = data.city;
+    if (data.phone !== undefined) updateData.phone = data.phone;
+    if (data.email !== undefined) updateData.email = data.email;
+    if (data.website !== undefined) updateData.website = data.website;
+
+    if (Object.keys(updateData).length > 0) {
+      const { error } = await supabase
+        .from('organizations')
+        .update(updateData)
+        .eq('id', orgId);
+        
+      if (error) throw error;
+    }
   }
 
   static async seedDefaultAccounts(orgId: string): Promise<void> {

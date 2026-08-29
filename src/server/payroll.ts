@@ -1,42 +1,66 @@
-import { getDb } from './db';
-import { collection, doc, setDoc, getDocs, query, orderBy, serverTimestamp } from 'firebase/firestore';
+import { getSupabase } from './supabase';
 
 export class PayrollService {
   static async getEmployees(orgId: string) {
-    const db = getDb();
-    const employeesRef = collection(db, 'organizations', orgId, 'employees');
-    const q = query(employeesRef, orderBy('lastName'));
-    const snapshot = await getDocs(q);
-    return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+    const supabase = getSupabase();
+    const { data, error } = await supabase
+      .from('employees')
+      .select('*')
+      .eq('org_id', orgId)
+      .order('last_name');
+      
+    if (error) throw error;
+    
+    return (data || []).map(row => ({
+      id: row.id,
+      orgId: row.org_id,
+      firstName: row.first_name,
+      lastName: row.last_name,
+      email: row.email,
+      phone: row.phone,
+      department: row.department,
+      jobTitle: row.job_title,
+      hireDate: row.hire_date,
+      baseSalary: row.base_salary,
+      currency: row.currency,
+      payFrequency: row.pay_frequency,
+      kraPin: row.kra_pin,
+      nssfNumber: row.nssf_number,
+      nhifNumber: row.nhif_number,
+      bankName: row.bank_name,
+      bankAccount: row.bank_account,
+      status: row.status,
+      createdAt: row.created_at
+    }));
   }
 
   static async addEmployee(orgId: string, input: any) {
-    const db = getDb();
-    const employeesRef = collection(db, 'organizations', orgId, 'employees');
-    const newDocRef = doc(employeesRef);
-    await setDoc(newDocRef, {
-      firstName: input.firstName,
-      middleName: input.middleName || null,
-      lastName: input.lastName,
-      nationalId: input.nationalId || null,
-      email: input.email || null,
-      phone: input.phone || null,
-      jobTitle: input.jobTitle || 'Staff',
-      department: input.department || 'Operations',
-      employmentType: input.employmentType || 'Full-time',
-      hireDate: input.hireDate || new Date().toISOString().substring(0, 10),
-      kraPin: input.kraPin || null,
-      nssfNumber: input.nssfNumber || null,
-      shifNumber: input.shifNumber || null,
-      baseSalaryCents: input.baseSalaryCents || 0,
-      housingAllowanceCents: input.housingAllowanceCents || 0,
-      transportAllowanceCents: input.transportAllowanceCents || 0,
-      bankName: input.bankName || null,
-      bankAccountNo: input.bankAccountNo || null,
-      mpesaNumber: input.mpesaNumber || null,
-      status: 'ACTIVE',
-      createdAt: serverTimestamp()
-    });
-    return newDocRef.id;
+    const supabase = getSupabase();
+    const { data, error } = await supabase
+      .from('employees')
+      .insert({
+        org_id: orgId,
+        first_name: input.firstName,
+        last_name: input.lastName,
+        email: input.email || null,
+        phone: input.phone || null,
+        department: input.department || 'Operations',
+        job_title: input.jobTitle || 'Staff',
+        hire_date: input.hireDate || new Date().toISOString().substring(0, 10),
+        base_salary: input.baseSalaryCents || 0,
+        currency: 'KES',
+        pay_frequency: 'Monthly',
+        kra_pin: input.kraPin || null,
+        nssf_number: input.nssfNumber || null,
+        nhif_number: input.shifNumber || null,
+        bank_name: input.bankName || null,
+        bank_account: input.bankAccountNo || null,
+        status: 'Active'
+      })
+      .select('id')
+      .single();
+      
+    if (error) throw error;
+    return data.id;
   }
 }
