@@ -61,7 +61,7 @@ export class GeminiService {
       }
     });
 
-    const text = response.text();
+    const text = response.text;
     if (!text) throw new Error("No text received from Gemini");
 
     return JSON.parse(text);
