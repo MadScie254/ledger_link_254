@@ -6,7 +6,7 @@ import cors from 'cors';
 import rateLimit from 'express-rate-limit';
 import { createServer as createViteServer } from 'vite';
 
-const ALLOWED_ORIGINS = (process.env.ALLOWED_ORIGINS || 'http://localhost:3001').split(',');
+const ALLOWED_ORIGINS = (process.env.ALLOWED_ORIGINS || 'http://localhost:3000,http://127.0.0.1:3000,http://localhost:3001').split(',');
 
 async function startServer() {
   const app = express();
