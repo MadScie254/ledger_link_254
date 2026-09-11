@@ -61,7 +61,7 @@ export async function requireAuthenticationAndOrganization(
     .maybeSingle();
 
   if (membershipError) {
-    return next(membershipError);
+    return res.status(500).json({ error: membershipError.message || 'Failed to verify organization membership.' });
   }
 
   const role = membership?.role?.toLowerCase() as OrganizationRole | undefined;

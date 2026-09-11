@@ -76,6 +76,15 @@ async function startServer() {
     });
   }
 
+  // --- Global Error Handler ---
+  app.use((err: any, _req: any, res: any, _next: any) => {
+    const message = err instanceof Error ? err.message : (typeof err === 'string' ? err : JSON.stringify(err));
+    console.error('[LedgerLink] Unhandled error:', message);
+    if (!res.headersSent) {
+      res.status(500).json({ error: message });
+    }
+  });
+
   app.listen(PORT, '127.0.0.1', () => {
     console.log(`[LedgerLink] Server running on http://127.0.0.1:${PORT}`);
   });
