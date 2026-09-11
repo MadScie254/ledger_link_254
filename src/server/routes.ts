@@ -17,34 +17,22 @@ import { ReportsService } from './reports';
 import { OrganizationService } from './organizations';
 import { CurrencyService } from './currency';
 import { GeminiService } from './gemini';
+import {
+  requireAuthenticationAndOrganization,
+  requireOrganizationAdministrator,
+  requireRequestedOrganization,
+  type AuthenticatedRequest,
+} from './auth';
+import { z } from 'zod';
 
 export const apiRouter = Router();
 
-// Auth middleware — reads org from x-org-id header, user from Supabase Bearer JWT
-apiRouter.use(async (req, res, next) => {
-  const orgId = req.headers['x-org-id'] as string | undefined;
-  const authHeader = req.headers['authorization'];
-  const token = authHeader?.startsWith('Bearer ') ? authHeader.slice(7) : null;
+apiRouter.use(requireAuthenticationAndOrganization);
 
-  if (!orgId) {
-    return res.status(401).json({ error: 'Missing x-org-id header' });
-  }
-
-  // Decode user_id from Supabase JWT payload (base64url mid-section)
-  let userId = 'anonymous';
-  if (token) {
-    try {
-      const payload = JSON.parse(Buffer.from(token.split('.')[1], 'base64url').toString());
-      userId = payload.sub || 'anonymous';
-    } catch {
-      // malformed token — let individual routes decide if they need auth
-    }
-  }
-
-  (req as any).orgId = orgId;
-  (req as any).userId = userId;
-  req.body.orgId = orgId;
-  next();
+const bulkStatusUpdateSchema = z.object({
+  entityType: z.enum(['CUSTOMERS', 'VENDORS', 'INVENTORY', 'EMPLOYEES']),
+  ids: z.array(z.string().uuid()).min(1).max(100),
+  status: z.string().trim().min(1).max(32),
 });
 
 // --- Reports ---
@@ -272,7 +260,7 @@ apiRouter.get('/banking/ai-matches', async (req, res) => {
 apiRouter.post('/banking/auto-reconcile-all', async (req, res) => {
   try {
     const orgId = (req as any).orgId;
-    const userId = (req as any).userId || 'demo-user';
+    const userId = (req as AuthenticatedRequest).userId!;
     const minConfidence = req.body.minConfidence || 85;
     const result = await BankingService.autoReconcileAll(orgId, minConfidence, userId);
     res.json(result);
@@ -295,7 +283,8 @@ apiRouter.post('/banking/match', async (req, res) => {
   try {
     const orgId = (req as any).orgId;
     const { transactionId, targetAccountId, existingJournalEntryId } = req.body;
-    const journalEntryId = await BankingService.matchTransaction(orgId, transactionId, targetAccountId, existingJournalEntryId, 'test-user');
+    const userId = (req as AuthenticatedRequest).userId!;
+    const journalEntryId = await BankingService.matchTransaction(orgId, transactionId, targetAccountId, existingJournalEntryId, userId);
     res.json({ journalEntryId });
   } catch (err: any) {
     res.status(400).json({ error: err.message });
@@ -345,8 +334,12 @@ apiRouter.get('/invoices', async (req, res) => {
 
 apiRouter.post('/invoices', async (req, res) => {
   try {
-    req.body.createdBy = (req as any).userId || 'test-user';
-    const id = await InvoiceService.createInvoice(req.body);
+    const authenticatedReq = req as AuthenticatedRequest;
+    const id = await InvoiceService.createInvoice({
+      ...req.body,
+      orgId: authenticatedReq.orgId!,
+      createdBy: authenticatedReq.userId!,
+    });
     res.json({ id });
   } catch (err: any) {
     res.status(400).json({ error: err.message });
@@ -407,8 +400,12 @@ apiRouter.get('/bills', async (req, res) => {
 
 apiRouter.post('/bills', async (req, res) => {
   try {
-    req.body.createdBy = (req as any).userId || 'test-user';
-    const id = await BillService.createBill(req.body);
+    const authenticatedReq = req as AuthenticatedRequest;
+    const id = await BillService.createBill({
+      ...req.body,
+      orgId: authenticatedReq.orgId!,
+      createdBy: authenticatedReq.userId!,
+    });
     res.json({ id });
   } catch (err: any) {
     res.status(400).json({ error: err.message });
@@ -427,9 +424,10 @@ apiRouter.patch('/bills/:id', async (req, res) => {
 
 apiRouter.post('/expenses/scan', async (req, res) => {
   try {
-    const { image, mimeType } = req.body;
-    if (!image) throw new Error('Image data is required');
-    const result = await GeminiService.scanReceipt(image, mimeType || 'image/jpeg');
+    const { image, imageBase64, mimeType } = req.body;
+    const receiptImage = image || imageBase64;
+    if (!receiptImage) throw new Error('Image data is required');
+    const result = await GeminiService.scanReceipt(receiptImage, mimeType || 'image/jpeg');
     res.json(result);
   } catch (err: any) {
     res.status(500).json({ error: err.message });
@@ -533,7 +531,7 @@ apiRouter.patch('/projects/:id', async (req, res) => {
 apiRouter.post('/bulk/delete', async (req, res) => {
   try {
     const orgId = (req as any).orgId;
-    const userId = (req as any).userId || 'test-user';
+    const userId = (req as AuthenticatedRequest).userId!;
     const { entityType, ids } = req.body;
     if (!Array.isArray(ids) || ids.length === 0) {
       throw new Error('ids array is required');
@@ -557,7 +555,6 @@ apiRouter.post('/bulk/delete', async (req, res) => {
       CUSTOMERS: 'customers',
       VENDORS: 'vendors',
       INVENTORY: 'inventory_items',
-      ACCOUNTS: 'accounts',
       EMPLOYEES: 'employees'
     };
 
@@ -585,16 +582,11 @@ apiRouter.post('/bulk/delete', async (req, res) => {
 apiRouter.post('/bulk/status-update', async (req, res) => {
   try {
     const orgId = (req as any).orgId;
-    const { entityType, ids, status } = req.body;
-    if (!Array.isArray(ids) || ids.length === 0) {
-      throw new Error('ids array is required');
-    }
+    const { entityType, ids, status } = bulkStatusUpdateSchema.parse(req.body);
 
     const collectionMap: Record<string, string> = {
       CUSTOMERS: 'customers',
       VENDORS: 'vendors',
-      BILLS: 'bills',
-      INVOICES: 'invoices',
       INVENTORY: 'inventory_items',
       EMPLOYEES: 'employees'
     };
@@ -620,14 +612,15 @@ apiRouter.post('/bulk/status-update', async (req, res) => {
 // --- Organizations & Multi-Entity Management ---
 apiRouter.get('/organizations', async (req, res) => {
   try {
-    const orgs = await OrganizationService.getOrganizations();
+    const userId = (req as AuthenticatedRequest).userId!;
+    const orgs = await OrganizationService.getOrganizations(userId);
     res.json({ organizations: orgs });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
   }
 });
 
-apiRouter.get('/organizations/:id', async (req, res) => {
+apiRouter.get('/organizations/:id', requireRequestedOrganization, async (req, res) => {
   try {
     const org = await OrganizationService.getOrganization(req.params.id);
     if (!org) return res.status(404).json({ error: 'Organization not found' });
@@ -639,14 +632,15 @@ apiRouter.get('/organizations/:id', async (req, res) => {
 
 apiRouter.post('/organizations', async (req, res) => {
   try {
-    const id = await OrganizationService.createOrganization(req.body);
+    const userId = (req as AuthenticatedRequest).userId!;
+    const id = await OrganizationService.createOrganization(req.body, userId);
     res.json({ id, message: 'Organization created successfully' });
   } catch (err: any) {
     res.status(400).json({ error: err.message });
   }
 });
 
-apiRouter.put('/organizations/:id', async (req, res) => {
+apiRouter.put('/organizations/:id', requireRequestedOrganization, requireOrganizationAdministrator, async (req, res) => {
   try {
     await OrganizationService.updateOrganization(req.params.id, req.body);
     res.json({ success: true, message: 'Organization updated' });

@@ -21,18 +21,23 @@ export interface Organization {
 }
 
 export class OrganizationService {
-  static async getOrganizations(): Promise<Organization[]> {
+  static async getOrganizations(userId: string): Promise<Organization[]> {
     const supabase = getSupabase();
-    // We only fetch organizations the user has access to, handled by RLS.
-    // However, this is a service-role query, so it fetches all unless we pass a user ID.
-    // But wait, the Express routes are calling this. The routes should ideally use a user-scoped client.
-    // Since we use the service role, we should filter by memberships if we have the userId.
-    // For now, we fetch all orgs (which matches previous behavior without proper auth).
-    // In routes.ts, we will enforce access.
-    
+
+    const { data: memberships, error: membershipsError } = await supabase
+      .from('memberships')
+      .select('org_id')
+      .eq('user_id', userId);
+
+    if (membershipsError) throw membershipsError;
+
+    const organizationIds = (memberships || []).map((membership) => membership.org_id);
+    if (organizationIds.length === 0) return [];
+
     const { data, error } = await supabase
       .from('organizations')
       .select('*')
+      .in('id', organizationIds)
       .order('name');
 
     if (error) throw error;
@@ -117,11 +122,16 @@ export class OrganizationService {
     const orgId = newOrg.id;
 
     if (ownerId) {
-      await supabase.from('memberships').insert({
+      const { error: membershipError } = await supabase.from('memberships').insert({
         org_id: orgId,
         user_id: ownerId,
         role: 'owner'
       });
+
+      if (membershipError) {
+        await supabase.from('organizations').delete().eq('id', orgId);
+        throw membershipError;
+      }
     }
 
     // Initialize Standard Chart of Accounts
@@ -179,11 +189,7 @@ export class OrganizationService {
     ];
 
     for (const acc of standardAccounts) {
-      try {
-        await AccountService.createAccount({ ...acc, orgId });
-      } catch (e) {
-        // Account may already exist
-      }
+      await AccountService.createAccount({ ...acc, orgId });
     }
   }
 }
