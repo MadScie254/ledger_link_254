@@ -37,10 +37,8 @@ async function seedDemoOrg() {
   await delay(1000);
   const bankAccount = await AccountService.getAccountByCode(orgId, '1000');
   const arAccount = await AccountService.getAccountByCode(orgId, '1100');
-  const apAccount = await AccountService.getAccountByCode(orgId, '2000');
   const salesAccount = await AccountService.getAccountByCode(orgId, '4000');
   const opAccount = await AccountService.getAccountByCode(orgId, '6000');
-  const vatAccount = await AccountService.getAccountByCode(orgId, '2100');
 
   // 2. Customers
   const customers = [
@@ -84,23 +82,17 @@ async function seedDemoOrg() {
       issueDate: invDate.toISOString().substring(0, 10),
       dueDate: dueDate.toISOString().substring(0, 10),
       currency: 'KES',
-      subtotalCents: 15000000,
-      taxCents: 2400000,
-      totalCents: 17400000,
-      status: i > 1 ? 'PAID' : 'OPEN', // older ones paid
       notes: 'Monthly retainer',
       createdBy: userId,
-      items: [
+      lines: [
         {
           description: 'Software Consulting',
-          quantity: 1,
-          unitPriceCents: 15000000,
-          totalCents: 15000000,
-          accountId: salesAccount?.id
+          amountCents: 17400000,
+          accountId: salesAccount!.id
         }
       ]
     });
-    invoiceIds.push({ id: inv1Id, date: invDate, customer: customers[0].name, amount: 17400000, paid: i > 1 });
+    invoiceIds.push({ id: inv1Id, date: invDate, customer: customers[0].displayName, amount: 17400000, paid: i > 1 });
 
     // Equity Bank
     const inv2Id = await InvoiceService.createInvoice({
@@ -109,23 +101,17 @@ async function seedDemoOrg() {
       issueDate: invDate.toISOString().substring(0, 10),
       dueDate: dueDate.toISOString().substring(0, 10),
       currency: 'KES',
-      subtotalCents: 20000000,
-      taxCents: 3200000,
-      totalCents: 23200000,
-      status: i > 0 ? 'PAID' : 'OPEN',
       notes: 'System maintenance',
       createdBy: userId,
-      items: [
+      lines: [
         {
           description: 'Maintenance Contract',
-          quantity: 1,
-          unitPriceCents: 20000000,
-          totalCents: 20000000,
-          accountId: salesAccount?.id
+          amountCents: 23200000,
+          accountId: salesAccount!.id
         }
       ]
     });
-    invoiceIds.push({ id: inv2Id, date: invDate, customer: customers[1].name, amount: 23200000, paid: i > 0 });
+    invoiceIds.push({ id: inv2Id, date: invDate, customer: customers[1].displayName, amount: 23200000, paid: i > 0 });
   }
 
   // 5. Bills
@@ -138,22 +124,16 @@ async function seedDemoOrg() {
     await BillService.createBill({
       orgId,
       vendorId: vendorIds[0],
-      issueDate: billDate.toISOString().substring(0, 10),
+      billDate: billDate.toISOString().substring(0, 10),
       dueDate: dueDate.toISOString().substring(0, 10),
       currency: 'KES',
-      subtotalCents: 4500000,
-      taxCents: 720000,
-      totalCents: 5220000,
-      status: i > 0 ? 'PAID' : 'OPEN',
       notes: 'Monthly electricity',
       createdBy: userId,
-      items: [
+      lines: [
         {
           description: 'Electricity Bill',
-          quantity: 1,
-          unitPriceCents: 4500000,
-          totalCents: 4500000,
-          accountId: opAccount?.id
+          amountCents: 5220000,
+          accountId: opAccount!.id
         }
       ]
     });
@@ -162,22 +142,16 @@ async function seedDemoOrg() {
     await BillService.createBill({
       orgId,
       vendorId: vendorIds[1],
-      issueDate: billDate.toISOString().substring(0, 10),
+      billDate: billDate.toISOString().substring(0, 10),
       dueDate: dueDate.toISOString().substring(0, 10),
       currency: 'KES',
-      subtotalCents: 2500000,
-      taxCents: 400000,
-      totalCents: 2900000,
-      status: 'PAID', // Always paid
       notes: 'Fuel',
       createdBy: userId,
-      items: [
+      lines: [
         {
           description: 'Vehicle Fuel',
-          quantity: 1,
-          unitPriceCents: 2500000,
-          totalCents: 2500000,
-          accountId: opAccount?.id
+          amountCents: 2900000,
+          accountId: opAccount!.id
         }
       ]
     });

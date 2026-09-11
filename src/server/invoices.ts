@@ -12,6 +12,7 @@ export interface InvoiceInput {
   currency?: string;
   exchangeRate?: number;
   foreignAmountCents?: number;
+  notes?: string;
   lines: {
     description: string;
     accountId: string;
@@ -36,8 +37,10 @@ export class InvoiceService {
       id: row.id,
       orgId: row.org_id,
       invoiceNumber: row.invoice_number,
+      invoiceNo: row.invoice_number,
       customerId: row.customer_id,
       date: row.date,
+      issueDate: row.date,
       dueDate: row.due_date,
       subtotalCents: row.subtotal_cents,
       taxCents: row.tax_cents,
@@ -45,6 +48,8 @@ export class InvoiceService {
       amountDueCents: row.amount_due_cents,
       status: row.status,
       currency: row.currency,
+      exchangeRate: row.exchange_rate,
+      foreignAmountCents: row.foreign_amount_cents,
       notes: row.notes,
       createdBy: row.created_by,
       createdAt: row.created_at
@@ -118,7 +123,7 @@ export class InvoiceService {
         amount_due_cents: totalCents,
         status: 'SENT',
         currency: currency,
-        notes: null,
+        notes: input.notes || null,
         created_by: input.createdBy || null
       })
       .select('id')
@@ -128,16 +133,29 @@ export class InvoiceService {
     const invoiceRefId = invoice.id;
 
     // 5. Post to Ledger Core (This asserts double-entry integrity)
-    await LedgerService.postJournalEntry({
-      orgId: input.orgId,
-      entryDate: input.issueDate,
-      memo: `Invoice ${invoiceNo}${currency !== 'KES' ? ` [${currency}]` : ''}`,
-      sourceType: 'INVOICE',
-      sourceId: invoiceRefId,
-      referenceNo: invoiceNo,
-      createdBy: input.createdBy,
-      lines: journalLines
-    });
+    try {
+      await LedgerService.postJournalEntry({
+        orgId: input.orgId,
+        entryDate: input.issueDate,
+        memo: `Invoice ${invoiceNo}${currency !== 'KES' ? ` [${currency}]` : ''}`,
+        sourceType: 'INVOICE',
+        sourceId: invoiceRefId,
+        referenceNo: invoiceNo,
+        createdBy: input.createdBy,
+        lines: journalLines
+      });
+    } catch (error) {
+      const { error: cleanupError } = await supabase
+        .from('invoices')
+        .delete()
+        .eq('id', invoiceRefId)
+        .eq('org_id', input.orgId);
+
+      if (cleanupError) {
+        console.error('Failed to remove invoice after ledger posting failed:', cleanupError);
+      }
+      throw error;
+    }
 
     // 6. Submit to KRA eTIMS (Mock)
     let etimsData = null;
@@ -213,11 +231,14 @@ export class InvoiceService {
 
   static async updateInvoice(orgId: string, id: string, input: any) {
     const supabase = getSupabase();
+
+    if (input.status !== undefined) {
+      throw new Error('Invoice status must be changed through a dedicated payment or void workflow.');
+    }
     
     // Only allow metadata updates
     const updateData: any = {};
     if (input.dueDate !== undefined) updateData.due_date = input.dueDate;
-    if (input.status !== undefined) updateData.status = input.status;
     if (input.notes !== undefined) updateData.notes = input.notes;
     
     if (Object.keys(updateData).length > 0) {

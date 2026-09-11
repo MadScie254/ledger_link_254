@@ -3,9 +3,11 @@ import {createRoot} from 'react-dom/client';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import App from './App.tsx';
 import './index.css';
+import { installAuthenticatedApiFetch } from './utils/api.ts';
 
 // Safely suppress benign Vite dev WebSocket reconnect warnings
 if (typeof window !== 'undefined') {
+  installAuthenticatedApiFetch();
   window.addEventListener('unhandledrejection', (event) => {
     const msg = event.reason?.message || String(event.reason || '');
     if (msg.includes('WebSocket') || msg.includes('websocket')) {

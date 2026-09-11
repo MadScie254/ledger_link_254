@@ -54,6 +54,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const signOut = async () => {
     await supabase.auth.signOut();
+    localStorage.removeItem('supabase-auth-token');
+    setLocked(true);
   };
 
   const signInWithOtp = async (email: string) => {

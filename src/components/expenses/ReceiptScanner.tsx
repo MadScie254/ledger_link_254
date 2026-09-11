@@ -1,7 +1,6 @@
 import React from 'react';
 import { useState, useRef, useEffect } from 'react';
 import { Camera, Upload, X, Loader2 } from 'lucide-react';
-import { useAppStore } from '../../store';
 
 interface ReceiptScannerProps {
   onScanComplete: (data: { vendor: string; amount: number; date: string }) => void;
@@ -76,7 +75,7 @@ export function ReceiptScanner({ onScanComplete, onClose }: ReceiptScannerProps)
       const res = await fetch('/api/expenses/scan', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ imageBase64: base64Data })
+        body: JSON.stringify({ image: base64Data, mimeType: 'image/jpeg' })
       });
       
       if (!res.ok) {

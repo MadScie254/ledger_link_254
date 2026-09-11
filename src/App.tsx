@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 import { useEffect } from "react";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import { AppLayout } from "./components/layout/AppLayout";
 import { useAppStore } from "./store";
 import { SalesView } from "./components/sales/SalesView";
@@ -24,20 +24,62 @@ import { AuditLogView } from "./components/audit/AuditLogView";
 import { SystemHealthView } from "./components/health/SystemHealthView";
 import { SettingsView } from "./components/settings/SettingsView";
 import { TenantProvider } from "./context/TenantContext";
-import { fetchWithTenant } from "./utils/api";
 import { UndoToast } from "./components/layout/UndoToast";
 import { LockScreen } from "./components/layout/LockScreen";
 import { fetchExchangeRates } from "./utils/currency";
 import { AuthProvider } from "./context/AuthProvider";
+import { useAuth } from "./context/AuthProvider";
+import type { OrganizationData } from "./store";
 
 export default function App() {
-  const queryClient = useQueryClient();
-  const { activeView, setActiveView, isLocked, setLocked, activeCompany } = useAppStore();
+  return (
+    <AuthProvider>
+      <LedgerApp />
+    </AuthProvider>
+  );
+}
+
+function LedgerApp() {
+  const { session, signOut } = useAuth();
+  const {
+    activeView,
+    setActiveView,
+    isLocked,
+    setLocked,
+    activeCompany,
+    currentOrgId,
+    setCurrentOrgId,
+    setOrganizations,
+    setActiveCompany,
+    setDisplayCurrency,
+  } = useAppStore();
+
+  const { data: organizations, isLoading: organizationsLoading } = useQuery({
+    queryKey: ['organizations'],
+    enabled: Boolean(session),
+    queryFn: async () => {
+      const response = await fetch('/api/organizations');
+      if (!response.ok) throw new Error('Failed to load organizations');
+      const body = await response.json();
+      return body.organizations as OrganizationData[];
+    },
+  });
+
+  useEffect(() => {
+    if (!organizations?.length) return;
+
+    setOrganizations(organizations);
+    const selectedOrganization = organizations.find((organization) => organization.id === currentOrgId) || organizations[0];
+    setCurrentOrgId(selectedOrganization.id);
+    setActiveCompany(selectedOrganization);
+    setDisplayCurrency(selectedOrganization.baseCurrency);
+  }, [organizations, currentOrgId, setActiveCompany, setCurrentOrgId, setDisplayCurrency, setOrganizations]);
 
   // Automated daily exchange rate sync on startup
   useEffect(() => {
+    if (!session || !activeCompany) return;
     fetchExchangeRates(activeCompany?.baseCurrency || 'KES').catch(console.error);
-  }, [activeCompany?.baseCurrency]);
+  }, [activeCompany?.baseCurrency, session]);
 
   
 
@@ -50,8 +92,7 @@ export default function App() {
       if (!isLocked) {
         timeoutId = setTimeout(() => {
           setLocked(true);
-          sessionStorage.clear();
-          localStorage.removeItem("ledgerline-auth");
+          void signOut();
         }, 15 * 60 * 1000); // 15 minutes
       }
     };
@@ -69,7 +110,7 @@ export default function App() {
         document.removeEventListener(event, resetTimer);
       });
     };
-  }, [isLocked, setLocked]);
+  }, [isLocked, setLocked, signOut]);
 
   // Keyboard shortcuts
   useEffect(() => {
@@ -95,15 +136,6 @@ export default function App() {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [setActiveView, isLocked]);
 
-  const { data, isLoading } = useQuery({
-    queryKey: ["accounts"],
-    queryFn: async () => {
-      const res = await fetchWithTenant("/api/accounts");
-      if (!res.ok) throw new Error("Failed to fetch");
-      return res.json();
-    },
-  });
-
   const renderContent = () => {
     if (activeView === "Home / Dashboard") return <DashboardView />;
     if (activeView === "Business Feed") return <BusinessFeedView />;
@@ -126,13 +158,31 @@ export default function App() {
     return <DashboardView />;
   };
 
+  if (!session || isLocked) {
+    return <LockScreen />;
+  }
+
+  if (organizationsLoading) {
+    return <div className="fixed inset-0 bg-ink-900 z-[100] flex items-center justify-center text-white">Loading organizations...</div>;
+  }
+
+  if (organizations && organizations.length === 0) {
+    return (
+      <>
+        <TenantProvider>
+          <AppLayout><SettingsView /></AppLayout>
+        </TenantProvider>
+        <UndoToast />
+      </>
+    );
+  }
+
   return (
-    <AuthProvider>
-      {isLocked && <LockScreen />}
+    <>
       <TenantProvider>
         <AppLayout>{renderContent()}</AppLayout>
       </TenantProvider>
       <UndoToast />
-    </AuthProvider>
+    </>
   );
 }

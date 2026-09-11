@@ -11,6 +11,7 @@ export interface BillInput {
   currency?: string;
   exchangeRate?: number;
   foreignAmountCents?: number;
+  notes?: string;
   lines: {
     description: string;
     accountId: string;
@@ -37,6 +38,7 @@ export class BillService {
       billNumber: row.bill_number,
       vendorId: row.vendor_id,
       date: row.date,
+      billDate: row.date,
       dueDate: row.due_date,
       subtotalCents: row.subtotal_cents,
       taxCents: row.tax_cents,
@@ -44,6 +46,8 @@ export class BillService {
       amountDueCents: row.amount_due_cents,
       status: row.status,
       currency: row.currency,
+      exchangeRate: row.exchange_rate,
+      foreignAmountCents: row.foreign_amount_cents,
       notes: row.notes,
       createdBy: row.created_by,
       createdAt: row.created_at
@@ -117,7 +121,7 @@ export class BillService {
         amount_due_cents: totalCents,
         status: 'OPEN',
         currency: currency,
-        notes: null,
+        notes: input.notes || null,
         created_by: input.createdBy || null
       })
       .select('id')
@@ -127,16 +131,29 @@ export class BillService {
     const billRefId = bill.id;
 
     // 5. Post to Ledger Core (Asserts double-entry integrity)
-    await LedgerService.postJournalEntry({
-      orgId: input.orgId,
-      entryDate: input.billDate,
-      memo: `Bill ${billNo}${currency !== 'KES' ? ` [${currency}]` : ''}`,
-      sourceType: 'BILL',
-      sourceId: billRefId,
-      referenceNo: billNo,
-      createdBy: input.createdBy,
-      lines: journalLines
-    });
+    try {
+      await LedgerService.postJournalEntry({
+        orgId: input.orgId,
+        entryDate: input.billDate,
+        memo: `Bill ${billNo}${currency !== 'KES' ? ` [${currency}]` : ''}`,
+        sourceType: 'BILL',
+        sourceId: billRefId,
+        referenceNo: billNo,
+        createdBy: input.createdBy,
+        lines: journalLines
+      });
+    } catch (error) {
+      const { error: cleanupError } = await supabase
+        .from('bills')
+        .delete()
+        .eq('id', billRefId)
+        .eq('org_id', input.orgId);
+
+      if (cleanupError) {
+        console.error('Failed to remove bill after ledger posting failed:', cleanupError);
+      }
+      throw error;
+    }
 
     return billRefId;
   }
@@ -197,11 +214,14 @@ export class BillService {
 
   static async updateBill(orgId: string, id: string, input: any) {
     const supabase = getSupabase();
+
+    if (input.status !== undefined) {
+      throw new Error('Bill status must be changed through a dedicated payment or void workflow.');
+    }
     
     // Only allow metadata updates
     const updateData: any = {};
     if (input.dueDate !== undefined) updateData.due_date = input.dueDate;
-    if (input.status !== undefined) updateData.status = input.status;
     if (input.notes !== undefined) updateData.notes = input.notes;
     
     if (Object.keys(updateData).length > 0) {

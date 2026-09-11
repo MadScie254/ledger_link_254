@@ -94,7 +94,7 @@ export function CommandPalette() {
   const { data: itemsData } = useQuery({
     queryKey: ['items', currentOrgId],
     queryFn: async () => {
-      const res = await fetch('/api/items', { headers: { 'x-org-id': currentOrgId } });
+      const res = await fetch('/api/inventory', { headers: { 'x-org-id': currentOrgId } });
       if (!res.ok) return { items: [] };
       return res.json();
     },
