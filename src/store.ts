@@ -74,61 +74,21 @@ export const useAppStore = create<AppState>((set) => ({
   setRateMetadata: (meta) => set({ rateMetadata: meta }),
   activeView: 'Dashboard',
   setActiveView: (view) => set({ activeView: view }),
-  currentOrgId: 'default-org-id',
+  currentOrgId: '',
   setCurrentOrgId: (orgId) => set({ currentOrgId: orgId }),
-  organizations: [
-    {
-      id: 'default-org-id',
-      name: 'Acme Corp Ltd.',
-      legalName: 'Acme Global Corporation Kenya Ltd',
-      baseCurrency: 'KES',
-      country: 'Kenya',
-      taxId: 'P051234567Z',
-      fiscalYearStart: 'January',
-      industry: 'Technology & Logistics',
-      address: 'Riverside Square, 4th Floor',
-      city: 'Nairobi',
-      phone: '+254 700 123 456',
-      email: 'finance@acmecorp.co.ke',
-      isDefault: true,
-      isDemo: true
-    },
-    {
-      id: 'org-apex-holdings',
-      name: 'Apex Holdings East Africa',
-      legalName: 'Apex Regional Holdings Ltd',
-      baseCurrency: 'USD',
-      country: 'United States / Regional',
-      taxId: 'US-987654321',
-      fiscalYearStart: 'January',
-      industry: 'Investment & Consulting',
-      address: '100 Financial District Blvd',
-      city: 'Delaware / Nairobi',
-      phone: '+1 (555) 349-2000',
-      email: 'treasury@apexholdings.com',
-      isDefault: false
-    }
-  ],
+  // No hardcoded demo organizations here — a fresh account genuinely has
+  // zero organizations until it creates one. Showing fake "Acme Corp Ltd."/
+  // "Apex Holdings" data by default masked that, making a brand-new
+  // account with zero real memberships look like it already had 2
+  // companies set up (and every query fired with the fake org id
+  // 'default-org-id', which isn't a valid UUID and made every org-scoped
+  // API call fail).
+  organizations: [],
   setOrganizations: (orgs) => set({ organizations: orgs }),
-  activeCompany: {
-    id: 'default-org-id',
-    name: 'Acme Corp Ltd.',
-    legalName: 'Acme Global Corporation Kenya Ltd',
-    baseCurrency: 'KES',
-    country: 'Kenya',
-    taxId: 'P051234567Z',
-    fiscalYearStart: 'January',
-    industry: 'Technology & Logistics',
-    address: 'Riverside Square, 4th Floor',
-    city: 'Nairobi',
-    phone: '+254 700 123 456',
-    email: 'finance@acmecorp.co.ke',
-    isDefault: true,
-    isDemo: true
-  },
-  setActiveCompany: (company) => set({ 
-    activeCompany: company, 
-    currentOrgId: company?.id || 'default-org-id',
+  activeCompany: null,
+  setActiveCompany: (company) => set({
+    activeCompany: company,
+    currentOrgId: company?.id || '',
     displayCurrency: company?.baseCurrency || 'KES'
   }),
   isCommandPaletteOpen: false,

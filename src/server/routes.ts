@@ -41,9 +41,19 @@ function sendServerError(res: Response, err: unknown) {
 // 400s are almost always our own intentional validation/business-rule
 // messages (e.g. "Account code X already exists"), so they're safe to
 // forward as-is; still log server-side for observability.
+//
+// Note: Supabase/PostgREST errors thrown via `if (error) throw error` are
+// plain { message, code, details, hint } objects — NOT `instanceof Error` —
+// so that check alone silently swallowed every DB-originated 400 message
+// into a generic "Invalid request." Check for a string `.message` too.
 function sendClientError(res: Response, err: unknown) {
-  const message = err instanceof Error ? err.message : 'Invalid request.';
-  console.error('[API] Request error:', message);
+  let message = 'Invalid request.';
+  if (err instanceof Error) {
+    message = err.message;
+  } else if (err && typeof err === 'object' && typeof (err as any).message === 'string') {
+    message = (err as any).message;
+  }
+  console.error('[API] Request error:', err);
   res.status(400).json({ error: message });
 }
 

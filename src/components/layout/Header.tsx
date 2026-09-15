@@ -47,7 +47,7 @@ export function Header() {
               className="flex items-center space-x-2 px-2.5 py-1.5 rounded-sm border border-ink-900/15 bg-paper-100 text-xs font-semibold text-ink-900 hover:bg-paper-50 transition-colors shadow-2xs"
             >
               <Building2 className="w-3.5 h-3.5 text-focus-blue-600 shrink-0" />
-              <span className="max-w-[140px] sm:max-w-[180px] truncate">{activeCompany?.name || 'Acme Corp Ltd.'}</span>
+              <span className="max-w-[140px] sm:max-w-[180px] truncate">{activeCompany?.name || 'No company'}</span>
               <span className="font-mono text-[10px] px-1 py-0.2 bg-paper-100  rounded text-slate-500 font-bold">
                 {activeCompany?.baseCurrency || 'KES'}
               </span>

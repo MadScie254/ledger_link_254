@@ -15,6 +15,7 @@ export interface AuthenticatedRequest extends Request {
 }
 
 const writeRoles = new Set<OrganizationRole>(['owner', 'admin']);
+const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 function isOrganizationCollectionRequest(req: Request) {
   return req.path === '/organizations' && (req.method === 'GET' || req.method === 'POST');
@@ -57,6 +58,12 @@ export async function requireAuthenticationAndOrganization(
   if (typeof requestedOrgId !== 'string' || !requestedOrgId) {
     return res.status(400).json({ error: 'Missing x-org-id header.' });
   }
+  if (!UUID_PATTERN.test(requestedOrgId)) {
+    // Not a real org id (e.g. a client sent a placeholder before an
+    // organization was selected) — reject cleanly instead of letting an
+    // invalid UUID hit Postgres and surface as a raw 500.
+    return res.status(400).json({ error: 'Invalid x-org-id header.' });
+  }
 
   const { data: membership, error: membershipError } = await supabase
     .from('memberships')
@@ -66,7 +73,8 @@ export async function requireAuthenticationAndOrganization(
     .maybeSingle();
 
   if (membershipError) {
-    return res.status(500).json({ error: membershipError.message || 'Failed to verify organization membership.' });
+    console.error('[Auth] Failed to verify organization membership:', membershipError);
+    return res.status(500).json({ error: 'Failed to verify organization membership.' });
   }
 
   const role = membership?.role?.toLowerCase() as OrganizationRole | undefined;

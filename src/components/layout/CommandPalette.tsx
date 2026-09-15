@@ -68,7 +68,7 @@ export function CommandPalette() {
       if (!res.ok) return { invoices: [] };
       return res.json();
     },
-    enabled: isCommandPaletteOpen,
+    enabled: isCommandPaletteOpen && Boolean(currentOrgId),
   });
 
   const { data: customersData } = useQuery({
@@ -78,7 +78,7 @@ export function CommandPalette() {
       if (!res.ok) return { customers: [] };
       return res.json();
     },
-    enabled: isCommandPaletteOpen,
+    enabled: isCommandPaletteOpen && Boolean(currentOrgId),
   });
 
   const { data: vendorsData } = useQuery({
@@ -88,7 +88,7 @@ export function CommandPalette() {
       if (!res.ok) return { vendors: [] };
       return res.json();
     },
-    enabled: isCommandPaletteOpen,
+    enabled: isCommandPaletteOpen && Boolean(currentOrgId),
   });
 
   const { data: itemsData } = useQuery({
@@ -98,7 +98,7 @@ export function CommandPalette() {
       if (!res.ok) return { items: [] };
       return res.json();
     },
-    enabled: isCommandPaletteOpen,
+    enabled: isCommandPaletteOpen && Boolean(currentOrgId),
   });
 
   const { data: billsData } = useQuery({
@@ -108,7 +108,7 @@ export function CommandPalette() {
       if (!res.ok) return { bills: [] };
       return res.json();
     },
-    enabled: isCommandPaletteOpen,
+    enabled: isCommandPaletteOpen && Boolean(currentOrgId),
   });
 
   const { data: accountsData } = useQuery({
@@ -118,7 +118,7 @@ export function CommandPalette() {
       if (!res.ok) return { accounts: [] };
       return res.json();
     },
-    enabled: isCommandPaletteOpen,
+    enabled: isCommandPaletteOpen && Boolean(currentOrgId),
   });
 
   // Build searchable items list

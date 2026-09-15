@@ -210,7 +210,7 @@ export function SettingsView() {
                 </p>
               </div>
               <span className="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-bold bg-ledger-green-100 text-ledger-green-800">
-                Active: {activeCompany?.name || 'Acme Corp Ltd.'}
+                Active: {activeCompany?.name || 'None yet'}
               </span>
             </div>
           </div>
