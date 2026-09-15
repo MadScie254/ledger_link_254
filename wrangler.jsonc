@@ -18,6 +18,6 @@
   "vars": {
     "NODE_ENV": "production",
     "SUPABASE_URL": "https://jhmlkcuqsmynnkqgfisf.supabase.co",
-    "ALLOWED_ORIGINS": "https://ledgerlink.workers.dev"
+    "ALLOWED_ORIGINS": "https://ledgerlink.dmwanjala254.workers.dev"
   }
 }
