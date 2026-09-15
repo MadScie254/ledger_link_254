@@ -1,6 +1,6 @@
 import { getSupabase } from './supabase';
 import { AuditService } from './audit';
-import type { OrganizationRole } from './auth';
+import type { OrganizationRole } from '../../worker/auth';
 
 export interface TeamMemberInput {
   orgId: string;
