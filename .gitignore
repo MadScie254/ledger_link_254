@@ -6,6 +6,8 @@ coverage/
 *.log
 .env*
 !.env.example
+.wrangler/
+.dev.vars*
 
 # Never commit secrets or service credentials
 *-config.json
