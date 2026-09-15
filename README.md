@@ -79,6 +79,12 @@ GEMINI_API_KEY=your-gemini-api-key                 # backend only, never expose 
 PORT=3001
 NODE_ENV=development
 ENABLE_SEED_DATA=false                              # set to true for dev/staging demo data
+
+# Vite only exposes VITE_-prefixed vars to the browser — the frontend Supabase
+# client (src/lib/supabase.ts) reads these, separately from the server-only
+# vars above. Use the same project URL and anon key.
+VITE_SUPABASE_URL=https://your-project-ref.supabase.co
+VITE_SUPABASE_ANON_KEY=your-anon-key
 ```
 
 > ⚠️ **Never commit `.env`** — it is listed in `.gitignore`. Only `.env.example` is committed.

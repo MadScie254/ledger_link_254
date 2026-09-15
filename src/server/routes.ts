@@ -1,4 +1,4 @@
-import { Router } from 'express';
+import { Router, type Response } from 'express';
 import { getSupabase } from './supabase';
 import { AccountService } from './accounts';
 import { CustomerService } from './customers';
@@ -29,6 +29,22 @@ export const apiRouter = Router();
 
 apiRouter.use(requireAuthenticationAndOrganization);
 
+// 500s can carry raw Supabase/Postgres error text (constraint names, column
+// names) — log the detail server-side and never forward it to the client.
+function sendServerError(res: Response, err: unknown) {
+  console.error('[API] Unhandled server error:', err);
+  res.status(500).json({ error: 'An unexpected error occurred. Please try again later.' });
+}
+
+// 400s are almost always our own intentional validation/business-rule
+// messages (e.g. "Account code X already exists"), so they're safe to
+// forward as-is; still log server-side for observability.
+function sendClientError(res: Response, err: unknown) {
+  const message = err instanceof Error ? err.message : 'Invalid request.';
+  console.error('[API] Request error:', message);
+  res.status(400).json({ error: message });
+}
+
 const bulkStatusUpdateSchema = z.object({
   entityType: z.enum(['CUSTOMERS', 'VENDORS', 'INVENTORY', 'EMPLOYEES']),
   ids: z.array(z.string().uuid()).min(1).max(100),
@@ -43,7 +59,7 @@ apiRouter.get('/reports/pnl', async (req, res) => {
     const data = await ReportsService.getProfitAndLoss(orgId, dateRange);
     res.json(data);
   } catch (err: any) {
-    res.status(500).json({ error: err.message });
+    sendServerError(res, err);
   }
 });
 
@@ -54,7 +70,7 @@ apiRouter.get('/reports/balance-sheet', async (req, res) => {
     const data = await ReportsService.getBalanceSheet(orgId, asOfDate);
     res.json(data);
   } catch (err: any) {
-    res.status(500).json({ error: err.message });
+    sendServerError(res, err);
   }
 });
 
@@ -65,7 +81,7 @@ apiRouter.get('/reports/cash-flow', async (req, res) => {
     const data = await ReportsService.getCashFlow(orgId, dateRange);
     res.json(data);
   } catch (err: any) {
-    res.status(500).json({ error: err.message });
+    sendServerError(res, err);
   }
 });
 
@@ -75,7 +91,7 @@ apiRouter.get('/reports/trial-balance', async (req, res) => {
     const data = await ReportsService.getTrialBalance(orgId);
     res.json(data);
   } catch (err: any) {
-    res.status(500).json({ error: err.message });
+    sendServerError(res, err);
   }
 });
 
@@ -86,7 +102,7 @@ apiRouter.get('/reports/tax-summary', async (req, res) => {
     const data = await ReportsService.getTaxSummary(orgId, period);
     res.json(data);
   } catch (err: any) {
-    res.status(500).json({ error: err.message });
+    sendServerError(res, err);
   }
 });
 
@@ -98,7 +114,7 @@ apiRouter.get('/reports/ledger', async (req, res) => {
     const lines = await ReportsService.getLedgerLinesForAccount(orgId, accountName);
     res.json({ lines });
   } catch (err: any) {
-    res.status(500).json({ error: err.message });
+    sendServerError(res, err);
   }
 });
 
@@ -108,7 +124,7 @@ apiRouter.get('/team', async (req, res) => {
     const members = await TeamService.getMembers(orgId);
     res.json({ members });
   } catch (err: any) {
-    res.status(500).json({ error: err.message });
+    sendServerError(res, err);
   }
 });
 
@@ -118,7 +134,7 @@ apiRouter.post('/team', async (req, res) => {
     const id = await TeamService.addMember({ ...req.body, orgId });
     res.json({ id });
   } catch (err: any) {
-    res.status(400).json({ error: err.message });
+    sendClientError(res, err);
   }
 });
 
@@ -128,7 +144,7 @@ apiRouter.get('/dashboard/metrics', async (req, res) => {
     const metrics = await DashboardService.getMetrics(orgId);
     res.json(metrics);
   } catch (err: any) {
-    res.status(500).json({ error: err.message });
+    sendServerError(res, err);
   }
 });
 
@@ -139,7 +155,7 @@ apiRouter.post('/accounts', async (req, res) => {
     const id = await AccountService.createAccount({ ...req.body, orgId, createdBy: userId });
     res.json({ id });
   } catch (err: any) {
-    res.status(400).json({ error: err.message });
+    sendClientError(res, err);
   }
 });
 
@@ -151,7 +167,7 @@ apiRouter.post('/accounts/bulk', async (req, res) => {
     const result = await AccountService.bulkCreateAccounts(orgId, accounts, userId);
     res.json(result);
   } catch (err: any) {
-    res.status(400).json({ error: err.message });
+    sendClientError(res, err);
   }
 });
 
@@ -163,7 +179,7 @@ apiRouter.post('/accounts/undo-bulk', async (req, res) => {
     await AccountService.bulkDeleteAccounts(orgId, accountIds, userId);
     res.json({ success: true });
   } catch (err: any) {
-    res.status(400).json({ error: err.message });
+    sendClientError(res, err);
   }
 });
 
@@ -174,7 +190,7 @@ apiRouter.get('/journal-entries', async (req, res) => {
     const entries = await LedgerService.getJournalEntries(orgId);
     res.json({ entries });
   } catch (err: any) {
-    res.status(500).json({ error: err.message });
+    sendServerError(res, err);
   }
 });
 
@@ -185,7 +201,7 @@ apiRouter.post('/journal-entries', async (req, res) => {
     const id = await LedgerService.postJournalEntry({ ...req.body, orgId, createdBy: userId });
     res.json({ id });
   } catch (err: any) {
-    res.status(400).json({ error: err.message });
+    sendClientError(res, err);
   }
 });
 
@@ -196,7 +212,7 @@ apiRouter.get('/audit', async (req, res) => {
     const logs = await AuditService.getLogs(orgId);
     res.json({ logs });
   } catch (err: any) {
-    res.status(500).json({ error: err.message });
+    sendServerError(res, err);
   }
 });
 
@@ -206,7 +222,7 @@ apiRouter.get('/accounts', async (req, res) => {
     const accounts = await AccountService.getAccounts(orgId);
     res.json({ accounts });
   } catch (err: any) {
-    res.status(500).json({ error: err.message });
+    sendServerError(res, err);
   }
 });
 
@@ -232,7 +248,7 @@ apiRouter.post('/accounts/seed', async (req, res) => {
     }
     res.json({ success: true });
   } catch (err: any) {
-    res.status(500).json({ error: err.message });
+    sendServerError(res, err);
   }
 });
 
@@ -243,7 +259,7 @@ apiRouter.get('/banking/transactions', async (req, res) => {
     const transactions = await BankingService.getTransactions(orgId);
     res.json({ transactions });
   } catch (err: any) {
-    res.status(500).json({ error: err.message });
+    sendServerError(res, err);
   }
 });
 
@@ -253,7 +269,7 @@ apiRouter.get('/banking/ai-matches', async (req, res) => {
     const matches = await BankingService.getAIMatches(orgId);
     res.json({ matches });
   } catch (err: any) {
-    res.status(500).json({ error: err.message });
+    sendServerError(res, err);
   }
 });
 
@@ -265,7 +281,7 @@ apiRouter.post('/banking/auto-reconcile-all', async (req, res) => {
     const result = await BankingService.autoReconcileAll(orgId, minConfidence, userId);
     res.json(result);
   } catch (err: any) {
-    res.status(500).json({ error: err.message });
+    sendServerError(res, err);
   }
 });
 
@@ -275,7 +291,7 @@ apiRouter.post('/banking/sync', async (req, res) => {
     const result = await BankingService.syncTransactions(orgId);
     res.json(result);
   } catch (err: any) {
-    res.status(400).json({ error: err.message });
+    sendClientError(res, err);
   }
 });
 
@@ -287,7 +303,7 @@ apiRouter.post('/banking/match', async (req, res) => {
     const journalEntryId = await BankingService.matchTransaction(orgId, transactionId, targetAccountId, existingJournalEntryId, userId);
     res.json({ journalEntryId });
   } catch (err: any) {
-    res.status(400).json({ error: err.message });
+    sendClientError(res, err);
   }
 });
 
@@ -297,7 +313,7 @@ apiRouter.get('/customers', async (req, res) => {
     const customers = await CustomerService.getCustomers(orgId);
     res.json({ customers });
   } catch (err: any) {
-    res.status(500).json({ error: err.message });
+    sendServerError(res, err);
   }
 });
 
@@ -307,7 +323,7 @@ apiRouter.post('/customers', async (req, res) => {
     const id = await CustomerService.createCustomer(orgId, req.body);
     res.json({ id });
   } catch (err: any) {
-    res.status(400).json({ error: err.message });
+    sendClientError(res, err);
   }
 });
 
@@ -317,7 +333,7 @@ apiRouter.patch('/customers/:id', async (req, res) => {
     await CustomerService.updateCustomer(orgId, req.params.id, req.body);
     res.json({ success: true });
   } catch (err: any) {
-    res.status(400).json({ error: err.message });
+    sendClientError(res, err);
   }
 });
 
@@ -328,7 +344,7 @@ apiRouter.get('/invoices', async (req, res) => {
     const invoices = await InvoiceService.getInvoices(orgId);
     res.json({ invoices });
   } catch (err: any) {
-    res.status(500).json({ error: err.message });
+    sendServerError(res, err);
   }
 });
 
@@ -342,7 +358,7 @@ apiRouter.post('/invoices', async (req, res) => {
     });
     res.json({ id });
   } catch (err: any) {
-    res.status(400).json({ error: err.message });
+    sendClientError(res, err);
   }
 });
 
@@ -352,7 +368,7 @@ apiRouter.patch('/invoices/:id', async (req, res) => {
     await InvoiceService.updateInvoice(orgId, req.params.id, req.body);
     res.json({ success: true });
   } catch (err: any) {
-    res.status(400).json({ error: err.message });
+    sendClientError(res, err);
   }
 });
 
@@ -363,7 +379,7 @@ apiRouter.get('/vendors', async (req, res) => {
     const vendors = await VendorService.getVendors(orgId);
     res.json({ vendors });
   } catch (err: any) {
-    res.status(500).json({ error: err.message });
+    sendServerError(res, err);
   }
 });
 
@@ -373,7 +389,7 @@ apiRouter.post('/vendors', async (req, res) => {
     const id = await VendorService.createVendor(orgId, req.body);
     res.json({ id });
   } catch (err: any) {
-    res.status(400).json({ error: err.message });
+    sendClientError(res, err);
   }
 });
 
@@ -383,7 +399,7 @@ apiRouter.patch('/vendors/:id', async (req, res) => {
     await VendorService.updateVendor(orgId, req.params.id, req.body);
     res.json({ success: true });
   } catch (err: any) {
-    res.status(400).json({ error: err.message });
+    sendClientError(res, err);
   }
 });
 
@@ -394,7 +410,7 @@ apiRouter.get('/bills', async (req, res) => {
     const bills = await BillService.getBills(orgId);
     res.json({ bills });
   } catch (err: any) {
-    res.status(500).json({ error: err.message });
+    sendServerError(res, err);
   }
 });
 
@@ -408,7 +424,7 @@ apiRouter.post('/bills', async (req, res) => {
     });
     res.json({ id });
   } catch (err: any) {
-    res.status(400).json({ error: err.message });
+    sendClientError(res, err);
   }
 });
 
@@ -418,7 +434,7 @@ apiRouter.patch('/bills/:id', async (req, res) => {
     await BillService.updateBill(orgId, req.params.id, req.body);
     res.json({ success: true });
   } catch (err: any) {
-    res.status(400).json({ error: err.message });
+    sendClientError(res, err);
   }
 });
 
@@ -430,7 +446,7 @@ apiRouter.post('/expenses/scan', async (req, res) => {
     const result = await GeminiService.scanReceipt(receiptImage, mimeType || 'image/jpeg');
     res.json(result);
   } catch (err: any) {
-    res.status(500).json({ error: err.message });
+    sendServerError(res, err);
   }
 });
 
@@ -441,7 +457,7 @@ apiRouter.get('/employees', async (req, res) => {
     const employees = await PayrollService.getEmployees(orgId);
     res.json({ employees });
   } catch (err: any) {
-    res.status(500).json({ error: err.message });
+    sendServerError(res, err);
   }
 });
 
@@ -451,7 +467,7 @@ apiRouter.post('/employees', async (req, res) => {
     const id = await PayrollService.addEmployee(orgId, req.body);
     res.json({ id });
   } catch (err: any) {
-    res.status(400).json({ error: err.message });
+    sendClientError(res, err);
   }
 });
 
@@ -461,7 +477,7 @@ apiRouter.patch('/employees/:id', async (req, res) => {
     await PayrollService.updateEmployee(orgId, req.params.id, req.body);
     res.json({ success: true });
   } catch (err: any) {
-    res.status(400).json({ error: err.message });
+    sendClientError(res, err);
   }
 });
 
@@ -472,7 +488,7 @@ apiRouter.get('/inventory', async (req, res) => {
     const items = await InventoryService.getItems(orgId);
     res.json({ items });
   } catch (err: any) {
-    res.status(500).json({ error: err.message });
+    sendServerError(res, err);
   }
 });
 
@@ -482,7 +498,7 @@ apiRouter.post('/inventory', async (req, res) => {
     const id = await InventoryService.createItem(orgId, req.body);
     res.json({ id });
   } catch (err: any) {
-    res.status(400).json({ error: err.message });
+    sendClientError(res, err);
   }
 });
 
@@ -492,7 +508,7 @@ apiRouter.patch('/inventory/:id', async (req, res) => {
     await InventoryService.updateItem(orgId, req.params.id, req.body);
     res.json({ success: true });
   } catch (err: any) {
-    res.status(400).json({ error: err.message });
+    sendClientError(res, err);
   }
 });
 
@@ -503,7 +519,7 @@ apiRouter.get('/projects', async (req, res) => {
     const projects = await ProjectService.getProjects(orgId);
     res.json({ projects });
   } catch (err: any) {
-    res.status(500).json({ error: err.message });
+    sendServerError(res, err);
   }
 });
 
@@ -513,7 +529,7 @@ apiRouter.post('/projects', async (req, res) => {
     const id = await ProjectService.createProject(orgId, req.body);
     res.json({ id });
   } catch (err: any) {
-    res.status(400).json({ error: err.message });
+    sendClientError(res, err);
   }
 });
 
@@ -523,7 +539,7 @@ apiRouter.patch('/projects/:id', async (req, res) => {
     await ProjectService.updateProject(orgId, req.params.id, req.body);
     res.json({ success: true });
   } catch (err: any) {
-    res.status(400).json({ error: err.message });
+    sendClientError(res, err);
   }
 });
 
@@ -575,7 +591,7 @@ apiRouter.post('/bulk/delete', async (req, res) => {
 
     res.json({ success: true, count: ids.length, action: 'DELETE' });
   } catch (err: any) {
-    res.status(400).json({ error: err.message });
+    sendClientError(res, err);
   }
 });
 
@@ -605,7 +621,7 @@ apiRouter.post('/bulk/status-update', async (req, res) => {
 
     res.json({ success: true, count: ids.length });
   } catch (err: any) {
-    res.status(400).json({ error: err.message });
+    sendClientError(res, err);
   }
 });
 
@@ -616,7 +632,7 @@ apiRouter.get('/organizations', async (req, res) => {
     const orgs = await OrganizationService.getOrganizations(userId);
     res.json({ organizations: orgs });
   } catch (err: any) {
-    res.status(500).json({ error: err.message });
+    sendServerError(res, err);
   }
 });
 
@@ -626,7 +642,7 @@ apiRouter.get('/organizations/:id', requireRequestedOrganization, async (req, re
     if (!org) return res.status(404).json({ error: 'Organization not found' });
     res.json({ organization: org });
   } catch (err: any) {
-    res.status(500).json({ error: err.message });
+    sendServerError(res, err);
   }
 });
 
@@ -636,7 +652,7 @@ apiRouter.post('/organizations', async (req, res) => {
     const id = await OrganizationService.createOrganization(req.body, userId);
     res.json({ id, message: 'Organization created successfully' });
   } catch (err: any) {
-    res.status(400).json({ error: err.message });
+    sendClientError(res, err);
   }
 });
 
@@ -645,7 +661,7 @@ apiRouter.put('/organizations/:id', requireRequestedOrganization, requireOrganiz
     await OrganizationService.updateOrganization(req.params.id, req.body);
     res.json({ success: true, message: 'Organization updated' });
   } catch (err: any) {
-    res.status(400).json({ error: err.message });
+    sendClientError(res, err);
   }
 });
 
@@ -657,7 +673,7 @@ apiRouter.get('/currency/rates', async (req, res) => {
     const ratesData = await CurrencyService.fetchLiveRates(base, forceRefresh);
     res.json(ratesData);
   } catch (err: any) {
-    res.status(500).json({ error: err.message });
+    sendServerError(res, err);
   }
 });
 
@@ -667,7 +683,7 @@ apiRouter.post('/currency/refresh', async (req, res) => {
     const ratesData = await CurrencyService.fetchLiveRates(base, true);
     res.json({ success: true, data: ratesData, message: 'Daily exchange rates refreshed from free live market API' });
   } catch (err: any) {
-    res.status(500).json({ error: err.message });
+    sendServerError(res, err);
   }
 });
 
@@ -678,6 +694,6 @@ apiRouter.get('/currency/unrealized-fx', async (req, res) => {
     const breakdown = await CurrencyService.calculateUnrealizedFX(orgId, base);
     res.json(breakdown);
   } catch (err: any) {
-    res.status(500).json({ error: err.message });
+    sendServerError(res, err);
   }
 });

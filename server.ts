@@ -78,10 +78,9 @@ async function startServer() {
 
   // --- Global Error Handler ---
   app.use((err: any, _req: any, res: any, _next: any) => {
-    const message = err instanceof Error ? err.message : (typeof err === 'string' ? err : JSON.stringify(err));
-    console.error('[LedgerLink] Unhandled error:', message);
+    console.error('[LedgerLink] Unhandled error:', err);
     if (!res.headersSent) {
-      res.status(500).json({ error: message });
+      res.status(500).json({ error: 'An unexpected error occurred. Please try again later.' });
     }
   });
 
