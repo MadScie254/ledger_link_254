@@ -18,6 +18,7 @@ import { OrganizationService } from './organizations';
 import { CurrencyService } from './currency';
 import { GeminiService } from './gemini';
 import { BudgetService } from './budgets';
+import { AIInsightsService } from './aiInsights';
 import {
   requireAuthenticationAndOrganization,
   requireOrganizationAdministrator,
@@ -609,6 +610,20 @@ apiRouter.post('/expenses/scan', async (req, res) => {
     res.json(result);
   } catch (err: any) {
     sendServerError(res, err);
+  }
+});
+
+// --- AI Business Feed ---
+apiRouter.post('/ai/ask', async (req, res) => {
+  try {
+    const orgId = (req as any).orgId;
+    const question = (req.body.question || '').trim();
+    if (!question) throw new Error('A question is required.');
+    if (question.length > 500) throw new Error('Question is too long (max 500 characters).');
+    const answer = await AIInsightsService.ask(orgId, question);
+    res.json({ answer });
+  } catch (err: any) {
+    sendClientError(res, err);
   }
 });
 

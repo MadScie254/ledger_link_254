@@ -53,11 +53,18 @@ async function startServer() {
     message: { error: 'Receipt scan rate limit reached. Please try again in an hour.' }
   });
 
+  const aiAskLimiter = rateLimit({
+    windowMs: 60 * 60 * 1000, // 1 hour
+    max: 30,
+    message: { error: 'AI assistant rate limit reached. Please try again in an hour.' }
+  });
+
   app.use(express.json({ limit: '10mb' })); // 10mb to allow base64 receipt images
 
   // --- API Routes ---
   const { apiRouter } = await import('./src/server/routes.ts');
   app.use('/api/expenses/scan', scanLimiter);
+  app.use('/api/ai/ask', aiAskLimiter);
   app.use('/api', apiLimiter, apiRouter);
 
   // --- Vite Middleware for Development ---
