@@ -68,15 +68,19 @@ export function ReportsView() {
   }
 
   return (
-    <div className="max-w-6xl mx-auto">
-      <div className="mb-2 flex justify-between items-center">
-        <h1 className="text-2xl font-serif text-ink-900">Reports</h1>
+    <div>
+      <section className="surface-card mb-6 flex flex-col gap-4 p-5 sm:flex-row sm:items-end sm:justify-between sm:p-6">
+        <div>
+          <p className="page-kicker">Financial intelligence</p>
+          <h1 className="mt-2 text-3xl tracking-[-0.03em] font-serif font-semibold text-ink-900">Reports</h1>
+          <p className="mt-1.5 text-sm text-slate-500">Clear statements, built for decisions and a clean audit trail.</p>
+        </div>
         <div className="flex items-center space-x-2">
-          <label className="text-sm text-slate-500 font-medium">Currency:</label>
+          <label className="text-xs text-slate-500 font-semibold">Display currency</label>
           <select 
             value={displayCurrency}
             onChange={(e) => setDisplayCurrency(e.target.value)}
-            className="bg-paper-100 border border-ink-900/20 text-ink-900 text-sm rounded-sm px-2 py-1 outline-none focus:ring-1 focus:ring-focus-blue-500"
+            className="bg-paper-50 border border-ink-900/15 text-ink-900 text-xs rounded-xl px-3 py-2 outline-none focus:ring-1 focus:ring-focus-blue-500"
           >
             <option value="KES">KES - Kenyan Shilling</option>
             <option value="USD">USD - US Dollar</option>
@@ -86,19 +90,19 @@ export function ReportsView() {
             <option value="TZS">TZS - Tanzanian Shilling</option>
           </select>
         </div>
-      </div>
+      </section>
       <div className="ledger-divider mb-6"></div>
 
       {/* Sub-navigation */}
-      <div className="flex space-x-6 border-b border-ink-900/10 mb-6 overflow-x-auto">
+      <div className="flex gap-1.5 rounded-2xl border border-ink-900/8 bg-paper-100/70 p-1.5 mb-6 overflow-x-auto">
         {tabs.map(tab => (
           <button
             key={tab}
             onClick={() => setActiveTab(tab)}
-            className={`pb-3 text-sm font-medium transition-colors border-b-2 whitespace-nowrap ${
-              activeTab === tab 
-                ? 'border-brass-500 text-ink-900' 
-                : 'border-transparent text-slate-500 hover:text-ink-900 hover:border-ink-900/20'
+            className={`px-3 py-2 text-xs font-semibold transition-colors rounded-xl whitespace-nowrap ${
+              activeTab === tab
+                ? 'bg-focus-blue-500 text-white shadow-sm'
+                : 'text-slate-500 hover:bg-paper-50 hover:text-ink-900'
             }`}
           >
             {tab}
@@ -110,7 +114,7 @@ export function ReportsView() {
         <div className="space-y-8">
           {Object.entries(groupedReports).map(([category, reports]) => (
             <div key={category}>
-              <h2 className="text-sm font-bold text-ink-900 uppercase tracking-wider mb-4 border-b border-ink-900/10 pb-2">
+              <h2 className="text-[11px] font-bold text-ink-900 uppercase tracking-[0.12em] mb-4 border-b border-ink-900/10 pb-2">
                 {category}
               </h2>
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -118,7 +122,7 @@ export function ReportsView() {
                   <div 
                     key={report.name} 
                     onClick={() => setActiveReport(report.name)}
-                    className="group bg-paper-100 border border-ink-900/10 rounded-sm p-4 shadow-sm hover:shadow transition-shadow hover:border-focus-blue-500/50 cursor-pointer flex flex-col h-full"
+                    className="surface-card group p-5 cursor-pointer flex flex-col h-full transition-all duration-200 hover:-translate-y-0.5 hover:border-focus-blue-500/40 hover:shadow-lg"
                   >
                     <h3 className="text-base font-semibold text-focus-blue-500 group-hover:text-ink-900 transition-colors mb-2">
                       {report.name}
