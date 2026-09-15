@@ -17,6 +17,12 @@ export function BankingView() {
   const [filterStatus, setFilterStatus] = useState('ALL');
   const [matchingTx, setMatchingTx] = useState<any>(null); // Transaction being matched
   const [selectedCandidate, setSelectedCandidate] = useState<any>(null);
+  const [isCreatingRule, setIsCreatingRule] = useState(false);
+  const [ruleMatchText, setRuleMatchText] = useState('');
+  const [ruleAccountId, setRuleAccountId] = useState('');
+  const [isConnecting, setIsConnecting] = useState(false);
+  const [connectInstitution, setConnectInstitution] = useState('');
+  const [connectEmail, setConnectEmail] = useState('');
   const { currentOrgId } = useAppStore();
   const queryClient = useQueryClient();
 
@@ -67,6 +73,94 @@ export function BankingView() {
     if (filterDirection !== 'ALL' && tx.direction !== filterDirection) matches = false;
     if (filterStatus !== 'ALL' && tx.status !== filterStatus) matches = false;
     return matches;
+  });
+
+  // Fetch Bank Rules
+  const { data: rulesData, isLoading: rulesLoading } = useQuery({
+    queryKey: ['banking_rules', currentOrgId],
+    queryFn: async () => {
+      const res = await fetch('/api/banking/rules', { headers: { 'x-org-id': currentOrgId } });
+      if (!res.ok) throw new Error('Failed to fetch rules');
+      return res.json();
+    },
+    enabled: activeTab === 'Rules'
+  });
+
+  const createRuleMutation = useMutation({
+    mutationFn: async () => {
+      const res = await fetch('/api/banking/rules', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'x-org-id': currentOrgId },
+        body: JSON.stringify({ matchText: ruleMatchText, targetAccountId: ruleAccountId })
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.error || 'Failed to create rule');
+      }
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['banking_rules', currentOrgId] });
+      queryClient.invalidateQueries({ queryKey: ['banking_ai_matches', currentOrgId] });
+      setIsCreatingRule(false);
+      setRuleMatchText('');
+      setRuleAccountId('');
+    }
+  });
+
+  const deleteRuleMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const res = await fetch(`/api/banking/rules/${id}`, { method: 'DELETE', headers: { 'x-org-id': currentOrgId } });
+      if (!res.ok) throw new Error('Failed to delete rule');
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['banking_rules', currentOrgId] });
+      queryClient.invalidateQueries({ queryKey: ['banking_ai_matches', currentOrgId] });
+    }
+  });
+
+  // Fetch Reconciliation Summary
+  const { data: reconciliationData, isLoading: reconciliationLoading } = useQuery({
+    queryKey: ['banking_reconciliation', currentOrgId],
+    queryFn: async () => {
+      const res = await fetch('/api/banking/reconciliation', { headers: { 'x-org-id': currentOrgId } });
+      if (!res.ok) throw new Error('Failed to fetch reconciliation summary');
+      return res.json();
+    },
+    enabled: activeTab === 'Reconcile'
+  });
+
+  // Fetch Bank Connection Requests
+  const { data: connectionsData, isLoading: connectionsLoading } = useQuery({
+    queryKey: ['banking_connections', currentOrgId],
+    queryFn: async () => {
+      const res = await fetch('/api/banking/connection-requests', { headers: { 'x-org-id': currentOrgId } });
+      if (!res.ok) throw new Error('Failed to fetch connection requests');
+      return res.json();
+    },
+    enabled: activeTab === 'Bank connections'
+  });
+
+  const requestConnectionMutation = useMutation({
+    mutationFn: async () => {
+      const res = await fetch('/api/banking/connection-requests', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'x-org-id': currentOrgId },
+        body: JSON.stringify({ institutionName: connectInstitution, contactEmail: connectEmail || undefined })
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.error || 'Failed to submit request');
+      }
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['banking_connections', currentOrgId] });
+      setIsConnecting(false);
+      setConnectInstitution('');
+      setConnectEmail('');
+    }
   });
 
   // Fetch Journal Entries (for matching)
@@ -501,99 +595,188 @@ export function BankingView() {
                <h3 className="text-lg font-medium text-ink-900">Auto-Categorization Rules</h3>
                <p className="text-sm text-slate-500">Automatically map recurring bank lines to your ledger accounts.</p>
              </div>
-             <button className="bg-sidebar-bg text-sidebar-ink  px-4 py-2 text-sm font-medium rounded-sm hover:bg-sidebar-bg/90 transition-colors">
+             <button onClick={() => setIsCreatingRule(true)} className="bg-sidebar-bg text-sidebar-ink px-4 py-2 text-sm font-medium rounded-sm hover:bg-sidebar-bg/90 transition-colors">
                Create Rule
              </button>
            </div>
-           
-           <div className="border border-ink-900/10 rounded-sm divide-y divide-ink-900/5">
-             <div className="p-4 flex items-center justify-between hover:bg-paper-50 transition-colors cursor-pointer">
-                <div>
-                   <p className="font-semibold text-ink-900">Contains "Safaricom"</p>
-                   <p className="text-sm text-slate-500">Apply to: <span className="font-medium">Telephone & Internet Expense</span></p>
-                </div>
-                <span className="text-xs text-ledger-green-700 bg-ledger-green-700/10 px-2 py-1 rounded">Active</span>
+
+           {rulesLoading ? (
+             <div className="p-8 text-center text-slate-500">Loading rules...</div>
+           ) : !rulesData?.rules?.length ? (
+             <div className="p-8 text-center text-slate-500 border border-dashed border-ink-900/10 rounded-sm">
+               No rules yet. Create one to automatically categorize bank lines containing specific text.
              </div>
-             <div className="p-4 flex items-center justify-between hover:bg-paper-50 transition-colors cursor-pointer">
-                <div>
-                   <p className="font-semibold text-ink-900">Contains "KRA"</p>
-                   <p className="text-sm text-slate-500">Apply to: <span className="font-medium">Tax Payable / KRA VAT</span></p>
-                </div>
-                <span className="text-xs text-ledger-green-700 bg-ledger-green-700/10 px-2 py-1 rounded">Active</span>
+           ) : (
+             <div className="border border-ink-900/10 rounded-sm divide-y divide-ink-900/5">
+               {rulesData.rules.map((rule: any) => (
+                 <div key={rule.id} className="p-4 flex items-center justify-between hover:bg-paper-50 transition-colors">
+                    <div>
+                       <p className="font-semibold text-ink-900">Contains "{rule.matchText}"</p>
+                       <p className="text-sm text-slate-500">Apply to: <span className="font-medium">{rule.targetAccountCode} - {rule.targetAccountName}</span></p>
+                    </div>
+                    <div className="flex items-center space-x-3">
+                      <span className="text-xs text-ledger-green-700 bg-ledger-green-700/10 px-2 py-1 rounded">Active</span>
+                      <button
+                        onClick={() => deleteRuleMutation.mutate(rule.id)}
+                        className="text-xs text-rust-700 hover:underline"
+                      >
+                        Delete
+                      </button>
+                    </div>
+                 </div>
+               ))}
              </div>
-             <div className="p-4 flex items-center justify-between hover:bg-paper-50 transition-colors cursor-pointer">
-                <div>
-                   <p className="font-semibold text-ink-900">Contains "AWS"</p>
-                   <p className="text-sm text-slate-500">Apply to: <span className="font-medium">Software & Subscriptions</span></p>
-                </div>
-                <span className="text-xs text-ledger-green-700 bg-ledger-green-700/10 px-2 py-1 rounded">Active</span>
+           )}
+
+           {isCreatingRule && (
+             <div className="fixed inset-0 bg-ink-900/20 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+               <div className="bg-paper-100 rounded-sm shadow-xl border border-ink-900/10 w-full max-w-md p-6">
+                 <h3 className="text-xl font-serif text-ink-900 mb-4">Create Auto-Categorization Rule</h3>
+                 <form onSubmit={(e) => { e.preventDefault(); createRuleMutation.mutate(); }} className="space-y-4">
+                   <div>
+                     <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">Bank line contains *</label>
+                     <input
+                       required
+                       value={ruleMatchText}
+                       onChange={(e) => setRuleMatchText(e.target.value)}
+                       placeholder="e.g., SAFARICOM"
+                       className="w-full bg-paper-100 border border-ink-900/20 text-ink-900 text-sm rounded-sm px-3 py-2 focus:ring-1 focus:ring-focus-blue-500 outline-none"
+                     />
+                   </div>
+                   <div>
+                     <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">Categorize as *</label>
+                     <select
+                       required
+                       value={ruleAccountId}
+                       onChange={(e) => setRuleAccountId(e.target.value)}
+                       className="w-full bg-paper-100 border border-ink-900/20 text-ink-900 text-sm rounded-sm px-3 py-2 focus:ring-1 focus:ring-focus-blue-500 outline-none"
+                     >
+                       <option value="">Select an account...</option>
+                       {(accountsData?.accounts || []).map((a: any) => (
+                         <option key={a.id} value={a.id}>{a.code} - {a.name}</option>
+                       ))}
+                     </select>
+                   </div>
+                   <div className="flex justify-end space-x-3 pt-4 border-t border-ink-900/10">
+                     <button type="button" onClick={() => setIsCreatingRule(false)} className="px-4 py-2 text-sm font-medium text-slate-600 hover:text-ink-900">Cancel</button>
+                     <button type="submit" disabled={createRuleMutation.isPending} className="bg-sidebar-bg text-sidebar-ink px-4 py-2 text-sm font-medium rounded-sm hover:bg-sidebar-bg/90 transition-colors disabled:opacity-50">
+                       {createRuleMutation.isPending ? 'Saving...' : 'Save Rule'}
+                     </button>
+                   </div>
+                 </form>
+               </div>
              </div>
-           </div>
+           )}
         </div>
       )}
 
       {activeTab === 'Reconcile' && (
         <div className="bg-paper-100 border border-ink-900/10 shadow-sm rounded-sm p-8 max-w-4xl mx-auto text-center">
            <h3 className="text-xl font-medium text-ink-900 mb-2">Month-End Bank Reconciliation</h3>
-           <p className="text-slate-500 mb-6">Verify statement balances against double-entry general ledger journals.</p>
-           
-           <div className="grid grid-cols-2 gap-6 mb-8">
-             <div className="p-6 border border-ink-900/10 bg-paper-50 rounded-sm">
-                <p className="text-sm text-slate-500 uppercase tracking-wider mb-2">Statement Balance (M-Pesa + Bank)</p>
-                <p className="text-2xl font-serif text-ink-900 tabular-currency">KES 1,245,000.00</p>
-             </div>
-             <div className="p-6 border border-ink-900/10 bg-paper-50 rounded-sm">
-                <p className="text-sm text-slate-500 uppercase tracking-wider mb-2">General Ledger Balance</p>
-                <p className="text-2xl font-serif text-ink-900 tabular-currency">KES 1,245,000.00</p>
-             </div>
-           </div>
-           
-           <div className="inline-flex items-center space-x-2 text-ledger-green-700 bg-ledger-green-700/10 px-4 py-2 rounded-full mb-6">
-              <span className="w-2 h-2 rounded-full bg-ledger-green-700"></span>
-              <span className="font-medium">Balanced. Zero Variance.</span>
-           </div>
-           
-           <div>
-             <button 
-              onClick={() => alert('Official Reconciliation Statement Generated')}
-              className="bg-sidebar-bg text-sidebar-ink  px-6 py-3 text-sm font-medium rounded-sm hover:bg-sidebar-bg/90 transition-colors shadow-sm"
-             >
-               Publish Reconciliation Report
-             </button>
-           </div>
+           <p className="text-slate-500 mb-6">Compares your imported bank feed against the general ledger's Cash account (1000).</p>
+
+           {reconciliationLoading ? (
+             <div className="py-8 text-slate-500">Calculating...</div>
+           ) : (
+             <>
+               <div className="grid grid-cols-2 gap-6 mb-8">
+                 <div className="p-6 border border-ink-900/10 bg-paper-50 rounded-sm">
+                    <p className="text-sm text-slate-500 uppercase tracking-wider mb-2">Statement Balance (Bank Feed)</p>
+                    <p className="text-2xl font-serif text-ink-900 tabular-currency">{formatCurrency(reconciliationData?.statementBalanceCents || 0)}</p>
+                 </div>
+                 <div className="p-6 border border-ink-900/10 bg-paper-50 rounded-sm">
+                    <p className="text-sm text-slate-500 uppercase tracking-wider mb-2">General Ledger Balance</p>
+                    <p className="text-2xl font-serif text-ink-900 tabular-currency">{formatCurrency(reconciliationData?.glBalanceCents || 0)}</p>
+                 </div>
+               </div>
+
+               {reconciliationData?.varianceCents === 0 ? (
+                 <div className="inline-flex items-center space-x-2 text-ledger-green-700 bg-ledger-green-700/10 px-4 py-2 rounded-full mb-6">
+                    <span className="w-2 h-2 rounded-full bg-ledger-green-700"></span>
+                    <span className="font-medium">Balanced. Zero Variance.</span>
+                 </div>
+               ) : (
+                 <div className="inline-flex items-center space-x-2 text-rust-700 bg-rust-700/10 px-4 py-2 rounded-full mb-6">
+                    <span className="w-2 h-2 rounded-full bg-rust-700"></span>
+                    <span className="font-medium">Variance: {formatCurrency(Math.abs(reconciliationData?.varianceCents || 0))} {(reconciliationData?.varianceCents || 0) > 0 ? 'unmatched in bank feed' : 'unmatched in ledger'}</span>
+                 </div>
+               )}
+               <p className="text-xs text-slate-400">Based on {reconciliationData?.transactionCount || 0} imported bank transactions. Unmatched transactions in the "Bank transactions" tab explain most variances.</p>
+             </>
+           )}
         </div>
       )}
 
       {activeTab === 'Bank connections' && (
         <div className="bg-paper-100 border border-ink-900/10 shadow-sm rounded-sm p-8 max-w-4xl mx-auto">
-           <h3 className="text-lg font-medium text-ink-900 mb-6">Linked Accounts & Gateways</h3>
-           
-           <div className="space-y-4">
-             <div className="flex items-center justify-between p-4 border border-ink-900/10 rounded-sm bg-paper-50">
-               <div className="flex items-center space-x-4">
-                 <div className="w-10 h-10 rounded-full bg-ledger-green-700/20 flex items-center justify-center font-bold text-ledger-green-700 text-lg">E</div>
-                 <div>
-                   <p className="font-medium text-ink-900">Equity Bank - Current</p>
-                   <p className="text-sm text-slate-500">Account ending in 4512 • Feed active</p>
-                 </div>
-               </div>
-               <span className="text-xs text-ledger-green-700 bg-ledger-green-700/10 px-2 py-1 rounded font-semibold">Live Sync</span>
+           <h3 className="text-lg font-medium text-ink-900 mb-2">Linked Accounts & Gateways</h3>
+           <p className="text-sm text-slate-500 mb-6">
+             Live bank/M-Pesa feeds require connecting a real banking aggregator account — this isn't
+             something that can be switched on from the app. Submitting a request below records your
+             interest; it does not establish a live connection.
+           </p>
+
+           {connectionsLoading ? (
+             <div className="p-8 text-center text-slate-500">Loading...</div>
+           ) : !connectionsData?.requests?.length ? (
+             <div className="p-8 text-center text-slate-500 border border-dashed border-ink-900/10 rounded-sm mb-4">
+               No institutions connected or requested yet.
              </div>
-             <div className="flex items-center justify-between p-4 border border-ink-900/10 rounded-sm bg-paper-50">
-               <div className="flex items-center space-x-4">
-                 <div className="w-10 h-10 rounded-full bg-brass-500/20 flex items-center justify-center font-bold text-brass-700 text-lg">M</div>
-                 <div>
-                   <p className="font-medium text-ink-900">M-Pesa Business Till</p>
-                   <p className="text-sm text-slate-500">Till 555123 • Instant webhooks enabled</p>
+           ) : (
+             <div className="space-y-3 mb-4">
+               {connectionsData.requests.map((req: any) => (
+                 <div key={req.id} className="flex items-center justify-between p-4 border border-ink-900/10 rounded-sm bg-paper-50">
+                   <div>
+                     <p className="font-medium text-ink-900">{req.institutionName}</p>
+                     <p className="text-sm text-slate-500">Requested {format(new Date(req.createdAt), 'MMM d, yyyy')}</p>
+                   </div>
+                   <span className="text-xs bg-amber-500/10 text-amber-700 px-2 py-1 rounded font-semibold">{req.status}</span>
                  </div>
-               </div>
-               <span className="text-xs text-ledger-green-700 bg-ledger-green-700/10 px-2 py-1 rounded font-semibold">Live Sync</span>
+               ))}
              </div>
-             
-             <button className="w-full mt-4 py-3 border-2 border-dashed border-ink-900/20 rounded-sm text-ink-900 font-medium hover:border-ink-900/50 transition-colors">
-               + Connect New Financial Institution / Paybill
-             </button>
-           </div>
+           )}
+
+           <button
+             onClick={() => setIsConnecting(true)}
+             className="w-full mt-4 py-3 border-2 border-dashed border-ink-900/20 rounded-sm text-ink-900 font-medium hover:border-ink-900/50 transition-colors"
+           >
+             + Request New Financial Institution / Paybill
+           </button>
+
+           {isConnecting && (
+             <div className="fixed inset-0 bg-ink-900/20 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+               <div className="bg-paper-100 rounded-sm shadow-xl border border-ink-900/10 w-full max-w-md p-6 text-left">
+                 <h3 className="text-xl font-serif text-ink-900 mb-4">Request Bank Connection</h3>
+                 <form onSubmit={(e) => { e.preventDefault(); requestConnectionMutation.mutate(); }} className="space-y-4">
+                   <div>
+                     <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">Institution / Paybill Name *</label>
+                     <input
+                       required
+                       value={connectInstitution}
+                       onChange={(e) => setConnectInstitution(e.target.value)}
+                       placeholder="e.g., Equity Bank, M-Pesa Till 555123"
+                       className="w-full bg-paper-100 border border-ink-900/20 text-ink-900 text-sm rounded-sm px-3 py-2 focus:ring-1 focus:ring-focus-blue-500 outline-none"
+                     />
+                   </div>
+                   <div>
+                     <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">Contact Email (optional)</label>
+                     <input
+                       type="email"
+                       value={connectEmail}
+                       onChange={(e) => setConnectEmail(e.target.value)}
+                       className="w-full bg-paper-100 border border-ink-900/20 text-ink-900 text-sm rounded-sm px-3 py-2 focus:ring-1 focus:ring-focus-blue-500 outline-none"
+                     />
+                   </div>
+                   <div className="flex justify-end space-x-3 pt-4 border-t border-ink-900/10">
+                     <button type="button" onClick={() => setIsConnecting(false)} className="px-4 py-2 text-sm font-medium text-slate-600 hover:text-ink-900">Cancel</button>
+                     <button type="submit" disabled={requestConnectionMutation.isPending} className="bg-sidebar-bg text-sidebar-ink px-4 py-2 text-sm font-medium rounded-sm hover:bg-sidebar-bg/90 transition-colors disabled:opacity-50">
+                       {requestConnectionMutation.isPending ? 'Submitting...' : 'Submit Request'}
+                     </button>
+                   </div>
+                 </form>
+               </div>
+             </div>
+           )}
         </div>
       )}
 

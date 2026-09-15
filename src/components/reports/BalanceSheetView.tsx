@@ -8,7 +8,7 @@ import { Printer, Download, ArrowLeft } from 'lucide-react';
 import * as XLSX from 'xlsx';
 
 export function BalanceSheetView({ onBack }: { onBack: () => void }) {
-  const { currentOrgId } = useAppStore();
+  const { currentOrgId, activeCompany } = useAppStore();
   const [asOfDate, setAsOfDate] = useState('2026-08-31');
 
   const { data, isLoading } = useQuery({
@@ -41,6 +41,8 @@ export function BalanceSheetView({ onBack }: { onBack: () => void }) {
         title: 'Balance Sheet Statement',
         subtitle: 'Statement of Financial Position',
         period: `As of ${format(new Date(asOfDate), 'MMMM d, yyyy')}`,
+        companyName: activeCompany?.legalName || activeCompany?.name,
+        kraPin: activeCompany?.taxId,
         currency: 'KES',
         filename: `balance_sheet_${format(new Date(), 'yyyyMMdd')}.pdf`
       },

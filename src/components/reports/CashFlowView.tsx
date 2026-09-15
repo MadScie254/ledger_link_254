@@ -8,7 +8,7 @@ import { Printer, Download, ArrowLeft } from 'lucide-react';
 import * as XLSX from 'xlsx';
 
 export function CashFlowView({ onBack }: { onBack: () => void }) {
-  const { currentOrgId } = useAppStore();
+  const { currentOrgId, activeCompany } = useAppStore();
   const [dateRange, setDateRange] = useState('This Year-to-date');
 
   const { data, isLoading } = useQuery({
@@ -39,6 +39,8 @@ export function CashFlowView({ onBack }: { onBack: () => void }) {
         title: 'Statement of Cash Flows',
         subtitle: 'Cash Flow from Operating, Investing, and Financing Activities',
         period: dateRange,
+        companyName: activeCompany?.legalName || activeCompany?.name,
+        kraPin: activeCompany?.taxId,
         currency: 'KES',
         filename: `cash_flow_${format(new Date(), 'yyyyMMdd')}.pdf`
       },

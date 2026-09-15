@@ -8,7 +8,7 @@ import { Printer, Download, ArrowLeft } from 'lucide-react';
 import * as XLSX from 'xlsx';
 
 export function ProfitAndLossView({ onBack }: { onBack: () => void }) {
-  const { currentOrgId } = useAppStore();
+  const { currentOrgId, activeCompany } = useAppStore();
   const [dateRange, setDateRange] = useState('This Year-to-date');
   const [drillDownAccount, setDrillDownAccount] = useState<string | null>(null);
 
@@ -50,6 +50,8 @@ export function ProfitAndLossView({ onBack }: { onBack: () => void }) {
         title: 'Profit & Loss Statement',
         subtitle: 'Statement of Comprehensive Income',
         period: dateRange,
+        companyName: activeCompany?.legalName || activeCompany?.name,
+        kraPin: activeCompany?.taxId,
         currency: 'KES',
         filename: `profit_and_loss_${format(new Date(), 'yyyyMMdd')}.pdf`
       },

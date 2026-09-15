@@ -47,9 +47,112 @@ export class BankingService {
     return { count: 0, message: "Bank sync isn't connected yet" };
   }
 
+  static async getRules(orgId: string) {
+    const supabase = getSupabase();
+    const { data, error } = await supabase
+      .from('bank_rules')
+      .select('id, match_text, target_account_id, accounts!inner(code, name)')
+      .eq('org_id', orgId)
+      .order('created_at', { ascending: true });
+
+    if (error) throw error;
+
+    return (data || []).map((row: any) => ({
+      id: row.id,
+      matchText: row.match_text,
+      targetAccountId: row.target_account_id,
+      targetAccountCode: row.accounts?.code,
+      targetAccountName: row.accounts?.name
+    }));
+  }
+
+  static async createRule(orgId: string, matchText: string, targetAccountId: string, createdBy?: string): Promise<string> {
+    const supabase = getSupabase();
+    if (!matchText?.trim()) throw new Error('Match text is required.');
+    if (!targetAccountId) throw new Error('A target account is required.');
+
+    const { data, error } = await supabase
+      .from('bank_rules')
+      .insert({ org_id: orgId, match_text: matchText.trim(), target_account_id: targetAccountId, created_by: createdBy || null })
+      .select('id')
+      .single();
+
+    if (error) throw error;
+    return data.id;
+  }
+
+  static async deleteRule(orgId: string, id: string): Promise<void> {
+    const supabase = getSupabase();
+    const { error } = await supabase.from('bank_rules').delete().eq('id', id).eq('org_id', orgId);
+    if (error) throw error;
+  }
+
+  static async requestBankConnection(orgId: string, input: { institutionName: string; contactEmail?: string; notes?: string }, requestedBy?: string): Promise<string> {
+    const supabase = getSupabase();
+    if (!input.institutionName?.trim()) throw new Error('Institution name is required.');
+
+    const { data, error } = await supabase
+      .from('bank_connection_requests')
+      .insert({
+        org_id: orgId,
+        institution_name: input.institutionName.trim(),
+        contact_email: input.contactEmail || null,
+        notes: input.notes || null,
+        requested_by: requestedBy || null
+      })
+      .select('id')
+      .single();
+
+    if (error) throw error;
+    return data.id;
+  }
+
+  static async getConnectionRequests(orgId: string) {
+    const supabase = getSupabase();
+    const { data, error } = await supabase
+      .from('bank_connection_requests')
+      .select('*')
+      .eq('org_id', orgId)
+      .order('created_at', { ascending: false });
+
+    if (error) throw error;
+
+    return (data || []).map((row: any) => ({
+      id: row.id,
+      institutionName: row.institution_name,
+      contactEmail: row.contact_email,
+      notes: row.notes,
+      status: row.status,
+      createdAt: row.created_at
+    }));
+  }
+
+  static async getReconciliationSummary(orgId: string) {
+    const transactions = await this.getTransactions(orgId);
+    const statementBalanceCents = transactions.reduce(
+      (sum, tx: any) => sum + (tx.direction === 'IN' ? tx.amountCents : -tx.amountCents),
+      0
+    );
+
+    const bankAccount = await AccountService.getAccountByCode(orgId, '1000');
+    let glBalanceCents = 0;
+    if (bankAccount) {
+      const balances = await AccountService.getAccountBalances(orgId);
+      glBalanceCents = balances.get(bankAccount.id) || 0;
+    }
+
+    return {
+      statementBalanceCents,
+      glBalanceCents,
+      varianceCents: statementBalanceCents - glBalanceCents,
+      transactionCount: transactions.length
+    };
+  }
+
   static async getAIMatches(orgId: string): Promise<AIMatchCandidate[]> {
     const transactions = await this.getTransactions(orgId);
     const unreviewed = transactions.filter((t: any) => t.status !== 'MATCHED');
+    const rules = await this.getRules(orgId);
 
     let invoices: any[] = [];
     let bills: any[] = [];
@@ -69,7 +172,19 @@ export class BankingService {
 
       let bestMatch: AIMatchCandidate | null = null;
 
-      if (isIncoming) {
+      const matchedRule = rules.find(r => desc.includes(r.matchText.toUpperCase()));
+      if (matchedRule) {
+        bestMatch = {
+          transactionId: tx.id,
+          transaction: tx,
+          confidence: 99,
+          matchType: 'ACCOUNT',
+          entityName: matchedRule.targetAccountName,
+          reason: `Matched your rule: contains "${matchedRule.matchText}"`,
+          suggestedAccountCode: matchedRule.targetAccountCode,
+          suggestedAccountName: matchedRule.targetAccountName
+        };
+      } else if (isIncoming) {
         // Try matching open invoices
         const matchedInv = invoices.find(inv => {
           const invTotal = (inv.totalAmount || inv.totalCents || 0);

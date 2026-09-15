@@ -1,10 +1,13 @@
 import { useState } from 'react';
 import { useAppStore } from '../../store';
+import { Info } from 'lucide-react';
 import { ProfitAndLossView } from './ProfitAndLossView';
 import { BalanceSheetView } from './BalanceSheetView';
 import { CashFlowView } from './CashFlowView';
 import { TrialBalanceView } from './TrialBalanceView';
 import { TaxSummaryView } from './TaxSummaryView';
+import { ARAgingView, APAgingView } from './ARAgingView';
+import { GeneralLedgerView } from './GeneralLedgerView';
 
 const tabs = ['Standard reports', 'Custom report builder', 'Management report packs', 'Scheduled/emailed reports'];
 
@@ -23,6 +26,7 @@ export function ReportsView() {
   const { displayCurrency, setDisplayCurrency } = useAppStore();
   const [activeTab, setActiveTab] = useState('Standard reports');
   const [activeReport, setActiveReport] = useState<string | null>(null);
+  const [notBuiltMessage, setNotBuiltMessage] = useState<string | null>(null);
   
   // Group reports by category
   const groupedReports = standardReports.reduce((acc, report) => {
@@ -51,24 +55,16 @@ export function ReportsView() {
     return <TaxSummaryView onBack={() => setActiveReport(null)} />;
   }
 
-  if (activeReport) {
-    return (
-      <div className="max-w-6xl mx-auto">
-        <button 
-          onClick={() => setActiveReport(null)}
-          className="text-sm font-medium text-focus-blue-500 hover:text-ink-900 mb-6 inline-flex items-center"
-        >
-          &larr; Back to Reports
-        </button>
-        <div className="bg-paper-100 border border-ink-900/10 shadow-sm rounded-sm p-16 text-center">
-          <h3 className="text-xl font-medium text-ink-900 mb-2">{activeReport}</h3>
-          <p className="text-slate-500 mb-6">This report template is configured but awaiting direct ledger aggregation.</p>
-          <button className="bg-sidebar-bg text-sidebar-ink  px-6 py-2 text-sm font-medium rounded-sm hover:bg-sidebar-bg/90 transition-colors">
-            Generate Export (Excel)
-          </button>
-        </div>
-      </div>
-    );
+  if (activeReport === 'A/R Aging Summary') {
+    return <ARAgingView onBack={() => setActiveReport(null)} />;
+  }
+
+  if (activeReport === 'A/P Aging Summary') {
+    return <APAgingView onBack={() => setActiveReport(null)} />;
+  }
+
+  if (activeReport === 'General Ledger') {
+    return <GeneralLedgerView onBack={() => setActiveReport(null)} />;
   }
 
   return (
@@ -142,7 +138,10 @@ export function ReportsView() {
         <div className="bg-paper-100 border border-ink-900/10 shadow-sm rounded-sm p-8 max-w-4xl mx-auto text-center">
            <h3 className="text-xl font-medium text-ink-900 mb-2">Custom Report Builder</h3>
            <p className="text-slate-500 mb-6">Design tailored financial reports with custom dimension tagging and multi-period comparatives.</p>
-           <button className="bg-sidebar-bg text-sidebar-ink  px-6 py-2 text-sm font-medium rounded-sm hover:bg-sidebar-bg/90 transition-colors">
+           <button
+             onClick={() => setNotBuiltMessage('The custom report builder (arbitrary dimension tagging and multi-period comparatives) is not built yet. For now, use the eight Standard Reports, each with real PDF/Excel export.')}
+             className="bg-sidebar-bg text-sidebar-ink px-6 py-2 text-sm font-medium rounded-sm hover:bg-sidebar-bg/90 transition-colors"
+           >
              Create Custom Report
            </button>
         </div>
@@ -155,18 +154,24 @@ export function ReportsView() {
                <h3 className="text-lg font-medium text-ink-900">Management Packs</h3>
                <p className="text-sm text-slate-500">Curated collections of reports (Cover page, Executive Summary, P&L, Balance Sheet) exported as a single PDF.</p>
              </div>
-             <button className="bg-sidebar-bg text-sidebar-ink  px-4 py-2 text-sm font-medium rounded-sm hover:bg-sidebar-bg/90 transition-colors">
+             <button
+               onClick={() => setNotBuiltMessage('Custom, named report packs are not built yet. The one pack below (P&L + Balance Sheet) works today — open Standard Reports for the full, real set.')}
+               className="bg-sidebar-bg text-sidebar-ink px-4 py-2 text-sm font-medium rounded-sm hover:bg-sidebar-bg/90 transition-colors"
+             >
                Build New Pack
              </button>
            </div>
-           
+
            <div className="border border-ink-900/10 rounded-sm p-4 bg-paper-50 flex items-center justify-between">
               <div>
                 <p className="font-semibold text-ink-900">Monthly Board Reporting Pack</p>
-                <p className="text-xs text-slate-500 mt-1">Contains: Executive Summary, P&L, Balance Sheet, Cashflow</p>
+                <p className="text-xs text-slate-500 mt-1">Contains: P&L, Balance Sheet (real data — open each from Standard Reports for the full report and export)</p>
               </div>
-              <button className="text-sm font-medium text-focus-blue-500 border border-focus-blue-500/30 px-3 py-1.5 rounded-sm hover:bg-paper-100 transition-colors">
-                Export PDF
+              <button
+                onClick={() => setActiveTab('Standard reports')}
+                className="text-sm font-medium text-focus-blue-500 border border-focus-blue-500/30 px-3 py-1.5 rounded-sm hover:bg-paper-100 transition-colors"
+              >
+                Open Reports
               </button>
            </div>
         </div>
@@ -176,9 +181,29 @@ export function ReportsView() {
         <div className="bg-paper-100 border border-ink-900/10 shadow-sm rounded-sm p-8 max-w-4xl mx-auto text-center">
            <h3 className="text-xl font-medium text-ink-900 mb-2">Scheduled Delivery</h3>
            <p className="text-slate-500 mb-6">Automate your reporting. Set up standard reports or management packs to be emailed to stakeholders weekly or monthly.</p>
-           <button className="bg-sidebar-bg text-sidebar-ink  px-6 py-2 text-sm font-medium rounded-sm hover:bg-sidebar-bg/90 transition-colors">
+           <button
+             onClick={() => setNotBuiltMessage('Scheduled email delivery needs a transactional email service (SMTP/SES/Postmark, etc.) wired into the server, which is not configured in this project yet.')}
+             className="bg-sidebar-bg text-sidebar-ink px-6 py-2 text-sm font-medium rounded-sm hover:bg-sidebar-bg/90 transition-colors"
+           >
              + New Schedule
            </button>
+        </div>
+      )}
+
+      {notBuiltMessage && (
+        <div className="fixed inset-0 bg-ink-900/30 backdrop-blur-xs z-50 flex items-center justify-center p-4" onClick={() => setNotBuiltMessage(null)}>
+          <div className="bg-paper-100 rounded-sm shadow-2xl border border-ink-900/10 w-full max-w-md p-6" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-start space-x-3 mb-4">
+              <Info className="w-5 h-5 text-focus-blue-500 shrink-0 mt-0.5" />
+              <p className="text-sm text-ink-900">{notBuiltMessage}</p>
+            </div>
+            <button
+              onClick={() => setNotBuiltMessage(null)}
+              className="w-full bg-sidebar-bg text-sidebar-ink py-2.5 rounded-sm font-medium hover:bg-sidebar-bg/90 transition-colors"
+            >
+              Got it
+            </button>
+          </div>
         </div>
       )}
     </div>

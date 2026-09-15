@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAppStore, OrganizationData } from '../../store';
 import { SUPPORTED_CURRENCIES, fetchExchangeRates, refreshLiveRates } from '../../utils/currency';
+import Papa from 'papaparse';
 import { 
   Building2, 
   Coins, 
@@ -563,7 +564,41 @@ export function SettingsView() {
             </p>
 
             <button
-              onClick={() => alert('Financial ledger snapshot exported.')}
+              onClick={async () => {
+                try {
+                  const res = await fetch('/api/journal-entries', { headers: { 'x-org-id': currentOrgId } });
+                  if (!res.ok) throw new Error('Failed to fetch journal entries');
+                  const { entries } = await res.json();
+                  const rows = (entries || []).flatMap((entry: any) =>
+                    (entry.lines || []).map((line: any) => ({
+                      Date: entry.entryDate,
+                      Memo: entry.memo || '',
+                      Source: entry.sourceType,
+                      Reference: entry.referenceNo || '',
+                      AccountId: line.accountId,
+                      Debit: (line.debit || 0) / 100,
+                      Credit: (line.credit || 0) / 100
+                    }))
+                  );
+                  if (rows.length === 0) {
+                    alert('No posted journal entries to export yet.');
+                    return;
+                  }
+                  const csv = Papa.unparse(rows);
+                  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+                  const url = URL.createObjectURL(blob);
+                  const link = document.createElement('a');
+                  link.href = url;
+                  link.download = `general_ledger_export_${new Date().toISOString().slice(0, 10)}.csv`;
+                  document.body.appendChild(link);
+                  link.click();
+                  document.body.removeChild(link);
+                  URL.revokeObjectURL(url);
+                } catch (err) {
+                  alert('Failed to export general ledger.');
+                  console.error(err);
+                }
+              }}
               className="inline-flex items-center space-x-1.5 px-3 py-1.5 bg-paper-100 hover:bg-paper-200 text-ink-900 rounded-sm text-xs font-medium transition-colors"
             >
               <Download className="w-3.5 h-3.5" />

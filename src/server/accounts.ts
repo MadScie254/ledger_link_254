@@ -121,11 +121,14 @@ export class AccountService {
       .select('*')
       .eq('org_id', orgId)
       .order('code');
-      
+
     if (error) throw error;
-    
+
+    const accounts = data || [];
+    const balanceByAccountId = await this.getAccountBalances(orgId);
+
     // Convert snake_case to camelCase for the frontend
-    return (data || []).map(row => ({
+    return accounts.map(row => ({
       id: row.id,
       orgId: row.org_id,
       code: row.code,
@@ -134,7 +137,39 @@ export class AccountService {
       subtype: row.subtype,
       parentId: row.parent_id,
       isActive: row.is_active,
-      createdAt: row.created_at
+      createdAt: row.created_at,
+      balanceCents: balanceByAccountId.get(row.id) || 0
     }));
+  }
+
+  /**
+   * Computes each account's current balance in cents from posted journal
+   * lines, in the account's normal-balance direction (debit for
+   * ASSET/COGS/EXPENSE, credit for LIABILITY/EQUITY/INCOME).
+   */
+  static async getAccountBalances(orgId: string): Promise<Map<string, number>> {
+    const supabase = getSupabase();
+    const { data: lines, error } = await supabase
+      .from('journal_lines')
+      .select('debit, credit, account:accounts!inner(id, type, org_id)')
+      .eq('accounts.org_id', orgId);
+
+    if (error) throw error;
+
+    const balances = new Map<string, number>();
+    const creditNormalTypes = new Set(['LIABILITY', 'EQUITY', 'INCOME']);
+
+    for (const line of (lines || []) as any[]) {
+      const account = line.account;
+      if (!account) continue;
+      const debit = Number(line.debit) || 0;
+      const credit = Number(line.credit) || 0;
+      // debit/credit are already stored in cents (see journal_lines schema
+      // and the same convention in reports.ts), not currency-unit floats.
+      const delta = creditNormalTypes.has(account.type) ? credit - debit : debit - credit;
+      balances.set(account.id, (balances.get(account.id) || 0) + Math.round(delta));
+    }
+
+    return balances;
   }
 }

@@ -8,7 +8,7 @@ import { Printer, Download, ArrowLeft, CheckCircle2 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 
 export function TrialBalanceView({ onBack }: { onBack: () => void }) {
-  const { currentOrgId } = useAppStore();
+  const { currentOrgId, activeCompany } = useAppStore();
 
   const { data, isLoading } = useQuery({
     queryKey: ['reports_trial_balance', currentOrgId],
@@ -32,6 +32,8 @@ export function TrialBalanceView({ onBack }: { onBack: () => void }) {
         title: 'Trial Balance Report',
         subtitle: 'General Ledger Account Balance Verification',
         period: `As of ${format(new Date(), 'MMMM d, yyyy')}`,
+        companyName: activeCompany?.legalName || activeCompany?.name,
+        kraPin: activeCompany?.taxId,
         currency: 'KES',
         filename: `trial_balance_${format(new Date(), 'yyyyMMdd')}.pdf`
       },

@@ -17,6 +17,7 @@ import { ReportsService } from './reports';
 import { OrganizationService } from './organizations';
 import { CurrencyService } from './currency';
 import { GeminiService } from './gemini';
+import { BudgetService } from './budgets';
 import {
   requireAuthenticationAndOrganization,
   requireOrganizationAdministrator,
@@ -118,21 +119,65 @@ apiRouter.get('/reports/ledger', async (req, res) => {
   }
 });
 
+apiRouter.get('/reports/ar-aging', async (req, res) => {
+  try {
+    const orgId = (req as any).orgId;
+    const data = await ReportsService.getARAging(orgId);
+    res.json(data);
+  } catch (err: any) {
+    sendServerError(res, err);
+  }
+});
+
+apiRouter.get('/reports/ap-aging', async (req, res) => {
+  try {
+    const orgId = (req as any).orgId;
+    const data = await ReportsService.getAPAging(orgId);
+    res.json(data);
+  } catch (err: any) {
+    sendServerError(res, err);
+  }
+});
+
 apiRouter.get('/team', async (req, res) => {
   try {
     const orgId = (req as any).orgId;
-    const members = await TeamService.getMembers(orgId);
+    const userId = (req as AuthenticatedRequest).userId;
+    const members = await TeamService.getMembers(orgId, userId);
     res.json({ members });
   } catch (err: any) {
     sendServerError(res, err);
   }
 });
 
-apiRouter.post('/team', async (req, res) => {
+apiRouter.post('/team', requireOrganizationAdministrator, async (req, res) => {
   try {
     const orgId = (req as any).orgId;
-    const id = await TeamService.addMember({ ...req.body, orgId });
+    const userId = (req as AuthenticatedRequest).userId;
+    const id = await TeamService.addMember({ ...req.body, orgId, invitedBy: userId });
     res.json({ id });
+  } catch (err: any) {
+    sendClientError(res, err);
+  }
+});
+
+apiRouter.patch('/team/:id', requireOrganizationAdministrator, async (req, res) => {
+  try {
+    const orgId = (req as any).orgId;
+    const userId = (req as AuthenticatedRequest).userId;
+    await TeamService.updateMemberRole(orgId, req.params.id, req.body.role, userId);
+    res.json({ success: true });
+  } catch (err: any) {
+    sendClientError(res, err);
+  }
+});
+
+apiRouter.delete('/team/:id', requireOrganizationAdministrator, async (req, res) => {
+  try {
+    const orgId = (req as any).orgId;
+    const userId = (req as AuthenticatedRequest).userId;
+    await TeamService.removeMember(orgId, req.params.id, userId);
+    res.json({ success: true });
   } catch (err: any) {
     sendClientError(res, err);
   }
@@ -252,6 +297,48 @@ apiRouter.post('/accounts/seed', async (req, res) => {
   }
 });
 
+// --- Budgets ---
+apiRouter.get('/budgets', async (req, res) => {
+  try {
+    const orgId = (req as any).orgId;
+    const budgets = await BudgetService.getBudgets(orgId);
+    res.json({ budgets });
+  } catch (err: any) {
+    sendServerError(res, err);
+  }
+});
+
+apiRouter.post('/budgets', async (req, res) => {
+  try {
+    const orgId = (req as any).orgId;
+    const userId = (req as AuthenticatedRequest).userId;
+    const id = await BudgetService.createBudget({ ...req.body, orgId, createdBy: userId });
+    res.json({ id });
+  } catch (err: any) {
+    sendClientError(res, err);
+  }
+});
+
+apiRouter.patch('/budgets/:id', async (req, res) => {
+  try {
+    const orgId = (req as any).orgId;
+    await BudgetService.updateBudget(orgId, req.params.id, req.body.limitCents);
+    res.json({ success: true });
+  } catch (err: any) {
+    sendClientError(res, err);
+  }
+});
+
+apiRouter.delete('/budgets/:id', async (req, res) => {
+  try {
+    const orgId = (req as any).orgId;
+    await BudgetService.deleteBudget(orgId, req.params.id);
+    res.json({ success: true });
+  } catch (err: any) {
+    sendClientError(res, err);
+  }
+});
+
 // --- Banking ---
 apiRouter.get('/banking/transactions', async (req, res) => {
   try {
@@ -302,6 +389,68 @@ apiRouter.post('/banking/match', async (req, res) => {
     const userId = (req as AuthenticatedRequest).userId!;
     const journalEntryId = await BankingService.matchTransaction(orgId, transactionId, targetAccountId, existingJournalEntryId, userId);
     res.json({ journalEntryId });
+  } catch (err: any) {
+    sendClientError(res, err);
+  }
+});
+
+apiRouter.get('/banking/rules', async (req, res) => {
+  try {
+    const orgId = (req as any).orgId;
+    const rules = await BankingService.getRules(orgId);
+    res.json({ rules });
+  } catch (err: any) {
+    sendServerError(res, err);
+  }
+});
+
+apiRouter.post('/banking/rules', async (req, res) => {
+  try {
+    const orgId = (req as any).orgId;
+    const userId = (req as AuthenticatedRequest).userId;
+    const id = await BankingService.createRule(orgId, req.body.matchText, req.body.targetAccountId, userId);
+    res.json({ id });
+  } catch (err: any) {
+    sendClientError(res, err);
+  }
+});
+
+apiRouter.delete('/banking/rules/:id', async (req, res) => {
+  try {
+    const orgId = (req as any).orgId;
+    await BankingService.deleteRule(orgId, req.params.id);
+    res.json({ success: true });
+  } catch (err: any) {
+    sendClientError(res, err);
+  }
+});
+
+apiRouter.get('/banking/reconciliation', async (req, res) => {
+  try {
+    const orgId = (req as any).orgId;
+    const summary = await BankingService.getReconciliationSummary(orgId);
+    res.json(summary);
+  } catch (err: any) {
+    sendServerError(res, err);
+  }
+});
+
+apiRouter.get('/banking/connection-requests', async (req, res) => {
+  try {
+    const orgId = (req as any).orgId;
+    const requests = await BankingService.getConnectionRequests(orgId);
+    res.json({ requests });
+  } catch (err: any) {
+    sendServerError(res, err);
+  }
+});
+
+apiRouter.post('/banking/connection-requests', async (req, res) => {
+  try {
+    const orgId = (req as any).orgId;
+    const userId = (req as AuthenticatedRequest).userId;
+    const id = await BankingService.requestBankConnection(orgId, req.body, userId);
+    res.json({ id });
   } catch (err: any) {
     sendClientError(res, err);
   }
@@ -438,6 +587,19 @@ apiRouter.patch('/bills/:id', async (req, res) => {
   }
 });
 
+apiRouter.post('/bills/batch-pay', async (req, res) => {
+  try {
+    const orgId = (req as any).orgId;
+    const userId = (req as AuthenticatedRequest).userId!;
+    const { billIds, paymentDate } = req.body;
+    if (!Array.isArray(billIds) || billIds.length === 0) throw new Error('billIds array is required.');
+    const result = await BillService.recordBatchPayment(orgId, billIds, paymentDate || new Date().toISOString().slice(0, 10), userId);
+    res.json(result);
+  } catch (err: any) {
+    sendClientError(res, err);
+  }
+});
+
 apiRouter.post('/expenses/scan', async (req, res) => {
   try {
     const { image, imageBase64, mimeType } = req.body;
@@ -476,6 +638,39 @@ apiRouter.patch('/employees/:id', async (req, res) => {
     const orgId = (req as any).orgId;
     await PayrollService.updateEmployee(orgId, req.params.id, req.body);
     res.json({ success: true });
+  } catch (err: any) {
+    sendClientError(res, err);
+  }
+});
+
+apiRouter.get('/payroll/runs', async (req, res) => {
+  try {
+    const orgId = (req as any).orgId;
+    const runs = await PayrollService.getPayrollRuns(orgId);
+    res.json({ runs });
+  } catch (err: any) {
+    sendServerError(res, err);
+  }
+});
+
+apiRouter.get('/payroll/runs/:id/payslips', async (req, res) => {
+  try {
+    const orgId = (req as any).orgId;
+    const payslips = await PayrollService.getPayslips(orgId, req.params.id);
+    res.json({ payslips });
+  } catch (err: any) {
+    sendServerError(res, err);
+  }
+});
+
+apiRouter.post('/payroll/runs', async (req, res) => {
+  try {
+    const orgId = (req as any).orgId;
+    const userId = (req as AuthenticatedRequest).userId!;
+    const { period, payDate } = req.body;
+    if (!period || !payDate) throw new Error('period and payDate are required.');
+    const id = await PayrollService.runPayroll(orgId, period, payDate, userId);
+    res.json({ id });
   } catch (err: any) {
     sendClientError(res, err);
   }
@@ -538,6 +733,27 @@ apiRouter.patch('/projects/:id', async (req, res) => {
     const orgId = (req as any).orgId;
     await ProjectService.updateProject(orgId, req.params.id, req.body);
     res.json({ success: true });
+  } catch (err: any) {
+    sendClientError(res, err);
+  }
+});
+
+apiRouter.get('/time-entries', async (req, res) => {
+  try {
+    const orgId = (req as any).orgId;
+    const entries = await ProjectService.getTimeEntries(orgId);
+    res.json({ entries });
+  } catch (err: any) {
+    sendServerError(res, err);
+  }
+});
+
+apiRouter.post('/time-entries', async (req, res) => {
+  try {
+    const orgId = (req as any).orgId;
+    const userId = (req as AuthenticatedRequest).userId;
+    const id = await ProjectService.submitTimeEntry(orgId, userId, req.body);
+    res.json({ id });
   } catch (err: any) {
     sendClientError(res, err);
   }

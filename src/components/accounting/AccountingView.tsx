@@ -128,7 +128,7 @@ export function AccountingView() {
     mutationFn: async (payload: any) => {
       const res = await fetch('/api/journal-entries', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'x-org-id': currentOrgId, 'x-user-id': 'demo-user-id' },
+        headers: { 'Content-Type': 'application/json', 'x-org-id': currentOrgId },
         body: JSON.stringify(payload)
       });
       if (!res.ok) {
@@ -270,7 +270,7 @@ export function AccountingView() {
                       <td className="px-4 py-2 tabular-currency font-medium text-ink-900 font-mono">{acc.code}</td>
                       <td className="px-4 py-2 text-ink-900">{acc.name}</td>
                       <td className="px-4 py-2 text-slate-500">{acc.type}</td>
-                      <td className="px-4 py-2 tabular-currency text-right text-ink-900">0.00</td>
+                      <td className="px-4 py-2 tabular-currency text-right text-ink-900">{formatCurrency(acc.balanceCents || 0)}</td>
                     </tr>
                   ))}
                   {filteredAccounts.length === 0 && (

@@ -2,13 +2,19 @@ import { formatCurrency, formatCurrencyFromFloat } from '../../utils/currency';
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAppStore } from '../../store';
+import { format } from 'date-fns';
 
 const tabs = ['Project list', 'Job costing', 'Time tracking'];
 
 export function ProjectsView() {
   const [activeTab, setActiveTab] = useState('Project list');
   const [isAddingProject, setIsAddingProject] = useState(false);
-  
+  const [timesheetProjectId, setTimesheetProjectId] = useState('');
+  const [timesheetDate, setTimesheetDate] = useState(format(new Date(), 'yyyy-MM-dd'));
+  const [timesheetHours, setTimesheetHours] = useState('');
+  const [timesheetNotes, setTimesheetNotes] = useState('');
+  const [timesheetError, setTimesheetError] = useState('');
+
   const { currentOrgId } = useAppStore();
   const queryClient = useQueryClient();
 
@@ -19,6 +25,44 @@ export function ProjectsView() {
       if (!res.ok) throw new Error('Failed to fetch projects');
       return res.json();
     }
+  });
+
+  const { data: timeEntriesData, isLoading: timeEntriesLoading } = useQuery({
+    queryKey: ['time-entries', currentOrgId],
+    queryFn: async () => {
+      const res = await fetch('/api/time-entries', { headers: { 'x-org-id': currentOrgId } });
+      if (!res.ok) throw new Error('Failed to fetch time entries');
+      return res.json();
+    },
+    enabled: activeTab === 'Time tracking'
+  });
+
+  const submitTimesheetMutation = useMutation({
+    mutationFn: async () => {
+      const res = await fetch('/api/time-entries', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'x-org-id': currentOrgId },
+        body: JSON.stringify({
+          projectId: timesheetProjectId,
+          entryDate: timesheetDate,
+          hours: parseFloat(timesheetHours || '0'),
+          description: timesheetNotes || undefined
+        })
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.error || 'Failed to submit timesheet');
+      }
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['time-entries', currentOrgId] });
+      setTimesheetProjectId('');
+      setTimesheetHours('');
+      setTimesheetNotes('');
+      setTimesheetError('');
+    },
+    onError: (err: any) => setTimesheetError(err.message)
   });
 
   const addProjectMutation = useMutation({
@@ -91,7 +135,7 @@ export function ProjectsView() {
                 projects.map((proj: any) => {
                   const budget = (proj.budgetCents || 0) / 100;
                   // Pull actual cost if available, otherwise 0
-                  const cost = (proj.actualCostCents || 0) / 100; 
+                  const cost = (proj.costCents || 0) / 100; 
                   
                   return (
                     <tr key={proj.id} className="hover:bg-paper-50 transition-colors cursor-pointer group">
@@ -130,8 +174,7 @@ export function ProjectsView() {
             ) : (
               projects.map((proj: any) => {
                 const budget = proj.budgetCents / 100;
-                // Generate a stable mock cost between 30% and 90% for layout demo
-                const cost = budget * 0.65;
+                const cost = (proj.costCents || 0) / 100;
                 const percentage = Math.min(Math.round((cost / budget) * 100), 100) || 0;
                 const isOver = cost > budget;
                 
@@ -166,12 +209,111 @@ export function ProjectsView() {
       )}
 
       {activeTab === 'Time tracking' && (
-        <div className="bg-paper-100 border border-ink-900/10 shadow-sm rounded-sm p-8 max-w-4xl mx-auto text-center">
-           <h3 className="text-xl font-medium text-ink-900 mb-2">Timesheets & Hours</h3>
-           <p className="text-slate-500 mb-6">Log billable hours against specific projects and auto-sync them to payroll or invoices.</p>
-           <button className="bg-sidebar-bg text-sidebar-ink  px-6 py-2 text-sm font-medium rounded-sm hover:bg-sidebar-bg/90 transition-colors">
-             Submit Timesheet
-           </button>
+        <div className="max-w-4xl mx-auto space-y-6">
+          <div className="bg-paper-100 border border-ink-900/10 shadow-sm rounded-sm p-6">
+            <h3 className="text-lg font-medium text-ink-900 mb-1">Log Hours</h3>
+            <p className="text-sm text-slate-500 mb-4">Record billable hours against a project.</p>
+
+            {timesheetError && (
+              <div className="mb-4 p-2.5 bg-rust-700/10 border border-rust-700/20 text-rust-700 text-xs rounded-sm">
+                {timesheetError}
+              </div>
+            )}
+
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                setTimesheetError('');
+                submitTimesheetMutation.mutate();
+              }}
+              className="grid grid-cols-1 md:grid-cols-4 gap-4 items-end"
+            >
+              <div className="md:col-span-2">
+                <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">Project *</label>
+                <select
+                  required
+                  value={timesheetProjectId}
+                  onChange={(e) => setTimesheetProjectId(e.target.value)}
+                  className="w-full bg-paper-100 border border-ink-900/20 text-ink-900 text-sm rounded-sm px-3 py-2 focus:ring-1 focus:ring-focus-blue-500 outline-none"
+                >
+                  <option value="">Select a project...</option>
+                  {projects.map((p: any) => (
+                    <option key={p.id} value={p.id}>{p.name}</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">Date *</label>
+                <input
+                  required
+                  type="date"
+                  value={timesheetDate}
+                  onChange={(e) => setTimesheetDate(e.target.value)}
+                  className="w-full bg-paper-100 border border-ink-900/20 text-ink-900 text-sm rounded-sm px-3 py-2 focus:ring-1 focus:ring-focus-blue-500 outline-none"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">Hours *</label>
+                <input
+                  required
+                  type="number"
+                  min="0.25"
+                  max="24"
+                  step="0.25"
+                  value={timesheetHours}
+                  onChange={(e) => setTimesheetHours(e.target.value)}
+                  placeholder="8"
+                  className="w-full bg-paper-100 border border-ink-900/20 text-ink-900 text-sm rounded-sm px-3 py-2 focus:ring-1 focus:ring-focus-blue-500 outline-none"
+                />
+              </div>
+              <div className="md:col-span-3">
+                <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">Notes</label>
+                <input
+                  type="text"
+                  value={timesheetNotes}
+                  onChange={(e) => setTimesheetNotes(e.target.value)}
+                  placeholder="What did you work on?"
+                  className="w-full bg-paper-100 border border-ink-900/20 text-ink-900 text-sm rounded-sm px-3 py-2 focus:ring-1 focus:ring-focus-blue-500 outline-none"
+                />
+              </div>
+              <button
+                type="submit"
+                disabled={submitTimesheetMutation.isPending}
+                className="bg-sidebar-bg text-sidebar-ink px-6 py-2 text-sm font-medium rounded-sm hover:bg-sidebar-bg/90 transition-colors disabled:opacity-50"
+              >
+                {submitTimesheetMutation.isPending ? 'Submitting...' : 'Submit Timesheet'}
+              </button>
+            </form>
+          </div>
+
+          <div className="bg-paper-100 border border-ink-900/10 shadow-sm rounded-sm overflow-hidden">
+            <table className="w-full text-sm text-left">
+              <thead className="bg-paper-100 border-b border-ink-900/10 text-xs uppercase text-slate-500">
+                <tr>
+                  <th className="px-4 py-3 font-semibold">Date</th>
+                  <th className="px-4 py-3 font-semibold">Project</th>
+                  <th className="px-4 py-3 font-semibold text-right">Hours</th>
+                  <th className="px-4 py-3 font-semibold">Notes</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-ink-900/5">
+                {timeEntriesLoading ? (
+                  <tr><td colSpan={4} className="px-4 py-8 text-center text-slate-500">Loading timesheets...</td></tr>
+                ) : !timeEntriesData?.entries?.length ? (
+                  <tr><td colSpan={4} className="px-4 py-8 text-center text-slate-500">No hours logged yet.</td></tr>
+                ) : (
+                  timeEntriesData.entries.map((entry: any) => (
+                    <tr key={entry.id} className="hover:bg-paper-50">
+                      <td className="px-4 py-3 text-slate-500 whitespace-nowrap">{format(new Date(entry.entryDate), 'MMM d, yyyy')}</td>
+                      <td className="px-4 py-3 font-medium text-ink-900">{entry.projectName}</td>
+                      <td className="px-4 py-3 text-right tabular-currency text-ink-900">{entry.hours}</td>
+                      <td className="px-4 py-3 text-slate-600">{entry.description || '-'}</td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
         </div>
       )}
 
