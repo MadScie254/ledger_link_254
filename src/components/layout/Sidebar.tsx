@@ -14,6 +14,7 @@ import {
   Sparkles,
   ClipboardList,
   Building,
+  LogOut,
   X,
 } from 'lucide-react';
 import { useAppStore } from '../../store';
@@ -61,7 +62,7 @@ export function Sidebar() {
     isMobileSidebarOpen,
     setMobileSidebarOpen,
   } = useAppStore();
-  const { user } = useAuth();
+  const { user, signOut } = useAuth();
 
   const userEmail = user?.email || '';
   const userInitials = userEmail ? userEmail.slice(0, 2).toUpperCase() : '??';
@@ -80,7 +81,7 @@ export function Sidebar() {
           </div>
           <div>
             <span className="block text-[15px] font-serif font-semibold tracking-[0.01em] text-white leading-none">LedgerLink</span>
-            <span className="block mt-1 text-[9px] font-mono uppercase tracking-[0.16em] text-sidebar-muted">Financial OS</span>
+            <span className="block mt-1 text-[9px] uppercase tracking-[0.12em] text-sidebar-muted">Accounting workspace</span>
           </div>
         </div>
         <button
@@ -141,13 +142,22 @@ export function Sidebar() {
 
       <div className="p-4 border-t border-white/[0.08] shrink-0">
         <div className="flex items-center rounded-xl bg-white/[0.035] p-2.5">
-          <div className="h-8 w-8 rounded-lg bg-gradient-to-br from-brass-500 to-[#D9911D] flex items-center justify-center text-ink-900 text-xs font-bold shrink-0">
+          <div className="h-8 w-8 rounded-lg bg-brass-500 flex items-center justify-center text-ink-900 text-xs font-bold shrink-0">
             {userInitials}
           </div>
           <div className="ml-2.5 truncate">
             <p className="text-xs font-semibold text-white truncate">{userEmail || 'Signed in'}</p>
-            <p className="mt-0.5 text-[10px] font-medium text-sidebar-muted truncate">Secure workspace</p>
+            <p className="mt-0.5 text-[10px] font-medium text-sidebar-muted truncate">Signed in</p>
           </div>
+          <button
+            type="button"
+            onClick={() => void signOut()}
+            className="ml-auto p-1.5 text-sidebar-muted transition-colors hover:bg-white/[0.07] hover:text-white"
+            aria-label="Sign out"
+            title="Sign out"
+          >
+            <LogOut className="h-3.5 w-3.5" />
+          </button>
         </div>
       </div>
     </div>

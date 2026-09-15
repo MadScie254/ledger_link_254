@@ -69,11 +69,11 @@ export function ReportsView() {
 
   return (
     <div>
-      <section className="surface-card mb-6 flex flex-col gap-4 p-5 sm:flex-row sm:items-end sm:justify-between sm:p-6">
+      <section className="mb-6 flex flex-col gap-4 border-b border-ink-900/10 pb-6 sm:flex-row sm:items-end sm:justify-between">
         <div>
-          <p className="page-kicker">Financial intelligence</p>
+          <p className="page-kicker">Statements and schedules</p>
           <h1 className="mt-2 text-3xl tracking-[-0.03em] font-serif font-semibold text-ink-900">Reports</h1>
-          <p className="mt-1.5 text-sm text-slate-500">Clear statements, built for decisions and a clean audit trail.</p>
+          <p className="mt-1.5 text-sm text-slate-500">Standard financial reports for review, export, and reconciliation.</p>
         </div>
         <div className="flex items-center space-x-2">
           <label className="text-xs text-slate-500 font-semibold">Display currency</label>
@@ -94,15 +94,15 @@ export function ReportsView() {
       <div className="ledger-divider mb-6"></div>
 
       {/* Sub-navigation */}
-      <div className="flex gap-1.5 rounded-2xl border border-ink-900/8 bg-paper-100/70 p-1.5 mb-6 overflow-x-auto">
+      <div className="flex gap-6 border-b border-ink-900/10 mb-6 overflow-x-auto">
         {tabs.map(tab => (
           <button
             key={tab}
             onClick={() => setActiveTab(tab)}
-            className={`px-3 py-2 text-xs font-semibold transition-colors rounded-xl whitespace-nowrap ${
+            className={`pb-3 text-xs font-semibold transition-colors border-b-2 whitespace-nowrap ${
               activeTab === tab
-                ? 'bg-focus-blue-500 text-white shadow-sm'
-                : 'text-slate-500 hover:bg-paper-50 hover:text-ink-900'
+                ? 'border-focus-blue-500 text-ink-900'
+                : 'border-transparent text-slate-500 hover:text-ink-900'
             }`}
           >
             {tab}
@@ -122,7 +122,7 @@ export function ReportsView() {
                   <div 
                     key={report.name} 
                     onClick={() => setActiveReport(report.name)}
-                    className="surface-card group p-5 cursor-pointer flex flex-col h-full transition-all duration-200 hover:-translate-y-0.5 hover:border-focus-blue-500/40 hover:shadow-lg"
+                    className="surface-card group p-5 cursor-pointer flex flex-col h-full transition-colors hover:border-focus-blue-500/40"
                   >
                     <h3 className="text-base font-semibold text-focus-blue-500 group-hover:text-ink-900 transition-colors mb-2">
                       {report.name}

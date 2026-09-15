@@ -1,8 +1,14 @@
 import React, { useState } from 'react';
-import { LogIn, Mail, Lock, CheckCircle2, UserPlus } from 'lucide-react';
+import { Mail, Lock, CheckCircle2, UserPlus } from 'lucide-react';
 import { useAuth } from '../../context/AuthProvider';
 
 type Mode = 'signIn' | 'signUp';
+
+const productAreas = [
+  ['01', 'General ledger', 'Posted entries, account balances, and a complete audit history.'],
+  ['02', 'Operations', 'Invoices, bills, banking, payroll, inventory, and projects.'],
+  ['03', 'Reporting', 'Financial statements with export-ready schedules.'],
+];
 
 export function LockScreen() {
   const { signIn, signUp } = useAuth();
@@ -21,8 +27,8 @@ export function LockScreen() {
     setConfirmPassword('');
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleSubmit = async (event: React.FormEvent) => {
+    event.preventDefault();
     setError('');
 
     if (mode === 'signUp') {
@@ -38,12 +44,12 @@ export function LockScreen() {
 
     setLoading(true);
     if (mode === 'signIn') {
-      const { error } = await signIn(email, password);
-      if (error) setError(error.message);
+      const { error: signInError } = await signIn(email, password);
+      if (signInError) setError(signInError.message);
     } else {
-      const { error, needsEmailConfirmation } = await signUp(email, password);
-      if (error) {
-        setError(error.message);
+      const { error: signUpError, needsEmailConfirmation } = await signUp(email, password);
+      if (signUpError) {
+        setError(signUpError.message);
       } else if (needsEmailConfirmation) {
         setConfirmationSent(true);
       }
@@ -52,154 +58,167 @@ export function LockScreen() {
   };
 
   return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center overflow-y-auto bg-sidebar-bg p-4 sm:p-7">
-      <div className="absolute -left-28 top-0 h-80 w-80 rounded-full bg-focus-blue-500/20 blur-3xl" aria-hidden="true" />
-      <div className="absolute -right-20 bottom-0 h-80 w-80 rounded-full bg-brass-500/15 blur-3xl" aria-hidden="true" />
-      <div className="relative grid w-full max-w-5xl overflow-hidden rounded-[1.5rem] border border-white/[0.10] bg-paper-100 shadow-[0_28px_90px_rgba(1,8,25,0.40)] md:grid-cols-[1.06fr_0.94fr]">
-        <aside className="relative hidden min-h-[590px] overflow-hidden bg-[#111E37] p-9 text-white md:flex md:flex-col md:justify-between">
-          <div className="absolute inset-0 bg-[radial-gradient(circle_at_82%_12%,rgba(95,124,255,0.30),transparent_30%),radial-gradient(circle_at_12%_85%,rgba(244,181,74,0.18),transparent_28%)]" aria-hidden="true" />
-          <div className="relative">
-            <div className="flex items-center gap-2.5">
-              <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-brass-500 font-serif text-xs font-bold text-ink-900">LL</div>
+    <div className="fixed inset-0 z-[100] overflow-y-auto bg-paper-100">
+      <div className="grid min-h-full md:grid-cols-[minmax(360px,46%)_1fr]">
+        <aside className="hidden min-h-screen bg-sidebar-bg px-10 py-9 text-white md:flex md:flex-col md:justify-between lg:px-14 lg:py-11">
+          <div>
+            <div className="flex items-center gap-3">
+              <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-brass-500 font-serif text-xs font-bold text-ink-900">LL</div>
               <div>
                 <p className="font-serif text-lg font-semibold leading-none">LedgerLink</p>
-                <p className="mt-1 text-[9px] font-mono uppercase tracking-[0.15em] text-sidebar-muted">Financial OS</p>
+                <p className="mt-1 text-[10px] uppercase tracking-[0.12em] text-sidebar-muted">Business accounting</p>
               </div>
             </div>
-            <div className="mt-20 max-w-sm">
-              <p className="text-[10px] font-mono font-semibold uppercase tracking-[0.16em] text-brass-500">Clearer financial decisions</p>
-              <h1 className="mt-4 font-serif text-4xl font-semibold leading-[1.04] tracking-[-0.035em]">A calm home for every business number.</h1>
-              <p className="mt-5 text-sm leading-relaxed text-slate-300">Bring cash, receivables, spend, and the books together in one focused workspace.</p>
+
+            <div className="mt-24 max-w-md">
+              <p className="text-xs font-semibold uppercase tracking-[0.1em] text-brass-500">One financial record</p>
+              <h1 className="mt-4 font-serif text-[2.65rem] font-medium leading-[1.08] tracking-[-0.035em]">Your books and operations, connected.</h1>
+              <p className="mt-5 max-w-sm text-sm leading-6 text-sidebar-muted">LedgerLink keeps day-to-day financial work tied to the ledger it affects.</p>
             </div>
           </div>
-          <div className="relative rounded-2xl border border-white/[0.10] bg-white/[0.06] p-4 backdrop-blur-sm">
-            <p className="text-xs font-semibold text-white">Built for accountable work</p>
-            <p className="mt-1 text-xs leading-relaxed text-slate-300">A secure workspace designed around traceable financial operations.</p>
+
+          <div className="max-w-lg border-t border-white/15">
+            {productAreas.map(([number, title, description]) => (
+              <div key={number} className="grid grid-cols-[2rem_1fr] gap-3 border-b border-white/10 py-4">
+                <span className="pt-0.5 font-mono text-[10px] text-brass-500">{number}</span>
+                <div>
+                  <p className="text-xs font-semibold text-white">{title}</p>
+                  <p className="mt-1 text-xs leading-5 text-sidebar-muted">{description}</p>
+                </div>
+              </div>
+            ))}
           </div>
         </aside>
-        <div className="relative flex min-h-[590px] items-center justify-center p-6 sm:p-10">
-          <div className="w-full max-w-sm text-center">
-        {confirmationSent ? (
-          <>
-            <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-ledger-green-700/10 text-ledger-green-700 mb-6">
-              <CheckCircle2 className="w-8 h-8" />
-            </div>
-            <h2 className="text-3xl tracking-[-0.03em] font-serif text-ink-900 mb-2">Confirm your email</h2>
-            <p className="text-slate-500 mb-6 text-sm">
-              We sent a confirmation link to <strong>{email}</strong>. Click it to activate your account, then sign in below.
-            </p>
-            <button
-              onClick={() => {
-                setConfirmationSent(false);
-                switchMode('signIn');
-              }}
-              className="w-full bg-focus-blue-500 text-white py-3 rounded-xl text-sm font-semibold hover:brightness-95 transition-colors"
-            >
-              Back to sign in
-            </button>
-          </>
-        ) : (
-          <>
-            <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-focus-blue-500/10 text-focus-blue-500 mb-6">
-              {mode === 'signIn' ? <LogIn className="w-8 h-8" /> : <UserPlus className="w-8 h-8" />}
-            </div>
-            <div className="md:hidden mb-6">
-              <p className="font-serif text-lg font-semibold text-ink-900">LedgerLink</p>
-              <p className="mt-1 text-[9px] font-mono uppercase tracking-[0.14em] text-slate-500">Financial OS</p>
-            </div>
-            <h2 className="text-3xl tracking-[-0.03em] font-serif text-ink-900 mb-2">Welcome back</h2>
-            <p className="text-slate-500 mb-7 text-sm">
-              {mode === 'signIn' ? 'Sign in with your email and password.' : 'Create an account to get started.'}
-            </p>
 
-            {error && (
-              <div className="mb-4 text-sm text-rust-700 bg-rust-700/10 py-2.5 px-3 rounded-xl text-left">
-                {error}
+        <main className="flex min-h-screen items-center justify-center px-6 py-12 sm:px-10">
+          <div className="w-full max-w-[24rem]">
+            <div className="mb-12 flex items-center gap-2.5 md:hidden">
+              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-brass-500 font-serif text-[10px] font-bold text-ink-900">LL</div>
+              <div>
+                <p className="font-serif text-base font-semibold leading-none text-ink-900">LedgerLink</p>
+                <p className="mt-1 text-[9px] uppercase tracking-[0.1em] text-slate-500">Business accounting</p>
               </div>
-            )}
+            </div>
 
-            <form onSubmit={handleSubmit}>
-              <div className="relative mb-3 text-left">
-                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                  <Mail className="h-5 w-5 text-slate-400" />
-                </div>
-                <input
-                  type="email"
-                  required
-                  autoComplete="email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  placeholder="name@company.com"
-                  className="w-full pl-10 pr-3 py-3 bg-paper-50 border border-ink-900/10 text-ink-900 text-sm rounded-xl focus:ring-2 focus:ring-focus-blue-500 outline-none"
-                />
+            {confirmationSent ? (
+              <div>
+                <CheckCircle2 className="mb-6 h-8 w-8 text-ledger-green-700" />
+                <p className="page-kicker">Account created</p>
+                <h2 className="mt-2 text-3xl tracking-[-0.03em] font-serif font-semibold text-ink-900">Confirm your email</h2>
+                <p className="mt-3 text-sm leading-6 text-slate-500">
+                  We sent a confirmation link to <strong className="text-ink-900">{email}</strong>. Open it to activate your account.
+                </p>
+                <button
+                  onClick={() => {
+                    setConfirmationSent(false);
+                    switchMode('signIn');
+                  }}
+                  className="mt-7 w-full rounded-lg bg-focus-blue-500 py-3 text-sm font-semibold text-white transition-colors hover:brightness-95"
+                >
+                  Return to sign in
+                </button>
               </div>
+            ) : (
+              <>
+                <p className="page-kicker">{mode === 'signIn' ? 'Sign in' : 'Create an account'}</p>
+                <h2 className="mt-2 text-3xl tracking-[-0.03em] font-serif font-semibold text-ink-900">
+                  {mode === 'signIn' ? 'Access your books' : 'Set up your workspace'}
+                </h2>
+                <p className="mt-2 text-sm text-slate-500">
+                  {mode === 'signIn' ? 'Enter the details associated with your account.' : 'Use your work email to begin.'}
+                </p>
 
-              <div className="relative mb-3 text-left">
-                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                  <Lock className="h-5 w-5 text-slate-400" />
-                </div>
-                <input
-                  type="password"
-                  required
-                  minLength={8}
-                  autoComplete={mode === 'signIn' ? 'current-password' : 'new-password'}
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  placeholder="Password"
-                  className="w-full pl-10 pr-3 py-3 bg-paper-50 border border-ink-900/10 text-ink-900 text-sm rounded-xl focus:ring-2 focus:ring-focus-blue-500 outline-none"
-                />
-              </div>
-
-              {mode === 'signUp' && (
-                <div className="relative mb-4 text-left">
-                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                    <Lock className="h-5 w-5 text-slate-400" />
+                {error && (
+                  <div role="alert" className="mt-6 border-l-2 border-rust-700 bg-rust-700/5 px-3 py-2.5 text-sm text-rust-700">
+                    {error}
                   </div>
-                  <input
-                    type="password"
-                    required
-                    minLength={8}
-                    autoComplete="new-password"
-                    value={confirmPassword}
-                    onChange={(e) => setConfirmPassword(e.target.value)}
-                    placeholder="Confirm password"
-                    className="w-full pl-10 pr-3 py-3 bg-paper-50 border border-ink-900/10 text-ink-900 text-sm rounded-xl focus:ring-2 focus:ring-focus-blue-500 outline-none"
-                  />
+                )}
+
+                <form onSubmit={handleSubmit} className="mt-8 space-y-5">
+                  <label className="block text-left">
+                    <span className="mb-2 block text-xs font-semibold text-ink-900">Work email</span>
+                    <span className="relative block">
+                      <Mail className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                      <input
+                        type="email"
+                        required
+                        autoComplete="email"
+                        value={email}
+                        onChange={(event) => setEmail(event.target.value)}
+                        placeholder="name@company.com"
+                        className="w-full rounded-lg border border-ink-900/15 bg-paper-100 py-3 pl-10 pr-3 text-sm text-ink-900 outline-none"
+                      />
+                    </span>
+                  </label>
+
+                  <label className="block text-left">
+                    <span className="mb-2 block text-xs font-semibold text-ink-900">Password</span>
+                    <span className="relative block">
+                      <Lock className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                      <input
+                        type="password"
+                        required
+                        minLength={8}
+                        autoComplete={mode === 'signIn' ? 'current-password' : 'new-password'}
+                        value={password}
+                        onChange={(event) => setPassword(event.target.value)}
+                        placeholder="Enter your password"
+                        className="w-full rounded-lg border border-ink-900/15 bg-paper-100 py-3 pl-10 pr-3 text-sm text-ink-900 outline-none"
+                      />
+                    </span>
+                  </label>
+
+                  {mode === 'signUp' && (
+                    <label className="block text-left">
+                      <span className="mb-2 block text-xs font-semibold text-ink-900">Confirm password</span>
+                      <span className="relative block">
+                        <Lock className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                        <input
+                          type="password"
+                          required
+                          minLength={8}
+                          autoComplete="new-password"
+                          value={confirmPassword}
+                          onChange={(event) => setConfirmPassword(event.target.value)}
+                          placeholder="Re-enter your password"
+                          className="w-full rounded-lg border border-ink-900/15 bg-paper-100 py-3 pl-10 pr-3 text-sm text-ink-900 outline-none"
+                        />
+                      </span>
+                    </label>
+                  )}
+
+                  <button
+                    type="submit"
+                    disabled={loading}
+                    className="w-full rounded-lg bg-focus-blue-500 py-3 text-sm font-semibold text-white transition-colors hover:brightness-95 disabled:cursor-wait disabled:opacity-50"
+                  >
+                    {loading
+                      ? (mode === 'signIn' ? 'Signing in…' : 'Creating account…')
+                      : (mode === 'signIn' ? 'Sign in' : 'Create account')}
+                  </button>
+                </form>
+
+                <div className="mt-8 border-t border-ink-900/10 pt-5 text-sm text-slate-500">
+                  {mode === 'signIn' ? (
+                    <>
+                      New to LedgerLink?{' '}
+                      <button onClick={() => switchMode('signUp')} className="font-semibold text-focus-blue-500 hover:underline">
+                        Create an account
+                      </button>
+                    </>
+                  ) : (
+                    <>
+                      Already have an account?{' '}
+                      <button onClick={() => switchMode('signIn')} className="font-semibold text-focus-blue-500 hover:underline">
+                        Sign in
+                      </button>
+                    </>
+                  )}
                 </div>
-              )}
-
-              {mode === 'signIn' && <div className="mb-4" />}
-
-              <button
-                type="submit"
-                disabled={loading}
-                className="w-full bg-focus-blue-500 text-white py-3 rounded-xl text-sm font-semibold hover:brightness-95 transition-colors disabled:opacity-50 disabled:cursor-wait"
-              >
-                {loading
-                  ? (mode === 'signIn' ? 'Signing in...' : 'Creating account...')
-                  : (mode === 'signIn' ? 'Sign In' : 'Create Account')}
-              </button>
-            </form>
-
-            <p className="mt-5 text-xs text-slate-500">
-              {mode === 'signIn' ? (
-                <>Don't have an account?{' '}
-                  <button onClick={() => switchMode('signUp')} className="text-focus-blue-500 font-medium hover:underline">
-                    Sign up
-                  </button>
-                </>
-              ) : (
-                <>Already have an account?{' '}
-                  <button onClick={() => switchMode('signIn')} className="text-focus-blue-500 font-medium hover:underline">
-                    Sign in
-                  </button>
-                </>
-              )}
-            </p>
-          </>
-        )}
+              </>
+            )}
           </div>
-        </div>
+        </main>
       </div>
     </div>
   );

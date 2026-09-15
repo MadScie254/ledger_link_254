@@ -152,7 +152,7 @@ export function Header() {
           <div className="relative">
             <button
               onClick={() => openAddEntity()}
-              className="bg-focus-blue-500 text-white px-3.5 py-2 rounded-xl text-xs font-semibold hover:brightness-95 hover:-translate-y-px transition-all flex items-center gap-1.5 shadow-[0_8px_18px_color-mix(in_srgb,var(--focus-blue-500)_24%,transparent)]"
+              className="bg-focus-blue-500 text-white px-3.5 py-2 rounded-lg text-xs font-semibold hover:brightness-95 transition-colors flex items-center gap-1.5"
             >
               <Plus className="h-3.5 w-3.5" />
               <span>New</span>

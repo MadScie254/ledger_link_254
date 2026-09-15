@@ -531,25 +531,20 @@ export function DashboardView() {
   return (
     <div className="space-y-6 pb-12">
       {/* Dashboard masthead */}
-      <section className="surface-card relative overflow-hidden px-5 py-5 sm:px-7 sm:py-6">
-        <div className="absolute -right-16 -top-20 h-56 w-56 rounded-full bg-focus-blue-500/10 blur-3xl" aria-hidden="true" />
-        <div className="absolute right-16 bottom-0 h-24 w-24 rounded-full bg-ledger-green-700/10 blur-2xl" aria-hidden="true" />
-        <div className="relative flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
+      <section className="border-b border-ink-900/10 pb-6">
+        <div className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
           <div>
-            <p className="page-kicker">{activeCompany?.name || 'Your workspace'} · {format(new Date(), 'EEEE, d MMMM')}</p>
-            <h1 className="mt-2 text-3xl sm:text-[2.1rem] leading-none tracking-[-0.035em] font-serif font-semibold text-ink-900">Financial command center</h1>
-            <p className="mt-2 max-w-xl text-sm leading-relaxed text-slate-500">See the cash, obligations, and decisions that matter most—at a glance.</p>
+            <p className="page-kicker">{format(new Date(), 'EEEE, d MMMM yyyy')}</p>
+            <h1 className="mt-2 text-3xl sm:text-[2.1rem] leading-none tracking-[-0.035em] font-serif font-semibold text-ink-900">Overview</h1>
+            <p className="mt-2 max-w-xl text-sm leading-relaxed text-slate-500">Cash, receivables, payables, and operating results for {activeCompany?.name || 'your organization'}.</p>
           </div>
-          <div className="flex flex-wrap items-center gap-2">
-            <span className="inline-flex items-center gap-2 rounded-full border border-ledger-green-700/15 bg-ledger-green-700/8 px-3 py-1.5 text-[11px] font-semibold text-ledger-green-700">
-              <span className="h-1.5 w-1.5 rounded-full bg-ledger-green-700 animate-pulse" />
-              Ledger monitoring active
-            </span>
+          <div className="flex items-center gap-3">
+            <span className="text-[11px] text-slate-500">Figures shown in {activeCompany?.baseCurrency || 'KES'}</span>
             <button
               onClick={() => setActiveView('Reports')}
-              className="inline-flex items-center gap-1.5 rounded-xl bg-focus-blue-500 px-3.5 py-2 text-xs font-semibold text-white shadow-[0_8px_18px_color-mix(in_srgb,var(--focus-blue-500)_24%,transparent)] transition-all hover:-translate-y-px hover:brightness-95"
+              className="inline-flex items-center gap-1.5 rounded-lg border border-ink-900/15 bg-paper-100 px-3.5 py-2 text-xs font-semibold text-ink-900 transition-colors hover:border-focus-blue-500/40 hover:text-focus-blue-500"
             >
-              Review reports <ArrowRight className="h-3.5 w-3.5" />
+              View reports <ArrowRight className="h-3.5 w-3.5" />
             </button>
           </div>
         </div>
@@ -557,8 +552,8 @@ export function DashboardView() {
 
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <p className="page-kicker">Your view</p>
-          <h2 className="mt-1 text-lg font-semibold text-ink-900">Live financial overview</h2>
+          <p className="page-kicker">Dashboard</p>
+          <h2 className="mt-1 text-lg font-semibold text-ink-900">Key accounts</h2>
         </div>
         <div className="flex items-center gap-2">
           <button
@@ -644,7 +639,7 @@ export function DashboardView() {
                 onDragStart={(e) => handleDragStart(e, widget.id)}
                 onDragOver={(e) => handleDragOver(e, widget.id)}
                 onDragEnd={handleDragEnd}
-                className={`dashboard-widget p-5 sm:p-5 transition-all duration-200 relative group flex flex-col justify-between ${
+                className={`dashboard-widget ${widget.id === 'cash-position' ? 'dashboard-widget-primary' : ''} p-5 sm:p-5 transition-all duration-200 relative group flex flex-col justify-between ${
                   isWide ? 'md:col-span-2 min-h-[290px]' : isMedium ? 'min-h-[260px]' : 'min-h-[172px]'
                 } ${draggedWidgetId === widget.id ? 'opacity-40 ring-2 ring-focus-blue-500' : ''}`}
               >
