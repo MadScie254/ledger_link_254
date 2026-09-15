@@ -5,7 +5,7 @@
 > banking reconciliation, payroll, invoicing, and AI-powered receipt scanning.
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
-[![Stack: React 19 + Vite + Express + Supabase](https://img.shields.io/badge/Stack-React%2019%20%2B%20Vite%20%2B%20Express%20%2B%20Supabase-green.svg)](#tech-stack)
+[![Stack: React 19 + Vite + Cloudflare Workers + Supabase](https://img.shields.io/badge/Stack-React%2019%20%2B%20Vite%20%2B%20Cloudflare%20Workers%20%2B%20Supabase-green.svg)](#tech-stack)
 
 ---
 
@@ -22,7 +22,7 @@ enterprises operating across multiple currencies (KES, USD, EUR, GBP, UGX, TZS).
 - 📦 **Inventory** — stock tracking with COGS accounting
 - 🤖 **Receipt scanner** — AI-powered OCR via Gemini (vendor, amount, date extraction)
 - 📈 **Reports** — P&L, Balance Sheet, Cash Flow, Trial Balance, Tax Summary
-- 🔐 **Passwordless auth** — Supabase magic link (OTP-via-email) with row-level security
+- 🔐 **Email/password auth** — Supabase Auth with row-level security
 - 🌙 **Light/dark theme** — corporate light default, toggleable dark mode
 
 ---
@@ -33,9 +33,9 @@ enterprises operating across multiple currencies (KES, USD, EUR, GBP, UGX, TZS).
 |---|---|
 | Frontend | React 19, Vite, TypeScript, Tailwind CSS v4 |
 | State | Zustand, TanStack React Query |
-| Backend | Express.js, TypeScript, Node.js |
+| Backend | Hono, TypeScript, Cloudflare Workers |
 | Database | Supabase (PostgreSQL), Row Level Security |
-| Auth | Supabase Auth (magic link / OTP) |
+| Auth | Supabase Auth (email / password) |
 | AI | Google Gemini API (`@google/genai`) — server-side only |
 | Charts | Recharts |
 | PDF/CSV | jsPDF, PapaParse, SheetJS |
@@ -106,7 +106,44 @@ Or apply them manually from the `supabase/migrations/` directory in the Supabase
 npm run dev
 ```
 
-The app starts at **http://localhost:3001** (Express serves both the API and the Vite-built frontend).
+The app starts at **http://localhost:5173**. The `@cloudflare/vite-plugin` runs the API
+(`worker/index.ts`, a Hono app) inside the real Workers runtime (via `workerd`/Miniflare)
+alongside the Vite frontend, so local dev closely matches production.
+
+---
+
+## Deploying to Cloudflare
+
+The whole app — frontend and API — deploys as a single Cloudflare Worker with static assets.
+
+### 1. Authenticate Wrangler (one-time)
+
+```bash
+npx wrangler login
+```
+
+### 2. Set secrets
+
+Non-secret config (`SUPABASE_URL`, `ALLOWED_ORIGINS`, `NODE_ENV`) lives in `wrangler.jsonc`.
+Set the two real secrets once per environment:
+
+```bash
+npx wrangler secret put SUPABASE_SERVICE_ROLE_KEY
+npx wrangler secret put GEMINI_API_KEY
+```
+
+### 3. Build and deploy
+
+```bash
+npm run deploy
+```
+
+This runs `vite build` (produces `dist/client/` for static assets and bundles the Worker),
+then `wrangler deploy`. Wrangler prints the live `*.workers.dev` URL — update `ALLOWED_ORIGINS`
+in `wrangler.jsonc` to match it (or your custom domain) and redeploy if it changes.
+
+`npm run build` alone builds without deploying; `npx wrangler dev` runs the built Worker
+directly against the real Workers runtime for a final check before deploying.
 
 ---
 
@@ -117,7 +154,7 @@ ledger_link/
 ├── src/
 │   ├── components/          # React UI components, organized by domain
 │   │   ├── accounting/      # Chart of accounts, journal entries
-│   │   ├── auth/            # Login page (magic link)
+│   │   ├── auth/            # Login page (email/password)
 │   │   ├── banking/         # Bank reconciliation
 │   │   ├── common/          # Shared modals, tables, form components
 │   │   ├── dashboard/       # KPI dashboard
@@ -129,19 +166,21 @@ ledger_link/
 │   │   └── ...
 │   ├── context/             # React contexts (Auth, Tenant)
 │   ├── hooks/               # Custom React hooks
-│   ├── server/              # Express backend
+│   ├── server/              # Backend domain services (framework-agnostic; used by worker/)
 │   │   ├── supabase.ts      # Supabase admin client (service role)
-│   │   ├── routes.ts        # All API routes with zod validation
 │   │   ├── accounts.ts      # Chart of accounts service
 │   │   ├── ledger.ts        # Double-entry ledger service (calls Postgres fn)
 │   │   ├── banking.ts       # Banking & reconciliation service
 │   │   └── ...              # Other domain services
 │   ├── store.ts             # Zustand global state
 │   └── utils/               # Shared utilities (API client, currency, PDF export)
+├── worker/                  # Cloudflare Worker entry point (Hono)
+│   ├── index.ts             # All API routes, mounted at /api/*
+│   └── auth.ts              # Auth/org-membership middleware
 ├── supabase/
 │   └── migrations/          # SQL migration files
-├── server.ts                # Express entry point
-├── vite.config.ts           # Vite configuration
+├── wrangler.jsonc           # Cloudflare Worker + static assets configuration
+├── vite.config.ts           # Vite configuration (includes @cloudflare/vite-plugin)
 ├── .env.example             # Environment variable template
 └── package.json
 ```
@@ -152,9 +191,10 @@ ledger_link/
 
 | Command | Description |
 |---|---|
-| `npm run dev` | Start dev server (Express + Vite HMR) |
-| `npm run build` | Build for production (Vite frontend + esbuild server) |
-| `npm start` | Start production server |
+| `npm run dev` | Start dev server (Vite + Worker via `@cloudflare/vite-plugin`) |
+| `npm run build` | Build for production (client assets + Worker bundle) |
+| `npm run preview` | Preview the production build locally |
+| `npm run deploy` | Build and deploy to Cloudflare Workers |
 | `npm run lint` | TypeScript type-check |
 
 ---
