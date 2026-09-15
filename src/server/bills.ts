@@ -177,18 +177,12 @@ export class BillService {
       return; // Already voided
     }
 
-    // Update bill status
-    const { error: updateError } = await supabase
-      .from('bills')
-      .update({ status: 'VOID' })
-      .eq('id', billId);
-      
-    if (updateError) throw updateError;
-    
-    // Reverse the journal entries
+    // Reverse the journal entries FIRST. Only flip the bill's status once
+    // the reversing entry has actually posted, so a failed reversal never
+    // leaves the bill marked VOID with the original ledger entry still live.
     const journalEntries = await LedgerService.getJournalEntries(orgId);
     const originalEntry = journalEntries.find(je => je.sourceType === 'BILL' && je.sourceId === billId);
-    
+
     if (originalEntry) {
       const reversingLines = originalEntry.lines.map(line => ({
         accountId: line.accountId,
@@ -198,7 +192,7 @@ export class BillService {
         entityType: line.entityType,
         entityId: line.entityId
       }));
-      
+
       await LedgerService.postJournalEntry({
         orgId: orgId,
         entryDate: new Date().toISOString().split('T')[0],
@@ -210,6 +204,15 @@ export class BillService {
         lines: reversingLines
       });
     }
+
+    // Update bill status only after the reversal succeeded (or there was no
+    // original entry to reverse).
+    const { error: updateError } = await supabase
+      .from('bills')
+      .update({ status: 'VOID' })
+      .eq('id', billId);
+
+    if (updateError) throw updateError;
   }
 
   static async updateBill(orgId: string, id: string, input: any) {
