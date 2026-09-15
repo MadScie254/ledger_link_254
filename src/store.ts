@@ -1,5 +1,22 @@
 import { create } from 'zustand';
 
+const THEME_STORAGE_KEY = 'll-theme';
+
+function getInitialTheme(): 'light' | 'dark' {
+  if (typeof window === 'undefined') return 'light';
+  try {
+    const stored = localStorage.getItem(THEME_STORAGE_KEY);
+    if (stored === 'light' || stored === 'dark') return stored;
+  } catch {
+    // localStorage unavailable (private mode, blocked storage) — fall through
+  }
+  return window.matchMedia?.('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+}
+
+function applyThemeClass(theme: 'light' | 'dark') {
+  document.documentElement.classList.toggle('dark', theme === 'dark');
+}
+
 export interface OrganizationData {
   id: string;
   name: string;
@@ -35,6 +52,8 @@ interface AppState {
   setActiveCompany: (company: OrganizationData | null) => void;
   isCommandPaletteOpen: boolean;
   setCommandPaletteOpen: (isOpen: boolean) => void;
+  isMobileSidebarOpen: boolean;
+  setMobileSidebarOpen: (isOpen: boolean) => void;
   
   // Undo Stack
   undoStack: Array<{ id: string, message: string, revertEndpoint: string, data: any }>;
@@ -55,77 +74,44 @@ export const useAppStore = create<AppState>((set) => ({
   setRateMetadata: (meta) => set({ rateMetadata: meta }),
   activeView: 'Dashboard',
   setActiveView: (view) => set({ activeView: view }),
-  currentOrgId: 'default-org-id',
+  currentOrgId: '',
   setCurrentOrgId: (orgId) => set({ currentOrgId: orgId }),
-  organizations: [
-    {
-      id: 'default-org-id',
-      name: 'Acme Corp Ltd.',
-      legalName: 'Acme Global Corporation Kenya Ltd',
-      baseCurrency: 'KES',
-      country: 'Kenya',
-      taxId: 'P051234567Z',
-      fiscalYearStart: 'January',
-      industry: 'Technology & Logistics',
-      address: 'Riverside Square, 4th Floor',
-      city: 'Nairobi',
-      phone: '+254 700 123 456',
-      email: 'finance@acmecorp.co.ke',
-      isDefault: true,
-      isDemo: true
-    },
-    {
-      id: 'org-apex-holdings',
-      name: 'Apex Holdings East Africa',
-      legalName: 'Apex Regional Holdings Ltd',
-      baseCurrency: 'USD',
-      country: 'United States / Regional',
-      taxId: 'US-987654321',
-      fiscalYearStart: 'January',
-      industry: 'Investment & Consulting',
-      address: '100 Financial District Blvd',
-      city: 'Delaware / Nairobi',
-      phone: '+1 (555) 349-2000',
-      email: 'treasury@apexholdings.com',
-      isDefault: false
-    }
-  ],
+  // No hardcoded demo organizations here — a fresh account genuinely has
+  // zero organizations until it creates one. Showing fake "Acme Corp Ltd."/
+  // "Apex Holdings" data by default masked that, making a brand-new
+  // account with zero real memberships look like it already had 2
+  // companies set up (and every query fired with the fake org id
+  // 'default-org-id', which isn't a valid UUID and made every org-scoped
+  // API call fail).
+  organizations: [],
   setOrganizations: (orgs) => set({ organizations: orgs }),
-  activeCompany: {
-    id: 'default-org-id',
-    name: 'Acme Corp Ltd.',
-    legalName: 'Acme Global Corporation Kenya Ltd',
-    baseCurrency: 'KES',
-    country: 'Kenya',
-    taxId: 'P051234567Z',
-    fiscalYearStart: 'January',
-    industry: 'Technology & Logistics',
-    address: 'Riverside Square, 4th Floor',
-    city: 'Nairobi',
-    phone: '+254 700 123 456',
-    email: 'finance@acmecorp.co.ke',
-    isDefault: true,
-    isDemo: true
-  },
-  setActiveCompany: (company) => set({ 
-    activeCompany: company, 
-    currentOrgId: company?.id || 'default-org-id',
+  activeCompany: null,
+  setActiveCompany: (company) => set({
+    activeCompany: company,
+    currentOrgId: company?.id || '',
     displayCurrency: company?.baseCurrency || 'KES'
   }),
   isCommandPaletteOpen: false,
   setCommandPaletteOpen: (isOpen) => set({ isCommandPaletteOpen: isOpen }),
+  isMobileSidebarOpen: false,
+  setMobileSidebarOpen: (isOpen) => set({ isMobileSidebarOpen: isOpen }),
   
   undoStack: [],
   pushUndoAction: (action) => set((state) => ({ undoStack: [...state.undoStack, action] })),
   popUndoAction: () => set((state) => ({ undoStack: state.undoStack.slice(0, -1) })),
   isLocked: false,
   setLocked: (locked) => set({ isLocked: locked }),
-  theme: 'light',
+  theme: (() => {
+    const initial = getInitialTheme();
+    if (typeof window !== 'undefined') applyThemeClass(initial);
+    return initial;
+  })(),
   setTheme: (theme) => {
-    if (theme === 'dark') {
-      document.documentElement.classList.add('dark');
-    } else {
-      document.documentElement.classList.remove('dark');
+    applyThemeClass(theme);
+    try {
+      localStorage.setItem(THEME_STORAGE_KEY, theme);
+    } catch {
+      // ignore write failures, theme just won't persist this session
     }
     set({ theme });
   }

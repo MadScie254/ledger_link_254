@@ -1,9 +1,18 @@
+import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useAppStore } from '../../store';
 import { format } from 'date-fns';
 
+const RESOURCE_TYPE_FILTERS: Record<string, string> = {
+  'All Events': '',
+  'Journal Entries': 'JOURNAL_ENTRY',
+  'Accounts': 'ACCOUNT'
+};
+
 export function AuditLogView() {
   const { currentOrgId } = useAppStore();
+  const [searchQuery, setSearchQuery] = useState('');
+  const [resourceFilter, setResourceFilter] = useState('All Events');
 
   const { data: auditData, isLoading: auditLoading } = useQuery({
     queryKey: ['audit-logs', currentOrgId],
@@ -14,7 +23,13 @@ export function AuditLogView() {
     }
   });
 
-  const logs = auditData?.logs || [];
+  const allLogs = auditData?.logs || [];
+  const logs = allLogs.filter((log: any) => {
+    const matchesResource = !RESOURCE_TYPE_FILTERS[resourceFilter] || log.resourceType === RESOURCE_TYPE_FILTERS[resourceFilter];
+    const haystack = `${log.action} ${log.resourceType} ${log.userId} ${JSON.stringify(log.details || {})}`.toLowerCase();
+    const matchesSearch = !searchQuery || haystack.includes(searchQuery.toLowerCase());
+    return matchesResource && matchesSearch;
+  });
 
   return (
     <div className="max-w-6xl mx-auto space-y-6">
@@ -29,15 +44,21 @@ export function AuditLogView() {
 
       <div className="bg-paper-100 border border-ink-900/10 shadow-sm rounded-sm">
         <div className="p-4 border-b border-ink-900/10 flex gap-4">
-          <input 
-            type="text" 
-            placeholder="Search logs..." 
+          <input
+            type="text"
+            placeholder="Search logs..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
             className="border border-ink-900/20 px-3 py-1.5 rounded-sm w-64 text-sm focus:outline-none focus:ring-1 focus:ring-ink-900"
           />
-          <select className="border border-ink-900/20 px-3 py-1.5 rounded-sm text-sm focus:outline-none focus:ring-1 focus:ring-ink-900 bg-paper-100">
-            <option>All Events</option>
-            <option>Journal Entries</option>
-            <option>Accounts</option>
+          <select
+            value={resourceFilter}
+            onChange={(e) => setResourceFilter(e.target.value)}
+            className="border border-ink-900/20 px-3 py-1.5 rounded-sm text-sm focus:outline-none focus:ring-1 focus:ring-ink-900 bg-paper-100"
+          >
+            {Object.keys(RESOURCE_TYPE_FILTERS).map((label) => (
+              <option key={label}>{label}</option>
+            ))}
           </select>
         </div>
         
@@ -55,7 +76,7 @@ export function AuditLogView() {
             {auditLoading ? (
               <tr><td colSpan={5} className="px-4 py-8 text-center text-slate-500">Loading audit logs...</td></tr>
             ) : logs.length === 0 ? (
-              <tr><td colSpan={5} className="px-4 py-8 text-center text-slate-500">No audit logs found.</td></tr>
+              <tr><td colSpan={5} className="px-4 py-8 text-center text-slate-500">{allLogs.length === 0 ? 'No audit logs found.' : 'No logs match your search/filter.'}</td></tr>
             ) : (
               logs.map((log: any) => (
                 <tr key={log.id} className="hover:bg-paper-50 transition-colors">

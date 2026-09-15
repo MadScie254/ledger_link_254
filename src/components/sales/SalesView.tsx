@@ -198,7 +198,7 @@ export function SalesView() {
             <p className="text-slate-500 mb-4">You need a customer to create an invoice.</p>
             <button 
               onClick={handleCreateMockCustomer}
-              className="bg-ink-900 text-white  px-4 py-2 rounded-sm text-sm font-medium"
+              className="bg-sidebar-bg text-sidebar-ink  px-4 py-2 rounded-sm text-sm font-medium"
             >
               Add Sample Customer
             </button>
@@ -296,7 +296,7 @@ export function SalesView() {
             </button>
             <button 
               onClick={() => setIsBuilding(true)}
-              className="bg-ink-900 text-white  px-4 py-2 text-sm font-medium rounded-sm hover:bg-ink-900/90 transition-colors"
+              className="bg-sidebar-bg text-sidebar-ink  px-4 py-2 text-sm font-medium rounded-sm hover:bg-sidebar-bg/90 transition-colors"
             >
               Create Invoice
             </button>

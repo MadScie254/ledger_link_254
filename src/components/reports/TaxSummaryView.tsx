@@ -8,7 +8,7 @@ import { Printer, Download, ArrowLeft, ShieldCheck } from 'lucide-react';
 import * as XLSX from 'xlsx';
 
 export function TaxSummaryView({ onBack }: { onBack: () => void }) {
-  const { currentOrgId } = useAppStore();
+  const { currentOrgId, activeCompany } = useAppStore();
   const [period, setPeriod] = useState('August 2026');
 
   const { data, isLoading } = useQuery({
@@ -22,10 +22,12 @@ export function TaxSummaryView({ onBack }: { onBack: () => void }) {
     }
   });
 
-  const outputVat = data?.outputVat || { standardRatedSalesCents: 48500000, vatRatePercent: 16, taxAmountCents: 7760000 };
-  const inputVat = data?.inputVat || { claimablePurchasesCents: 24200000, vatRatePercent: 16, taxAmountCents: 3872000 };
-  const withholdingTaxVat = data?.withholdingTaxVat || { withholdingRatePercent: 2, withheldAmountCents: 450000 };
-  const netVatPayableCents = data?.netVatPayableCents || (outputVat.taxAmountCents - inputVat.taxAmountCents - withholdingTaxVat.withheldAmountCents);
+  const outputVat = data?.outputVat || { standardRatedSalesCents: 0, vatRatePercent: 16, taxAmountCents: 0 };
+  const inputVat = data?.inputVat || { claimablePurchasesCents: 0, vatRatePercent: 16, taxAmountCents: 0 };
+  const withholdingTaxVat = data?.withholdingTaxVat || { withholdingRatePercent: 2, withheldAmountCents: 0 };
+  const netVatPayableCents = data?.netVatPayableCents ?? (outputVat.taxAmountCents - inputVat.taxAmountCents - withholdingTaxVat.withheldAmountCents);
+  const etimsVerifiedCount = data?.etimsVerifiedCount ?? 0;
+  const etimsPendingCount = data?.etimsPendingCount ?? 0;
 
   const handleExportPDF = () => {
     FinancialPDFEngine.exportFinancialStatement(
@@ -33,7 +35,8 @@ export function TaxSummaryView({ onBack }: { onBack: () => void }) {
         title: 'KRA VAT & eTIMS Tax Compliance Summary',
         subtitle: 'Kenya Revenue Authority Value Added Tax Return Schedule',
         period,
-        kraPin: data?.kraPin || 'P051239847Z',
+        companyName: activeCompany?.legalName || activeCompany?.name,
+        kraPin: data?.kraPin || activeCompany?.taxId || 'Not set',
         currency: 'KES',
         filename: `kra_vat_summary_${format(new Date(), 'yyyyMMdd')}.pdf`
       },
@@ -133,23 +136,31 @@ export function TaxSummaryView({ onBack }: { onBack: () => void }) {
           <button onClick={handlePrint} className="bg-paper-100 border border-ink-900/20 text-ink-900 px-3 py-2 text-sm font-medium rounded-sm hover:bg-paper-50 transition-colors inline-flex items-center">
             <Printer className="w-4 h-4 mr-1.5" /> Print
           </button>
-          <button onClick={handleExportPDF} className="bg-ink-900 text-white  px-4 py-2 text-sm font-medium rounded-sm hover:bg-ink-900/90 transition-colors inline-flex items-center">
+          <button onClick={handleExportPDF} className="bg-sidebar-bg text-sidebar-ink  px-4 py-2 text-sm font-medium rounded-sm hover:bg-sidebar-bg/90 transition-colors inline-flex items-center">
             <Download className="w-4 h-4 mr-1.5" /> Export PDF
           </button>
         </div>
       </div>
 
       <div className="p-8 max-w-3xl mx-auto space-y-6">
-        <div className="p-4 rounded-sm bg-ledger-green-700/10 border border-ledger-green-700/20 flex items-center justify-between">
+        <div className={`p-4 rounded-sm border flex items-center justify-between ${etimsVerifiedCount > 0 && etimsPendingCount === 0 ? 'bg-ledger-green-700/10 border-ledger-green-700/20' : 'bg-brass-500/10 border-brass-500/20'}`}>
           <div className="flex items-center space-x-3">
-            <ShieldCheck className="w-6 h-6 text-ledger-green-700" />
+            <ShieldCheck className={`w-6 h-6 ${etimsVerifiedCount > 0 && etimsPendingCount === 0 ? 'text-ledger-green-700' : 'text-brass-600'}`} />
             <div>
-              <p className="font-bold text-ink-900">KRA eTIMS Auto-Reconciliation: 100% Compliant</p>
-              <p className="text-xs text-slate-500">42 validated eTIMS invoices & cryptographically signed QR receipts on file.</p>
+              <p className="font-bold text-ink-900">
+                {etimsPendingCount === 0 && etimsVerifiedCount === 0
+                  ? 'KRA eTIMS: Not Configured'
+                  : `KRA eTIMS: ${etimsVerifiedCount} verified, ${etimsPendingCount} pending`}
+              </p>
+              <p className="text-xs text-slate-500">
+                {etimsPendingCount === 0 && etimsVerifiedCount === 0
+                  ? 'Connect your KRA Type C API credentials under Tax & Compliance to start submitting invoices electronically.'
+                  : 'Based on real eTIMS submission records for this organization.'}
+              </p>
             </div>
           </div>
           <span className="text-xs font-mono font-bold px-2 py-1 bg-paper-100 rounded text-slate-700 border border-ink-900/10">
-            PIN: {data?.kraPin || 'P051239847Z'}
+            PIN: {data?.kraPin || activeCompany?.taxId || 'Not set'}
           </span>
         </div>
 
@@ -193,7 +204,7 @@ export function TaxSummaryView({ onBack }: { onBack: () => void }) {
           </div>
 
           {/* Final Net Tax */}
-          <div className="p-5 bg-ink-900 text-white  flex justify-between items-center">
+          <div className="p-5 bg-sidebar-bg text-sidebar-ink  flex justify-between items-center">
             <div>
               <p className="text-xs uppercase tracking-widest text-slate-300">Net Tax Payable to KRA</p>
               <p className="text-xs text-slate-400 mt-0.5">Due by 20th of the following month</p>

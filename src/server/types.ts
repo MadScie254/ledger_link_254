@@ -11,7 +11,7 @@ export interface JournalEntryInput {
   orgId: string;
   entryDate: string; // ISO String
   memo?: string;
-  sourceType: 'INVOICE' | 'BILL' | 'PAYMENT' | 'BANK' | 'MANUAL' | 'ADJUSTMENT';
+  sourceType: 'INVOICE' | 'BILL' | 'PAYMENT' | 'BANK' | 'MANUAL' | 'ADJUSTMENT' | 'PAYROLL';
   sourceId?: string;
   referenceNo?: string;
   createdBy: string;

@@ -215,6 +215,70 @@ export class BillService {
     if (updateError) throw updateError;
   }
 
+  /**
+   * Records a real cash payment against an open bill: posts a Debit A/P
+   * (2000) / Credit Cash (1000) journal entry, then marks the bill PAID.
+   * Previously "batch bill payment" only flipped the status label via the
+   * generic bulk-status-update endpoint with no corresponding ledger entry.
+   */
+  static async recordPayment(orgId: string, billId: string, paymentDate: string, paidBy: string): Promise<void> {
+    const supabase = getSupabase();
+
+    const { data: bill, error: billError } = await supabase
+      .from('bills')
+      .select('*')
+      .eq('id', billId)
+      .eq('org_id', orgId)
+      .single();
+
+    if (billError || !bill) throw new Error('Bill not found.');
+    if (bill.status === 'PAID') return;
+    if (bill.status === 'VOID') throw new Error('Cannot pay a voided bill.');
+    if (!bill.amount_due_cents || bill.amount_due_cents <= 0) throw new Error('Bill has no amount due.');
+
+    const apAccount = await AccountService.getAccountByCode(orgId, '2000');
+    const cashAccount = await AccountService.getAccountByCode(orgId, '1000');
+    if (!apAccount || !cashAccount) {
+      throw new Error('A/P (2000) or Cash (1000) account not found. Seed the chart of accounts.');
+    }
+
+    await LedgerService.postJournalEntry({
+      orgId,
+      entryDate: paymentDate,
+      memo: `Payment for Bill ${bill.bill_number}`,
+      sourceType: 'PAYMENT',
+      sourceId: billId,
+      referenceNo: `PAY-${bill.bill_number}`,
+      createdBy: paidBy,
+      lines: [
+        { accountId: apAccount.id, debit: bill.amount_due_cents, credit: 0, description: `Settle Bill ${bill.bill_number}` },
+        { accountId: cashAccount.id, debit: 0, credit: bill.amount_due_cents, description: `Cash paid for Bill ${bill.bill_number}` }
+      ]
+    });
+
+    const { error: updateError } = await supabase
+      .from('bills')
+      .update({ status: 'PAID', amount_due_cents: 0 })
+      .eq('id', billId)
+      .eq('org_id', orgId);
+
+    if (updateError) throw updateError;
+  }
+
+  static async recordBatchPayment(orgId: string, billIds: string[], paymentDate: string, paidBy: string): Promise<{ paid: number; failed: number }> {
+    let paid = 0;
+    let failed = 0;
+    for (const billId of billIds) {
+      try {
+        await this.recordPayment(orgId, billId, paymentDate, paidBy);
+        paid++;
+      } catch (err) {
+        failed++;
+      }
+    }
+    return { paid, failed };
+  }
+
   static async updateBill(orgId: string, id: string, input: any) {
     const supabase = getSupabase();
 

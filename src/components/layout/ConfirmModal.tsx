@@ -26,7 +26,7 @@ export function ConfirmModal({ isOpen, title, message, onConfirm, onCancel, conf
           </button>
           <button 
             onClick={onConfirm} 
-            className={`px-4 py-2 text-sm font-medium rounded-sm transition-colors text-white dark:text-[#0B0F19] ${isDestructive ? 'bg-rust-700 hover:bg-rust-700/90' : 'bg-ink-900 hover:bg-ink-900/90'}`}
+            className={`px-4 py-2 text-sm font-medium rounded-sm transition-colors text-white dark:text-[#0B0F19] ${isDestructive ? 'bg-rust-700 hover:bg-rust-700/90' : 'bg-ink-900 hover:bg-sidebar-bg/90'}`}
           >
             {confirmText}
           </button>

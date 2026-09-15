@@ -4,7 +4,7 @@ export interface AuditLogInput {
   orgId: string;
   userId: string;
   action: 'CREATE' | 'UPDATE' | 'DELETE';
-  resourceType: 'ACCOUNT' | 'JOURNAL_ENTRY' | 'BANK_TRANSACTION' | 'BILL' | 'INVOICE' | 'USER_ROLE';
+  resourceType: 'ACCOUNT' | 'JOURNAL_ENTRY' | 'BANK_TRANSACTION' | 'BILL' | 'INVOICE' | 'USER_ROLE' | 'TEAM_MEMBER';
   resourceId: string;
   details: any;
 }

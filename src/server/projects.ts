@@ -63,7 +63,58 @@ export class ProjectService {
       .update(updateData)
       .eq('id', id)
       .eq('org_id', orgId);
-      
+
     if (error) throw error;
+  }
+
+  static async getTimeEntries(orgId: string) {
+    const supabase = getSupabase();
+    const { data, error } = await supabase
+      .from('time_entries')
+      .select('id, project_id, user_id, entry_date, hours, description, created_at, projects!inner(name)')
+      .eq('org_id', orgId)
+      .order('entry_date', { ascending: false })
+      .limit(100);
+
+    if (error) throw error;
+
+    return (data || []).map((row: any) => ({
+      id: row.id,
+      projectId: row.project_id,
+      projectName: row.projects?.name || 'Unknown Project',
+      userId: row.user_id,
+      entryDate: row.entry_date,
+      hours: Number(row.hours),
+      description: row.description,
+      createdAt: row.created_at
+    }));
+  }
+
+  static async submitTimeEntry(orgId: string, userId: string | undefined, input: { projectId: string; entryDate: string; hours: number; description?: string }) {
+    const supabase = getSupabase();
+    if (!input.projectId) throw new Error('A project is required.');
+    if (!input.hours || input.hours <= 0 || input.hours > 24) {
+      throw new Error('Hours must be between 0 and 24.');
+    }
+
+    const { data, error } = await supabase
+      .from('time_entries')
+      .insert({
+        org_id: orgId,
+        project_id: input.projectId,
+        user_id: userId || null,
+        entry_date: input.entryDate,
+        hours: input.hours,
+        description: input.description || null
+      })
+      .select('id')
+      .single();
+
+    if (error) throw error;
+    // Note: this only records logged hours. Projects have no per-project
+    // billing/cost rate in the schema, so hours are not converted into a
+    // dollar cost here — doing so would mean inventing a rate. Job Costing's
+    // "Cost to Date" is driven by projects.cost_cents, entered separately.
+    return data.id;
   }
 }

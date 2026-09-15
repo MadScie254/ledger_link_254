@@ -1,10 +1,13 @@
 import { useState } from 'react';
 import { useAppStore } from '../../store';
+import { Info } from 'lucide-react';
 import { ProfitAndLossView } from './ProfitAndLossView';
 import { BalanceSheetView } from './BalanceSheetView';
 import { CashFlowView } from './CashFlowView';
 import { TrialBalanceView } from './TrialBalanceView';
 import { TaxSummaryView } from './TaxSummaryView';
+import { ARAgingView, APAgingView } from './ARAgingView';
+import { GeneralLedgerView } from './GeneralLedgerView';
 
 const tabs = ['Standard reports', 'Custom report builder', 'Management report packs', 'Scheduled/emailed reports'];
 
@@ -23,6 +26,7 @@ export function ReportsView() {
   const { displayCurrency, setDisplayCurrency } = useAppStore();
   const [activeTab, setActiveTab] = useState('Standard reports');
   const [activeReport, setActiveReport] = useState<string | null>(null);
+  const [notBuiltMessage, setNotBuiltMessage] = useState<string | null>(null);
   
   // Group reports by category
   const groupedReports = standardReports.reduce((acc, report) => {
@@ -51,36 +55,32 @@ export function ReportsView() {
     return <TaxSummaryView onBack={() => setActiveReport(null)} />;
   }
 
-  if (activeReport) {
-    return (
-      <div className="max-w-6xl mx-auto">
-        <button 
-          onClick={() => setActiveReport(null)}
-          className="text-sm font-medium text-focus-blue-500 hover:text-ink-900 mb-6 inline-flex items-center"
-        >
-          &larr; Back to Reports
-        </button>
-        <div className="bg-paper-100 border border-ink-900/10 shadow-sm rounded-sm p-16 text-center">
-          <h3 className="text-xl font-medium text-ink-900 mb-2">{activeReport}</h3>
-          <p className="text-slate-500 mb-6">This report template is configured but awaiting direct ledger aggregation.</p>
-          <button className="bg-ink-900 text-white  px-6 py-2 text-sm font-medium rounded-sm hover:bg-ink-900/90 transition-colors">
-            Generate Export (Excel)
-          </button>
-        </div>
-      </div>
-    );
+  if (activeReport === 'A/R Aging Summary') {
+    return <ARAgingView onBack={() => setActiveReport(null)} />;
+  }
+
+  if (activeReport === 'A/P Aging Summary') {
+    return <APAgingView onBack={() => setActiveReport(null)} />;
+  }
+
+  if (activeReport === 'General Ledger') {
+    return <GeneralLedgerView onBack={() => setActiveReport(null)} />;
   }
 
   return (
-    <div className="max-w-6xl mx-auto">
-      <div className="mb-2 flex justify-between items-center">
-        <h1 className="text-2xl font-serif text-ink-900">Reports</h1>
+    <div>
+      <section className="mb-6 flex flex-col gap-4 border-b border-ink-900/10 pb-6 sm:flex-row sm:items-end sm:justify-between">
+        <div>
+          <p className="page-kicker">Statements and schedules</p>
+          <h1 className="mt-2 text-3xl tracking-[-0.03em] font-serif font-semibold text-ink-900">Reports</h1>
+          <p className="mt-1.5 text-sm text-slate-500">Standard financial reports for review, export, and reconciliation.</p>
+        </div>
         <div className="flex items-center space-x-2">
-          <label className="text-sm text-slate-500 font-medium">Currency:</label>
+          <label className="text-xs text-slate-500 font-semibold">Display currency</label>
           <select 
             value={displayCurrency}
             onChange={(e) => setDisplayCurrency(e.target.value)}
-            className="bg-paper-100 border border-ink-900/20 text-ink-900 text-sm rounded-sm px-2 py-1 outline-none focus:ring-1 focus:ring-focus-blue-500"
+            className="bg-paper-50 border border-ink-900/15 text-ink-900 text-xs rounded-xl px-3 py-2 outline-none focus:ring-1 focus:ring-focus-blue-500"
           >
             <option value="KES">KES - Kenyan Shilling</option>
             <option value="USD">USD - US Dollar</option>
@@ -90,19 +90,19 @@ export function ReportsView() {
             <option value="TZS">TZS - Tanzanian Shilling</option>
           </select>
         </div>
-      </div>
+      </section>
       <div className="ledger-divider mb-6"></div>
 
       {/* Sub-navigation */}
-      <div className="flex space-x-6 border-b border-ink-900/10 mb-6 overflow-x-auto">
+      <div className="flex gap-6 border-b border-ink-900/10 mb-6 overflow-x-auto">
         {tabs.map(tab => (
           <button
             key={tab}
             onClick={() => setActiveTab(tab)}
-            className={`pb-3 text-sm font-medium transition-colors border-b-2 whitespace-nowrap ${
-              activeTab === tab 
-                ? 'border-brass-500 text-ink-900' 
-                : 'border-transparent text-slate-500 hover:text-ink-900 hover:border-ink-900/20'
+            className={`pb-3 text-xs font-semibold transition-colors border-b-2 whitespace-nowrap ${
+              activeTab === tab
+                ? 'border-focus-blue-500 text-ink-900'
+                : 'border-transparent text-slate-500 hover:text-ink-900'
             }`}
           >
             {tab}
@@ -114,7 +114,7 @@ export function ReportsView() {
         <div className="space-y-8">
           {Object.entries(groupedReports).map(([category, reports]) => (
             <div key={category}>
-              <h2 className="text-sm font-bold text-ink-900 uppercase tracking-wider mb-4 border-b border-ink-900/10 pb-2">
+              <h2 className="text-[11px] font-bold text-ink-900 uppercase tracking-[0.12em] mb-4 border-b border-ink-900/10 pb-2">
                 {category}
               </h2>
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -122,7 +122,7 @@ export function ReportsView() {
                   <div 
                     key={report.name} 
                     onClick={() => setActiveReport(report.name)}
-                    className="group bg-paper-100 border border-ink-900/10 rounded-sm p-4 shadow-sm hover:shadow transition-shadow hover:border-focus-blue-500/50 cursor-pointer flex flex-col h-full"
+                    className="surface-card group p-5 cursor-pointer flex flex-col h-full transition-colors hover:border-focus-blue-500/40"
                   >
                     <h3 className="text-base font-semibold text-focus-blue-500 group-hover:text-ink-900 transition-colors mb-2">
                       {report.name}
@@ -142,7 +142,10 @@ export function ReportsView() {
         <div className="bg-paper-100 border border-ink-900/10 shadow-sm rounded-sm p-8 max-w-4xl mx-auto text-center">
            <h3 className="text-xl font-medium text-ink-900 mb-2">Custom Report Builder</h3>
            <p className="text-slate-500 mb-6">Design tailored financial reports with custom dimension tagging and multi-period comparatives.</p>
-           <button className="bg-ink-900 text-white  px-6 py-2 text-sm font-medium rounded-sm hover:bg-ink-900/90 transition-colors">
+           <button
+             onClick={() => setNotBuiltMessage('The custom report builder (arbitrary dimension tagging and multi-period comparatives) is not built yet. For now, use the eight Standard Reports, each with real PDF/Excel export.')}
+             className="bg-sidebar-bg text-sidebar-ink px-6 py-2 text-sm font-medium rounded-sm hover:bg-sidebar-bg/90 transition-colors"
+           >
              Create Custom Report
            </button>
         </div>
@@ -155,18 +158,24 @@ export function ReportsView() {
                <h3 className="text-lg font-medium text-ink-900">Management Packs</h3>
                <p className="text-sm text-slate-500">Curated collections of reports (Cover page, Executive Summary, P&L, Balance Sheet) exported as a single PDF.</p>
              </div>
-             <button className="bg-ink-900 text-white  px-4 py-2 text-sm font-medium rounded-sm hover:bg-ink-900/90 transition-colors">
+             <button
+               onClick={() => setNotBuiltMessage('Custom, named report packs are not built yet. The one pack below (P&L + Balance Sheet) works today — open Standard Reports for the full, real set.')}
+               className="bg-sidebar-bg text-sidebar-ink px-4 py-2 text-sm font-medium rounded-sm hover:bg-sidebar-bg/90 transition-colors"
+             >
                Build New Pack
              </button>
            </div>
-           
+
            <div className="border border-ink-900/10 rounded-sm p-4 bg-paper-50 flex items-center justify-between">
               <div>
                 <p className="font-semibold text-ink-900">Monthly Board Reporting Pack</p>
-                <p className="text-xs text-slate-500 mt-1">Contains: Executive Summary, P&L, Balance Sheet, Cashflow</p>
+                <p className="text-xs text-slate-500 mt-1">Contains: P&L, Balance Sheet (real data — open each from Standard Reports for the full report and export)</p>
               </div>
-              <button className="text-sm font-medium text-focus-blue-500 border border-focus-blue-500/30 px-3 py-1.5 rounded-sm hover:bg-paper-100 transition-colors">
-                Export PDF
+              <button
+                onClick={() => setActiveTab('Standard reports')}
+                className="text-sm font-medium text-focus-blue-500 border border-focus-blue-500/30 px-3 py-1.5 rounded-sm hover:bg-paper-100 transition-colors"
+              >
+                Open Reports
               </button>
            </div>
         </div>
@@ -176,9 +185,29 @@ export function ReportsView() {
         <div className="bg-paper-100 border border-ink-900/10 shadow-sm rounded-sm p-8 max-w-4xl mx-auto text-center">
            <h3 className="text-xl font-medium text-ink-900 mb-2">Scheduled Delivery</h3>
            <p className="text-slate-500 mb-6">Automate your reporting. Set up standard reports or management packs to be emailed to stakeholders weekly or monthly.</p>
-           <button className="bg-ink-900 text-white  px-6 py-2 text-sm font-medium rounded-sm hover:bg-ink-900/90 transition-colors">
+           <button
+             onClick={() => setNotBuiltMessage('Scheduled email delivery needs a transactional email service (SMTP/SES/Postmark, etc.) wired into the server, which is not configured in this project yet.')}
+             className="bg-sidebar-bg text-sidebar-ink px-6 py-2 text-sm font-medium rounded-sm hover:bg-sidebar-bg/90 transition-colors"
+           >
              + New Schedule
            </button>
+        </div>
+      )}
+
+      {notBuiltMessage && (
+        <div className="fixed inset-0 bg-ink-900/30 backdrop-blur-xs z-50 flex items-center justify-center p-4" onClick={() => setNotBuiltMessage(null)}>
+          <div className="bg-paper-100 rounded-sm shadow-2xl border border-ink-900/10 w-full max-w-md p-6" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-start space-x-3 mb-4">
+              <Info className="w-5 h-5 text-focus-blue-500 shrink-0 mt-0.5" />
+              <p className="text-sm text-ink-900">{notBuiltMessage}</p>
+            </div>
+            <button
+              onClick={() => setNotBuiltMessage(null)}
+              className="w-full bg-sidebar-bg text-sidebar-ink py-2.5 rounded-sm font-medium hover:bg-sidebar-bg/90 transition-colors"
+            >
+              Got it
+            </button>
+          </div>
         </div>
       )}
     </div>

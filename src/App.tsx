@@ -163,7 +163,7 @@ function LedgerApp() {
   }
 
   if (organizationsLoading) {
-    return <div className="fixed inset-0 bg-ink-900 z-[100] flex items-center justify-center text-white">Loading organizations...</div>;
+    return <div className="fixed inset-0 bg-sidebar-bg z-[100] flex items-center justify-center text-sidebar-ink">Loading organizations...</div>;
   }
 
   if (organizations && organizations.length === 0) {
