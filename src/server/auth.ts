@@ -1,7 +1,12 @@
 import type { NextFunction, Request, Response } from 'express';
 import { getSupabase } from './supabase';
 
-export type OrganizationRole = 'owner' | 'admin' | 'editor' | 'viewer';
+// Must match the public.membership_role Postgres enum exactly
+// (supabase/migrations/20260829221831_001_core_tables.sql) — 'editor'/'viewer'
+// were never valid enum values, so any membership row other than 'owner' or
+// 'admin' would previously fail the role check below and get a 403 despite
+// being a legitimate member.
+export type OrganizationRole = 'owner' | 'admin' | 'member';
 
 export interface AuthenticatedRequest extends Request {
   userId?: string;
@@ -9,7 +14,7 @@ export interface AuthenticatedRequest extends Request {
   orgRole?: OrganizationRole;
 }
 
-const writeRoles = new Set<OrganizationRole>(['owner', 'admin', 'editor']);
+const writeRoles = new Set<OrganizationRole>(['owner', 'admin']);
 
 function isOrganizationCollectionRequest(req: Request) {
   return req.path === '/organizations' && (req.method === 'GET' || req.method === 'POST');
@@ -65,7 +70,7 @@ export async function requireAuthenticationAndOrganization(
   }
 
   const role = membership?.role?.toLowerCase() as OrganizationRole | undefined;
-  if (!role || !['owner', 'admin', 'editor', 'viewer'].includes(role)) {
+  if (!role || !['owner', 'admin', 'member'].includes(role)) {
     return res.status(403).json({ error: 'You do not have access to this organization.' });
   }
 

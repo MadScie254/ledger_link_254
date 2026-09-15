@@ -67,7 +67,7 @@ export function BudgetPlanner() {
         </div>
         <button 
           onClick={() => setIsAdding(true)}
-          className="bg-ink-900 text-white  px-4 py-2 text-sm font-medium rounded-sm hover:bg-ink-900/90 transition-colors flex items-center"
+          className="bg-sidebar-bg text-sidebar-ink  px-4 py-2 text-sm font-medium rounded-sm hover:bg-sidebar-bg/90 transition-colors flex items-center"
         >
           <Plus className="h-4 w-4 mr-2" /> New Budget
         </button>
@@ -158,7 +158,7 @@ export function BudgetPlanner() {
                 </button>
                 <button
                   type="submit"
-                  className="bg-ink-900 text-white  px-4 py-2 text-sm font-medium rounded-sm hover:bg-ink-900/90 transition-colors"
+                  className="bg-sidebar-bg text-sidebar-ink  px-4 py-2 text-sm font-medium rounded-sm hover:bg-sidebar-bg/90 transition-colors"
                 >
                   Save Budget
                 </button>

@@ -63,7 +63,7 @@ export function ReportsView() {
         <div className="bg-paper-100 border border-ink-900/10 shadow-sm rounded-sm p-16 text-center">
           <h3 className="text-xl font-medium text-ink-900 mb-2">{activeReport}</h3>
           <p className="text-slate-500 mb-6">This report template is configured but awaiting direct ledger aggregation.</p>
-          <button className="bg-ink-900 text-white  px-6 py-2 text-sm font-medium rounded-sm hover:bg-ink-900/90 transition-colors">
+          <button className="bg-sidebar-bg text-sidebar-ink  px-6 py-2 text-sm font-medium rounded-sm hover:bg-sidebar-bg/90 transition-colors">
             Generate Export (Excel)
           </button>
         </div>
@@ -142,7 +142,7 @@ export function ReportsView() {
         <div className="bg-paper-100 border border-ink-900/10 shadow-sm rounded-sm p-8 max-w-4xl mx-auto text-center">
            <h3 className="text-xl font-medium text-ink-900 mb-2">Custom Report Builder</h3>
            <p className="text-slate-500 mb-6">Design tailored financial reports with custom dimension tagging and multi-period comparatives.</p>
-           <button className="bg-ink-900 text-white  px-6 py-2 text-sm font-medium rounded-sm hover:bg-ink-900/90 transition-colors">
+           <button className="bg-sidebar-bg text-sidebar-ink  px-6 py-2 text-sm font-medium rounded-sm hover:bg-sidebar-bg/90 transition-colors">
              Create Custom Report
            </button>
         </div>
@@ -155,7 +155,7 @@ export function ReportsView() {
                <h3 className="text-lg font-medium text-ink-900">Management Packs</h3>
                <p className="text-sm text-slate-500">Curated collections of reports (Cover page, Executive Summary, P&L, Balance Sheet) exported as a single PDF.</p>
              </div>
-             <button className="bg-ink-900 text-white  px-4 py-2 text-sm font-medium rounded-sm hover:bg-ink-900/90 transition-colors">
+             <button className="bg-sidebar-bg text-sidebar-ink  px-4 py-2 text-sm font-medium rounded-sm hover:bg-sidebar-bg/90 transition-colors">
                Build New Pack
              </button>
            </div>
@@ -176,7 +176,7 @@ export function ReportsView() {
         <div className="bg-paper-100 border border-ink-900/10 shadow-sm rounded-sm p-8 max-w-4xl mx-auto text-center">
            <h3 className="text-xl font-medium text-ink-900 mb-2">Scheduled Delivery</h3>
            <p className="text-slate-500 mb-6">Automate your reporting. Set up standard reports or management packs to be emailed to stakeholders weekly or monthly.</p>
-           <button className="bg-ink-900 text-white  px-6 py-2 text-sm font-medium rounded-sm hover:bg-ink-900/90 transition-colors">
+           <button className="bg-sidebar-bg text-sidebar-ink  px-6 py-2 text-sm font-medium rounded-sm hover:bg-sidebar-bg/90 transition-colors">
              + New Schedule
            </button>
         </div>

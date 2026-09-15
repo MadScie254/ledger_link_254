@@ -9,6 +9,10 @@
   --color-ledger-green-700: var(--ledger-green-700);
   --color-rust-700: var(--rust-700);
   --color-focus-blue-500: var(--focus-blue-500);
+  --color-sidebar-bg: var(--sidebar-bg);
+  --color-sidebar-surface: var(--sidebar-surface);
+  --color-sidebar-ink: var(--sidebar-ink);
+  --color-sidebar-muted: var(--sidebar-muted);
   --font-sans: "Inter", "IBM Plex Sans", sans-serif;
   --font-serif: "IBM Plex Serif", "Newsreader", serif;
   --font-mono: "IBM Plex Mono", monospace;
@@ -25,6 +29,14 @@
     --ledger-green-700: #15803D;
     --rust-700: #B91C1C;
     --focus-blue-500: #2563EB;
+
+    /* The sidebar, auth screen, and full-screen loaders are a deliberately
+       dark "branded" surface regardless of the light/dark theme toggle —
+       these tokens stay constant instead of inverting like ink-900 does. */
+    --sidebar-bg: #0F172A;
+    --sidebar-surface: #182235;
+    --sidebar-ink: #F8FAFC;
+    --sidebar-muted: #94A3B8;
   }
 
   .dark {
@@ -37,6 +49,11 @@
     --ledger-green-700: #34D399;
     --rust-700: #F87171;
     --focus-blue-500: #60A5FA;
+
+    --sidebar-bg: #0B0F19;
+    --sidebar-surface: #111827;
+    --sidebar-ink: #F8FAFC;
+    --sidebar-muted: #94A3B8;
   }
 
   body {

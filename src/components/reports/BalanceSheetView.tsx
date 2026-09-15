@@ -125,7 +125,7 @@ export function BalanceSheetView({ onBack }: { onBack: () => void }) {
           <button onClick={handlePrint} className="bg-paper-100 border border-ink-900/20 text-ink-900 px-3 py-2 text-sm font-medium rounded-sm hover:bg-paper-50 transition-colors inline-flex items-center">
             <Printer className="w-4 h-4 mr-1.5" /> Print
           </button>
-          <button onClick={handleExportPDF} className="bg-ink-900 text-white  px-4 py-2 text-sm font-medium rounded-sm hover:bg-ink-900/90 transition-colors inline-flex items-center">
+          <button onClick={handleExportPDF} className="bg-sidebar-bg text-sidebar-ink  px-4 py-2 text-sm font-medium rounded-sm hover:bg-sidebar-bg/90 transition-colors inline-flex items-center">
             <Download className="w-4 h-4 mr-1.5" /> Export PDF
           </button>
         </div>
@@ -206,7 +206,7 @@ export function BalanceSheetView({ onBack }: { onBack: () => void }) {
             </tr>
 
             {/* TOTAL LIABILITIES & EQUITY */}
-            <tr className="bg-ink-900 text-white ">
+            <tr className="bg-sidebar-bg text-sidebar-ink ">
               <td className="py-4 pl-4 font-bold rounded-l-sm">TOTAL LIABILITIES & EQUITY</td>
               <td className="py-4 pr-4 text-right tabular-currency font-bold rounded-r-sm">{formatCurrency(totalLiabilitiesAndEquity)}</td>
             </tr>

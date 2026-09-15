@@ -144,7 +144,7 @@ export function ExpensesView() {
           </button>
           <button 
             onClick={() => setIsCreatingBill(true)}
-            className="bg-ink-900 text-white  px-4 py-2 text-sm font-medium rounded-sm hover:bg-ink-900/90 transition-colors"
+            className="bg-sidebar-bg text-sidebar-ink  px-4 py-2 text-sm font-medium rounded-sm hover:bg-sidebar-bg/90 transition-colors"
           >
             Create Bill
           </button>
@@ -322,7 +322,7 @@ export function ExpensesView() {
            <p className="text-slate-500 mb-6">Quickly log cash or card expenses that don't require an A/P bill.</p>
            <button 
              onClick={() => setIsCreatingBill(true)}
-             className="bg-ink-900 text-white  px-6 py-2 text-sm font-medium rounded-sm hover:bg-ink-900/90 transition-colors"
+             className="bg-sidebar-bg text-sidebar-ink  px-6 py-2 text-sm font-medium rounded-sm hover:bg-sidebar-bg/90 transition-colors"
            >
              + Record Expense
            </button>
@@ -335,7 +335,7 @@ export function ExpensesView() {
            <p className="text-slate-500 mb-6">Issue POs to vendors and convert them into bills upon receipt.</p>
            <button 
              onClick={() => setIsCreatingBill(true)}
-             className="bg-ink-900 text-white  px-6 py-2 text-sm font-medium rounded-sm hover:bg-ink-900/90 transition-colors"
+             className="bg-sidebar-bg text-sidebar-ink  px-6 py-2 text-sm font-medium rounded-sm hover:bg-sidebar-bg/90 transition-colors"
            >
              + Create Purchase Order
            </button>
@@ -348,7 +348,7 @@ export function ExpensesView() {
            <p className="text-slate-500 mb-6">Pay multiple suppliers in a single automated M-Pesa B2B or RTGS run.</p>
            <button 
              onClick={() => alert('Batch Payment Gateway Ready')}
-             className="bg-ink-900 text-white  px-6 py-2 text-sm font-medium rounded-sm hover:bg-ink-900/90 transition-colors"
+             className="bg-sidebar-bg text-sidebar-ink  px-6 py-2 text-sm font-medium rounded-sm hover:bg-sidebar-bg/90 transition-colors"
            >
              Schedule Batch Run
            </button>
@@ -483,7 +483,7 @@ export function ExpensesView() {
 
               <div className="flex justify-end space-x-3 pt-6 border-t border-ink-900/10 mt-6">
                 <button type="button" onClick={() => { setIsCreatingBill(false); setScannedData(null); }} className="px-4 py-2 text-sm font-medium text-slate-500 hover:text-ink-900">Cancel</button>
-                <button type="submit" disabled={createBillMutation.isPending} className="bg-ink-900 text-white  px-4 py-2 text-sm font-medium rounded-sm hover:bg-ink-900/90 transition-colors disabled:opacity-50">
+                <button type="submit" disabled={createBillMutation.isPending} className="bg-sidebar-bg text-sidebar-ink  px-4 py-2 text-sm font-medium rounded-sm hover:bg-sidebar-bg/90 transition-colors disabled:opacity-50">
                   {createBillMutation.isPending ? 'Saving...' : 'Save Bill'}
                 </button>
               </div>

@@ -181,7 +181,7 @@ export function AccountingView() {
         {activeTab === 'Chart of Accounts' && (
           <button 
             onClick={() => setIsAddingAccount(true)}
-            className="bg-ink-900 text-white  px-4 py-2 text-sm font-medium rounded-sm hover:bg-ink-900/90 transition-colors"
+            className="bg-sidebar-bg text-sidebar-ink  px-4 py-2 text-sm font-medium rounded-sm hover:bg-sidebar-bg/90 transition-colors"
           >
             Add Account
           </button>
@@ -189,7 +189,7 @@ export function AccountingView() {
         {activeTab === 'Journal Entries' && (
           <button 
             onClick={() => setIsAddingJE(true)}
-            className="bg-ink-900 text-white  px-4 py-2 text-sm font-medium rounded-sm hover:bg-ink-900/90 transition-colors"
+            className="bg-sidebar-bg text-sidebar-ink  px-4 py-2 text-sm font-medium rounded-sm hover:bg-sidebar-bg/90 transition-colors"
           >
             Post Journal Entry
           </button>
@@ -351,7 +351,7 @@ export function AccountingView() {
                   ref={fileInputRef}
                   onChange={handleImportCSV}
                 />
-                <button className="bg-ink-900 text-white  px-4 py-2 text-sm font-medium rounded-sm hover:bg-ink-900/90 transition-colors">
+                <button className="bg-sidebar-bg text-sidebar-ink  px-4 py-2 text-sm font-medium rounded-sm hover:bg-sidebar-bg/90 transition-colors">
                   Import CSV
                 </button>
               </div>
@@ -459,7 +459,7 @@ export function AccountingView() {
 
               <div className="flex justify-end space-x-3 pt-6 border-t border-ink-900/10">
                 <button type="button" onClick={() => setIsAddingJE(false)} className="px-4 py-2 text-sm font-medium text-slate-500 hover:text-ink-900">Cancel</button>
-                <button type="submit" disabled={!isBalanced || addJeMutation.isPending} className="bg-ink-900 text-white  px-4 py-2 text-sm font-medium rounded-sm hover:bg-ink-900/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
+                <button type="submit" disabled={!isBalanced || addJeMutation.isPending} className="bg-sidebar-bg text-sidebar-ink  px-4 py-2 text-sm font-medium rounded-sm hover:bg-sidebar-bg/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
                   {addJeMutation.isPending ? 'Posting...' : 'Post Entry'}
                 </button>
               </div>

@@ -7,14 +7,16 @@ interface AuthContextType {
   session: Session | null;
   user: User | null;
   signOut: () => Promise<void>;
-  signInWithOtp: (email: string) => Promise<{ error: any }>;
+  signIn: (email: string, password: string) => Promise<{ error: any }>;
+  signUp: (email: string, password: string) => Promise<{ error: any; needsEmailConfirmation: boolean }>;
 }
 
 const AuthContext = createContext<AuthContextType>({
   session: null,
   user: null,
   signOut: async () => {},
-  signInWithOtp: async () => ({ error: null })
+  signIn: async () => ({ error: null }),
+  signUp: async () => ({ error: null, needsEmailConfirmation: false })
 });
 
 export const useAuth = () => useContext(AuthContext);
@@ -58,25 +60,30 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setLocked(true);
   };
 
-  const signInWithOtp = async (email: string) => {
-    return supabase.auth.signInWithOtp({
-      email,
-      options: {
-        emailRedirectTo: window.location.origin
-      }
-    });
+  const signIn = async (email: string, password: string) => {
+    const { error } = await supabase.auth.signInWithPassword({ email, password });
+    return { error };
+  };
+
+  const signUp = async (email: string, password: string) => {
+    const { data, error } = await supabase.auth.signUp({ email, password });
+    // If email confirmation is required by the Supabase project's auth
+    // settings, signUp succeeds but returns no session until the user
+    // clicks the confirmation link.
+    const needsEmailConfirmation = !error && !data.session;
+    return { error, needsEmailConfirmation };
   };
 
   if (loading) {
     return (
-      <div className="fixed inset-0 bg-ink-900 z-[100] flex items-center justify-center">
+      <div className="fixed inset-0 bg-sidebar-bg z-[100] flex items-center justify-center">
         <div className="text-white">Authenticating...</div>
       </div>
     );
   }
 
   return (
-    <AuthContext.Provider value={{ session, user, signOut, signInWithOtp }}>
+    <AuthContext.Provider value={{ session, user, signOut, signIn, signUp }}>
       {children}
     </AuthContext.Provider>
   );

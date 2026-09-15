@@ -46,7 +46,7 @@ export function ProjectsView() {
         {activeTab === 'Project list' && (
           <button 
             onClick={() => setIsAddingProject(true)}
-            className="bg-ink-900 text-white  px-4 py-2 text-sm font-medium rounded-sm hover:bg-ink-900/90 transition-colors"
+            className="bg-sidebar-bg text-sidebar-ink  px-4 py-2 text-sm font-medium rounded-sm hover:bg-sidebar-bg/90 transition-colors"
           >
             Create Project
           </button>
@@ -169,7 +169,7 @@ export function ProjectsView() {
         <div className="bg-paper-100 border border-ink-900/10 shadow-sm rounded-sm p-8 max-w-4xl mx-auto text-center">
            <h3 className="text-xl font-medium text-ink-900 mb-2">Timesheets & Hours</h3>
            <p className="text-slate-500 mb-6">Log billable hours against specific projects and auto-sync them to payroll or invoices.</p>
-           <button className="bg-ink-900 text-white  px-6 py-2 text-sm font-medium rounded-sm hover:bg-ink-900/90 transition-colors">
+           <button className="bg-sidebar-bg text-sidebar-ink  px-6 py-2 text-sm font-medium rounded-sm hover:bg-sidebar-bg/90 transition-colors">
              Submit Timesheet
            </button>
         </div>
@@ -204,7 +204,7 @@ export function ProjectsView() {
 
               <div className="flex justify-end space-x-3 pt-6 border-t border-ink-900/10 mt-6">
                 <button type="button" onClick={() => setIsAddingProject(false)} className="px-4 py-2 text-sm font-medium text-slate-500 hover:text-ink-900">Cancel</button>
-                <button type="submit" disabled={addProjectMutation.isPending} className="bg-ink-900 text-white  px-4 py-2 text-sm font-medium rounded-sm hover:bg-ink-900/90 transition-colors disabled:opacity-50">
+                <button type="submit" disabled={addProjectMutation.isPending} className="bg-sidebar-bg text-sidebar-ink  px-4 py-2 text-sm font-medium rounded-sm hover:bg-sidebar-bg/90 transition-colors disabled:opacity-50">
                   {addProjectMutation.isPending ? 'Saving...' : 'Save Project'}
                 </button>
               </div>

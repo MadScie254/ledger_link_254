@@ -196,7 +196,7 @@ export function BankingView() {
           <button 
             onClick={() => syncMutation.mutate()}
             disabled={syncMutation.isPending}
-            className="bg-ink-900 text-white  px-4 py-2 text-sm font-medium rounded-sm hover:bg-ink-900/90 transition-colors flex items-center disabled:opacity-50"
+            className="bg-sidebar-bg text-sidebar-ink  px-4 py-2 text-sm font-medium rounded-sm hover:bg-sidebar-bg/90 transition-colors flex items-center disabled:opacity-50"
           >
             <RefreshCw className={`h-4 w-4 mr-1.5 ${syncMutation.isPending ? 'animate-spin' : ''}`} />
             {syncMutation.isPending ? 'Syncing...' : 'Sync Feed'}
@@ -234,7 +234,7 @@ export function BankingView() {
             <button
               onClick={() => autoReconcileMutation.mutate(85)}
               disabled={autoReconcileMutation.isPending || highConfidenceCount === 0}
-              className="px-4 py-1.5 text-xs font-bold bg-ink-900 text-white  rounded-sm hover:bg-ink-900/90 transition-colors flex items-center disabled:opacity-50"
+              className="px-4 py-1.5 text-xs font-bold bg-sidebar-bg text-sidebar-ink  rounded-sm hover:bg-sidebar-bg/90 transition-colors flex items-center disabled:opacity-50"
             >
               <CheckCheck className="w-4 h-4 mr-1.5" />
               {autoReconcileMutation.isPending ? 'Reconciling...' : `Auto-Reconcile (${highConfidenceCount})`}
@@ -417,7 +417,7 @@ export function BankingView() {
               <button
                 onClick={() => autoReconcileMutation.mutate(85)}
                 disabled={autoReconcileMutation.isPending || highConfidenceCount === 0}
-                className="bg-ink-900 text-white  px-4 py-2 text-sm font-semibold rounded-sm hover:bg-ink-900/90 transition-colors flex items-center disabled:opacity-50"
+                className="bg-sidebar-bg text-sidebar-ink  px-4 py-2 text-sm font-semibold rounded-sm hover:bg-sidebar-bg/90 transition-colors flex items-center disabled:opacity-50"
               >
                 <CheckCheck className="w-4 h-4 mr-2" />
                 Auto-Reconcile All High Confidence ({highConfidenceCount})
@@ -501,7 +501,7 @@ export function BankingView() {
                <h3 className="text-lg font-medium text-ink-900">Auto-Categorization Rules</h3>
                <p className="text-sm text-slate-500">Automatically map recurring bank lines to your ledger accounts.</p>
              </div>
-             <button className="bg-ink-900 text-white  px-4 py-2 text-sm font-medium rounded-sm hover:bg-ink-900/90 transition-colors">
+             <button className="bg-sidebar-bg text-sidebar-ink  px-4 py-2 text-sm font-medium rounded-sm hover:bg-sidebar-bg/90 transition-colors">
                Create Rule
              </button>
            </div>
@@ -556,7 +556,7 @@ export function BankingView() {
            <div>
              <button 
               onClick={() => alert('Official Reconciliation Statement Generated')}
-              className="bg-ink-900 text-white  px-6 py-3 text-sm font-medium rounded-sm hover:bg-ink-900/90 transition-colors shadow-sm"
+              className="bg-sidebar-bg text-sidebar-ink  px-6 py-3 text-sm font-medium rounded-sm hover:bg-sidebar-bg/90 transition-colors shadow-sm"
              >
                Publish Reconciliation Report
              </button>
@@ -623,7 +623,7 @@ export function BankingView() {
                 <button 
                   onClick={() => handleMatchNew(matchingTx)}
                   disabled={matchMutation.isPending}
-                  className="w-full bg-ink-900 text-white  px-4 py-2 text-sm font-medium rounded-sm hover:bg-ink-900/90 transition-colors"
+                  className="w-full bg-sidebar-bg text-sidebar-ink  px-4 py-2 text-sm font-medium rounded-sm hover:bg-sidebar-bg/90 transition-colors"
                 >
                   Confirm & Post Entry
                 </button>

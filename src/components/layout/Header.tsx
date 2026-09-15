@@ -8,7 +8,7 @@ import { EntityType } from '../../hooks/useEntityForm';
 
 export function Header() {
   const queryClient = useQueryClient();
-  const { setCommandPaletteOpen, activeView, setActiveView, activeCompany, organizations, setActiveCompany, setCurrentOrgId, setDisplayCurrency, theme, setTheme } = useAppStore();
+  const { setCommandPaletteOpen, activeView, setActiveView, activeCompany, organizations, setActiveCompany, setCurrentOrgId, setDisplayCurrency, theme, setTheme, setMobileSidebarOpen } = useAppStore();
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [modalEntityType, setModalEntityType] = useState<EntityType>('ITEM');
   const [isCompanyDropdownOpen, setIsCompanyDropdownOpen] = useState(false);
@@ -29,9 +29,14 @@ export function Header() {
 
   return (
     <>
-      <header className="h-16 bg-paper-50 dark:bg-[#0b0f17] border-b border-ink-900/10 flex items-center justify-between px-4 sm:px-6 shrink-0 transition-colors">
+      <header className="h-16 bg-paper-50 border-b border-ink-900/10 flex items-center justify-between px-4 sm:px-6 shrink-0 transition-colors">
         <div className="flex flex-1 items-center space-x-4">
-          <button type="button" className="md:hidden p-2 -ml-2 text-slate-500 hover:text-ink-900">
+          <button
+            type="button"
+            onClick={() => setMobileSidebarOpen(true)}
+            className="md:hidden p-2 -ml-2 text-slate-500 hover:text-ink-900"
+            title="Open navigation menu"
+          >
             <Menu className="h-6 w-6" />
           </button>
 
@@ -122,7 +127,7 @@ export function Header() {
           <div className="relative">
             <button
               onClick={() => openAddEntity()}
-              className="bg-ink-900 text-white  px-3 py-1.5 rounded-sm text-xs font-medium hover:bg-ink-900/90 transition-colors flex items-center space-x-1.5 shadow-xs"
+              className="bg-sidebar-bg text-sidebar-ink  px-3 py-1.5 rounded-sm text-xs font-medium hover:bg-sidebar-bg/90 transition-colors flex items-center space-x-1.5 shadow-xs"
             >
               <Plus className="h-3.5 w-3.5" />
               <span>New</span>

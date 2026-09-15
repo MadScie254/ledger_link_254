@@ -212,7 +212,7 @@ export function EntityDrillDownModal({
         <div className="px-6 py-5 border-b border-ink-900/10 bg-paper-50 ">
           <div className="flex items-start justify-between">
             <div className="flex items-center space-x-4">
-              <div className="w-12 h-12 rounded-sm bg-ink-900 text-white flex items-center justify-center shadow-xs">
+              <div className="w-12 h-12 rounded-sm bg-sidebar-bg text-sidebar-ink flex items-center justify-center shadow-xs">
                 <HeaderIcon className="h-6 w-6" />
               </div>
               <div>
@@ -803,7 +803,7 @@ export function EntityDrillDownModal({
           <div className="flex space-x-2">
             <button
               onClick={onClose}
-              className="bg-ink-900 text-white  px-4 py-1.5 rounded-sm font-medium hover:bg-ink-900/90 transition-colors"
+              className="bg-sidebar-bg text-sidebar-ink  px-4 py-1.5 rounded-sm font-medium hover:bg-sidebar-bg/90 transition-colors"
             >
               Close
             </button>

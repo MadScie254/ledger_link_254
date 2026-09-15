@@ -1,5 +1,22 @@
 import { create } from 'zustand';
 
+const THEME_STORAGE_KEY = 'll-theme';
+
+function getInitialTheme(): 'light' | 'dark' {
+  if (typeof window === 'undefined') return 'light';
+  try {
+    const stored = localStorage.getItem(THEME_STORAGE_KEY);
+    if (stored === 'light' || stored === 'dark') return stored;
+  } catch {
+    // localStorage unavailable (private mode, blocked storage) — fall through
+  }
+  return window.matchMedia?.('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+}
+
+function applyThemeClass(theme: 'light' | 'dark') {
+  document.documentElement.classList.toggle('dark', theme === 'dark');
+}
+
 export interface OrganizationData {
   id: string;
   name: string;
@@ -35,6 +52,8 @@ interface AppState {
   setActiveCompany: (company: OrganizationData | null) => void;
   isCommandPaletteOpen: boolean;
   setCommandPaletteOpen: (isOpen: boolean) => void;
+  isMobileSidebarOpen: boolean;
+  setMobileSidebarOpen: (isOpen: boolean) => void;
   
   // Undo Stack
   undoStack: Array<{ id: string, message: string, revertEndpoint: string, data: any }>;
@@ -114,18 +133,25 @@ export const useAppStore = create<AppState>((set) => ({
   }),
   isCommandPaletteOpen: false,
   setCommandPaletteOpen: (isOpen) => set({ isCommandPaletteOpen: isOpen }),
+  isMobileSidebarOpen: false,
+  setMobileSidebarOpen: (isOpen) => set({ isMobileSidebarOpen: isOpen }),
   
   undoStack: [],
   pushUndoAction: (action) => set((state) => ({ undoStack: [...state.undoStack, action] })),
   popUndoAction: () => set((state) => ({ undoStack: state.undoStack.slice(0, -1) })),
   isLocked: false,
   setLocked: (locked) => set({ isLocked: locked }),
-  theme: 'light',
+  theme: (() => {
+    const initial = getInitialTheme();
+    if (typeof window !== 'undefined') applyThemeClass(initial);
+    return initial;
+  })(),
   setTheme: (theme) => {
-    if (theme === 'dark') {
-      document.documentElement.classList.add('dark');
-    } else {
-      document.documentElement.classList.remove('dark');
+    applyThemeClass(theme);
+    try {
+      localStorage.setItem(THEME_STORAGE_KEY, theme);
+    } catch {
+      // ignore write failures, theme just won't persist this session
     }
     set({ theme });
   }

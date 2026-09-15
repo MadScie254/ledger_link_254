@@ -14,7 +14,7 @@ export function BusinessFeedView() {
              placeholder="Ask anything (e.g. 'Why did travel expenses spike in March?' or 'Forecast cashflow for Q3')"
              className="flex-1 bg-transparent border-none outline-none text-ink-900 placeholder:text-slate-400"
            />
-           <button className="bg-ink-900 text-white  px-4 py-2 text-sm font-medium rounded-sm">Ask</button>
+           <button className="bg-sidebar-bg text-sidebar-ink  px-4 py-2 text-sm font-medium rounded-sm">Ask</button>
         </div>
       </div>
 

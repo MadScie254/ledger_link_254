@@ -41,7 +41,7 @@ export function TaxView() {
               <p className="text-3xl font-serif text-ink-900 tabular-currency">82,500.00</p>
               <p className="text-xs text-rust-700 mt-2 font-medium">↓ 5% vs last month</p>
             </div>
-            <div className="bg-ink-900 text-white  p-6 rounded-sm shadow-sm">
+            <div className="bg-sidebar-bg text-sidebar-ink  p-6 rounded-sm shadow-sm">
               <h3 className="text-sm font-medium text-white/70 uppercase tracking-wider mb-2">Net VAT Payable</h3>
               <p className="text-3xl font-serif tabular-currency">62,500.00</p>
               <p className="text-xs text-white/50 mt-2 font-medium">Due by 20th of next month</p>
@@ -54,7 +54,7 @@ export function TaxView() {
                 <h3 className="text-lg font-medium text-ink-900">Recent Tax Transactions</h3>
                 <p className="text-sm text-slate-500">Auto-calculated from your ledger.</p>
               </div>
-              <button className="bg-ink-900 text-white  px-4 py-2 text-sm font-medium rounded-sm hover:bg-ink-900/90 transition-colors">
+              <button className="bg-sidebar-bg text-sidebar-ink  px-4 py-2 text-sm font-medium rounded-sm hover:bg-sidebar-bg/90 transition-colors">
                 Generate Return
               </button>
             </div>

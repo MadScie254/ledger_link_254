@@ -104,7 +104,7 @@ export function CustomerHubView() {
         <div className="flex space-x-2">
           <button 
             onClick={() => setIsAddingCustomer(true)}
-            className="bg-ink-900 text-white  px-4 py-2 text-sm font-medium rounded-sm hover:bg-ink-900/90 transition-colors"
+            className="bg-sidebar-bg text-sidebar-ink  px-4 py-2 text-sm font-medium rounded-sm hover:bg-sidebar-bg/90 transition-colors"
           >
             + Add Customer
           </button>
@@ -276,7 +276,7 @@ export function CustomerHubView() {
            <p className="text-slate-500 mb-6">Track quotes, estimates, and set automated reminders to close active deals.</p>
            <button 
              onClick={() => setIsAddingCustomer(true)}
-             className="bg-ink-900 text-white  px-6 py-2 text-sm font-medium rounded-sm hover:bg-ink-900/90 transition-colors"
+             className="bg-sidebar-bg text-sidebar-ink  px-6 py-2 text-sm font-medium rounded-sm hover:bg-sidebar-bg/90 transition-colors"
            >
              + New Customer / Quote
            </button>

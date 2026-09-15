@@ -33,7 +33,7 @@ export function PayrollView() {
         {activeTab === 'Employees' && (
           <button 
             onClick={() => setIsAddingEmployee(true)}
-            className="bg-ink-900 text-white  px-4 py-2 text-sm font-medium rounded-sm hover:bg-ink-900/90 transition-colors"
+            className="bg-sidebar-bg text-sidebar-ink  px-4 py-2 text-sm font-medium rounded-sm hover:bg-sidebar-bg/90 transition-colors"
           >
             Add Employee
           </button>
@@ -107,7 +107,7 @@ export function PayrollView() {
               <h3 className="text-lg font-medium text-ink-900">Next Pay Run</h3>
               <p className="text-sm text-slate-500">Period: Current Month</p>
             </div>
-            <button className="bg-ink-900 text-white  px-4 py-2 text-sm font-medium rounded-sm hover:bg-ink-900/90 transition-colors">
+            <button className="bg-sidebar-bg text-sidebar-ink  px-4 py-2 text-sm font-medium rounded-sm hover:bg-sidebar-bg/90 transition-colors">
               Process Payroll &rarr;
             </button>
           </div>

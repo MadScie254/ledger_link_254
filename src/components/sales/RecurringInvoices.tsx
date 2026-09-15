@@ -48,7 +48,7 @@ export function RecurringInvoices() {
         </div>
         <button
           onClick={() => setIsCreating(true)}
-          className="bg-ink-900 text-white  px-4 py-2 text-sm font-medium rounded-sm hover:bg-ink-900/90 transition-colors flex items-center"
+          className="bg-sidebar-bg text-sidebar-ink  px-4 py-2 text-sm font-medium rounded-sm hover:bg-sidebar-bg/90 transition-colors flex items-center"
         >
           <Plus className="h-4 w-4 mr-1" /> New Schedule
         </button>
@@ -142,7 +142,7 @@ export function RecurringInvoices() {
               </div>
               <div className="flex justify-end space-x-3 pt-6">
                 <button type="button" onClick={() => setIsCreating(false)} className="px-4 py-2 text-sm font-medium text-slate-500 hover:text-ink-900">Cancel</button>
-                <button type="submit" className="bg-ink-900 text-white  px-4 py-2 text-sm font-medium rounded-sm hover:bg-ink-900/90 transition-colors">
+                <button type="submit" className="bg-sidebar-bg text-sidebar-ink  px-4 py-2 text-sm font-medium rounded-sm hover:bg-sidebar-bg/90 transition-colors">
                   Create Profile
                 </button>
               </div>

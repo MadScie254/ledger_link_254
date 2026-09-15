@@ -136,7 +136,7 @@ export function SettingsView() {
               setEditingOrg(null);
               setIsCompanyModalOpen(true);
             }}
-            className="inline-flex items-center space-x-1.5 px-3.5 py-1.5 bg-ink-900 text-white  rounded-sm text-xs font-medium hover:bg-ink-900/90 transition-colors shadow-xs shrink-0"
+            className="inline-flex items-center space-x-1.5 px-3.5 py-1.5 bg-sidebar-bg text-sidebar-ink  rounded-sm text-xs font-medium hover:bg-sidebar-bg/90 transition-colors shadow-xs shrink-0"
           >
             <Plus className="w-3.5 h-3.5" />
             <span>Add New Company</span>
@@ -478,7 +478,7 @@ export function SettingsView() {
 
               <button
                 type="submit"
-                className="px-3.5 py-1.5 bg-ink-900 text-white rounded-sm text-xs font-medium hover:bg-ink-900/90 transition-colors shadow-xs"
+                className="px-3.5 py-1.5 bg-sidebar-bg text-sidebar-ink rounded-sm text-xs font-medium hover:bg-sidebar-bg/90 transition-colors shadow-xs"
               >
                 Apply Custom Rate
               </button>
@@ -823,7 +823,7 @@ function CompanyModal({ isOpen, initialData, onClose, onSuccess }: CompanyModalP
             <button
               type="submit"
               disabled={isSubmitting}
-              className="px-4 py-1.5 bg-ink-900 text-white rounded-sm font-medium hover:bg-ink-900/90 transition-colors disabled:opacity-50"
+              className="px-4 py-1.5 bg-sidebar-bg text-sidebar-ink rounded-sm font-medium hover:bg-sidebar-bg/90 transition-colors disabled:opacity-50"
             >
               {isSubmitting ? 'Saving...' : initialData ? 'Update Company' : 'Create Company'}
             </button>

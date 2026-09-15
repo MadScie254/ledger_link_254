@@ -30,7 +30,7 @@ export function TeamView() {
     <div className="max-w-6xl mx-auto">
       <div className="flex items-center justify-between mb-2">
         <h1 className="text-2xl font-serif text-ink-900">Team & Permissions</h1>
-        <button className="bg-ink-900 text-white  px-4 py-2 text-sm font-medium rounded-sm hover:bg-ink-900/90 transition-colors">
+        <button className="bg-sidebar-bg text-sidebar-ink  px-4 py-2 text-sm font-medium rounded-sm hover:bg-sidebar-bg/90 transition-colors">
           Invite Member
         </button>
       </div>
@@ -59,7 +59,7 @@ export function TeamView() {
                     <div className="text-slate-500 text-xs">{m.email}</div>
                   </td>
                   <td className="px-4 py-3">
-                    <span className={`inline-flex items-center px-2 py-1 rounded text-xs font-medium ${m.role === 'Admin' ? 'bg-ink-900 text-white ' : 'bg-paper-100 text-slate-700 border border-ink-900/10'}`}>
+                    <span className={`inline-flex items-center px-2 py-1 rounded text-xs font-medium ${m.role === 'Admin' ? 'bg-sidebar-bg text-sidebar-ink ' : 'bg-paper-100 text-slate-700 border border-ink-900/10'}`}>
                       {m.role}
                     </span>
                   </td>
@@ -78,7 +78,7 @@ export function TeamView() {
                 <div className="text-slate-500 text-xs">danieleinstein1998@gmail.com</div>
               </td>
               <td className="px-4 py-3">
-                <span className="inline-flex items-center px-2 py-1 rounded text-xs font-medium bg-ink-900 text-white ">
+                <span className="inline-flex items-center px-2 py-1 rounded text-xs font-medium bg-sidebar-bg text-sidebar-ink ">
                   Owner / Super Admin
                 </span>
               </td>
