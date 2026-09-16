@@ -62,7 +62,7 @@ const DEFAULT_WIDGETS: WidgetDef[] = [
 
 export function DashboardView() {
   useRenderTracker("DashboardView");
-  const { currentOrgId, setActiveView } = useAppStore();
+  const { currentOrgId, activeCompany, setActiveView } = useAppStore();
   const [widgets, setWidgets] = useState<WidgetDef[]>(() => {
     try {
       const saved = localStorage.getItem(`ledgerline-dashboard-grid-${currentOrgId}`);
@@ -529,24 +529,43 @@ export function DashboardView() {
   };
 
   return (
-    <div className="max-w-6xl mx-auto space-y-6 pb-12">
-      {/* Top Header */}
-      <div className="flex items-center justify-between mb-2">
-        <div>
-          <h1 className="text-2xl font-serif text-ink-900">Executive Dashboard</h1>
-          <p className="text-xs text-slate-500 mt-0.5">Drag to rearrange KPI widgets • Pinned for quick monitoring</p>
+    <div className="space-y-6 pb-12">
+      {/* Dashboard masthead */}
+      <section className="border-b border-ink-900/10 pb-6">
+        <div className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
+          <div>
+            <p className="page-kicker">{format(new Date(), 'EEEE, d MMMM yyyy')}</p>
+            <h1 className="mt-2 text-3xl sm:text-[2.1rem] leading-none tracking-[-0.035em] font-serif font-semibold text-ink-900">Overview</h1>
+            <p className="mt-2 max-w-xl text-sm leading-relaxed text-slate-500">Cash, receivables, payables, and operating results for {activeCompany?.name || 'your organization'}.</p>
+          </div>
+          <div className="flex items-center gap-3">
+            <span className="text-[11px] text-slate-500">Figures shown in {activeCompany?.baseCurrency || 'KES'}</span>
+            <button
+              onClick={() => setActiveView('Reports')}
+              className="inline-flex items-center gap-1.5 rounded-lg border border-ink-900/15 bg-paper-100 px-3.5 py-2 text-xs font-semibold text-ink-900 transition-colors hover:border-focus-blue-500/40 hover:text-focus-blue-500"
+            >
+              View reports <ArrowRight className="h-3.5 w-3.5" />
+            </button>
+          </div>
         </div>
-        <div className="flex items-center space-x-2">
+      </section>
+
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <p className="page-kicker">Dashboard</p>
+          <h2 className="mt-1 text-lg font-semibold text-ink-900">Key accounts</h2>
+        </div>
+        <div className="flex items-center gap-2">
           <button
             onClick={() => setIsCustomizeOpen(!isCustomizeOpen)}
-            className="flex items-center space-x-1.5 text-xs font-medium px-3 py-1.5 bg-paper-100 border border-ink-900/20 text-ink-900 rounded-sm hover:bg-paper-50 transition-colors shadow-xs"
+            className="flex items-center gap-1.5 text-xs font-semibold px-3 py-2 bg-paper-100 border border-ink-900/10 text-ink-900 rounded-xl hover:border-focus-blue-500/35 hover:bg-paper-50 transition-all shadow-xs"
           >
             <Sliders className="w-3.5 h-3.5 text-slate-500" />
             <span>Customize Grid</span>
           </button>
           <button
             onClick={resetLayout}
-            className="p-1.5 bg-paper-100 border border-ink-900/20 text-slate-500 hover:text-ink-900 rounded-sm hover:bg-paper-50 transition-colors"
+            className="p-2 bg-paper-100 border border-ink-900/10 text-slate-500 hover:text-ink-900 rounded-xl hover:bg-paper-50 transition-colors"
             title="Reset to Default Layout"
           >
             <RotateCcw className="w-3.5 h-3.5" />
@@ -557,7 +576,7 @@ export function DashboardView() {
 
       {/* Customize Drawer / Panel */}
       {isCustomizeOpen && (
-        <div className="bg-paper-100 border border-ink-900/10 p-4 rounded-sm shadow-md mb-6 animate-in fade-in duration-150">
+        <div className="surface-card p-4 sm:p-5 mb-6 animate-in fade-in slide-in-from-top-1 duration-150">
           <div className="flex items-center justify-between mb-3 border-b border-ink-900/10 pb-2">
             <div>
               <h3 className="text-sm font-semibold text-ink-900">Customize Dashboard Widgets</h3>
@@ -609,9 +628,10 @@ export function DashboardView() {
       {isMetricsLoading ? (
         <div className="p-16 text-center text-slate-500">Loading dashboard...</div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 lg:gap-5">
           {pinnedWidgets.map((widget) => {
             const isMedium = widget.size === 'medium';
+            const isWide = widget.id === 'pnl-breakdown' || widget.id === 'financial-trends';
             return (
               <div
                 key={widget.id}
@@ -619,9 +639,9 @@ export function DashboardView() {
                 onDragStart={(e) => handleDragStart(e, widget.id)}
                 onDragOver={(e) => handleDragOver(e, widget.id)}
                 onDragEnd={handleDragEnd}
-                className={`bg-paper-100 border border-ink-900/10 p-5 rounded-sm shadow-xs transition-all relative group flex flex-col justify-between ${
-                  isMedium ? 'md:col-span-1 lg:col-span-1 min-h-[260px]' : 'min-h-[160px]'
-                } ${draggedWidgetId === widget.id ? 'opacity-40 ring-2 ring-focus-blue-500' : 'hover:shadow-sm'}`}
+                className={`dashboard-widget ${widget.id === 'cash-position' ? 'dashboard-widget-primary' : ''} p-5 sm:p-5 transition-all duration-200 relative group flex flex-col justify-between ${
+                  isWide ? 'md:col-span-2 min-h-[290px]' : isMedium ? 'min-h-[260px]' : 'min-h-[172px]'
+                } ${draggedWidgetId === widget.id ? 'opacity-40 ring-2 ring-focus-blue-500' : ''}`}
               >
                 {/* Drag Handle & Pin Action */}
                 <div className="absolute top-2.5 right-2.5 flex items-center space-x-1 opacity-0 group-hover:opacity-100 transition-opacity">

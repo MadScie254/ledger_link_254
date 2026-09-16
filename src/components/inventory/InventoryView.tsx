@@ -69,7 +69,7 @@ export function InventoryView() {
         {activeTab === 'Items' && (
           <button 
             onClick={() => setIsAddingItem(true)}
-            className="bg-ink-900 text-white  px-4 py-2 text-sm font-medium rounded-sm hover:bg-ink-900/90 transition-colors"
+            className="bg-sidebar-bg text-sidebar-ink  px-4 py-2 text-sm font-medium rounded-sm hover:bg-sidebar-bg/90 transition-colors"
           >
             Add Item
           </button>
@@ -178,7 +178,7 @@ export function InventoryView() {
            <p className="text-slate-500 mb-6">Record breakages, theft, or physical audit discrepancies directly into the ledger.</p>
            <button 
              onClick={() => setIsAddingItem(true)}
-             className="bg-ink-900 text-white  px-6 py-2 text-sm font-medium rounded-sm hover:bg-ink-900/90 transition-colors"
+             className="bg-sidebar-bg text-sidebar-ink  px-6 py-2 text-sm font-medium rounded-sm hover:bg-sidebar-bg/90 transition-colors"
            >
              + New Adjustment
            </button>

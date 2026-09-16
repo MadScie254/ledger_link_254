@@ -90,9 +90,19 @@ export function ExpensesView() {
     }
   });
 
-  // Bulk Status Bills
+  // Bulk Status Bills — "PAID" records a real cash payment (posts a ledger
+  // entry via /api/bills/batch-pay); other statuses just update the label.
   const bulkStatusBillsMutation = useMutation({
     mutationFn: async ({ ids, status }: { ids: string[], status: string }) => {
+      if (status === 'PAID') {
+        const res = await fetch('/api/bills/batch-pay', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'x-org-id': currentOrgId },
+          body: JSON.stringify({ billIds: ids })
+        });
+        if (!res.ok) throw new Error('Failed to record bill payments');
+        return res.json();
+      }
       const res = await fetch('/api/bulk/status-update', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'x-org-id': currentOrgId },
@@ -103,6 +113,7 @@ export function ExpensesView() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['bills', currentOrgId] });
+      queryClient.invalidateQueries({ queryKey: ['accounts', currentOrgId] });
       setSelectedBillIds([]);
     }
   });
@@ -144,7 +155,7 @@ export function ExpensesView() {
           </button>
           <button 
             onClick={() => setIsCreatingBill(true)}
-            className="bg-ink-900 text-white  px-4 py-2 text-sm font-medium rounded-sm hover:bg-ink-900/90 transition-colors"
+            className="bg-sidebar-bg text-sidebar-ink  px-4 py-2 text-sm font-medium rounded-sm hover:bg-sidebar-bg/90 transition-colors"
           >
             Create Bill
           </button>
@@ -322,7 +333,7 @@ export function ExpensesView() {
            <p className="text-slate-500 mb-6">Quickly log cash or card expenses that don't require an A/P bill.</p>
            <button 
              onClick={() => setIsCreatingBill(true)}
-             className="bg-ink-900 text-white  px-6 py-2 text-sm font-medium rounded-sm hover:bg-ink-900/90 transition-colors"
+             className="bg-sidebar-bg text-sidebar-ink  px-6 py-2 text-sm font-medium rounded-sm hover:bg-sidebar-bg/90 transition-colors"
            >
              + Record Expense
            </button>
@@ -335,7 +346,7 @@ export function ExpensesView() {
            <p className="text-slate-500 mb-6">Issue POs to vendors and convert them into bills upon receipt.</p>
            <button 
              onClick={() => setIsCreatingBill(true)}
-             className="bg-ink-900 text-white  px-6 py-2 text-sm font-medium rounded-sm hover:bg-ink-900/90 transition-colors"
+             className="bg-sidebar-bg text-sidebar-ink  px-6 py-2 text-sm font-medium rounded-sm hover:bg-sidebar-bg/90 transition-colors"
            >
              + Create Purchase Order
            </button>
@@ -345,10 +356,27 @@ export function ExpensesView() {
       {activeTab === 'Bill payments' && (
         <div className="bg-paper-100 border border-ink-900/10 shadow-sm rounded-sm p-8 max-w-4xl mx-auto text-center">
            <h3 className="text-xl font-medium text-ink-900 mb-2">Batch Bill Disbursements</h3>
-           <p className="text-slate-500 mb-6">Pay multiple suppliers in a single automated M-Pesa B2B or RTGS run.</p>
-           <button 
-             onClick={() => alert('Batch Payment Gateway Ready')}
-             className="bg-ink-900 text-white  px-6 py-2 text-sm font-medium rounded-sm hover:bg-ink-900/90 transition-colors"
+           <p className="text-slate-500 mb-6">
+             Records a real cash payment (Debit A/P, Credit Cash) for every currently open bill.
+             This does not move real money — it does not connect to M-Pesa or a bank; use it once
+             you've paid vendors outside the system and need the books to reflect it.
+           </p>
+           <p className="text-sm text-slate-600 mb-6">
+             {bills.filter((b: any) => b.status === 'OPEN' || b.status === 'SENT').length} open bill(s) will be marked paid.
+           </p>
+           <button
+             onClick={() => {
+               const openBillIds = bills.filter((b: any) => b.status === 'OPEN' || b.status === 'SENT').map((b: any) => b.id);
+               if (openBillIds.length === 0) {
+                 alert('No open bills to pay.');
+                 return;
+               }
+               if (confirm(`Record payment for ${openBillIds.length} open bill(s)? This posts real ledger entries.`)) {
+                 bulkStatusBillsMutation.mutate({ ids: openBillIds, status: 'PAID' });
+               }
+             }}
+             disabled={bulkStatusBillsMutation.isPending}
+             className="bg-sidebar-bg text-sidebar-ink  px-6 py-2 text-sm font-medium rounded-sm hover:bg-sidebar-bg/90 transition-colors disabled:opacity-50"
            >
              Schedule Batch Run
            </button>
@@ -483,7 +511,7 @@ export function ExpensesView() {
 
               <div className="flex justify-end space-x-3 pt-6 border-t border-ink-900/10 mt-6">
                 <button type="button" onClick={() => { setIsCreatingBill(false); setScannedData(null); }} className="px-4 py-2 text-sm font-medium text-slate-500 hover:text-ink-900">Cancel</button>
-                <button type="submit" disabled={createBillMutation.isPending} className="bg-ink-900 text-white  px-4 py-2 text-sm font-medium rounded-sm hover:bg-ink-900/90 transition-colors disabled:opacity-50">
+                <button type="submit" disabled={createBillMutation.isPending} className="bg-sidebar-bg text-sidebar-ink  px-4 py-2 text-sm font-medium rounded-sm hover:bg-sidebar-bg/90 transition-colors disabled:opacity-50">
                   {createBillMutation.isPending ? 'Saving...' : 'Save Bill'}
                 </button>
               </div>

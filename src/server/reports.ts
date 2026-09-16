@@ -168,7 +168,13 @@ export class ReportsService {
 
   static async getTaxSummary(orgId: string, period: string) {
     const supabase = getSupabase();
-    
+
+    const { data: org } = await supabase
+      .from('organizations')
+      .select('tax_id')
+      .eq('id', orgId)
+      .maybeSingle();
+
     const { data: invoices, error: invError } = await supabase
       .from('invoices')
       .select('subtotal_cents, tax_cents')
@@ -199,9 +205,17 @@ export class ReportsService {
       claimablePurchases += (bill.subtotal_cents || 0);
     });
 
+    const { data: etimsSubmissions } = await supabase
+      .from('etims_submissions')
+      .select('status')
+      .eq('org_id', orgId);
+
+    const etimsVerifiedCount = (etimsSubmissions || []).filter((s: any) => s.status === 'VERIFIED').length;
+    const etimsPendingCount = (etimsSubmissions || []).filter((s: any) => s.status !== 'VERIFIED').length;
+
     return {
       period: period || new Date().toISOString().substring(0, 7),
-      kraPin: 'P051239847Z',
+      kraPin: org?.tax_id || null,
       outputVat: {
         standardRatedSalesCents: standardRatedSales,
         vatRatePercent: 16,
@@ -217,9 +231,70 @@ export class ReportsService {
         withheldAmountCents: 0
       },
       netVatPayableCents: outputVat - inputVat,
-      etimsVerifiedCount: (invoices || []).length,
-      etimsPendingCount: 0
+      etimsVerifiedCount,
+      etimsPendingCount
     };
+  }
+
+  static async getARAging(orgId: string) {
+    const supabase = getSupabase();
+    const { data: invoices, error } = await supabase
+      .from('invoices')
+      .select('id, invoice_number, customer_id, due_date, amount_due_cents, status, customers(display_name)')
+      .eq('org_id', orgId)
+      .neq('status', 'VOID')
+      .neq('status', 'PAID')
+      .gt('amount_due_cents', 0);
+
+    if (error) throw error;
+    return this.bucketByDueDate((invoices || []).map((inv: any) => ({
+      id: inv.id,
+      referenceNo: inv.invoice_number,
+      partyName: inv.customers?.display_name || 'Unknown Customer',
+      dueDate: inv.due_date,
+      amountDueCents: inv.amount_due_cents
+    })));
+  }
+
+  static async getAPAging(orgId: string) {
+    const supabase = getSupabase();
+    const { data: bills, error } = await supabase
+      .from('bills')
+      .select('id, bill_number, vendor_id, due_date, amount_due_cents, status, vendors(display_name)')
+      .eq('org_id', orgId)
+      .neq('status', 'VOID')
+      .neq('status', 'PAID')
+      .gt('amount_due_cents', 0);
+
+    if (error) throw error;
+    return this.bucketByDueDate((bills || []).map((bill: any) => ({
+      id: bill.id,
+      referenceNo: bill.bill_number,
+      partyName: bill.vendors?.display_name || 'Unknown Vendor',
+      dueDate: bill.due_date,
+      amountDueCents: bill.amount_due_cents
+    })));
+  }
+
+  private static bucketByDueDate(items: Array<{ id: string; referenceNo: string; partyName: string; dueDate: string | null; amountDueCents: number }>) {
+    const today = new Date();
+    const buckets = { current: 0, days1to30: 0, days31to60: 0, days61to90: 0, days90plus: 0 };
+    const rows = items.map(item => {
+      const daysPastDue = item.dueDate
+        ? Math.floor((today.getTime() - new Date(item.dueDate).getTime()) / (1000 * 60 * 60 * 24))
+        : 0;
+      let bucket: keyof typeof buckets = 'current';
+      if (daysPastDue > 90) bucket = 'days90plus';
+      else if (daysPastDue > 60) bucket = 'days61to90';
+      else if (daysPastDue > 30) bucket = 'days31to60';
+      else if (daysPastDue > 0) bucket = 'days1to30';
+
+      buckets[bucket] += item.amountDueCents;
+
+      return { ...item, daysPastDue: Math.max(daysPastDue, 0), bucket };
+    });
+
+    return { rows, totals: buckets, grandTotalCents: Object.values(buckets).reduce((a, b) => a + b, 0) };
   }
 
   static async getLedgerLinesForAccount(orgId: string, accountName: string) {

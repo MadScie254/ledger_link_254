@@ -8,7 +8,7 @@ import { Printer, Download, ArrowLeft } from 'lucide-react';
 import * as XLSX from 'xlsx';
 
 export function CashFlowView({ onBack }: { onBack: () => void }) {
-  const { currentOrgId } = useAppStore();
+  const { currentOrgId, activeCompany } = useAppStore();
   const [dateRange, setDateRange] = useState('This Year-to-date');
 
   const { data, isLoading } = useQuery({
@@ -39,6 +39,8 @@ export function CashFlowView({ onBack }: { onBack: () => void }) {
         title: 'Statement of Cash Flows',
         subtitle: 'Cash Flow from Operating, Investing, and Financing Activities',
         period: dateRange,
+        companyName: activeCompany?.legalName || activeCompany?.name,
+        kraPin: activeCompany?.taxId,
         currency: 'KES',
         filename: `cash_flow_${format(new Date(), 'yyyyMMdd')}.pdf`
       },
@@ -132,7 +134,7 @@ export function CashFlowView({ onBack }: { onBack: () => void }) {
           <button onClick={handlePrint} className="bg-paper-100 border border-ink-900/20 text-ink-900 px-3 py-2 text-sm font-medium rounded-sm hover:bg-paper-50 transition-colors inline-flex items-center">
             <Printer className="w-4 h-4 mr-1.5" /> Print
           </button>
-          <button onClick={handleExportPDF} className="bg-ink-900 text-white  px-4 py-2 text-sm font-medium rounded-sm hover:bg-ink-900/90 transition-colors inline-flex items-center">
+          <button onClick={handleExportPDF} className="bg-sidebar-bg text-sidebar-ink  px-4 py-2 text-sm font-medium rounded-sm hover:bg-sidebar-bg/90 transition-colors inline-flex items-center">
             <Download className="w-4 h-4 mr-1.5" /> Export PDF
           </button>
         </div>
@@ -206,7 +208,7 @@ export function CashFlowView({ onBack }: { onBack: () => void }) {
               <td className="py-2 pl-4 text-slate-600">Cash balance at beginning of period</td>
               <td className="py-2 pr-4 text-right tabular-currency text-slate-600">{formatCurrency(beginningCashCents)}</td>
             </tr>
-            <tr className="bg-ink-900 text-white ">
+            <tr className="bg-sidebar-bg text-sidebar-ink ">
               <td className="py-4 pl-4 font-bold rounded-l-sm">ENDING CASH & BANK BALANCE</td>
               <td className="py-4 pr-4 text-right tabular-currency font-bold rounded-r-sm">{formatCurrency(endingCashCents)}</td>
             </tr>

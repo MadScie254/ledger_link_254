@@ -27,7 +27,30 @@ export function CustomerHubView() {
     }
   });
 
+  const { data: invoicesData } = useQuery({
+    queryKey: ['invoices', currentOrgId],
+    queryFn: async () => {
+      const res = await fetch('/api/invoices', { headers: { 'x-org-id': currentOrgId } });
+      if (!res.ok) throw new Error('Failed to fetch invoices');
+      return res.json();
+    }
+  });
+
   const customers = customersData?.customers || [];
+  const invoices = invoicesData?.invoices || [];
+
+  const ninetyDaysAgo = new Date();
+  ninetyDaysAgo.setDate(ninetyDaysAgo.getDate() - 90);
+  const customerIdsInvoicedRecently = new Set(
+    invoices
+      .filter((inv: any) => inv.status !== 'VOID' && inv.issueDate && new Date(inv.issueDate) >= ninetyDaysAgo)
+      .map((inv: any) => inv.customerId)
+  );
+  const activeAccountsCount = customers.filter((c: any) => customerIdsInvoicedRecently.has(c.id)).length;
+
+  const billedInvoices = invoices.filter((inv: any) => inv.status !== 'VOID');
+  const totalBilledCents = billedInvoices.reduce((sum: number, inv: any) => sum + (inv.totalCents || 0), 0);
+  const avgLifetimeValueCents = customers.length > 0 ? Math.round(totalBilledCents / customers.length) : 0;
 
   // Bulk Delete Mutation
   const bulkDeleteMutation = useMutation({
@@ -104,7 +127,7 @@ export function CustomerHubView() {
         <div className="flex space-x-2">
           <button 
             onClick={() => setIsAddingCustomer(true)}
-            className="bg-ink-900 text-white  px-4 py-2 text-sm font-medium rounded-sm hover:bg-ink-900/90 transition-colors"
+            className="bg-sidebar-bg text-sidebar-ink  px-4 py-2 text-sm font-medium rounded-sm hover:bg-sidebar-bg/90 transition-colors"
           >
             + Add Customer
           </button>
@@ -136,8 +159,8 @@ export function CustomerHubView() {
                <p className="text-2xl font-serif text-ink-900">{customers.length}</p>
             </div>
             <div className="bg-paper-100 border border-ink-900/10 p-5 rounded-sm shadow-sm">
-               <h3 className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">Active Accounts</h3>
-               <p className="text-2xl font-serif text-ink-900">{customers.length > 0 ? customers.length : 14}</p>
+               <h3 className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">Active Accounts (90d)</h3>
+               <p className="text-2xl font-serif text-ink-900">{activeAccountsCount}</p>
             </div>
             <div className="bg-paper-100 border border-ink-900/10 p-5 rounded-sm shadow-sm">
                <h3 className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">KRA Compliant</h3>
@@ -145,7 +168,7 @@ export function CustomerHubView() {
             </div>
             <div className="bg-paper-100 border border-ink-900/10 p-5 rounded-sm shadow-sm">
                <h3 className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">Avg Lifetime Value</h3>
-               <p className="text-2xl font-serif text-ink-900 tabular-currency">84,500</p>
+               <p className="text-2xl font-serif text-ink-900 tabular-currency">{formatCurrency(avgLifetimeValueCents)}</p>
             </div>
           </div>
 
@@ -276,7 +299,7 @@ export function CustomerHubView() {
            <p className="text-slate-500 mb-6">Track quotes, estimates, and set automated reminders to close active deals.</p>
            <button 
              onClick={() => setIsAddingCustomer(true)}
-             className="bg-ink-900 text-white  px-6 py-2 text-sm font-medium rounded-sm hover:bg-ink-900/90 transition-colors"
+             className="bg-sidebar-bg text-sidebar-ink  px-6 py-2 text-sm font-medium rounded-sm hover:bg-sidebar-bg/90 transition-colors"
            >
              + New Customer / Quote
            </button>

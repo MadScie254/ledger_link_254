@@ -265,7 +265,7 @@ export function DetailedAddModal({ isOpen, onClose, initialType = 'ITEM', onSucc
         {/* Header with Entity Type Switcher */}
         <div className="px-6 py-4 border-b border-ink-900/10 bg-paper-50  flex items-center justify-between">
           <div className="flex items-center space-x-3">
-            <span className="p-2 bg-ink-900 text-white rounded-xs">
+            <span className="p-2 bg-sidebar-bg text-sidebar-ink rounded-xs">
               {selectedType === 'ITEM' && <Package className="h-5 w-5" />}
               {selectedType === 'VENDOR' && <Building2 className="h-5 w-5" />}
               {selectedType === 'CUSTOMER' && <Users className="h-5 w-5" />}
@@ -1440,7 +1440,7 @@ export function DetailedAddModal({ isOpen, onClose, initialType = 'ITEM', onSucc
               <button
                 type="submit"
                 disabled={createMutation.isPending}
-                className="bg-ink-900 text-white  px-5 py-2 text-sm font-medium rounded-sm hover:bg-ink-900/90 transition-colors disabled:opacity-50 flex items-center shadow-xs"
+                className="bg-sidebar-bg text-sidebar-ink  px-5 py-2 text-sm font-medium rounded-sm hover:bg-sidebar-bg/90 transition-colors disabled:opacity-50 flex items-center shadow-xs"
               >
                 {createMutation.isPending ? 'Saving Record...' : `Create ${selectedType.charAt(0) + selectedType.slice(1).toLowerCase()}`}
               </button>

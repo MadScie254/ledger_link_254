@@ -8,7 +8,7 @@ import { Printer, Download, ArrowLeft, CheckCircle2 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 
 export function TrialBalanceView({ onBack }: { onBack: () => void }) {
-  const { currentOrgId } = useAppStore();
+  const { currentOrgId, activeCompany } = useAppStore();
 
   const { data, isLoading } = useQuery({
     queryKey: ['reports_trial_balance', currentOrgId],
@@ -32,6 +32,8 @@ export function TrialBalanceView({ onBack }: { onBack: () => void }) {
         title: 'Trial Balance Report',
         subtitle: 'General Ledger Account Balance Verification',
         period: `As of ${format(new Date(), 'MMMM d, yyyy')}`,
+        companyName: activeCompany?.legalName || activeCompany?.name,
+        kraPin: activeCompany?.taxId,
         currency: 'KES',
         filename: `trial_balance_${format(new Date(), 'yyyyMMdd')}.pdf`
       },
@@ -102,7 +104,7 @@ export function TrialBalanceView({ onBack }: { onBack: () => void }) {
           <button onClick={handlePrint} className="bg-paper-100 border border-ink-900/20 text-ink-900 px-3 py-2 text-sm font-medium rounded-sm hover:bg-paper-50 transition-colors inline-flex items-center">
             <Printer className="w-4 h-4 mr-1.5" /> Print
           </button>
-          <button onClick={handleExportPDF} className="bg-ink-900 text-white  px-4 py-2 text-sm font-medium rounded-sm hover:bg-ink-900/90 transition-colors inline-flex items-center">
+          <button onClick={handleExportPDF} className="bg-sidebar-bg text-sidebar-ink  px-4 py-2 text-sm font-medium rounded-sm hover:bg-sidebar-bg/90 transition-colors inline-flex items-center">
             <Download className="w-4 h-4 mr-1.5" /> Export PDF
           </button>
         </div>
@@ -142,7 +144,7 @@ export function TrialBalanceView({ onBack }: { onBack: () => void }) {
                 </td>
               </tr>
             ))}
-            <tr className="bg-ink-900 text-white  font-bold text-sm">
+            <tr className="bg-sidebar-bg text-sidebar-ink  font-bold text-sm">
               <td colSpan={3} className="py-3.5 px-4 rounded-l-sm">TOTALS</td>
               <td className="py-3.5 px-4 text-right tabular-currency">{formatCurrency(totalDebit)}</td>
               <td className="py-3.5 px-4 text-right tabular-currency rounded-r-sm">{formatCurrency(totalCredit)}</td>

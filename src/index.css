@@ -9,6 +9,10 @@
   --color-ledger-green-700: var(--ledger-green-700);
   --color-rust-700: var(--rust-700);
   --color-focus-blue-500: var(--focus-blue-500);
+  --color-sidebar-bg: var(--sidebar-bg);
+  --color-sidebar-surface: var(--sidebar-surface);
+  --color-sidebar-ink: var(--sidebar-ink);
+  --color-sidebar-muted: var(--sidebar-muted);
   --font-sans: "Inter", "IBM Plex Sans", sans-serif;
   --font-serif: "IBM Plex Serif", "Newsreader", serif;
   --font-mono: "IBM Plex Mono", monospace;
@@ -16,54 +20,227 @@
 
 @layer base {
   :root {
-    /* Light mode (default corporate theme) */
-    --paper-50: #F8FAFC;
+    /* Light mode: a cool, luminous canvas with dark financial ink. */
+    --paper-50: #F5F7FB;
     --paper-100: #FFFFFF;
-    --ink-900: #0F172A;
-    --slate-500: #64748B;
-    --brass-500: #D97706;
-    --ledger-green-700: #15803D;
-    --rust-700: #B91C1C;
-    --focus-blue-500: #2563EB;
+    --ink-900: #17213A;
+    --slate-500: #667085;
+    --brass-500: #F4B54A;
+    --ledger-green-700: #157A5B;
+    --rust-700: #C3414D;
+    --focus-blue-500: #3B5BDB;
+    --surface-soft: #F8FAFD;
+    --surface-muted: #EEF2F8;
+    --line-subtle: rgba(23, 33, 58, 0.08);
+    --line-strong: rgba(23, 33, 58, 0.14);
+    --sidebar-bg: #101A30;
+    --sidebar-surface: #1A2742;
+    --sidebar-ink: #F8FAFC;
+    --sidebar-muted: #93A4C4;
+    --shadow-color: 28, 43, 78;
   }
 
   .dark {
     /* Dark mode */
-    --paper-50: #090E17;
-    --paper-100: #111827;
-    --ink-900: #F8FAFC;
-    --slate-500: #94A3B8;
-    --brass-500: #FBBF24;
-    --ledger-green-700: #34D399;
-    --rust-700: #F87171;
-    --focus-blue-500: #60A5FA;
+    --paper-50: #0C1220;
+    --paper-100: #121B2D;
+    --ink-900: #F3F6FC;
+    --slate-500: #9AA9C3;
+    --brass-500: #F6C661;
+    --ledger-green-700: #48C99B;
+    --rust-700: #FB7E8C;
+    --focus-blue-500: #7B9CFF;
+    --surface-soft: #172238;
+    --surface-muted: #1C2942;
+    --line-subtle: rgba(226, 232, 240, 0.09);
+    --line-strong: rgba(226, 232, 240, 0.16);
+    --sidebar-bg: #090F1D;
+    --sidebar-surface: #121D31;
+    --sidebar-ink: #F8FAFC;
+    --sidebar-muted: #9BAAC5;
+    --shadow-color: 0, 0, 0;
+  }
+
+  html {
+    min-width: 320px;
+    background: var(--paper-50);
+    text-rendering: optimizeLegibility;
   }
 
   body {
-    background-color: var(--color-paper-50);
+    min-height: 100vh;
+    background-color: var(--paper-50);
     color: var(--color-ink-900);
     font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  button, input, select, textarea {
+    font: inherit;
+  }
+
+  ::selection {
+    background: color-mix(in srgb, var(--focus-blue-500) 24%, transparent);
   }
 }
 
 @layer utilities {
+  .app-shell {
+    position: relative;
+    isolation: isolate;
+    background: var(--paper-50);
+  }
+
+  .app-page-container {
+    width: min(100%, 92rem);
+    margin-inline: auto;
+  }
+
+  .app-topbar {
+    background: color-mix(in srgb, var(--paper-50) 86%, transparent);
+    border-color: var(--line-subtle);
+    backdrop-filter: blur(18px);
+    -webkit-backdrop-filter: blur(18px);
+  }
+
+  .surface-card {
+    background: var(--paper-100);
+    border: 1px solid var(--line-subtle);
+    border-radius: 0.75rem;
+    box-shadow: 0 1px 2px rgba(var(--shadow-color), 0.04), 0 7px 20px rgba(var(--shadow-color), 0.035);
+  }
+
+  .page-kicker {
+    color: var(--slate-500);
+    font-family: var(--font-sans);
+    font-size: 0.6875rem;
+    font-weight: 650;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+
+  .dashboard-widget {
+    overflow: hidden;
+    background: color-mix(in srgb, var(--paper-100) 97%, transparent);
+    border: 1px solid var(--line-subtle);
+    border-radius: 0.75rem;
+    box-shadow: 0 1px 2px rgba(var(--shadow-color), 0.04), 0 7px 20px rgba(var(--shadow-color), 0.035);
+  }
+
+  .dashboard-widget::before {
+    display: none;
+  }
+
+  .dashboard-widget:hover {
+    border-color: var(--line-strong);
+    box-shadow: 0 9px 24px rgba(var(--shadow-color), 0.07);
+  }
+
+  .dashboard-widget-primary {
+    background: var(--sidebar-bg);
+    border-color: rgba(255, 255, 255, 0.08);
+  }
+
+  .dashboard-widget-primary .text-ink-900,
+  .dashboard-widget-primary .text-slate-600 {
+    color: var(--sidebar-ink);
+  }
+
+  .dashboard-widget-primary .text-slate-500,
+  .dashboard-widget-primary .text-slate-400 {
+    color: var(--sidebar-muted);
+  }
+
+  .dashboard-widget-primary .border-ink-900\/5 {
+    border-color: rgba(255, 255, 255, 0.09);
+  }
+
+  .app-shell .rounded-sm {
+    border-radius: 0.375rem;
+  }
+
+  .app-shell .rounded-xl {
+    border-radius: 0.5rem;
+  }
+
+  .app-shell .rounded-2xl {
+    border-radius: 0.75rem;
+  }
+
+  .app-shell .shadow-xs,
+  .app-shell .shadow-2xs {
+    box-shadow: 0 1px 2px rgba(var(--shadow-color), 0.06);
+  }
+
+  .app-shell button:focus-visible,
+  .app-shell input:focus-visible,
+  .app-shell select:focus-visible,
+  .app-shell textarea:focus-visible {
+    outline: 3px solid color-mix(in srgb, var(--focus-blue-500) 24%, transparent);
+    outline-offset: 2px;
+  }
+
+  .app-shell input,
+  .app-shell select,
+  .app-shell textarea {
+    border-color: var(--line-strong);
+    transition: border-color 160ms ease, box-shadow 160ms ease, background 160ms ease;
+  }
+
+  .app-shell input:focus,
+  .app-shell select:focus,
+  .app-shell textarea:focus {
+    border-color: var(--focus-blue-500);
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--focus-blue-500) 12%, transparent);
+  }
+
+  .app-shell table {
+    border-collapse: separate;
+    border-spacing: 0;
+  }
+
+  .app-shell thead {
+    background: color-mix(in srgb, var(--surface-muted) 74%, transparent);
+  }
+
+  .app-shell tbody tr {
+    transition: background-color 150ms ease;
+  }
+
+  .app-shell tbody tr:hover {
+    background: color-mix(in srgb, var(--focus-blue-500) 3.5%, transparent);
+  }
+
+  .app-shell ::-webkit-scrollbar {
+    width: 0.625rem;
+    height: 0.625rem;
+  }
+
+  .app-shell ::-webkit-scrollbar-thumb {
+    border: 0.18rem solid transparent;
+    border-radius: 999px;
+    background: color-mix(in srgb, var(--slate-500) 38%, transparent);
+    background-clip: padding-box;
+  }
+
   .tabular-currency {
     font-family: var(--font-mono);
     font-variant-numeric: tabular-nums;
   }
   
   .ledger-divider {
-    border-bottom: 1px solid var(--color-ink-900);
+    border-bottom: 1px solid var(--line-strong);
     position: relative;
-    margin-bottom: 2px;
+    margin-bottom: 3px;
   }
   .ledger-divider::after {
     content: '';
     position: absolute;
     bottom: -3px;
     left: 0;
-    right: 0;
-    border-bottom: 1px solid var(--color-ink-900);
+    right: 72%;
+    border-bottom: 1px solid var(--focus-blue-500);
   }
 }
 

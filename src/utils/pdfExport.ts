@@ -36,8 +36,8 @@ export class FinancialPDFEngine {
       format: 'a4'
     });
 
-    const company = options.companyName || 'LEDGERLINE ENTERPRISES LTD';
-    const kraPin = options.kraPin || 'P051239847Z';
+    const company = options.companyName || 'YOUR COMPANY';
+    const kraPin = options.kraPin || 'Not set';
     const currency = options.currency || 'KES';
     const period = options.period || 'Year-to-date 2026';
     const generatedDate = format(new Date(), 'dd MMMM yyyy, HH:mm');
