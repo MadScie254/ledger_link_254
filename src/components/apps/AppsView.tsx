@@ -6,9 +6,6 @@ const integrations = [
   { name: 'M-Pesa Business', desc: 'Sync paybills and tills automatically.', requires: 'a Safaricom Daraja API app (consumer key/secret) and a registered paybill/till.' },
   { name: 'KRA eTIMS', desc: 'Type C API integration for automated tax invoices.', requires: 'a KRA-issued OSCU/VSCU device registration tied to your PIN. Every invoice is already logged and queued (see Tax & Compliance) — it just can\'t submit to KRA without real device credentials.' },
   { name: 'WhatsApp Business', desc: 'Send invoices and reminders via WhatsApp.', requires: 'a Meta WhatsApp Business Platform account and API token.' },
-  { name: 'Stripe', desc: 'Accept international credit card payments.', requires: 'a Stripe account and API keys.' },
-  { name: 'Google Workspace', desc: 'Sync receipts from Gmail and Drive.', requires: 'a Google Cloud OAuth app authorized for your Workspace domain.' },
-  { name: 'Shopify', desc: 'Import daily sales summaries and inventory.', requires: 'a Shopify Admin API access token for your store.' },
 ];
 
 export function AppsView() {
