@@ -11,7 +11,7 @@ import { DynamicQuickAddModal } from '../common/DynamicQuickAddModal';
 import { EntityDrillDownModal } from '../common/EntityDrillDownModal';
 import { BulkActionBar } from '../common/BulkActionBar';
 
-const tabs = ['Vendors', 'Bills', 'Expenses', 'Purchase orders', 'Bill payments'];
+const tabs = ['Vendors', 'Bills', 'Expenses', 'Bill payments'];
 
 export function ExpensesView() {
   const [activeTab, setActiveTab] = useState('Bills');
@@ -336,19 +336,6 @@ export function ExpensesView() {
              className="bg-sidebar-bg text-sidebar-ink  px-6 py-2 text-sm font-medium rounded-sm hover:bg-sidebar-bg/90 transition-colors"
            >
              + Record Expense
-           </button>
-        </div>
-      )}
-
-      {activeTab === 'Purchase orders' && (
-        <div className="bg-paper-100 border border-ink-900/10 shadow-sm rounded-sm p-8 max-w-4xl mx-auto text-center">
-           <h3 className="text-xl font-medium text-ink-900 mb-2">Purchase Orders</h3>
-           <p className="text-slate-500 mb-6">Issue POs to vendors and convert them into bills upon receipt.</p>
-           <button 
-             onClick={() => setIsCreatingBill(true)}
-             className="bg-sidebar-bg text-sidebar-ink  px-6 py-2 text-sm font-medium rounded-sm hover:bg-sidebar-bg/90 transition-colors"
-           >
-             + Create Purchase Order
            </button>
         </div>
       )}
