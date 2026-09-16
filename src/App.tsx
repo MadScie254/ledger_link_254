@@ -2,7 +2,7 @@
  * @license
  * SPDX-License-Identifier: Apache-2.0
  */
-import { useEffect } from "react";
+import { useEffect, type ComponentType } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { AppLayout } from "./components/layout/AppLayout";
 import { useAppStore } from "./store";
@@ -30,13 +30,80 @@ import { fetchExchangeRates } from "./utils/currency";
 import { AuthProvider } from "./context/AuthProvider";
 import { useAuth } from "./context/AuthProvider";
 import type { OrganizationData } from "./store";
+import { navigate, usePathname } from "./router";
+import { MarketingShell } from "./marketing/MarketingShell";
+import { LandingPage } from "./marketing/LandingPage";
+import { PricingPage } from "./marketing/PricingPage";
+import { WhyKenyaPage } from "./marketing/WhyKenyaPage";
+import { ForAccountantsPage } from "./marketing/ForAccountantsPage";
+import { SecurityPage } from "./marketing/SecurityPage";
+import { ContactPage } from "./marketing/ContactPage";
+
+const MARKETING_ROUTES: Record<string, ComponentType> = {
+  "/": LandingPage,
+  "/pricing": PricingPage,
+  "/why-kenya": WhyKenyaPage,
+  "/for-accountants": ForAccountantsPage,
+  "/security": SecurityPage,
+  "/contact": ContactPage,
+};
 
 export default function App() {
   return (
     <AuthProvider>
-      <LedgerApp />
+      <Routes />
     </AuthProvider>
   );
+}
+
+/**
+ * AuthProvider does not render children until the session has resolved, so
+ * `session` here is always settled — there is no loading state to guard.
+ */
+function Routes() {
+  const pathname = usePathname();
+  const { session } = useAuth();
+
+  const isMarketing = pathname in MARKETING_ROUTES;
+  const isAuthPath = pathname === "/login" || pathname === "/signup";
+  const isAppPath = pathname === "/app" || pathname.startsWith("/app/");
+
+  // Redirects are effects, not render-time side effects: navigate() dispatches
+  // an event that sets state on anything listening, which React forbids during
+  // a render pass.
+  useEffect(() => {
+    if (isAuthPath && session) {
+      navigate("/app", { replace: true });
+    } else if (isAppPath && !session) {
+      navigate("/login", { replace: true });
+    } else if (!isMarketing && !isAuthPath && !isAppPath) {
+      navigate(session ? "/app" : "/", { replace: true });
+    }
+  }, [pathname, session, isMarketing, isAuthPath, isAppPath]);
+
+  if (isMarketing) {
+    const MarketingPage = MARKETING_ROUTES[pathname];
+    return (
+      <MarketingShell>
+        <MarketingPage />
+      </MarketingShell>
+    );
+  }
+
+  if (isAuthPath) {
+    if (session) return null; // Redirecting to /app.
+    // Keyed on the path so moving between /login and /signup remounts the form.
+    // Without it React keeps the same instance and `initialMode`, which only
+    // seeds useState, is ignored on the second visit.
+    return <LockScreen key={pathname} initialMode={pathname === "/signup" ? "signUp" : "signIn"} />;
+  }
+
+  if (isAppPath) {
+    if (!session) return null; // Redirecting to /login.
+    return <LedgerApp />;
+  }
+
+  return null; // Unknown path, redirecting.
 }
 
 function LedgerApp() {

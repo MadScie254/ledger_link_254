@@ -61,6 +61,37 @@ app.use(
   })
 );
 
+// --- Public, unauthenticated surface ---
+// Mounted before the authenticated /api router. Everything here is readable by
+// anyone on the internet, so it exposes exactly one fixed demo organization and
+// never accepts an org id from the request.
+const publicApi = new Hono();
+
+publicApi.get('/demo-balance-sheet', async (c) => {
+  const demoOrgId = process.env.DEMO_ORG_ID;
+  if (!demoOrgId) return c.json({ error: 'No demo organization is configured.' }, 503);
+
+  try {
+    const asOf = new Date().toISOString().slice(0, 10);
+    const [organization, balanceSheet] = await Promise.all([
+      OrganizationService.getOrganization(demoOrgId),
+      ReportsService.getBalanceSheet(demoOrgId, asOf),
+    ]);
+
+    c.header('Cache-Control', 'public, max-age=300');
+    return c.json({
+      organization: { name: organization?.name ?? 'Demo organization', baseCurrency: organization?.baseCurrency ?? 'KES' },
+      asOfDate: asOf,
+      ...balanceSheet,
+    });
+  } catch (err) {
+    console.error('[API] Demo balance sheet failed:', err);
+    return c.json({ error: 'The demo books are temporarily unavailable.' }, 503);
+  }
+});
+
+app.route('/api/public', publicApi);
+
 const api = new Hono<{ Variables: Variables }>();
 api.use('*', requireAuthenticationAndOrganization);
 
