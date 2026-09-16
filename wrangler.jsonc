@@ -18,6 +18,9 @@
   "vars": {
     "NODE_ENV": "production",
     "SUPABASE_URL": "https://jhmlkcuqsmynnkqgfisf.supabase.co",
-    "ALLOWED_ORIGINS": "https://ledgerlink.dmwanjala254.workers.dev"
+    "ALLOWED_ORIGINS": "https://ledgerlink.dmwanjala254.workers.dev",
+    // Read-only demo books rendered on the public landing page. Not a secret:
+    // /api/public/demo-balance-sheet serves this organization to anyone.
+    "DEMO_ORG_ID": "146b2a09-11b0-47bd-a0ba-d9f27f1f12ec"
   }
 }

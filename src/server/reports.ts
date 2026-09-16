@@ -61,6 +61,11 @@ export class ReportsService {
     const assetMap: Record<string, number> = {};
     const liabilityMap: Record<string, number> = {};
     const equityMap: Record<string, number> = {};
+    // Income less COGS and expenses. Without this the statement can never
+    // balance: profit earned in the period sits in the INCOME/COGS/EXPENSE
+    // accounts and has no equity account to land in until a closing entry is
+    // posted, so assets exceed liabilities + equity by exactly the profit.
+    let retainedEarnings = 0;
 
     lines.forEach((line: any) => {
       const accountInfo = line.account;
@@ -72,14 +77,23 @@ export class ReportsService {
         liabilityMap[accountInfo.name] = (liabilityMap[accountInfo.name] || 0) + (line.credit || 0) - (line.debit || 0);
       } else if (accountInfo.type === 'EQUITY') {
         equityMap[accountInfo.name] = (equityMap[accountInfo.name] || 0) + (line.credit || 0) - (line.debit || 0);
+      } else if (accountInfo.type === 'INCOME') {
+        retainedEarnings += (line.credit || 0) - (line.debit || 0);
+      } else if (accountInfo.type === 'COGS' || accountInfo.type === 'EXPENSE') {
+        retainedEarnings -= (line.debit || 0) - (line.credit || 0);
       }
     });
+
+    const equity = Object.entries(equityMap).map(([name, amountCents]) => ({ name, amountCents }));
+    if (retainedEarnings !== 0) {
+      equity.push({ name: 'Retained earnings (current period)', amountCents: retainedEarnings });
+    }
 
     return {
       currentAssets: Object.entries(assetMap).filter(([k]) => !k.includes('Equipment')).map(([name, amountCents]) => ({ name, amountCents })),
       nonCurrentAssets: Object.entries(assetMap).filter(([k]) => k.includes('Equipment')).map(([name, amountCents]) => ({ name, amountCents })),
       currentLiabilities: Object.entries(liabilityMap).map(([name, amountCents]) => ({ name, amountCents })),
-      equity: Object.entries(equityMap).map(([name, amountCents]) => ({ name, amountCents }))
+      equity
     };
   }
 

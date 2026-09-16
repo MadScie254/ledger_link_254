@@ -136,7 +136,7 @@ export function BalanceSheetView({ onBack }: { onBack: () => void }) {
       <div className="p-8 max-w-3xl mx-auto">
         <div className="text-center mb-8">
           <h3 className="text-lg font-bold text-ink-900 uppercase tracking-widest">Balance Sheet</h3>
-          <p className="text-slate-500 text-sm">Ledgerline Enterprises Ltd • As of {format(new Date(asOfDate), 'MMMM d, yyyy')}</p>
+          <p className="text-slate-500 text-sm">{activeCompany?.name || 'Your organization'} • As of {format(new Date(asOfDate), 'MMMM d, yyyy')}</p>
         </div>
 
         <table className="w-full text-sm">

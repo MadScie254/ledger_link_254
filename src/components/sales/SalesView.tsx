@@ -7,6 +7,7 @@ import { Download, Trash, Tag, Globe } from 'lucide-react';
 import { ConfirmModal } from '../layout/ConfirmModal';
 import { RecurringInvoices } from './RecurringInvoices';
 import { EntityDrillDownModal } from '../common/EntityDrillDownModal';
+import { DynamicQuickAddModal } from '../common/DynamicQuickAddModal';
 import { BulkActionBar } from '../common/BulkActionBar';
 import { useAppStore } from '../../store';
 
@@ -14,6 +15,7 @@ export function SalesView() {
   useRenderTracker("SalesView");
   const { currentOrgId, activeCompany, exchangeRates } = useAppStore();
   const [isBuilding, setIsBuilding] = useState(false);
+  const [isAddingCustomer, setIsAddingCustomer] = useState(false);
   const [activeTab, setActiveTab] = useState<'Invoices' | 'Recurring'>('Invoices');
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [selectedInvoice, setSelectedInvoice] = useState<any | null>(null);
@@ -129,15 +131,6 @@ export function SalesView() {
     window.URL.revokeObjectURL(url);
   };
 
-  const handleCreateMockCustomer = async () => {
-    await fetch('/api/customers', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'x-org-id': 'default-org-id' },
-      body: JSON.stringify({ displayName: 'Acme Corp', email: 'billing@acme.com' })
-    });
-    queryClient.invalidateQueries({ queryKey: ['customers'] });
-  };
-
   const handleCreateInvoice = async (e: React.FormEvent) => {
     e.preventDefault();
     const formData = new FormData(e.target as HTMLFormElement);
@@ -195,12 +188,12 @@ export function SalesView() {
 
         {!hasCustomers ? (
           <div className="bg-paper-100 p-8 border border-ink-900/10 rounded-sm text-center">
-            <p className="text-slate-500 mb-4">You need a customer to create an invoice.</p>
-            <button 
-              onClick={handleCreateMockCustomer}
+            <p className="text-slate-500 mb-4">An invoice needs a customer. Add one to continue.</p>
+            <button
+              onClick={() => setIsAddingCustomer(true)}
               className="bg-sidebar-bg text-sidebar-ink  px-4 py-2 rounded-sm text-sm font-medium"
             >
-              Add Sample Customer
+              Add Customer
             </button>
           </div>
         ) : (
@@ -278,6 +271,15 @@ export function SalesView() {
             </div>
           </form>
         )}
+
+        <DynamicQuickAddModal
+          isOpen={isAddingCustomer}
+          onClose={() => {
+            setIsAddingCustomer(false);
+            queryClient.invalidateQueries({ queryKey: ['customers', currentOrgId] });
+          }}
+          overrideType="CUSTOMER"
+        />
       </div>
     );
   }

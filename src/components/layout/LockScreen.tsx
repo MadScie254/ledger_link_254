@@ -10,9 +10,9 @@ const productAreas = [
   ['03', 'Reporting', 'Financial statements with export-ready schedules.'],
 ];
 
-export function LockScreen() {
+export function LockScreen({ initialMode = 'signIn' }: { initialMode?: Mode } = {}) {
   const { signIn, signUp } = useAuth();
-  const [mode, setMode] = useState<Mode>('signIn');
+  const [mode, setMode] = useState<Mode>(initialMode);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
