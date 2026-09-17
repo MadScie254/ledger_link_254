@@ -1,95 +1,318 @@
 @import "tailwindcss";
 
-@theme {
-  --color-ink-900: var(--ink-900);
-  --color-paper-50: var(--paper-50);
-  --color-paper-100: var(--paper-100);
-  --color-brass-500: var(--brass-500);
-  --color-slate-500: var(--slate-500);
-  --color-ledger-green-700: var(--ledger-green-700);
-  --color-rust-700: var(--rust-700);
-  --color-focus-blue-500: var(--focus-blue-500);
-  --color-sidebar-bg: var(--sidebar-bg);
-  --color-sidebar-surface: var(--sidebar-surface);
-  --color-sidebar-ink: var(--sidebar-ink);
-  --color-sidebar-muted: var(--sidebar-muted);
-  --font-sans: "Inter", "IBM Plex Sans", sans-serif;
-  --font-serif: "IBM Plex Serif", "Newsreader", serif;
-  --font-mono: "IBM Plex Mono", monospace;
+/*
+ * The Counter Book.
+ *
+ * The app is the hardcover counter book every Kenyan duka already keeps:
+ * bright paper with feint blue ruling, a stationery-red margin, figures in
+ * ballpoint blue, an oxblood bookcloth spine. Dark mode is the carbon sheet.
+ *
+ * Palette law. Nothing borrows these roles:
+ *   ink-blue     entered figures only
+ *   red          totals rules, losses, errors
+ *   green        auditor's tick: reconciled, paid, verified
+ *   pending      the yellow duplicate sheet: waiting on someone
+ *   oxblood      the binding: navigation, the primary action, focus
+ *
+ * Existing class names (ink-900, paper-*, slate-*, focus-blue-*, rust-*,
+ * ledger-green-*, brass-*, amber-*) are remapped onto these roles below, so
+ * every screen adopts the book without a rewrite and follows dark mode.
+ */
+
+@theme inline {
+  --font-sans: "Archivo", ui-sans-serif, system-ui, "Segoe UI", Roboto, sans-serif;
+  --font-serif: "Archivo", ui-sans-serif, system-ui, "Segoe UI", Roboto, sans-serif;
+  --font-mono: "Archivo", ui-sans-serif, system-ui, "Segoe UI", Roboto, sans-serif;
+
+  /* World tokens */
+  --color-paper-50: var(--paper-ground);
+  --color-paper-100: var(--paper-sheet);
+  --color-paper-200: var(--paper-tab);
+  --color-feint: var(--feint);
+  --color-feint-strong: var(--feint-strong);
+  --color-ink-900: var(--ink);
+  --color-graphite-700: var(--graphite-700);
+  --color-graphite-600: var(--graphite-600);
+  --color-graphite-500: var(--graphite-500);
+  --color-graphite-400: var(--graphite-400);
+  --color-ink-blue: var(--ink-blue);
+  --color-ledger-red: var(--red);
+  --color-auditor-green: var(--green);
+  --color-oxblood: var(--oxblood);
+  --color-oxblood-fill: var(--oxblood-fill);
+  --color-pending: var(--pending-ink);
+  --color-pending-sheet: var(--pending-sheet);
+  --color-field: var(--field);
+  --color-sidebar-bg: var(--spine);
+  --color-sidebar-surface: var(--spine-raised);
+  --color-sidebar-ink: var(--spine-ink);
+  --color-sidebar-muted: var(--spine-muted);
+
+  /* Graphite: every grey in the app is pencil on paper */
+  --color-slate-50: var(--paper-tab);
+  --color-slate-100: var(--paper-tab);
+  --color-slate-200: var(--feint);
+  --color-slate-300: var(--graphite-500);
+  --color-slate-400: var(--graphite-500);
+  --color-slate-500: var(--graphite-500);
+  --color-slate-600: var(--graphite-600);
+  --color-slate-700: var(--graphite-700);
+  --color-slate-800: var(--graphite-700);
+  --color-slate-900: var(--ink);
+
+  /* The binding: action, selection, focus */
+  --color-focus-blue-50: var(--oxblood-tint);
+  --color-focus-blue-100: var(--oxblood-tint);
+  --color-focus-blue-300: var(--oxblood);
+  --color-focus-blue-500: var(--oxblood);
+  --color-focus-blue-600: var(--oxblood);
+  --color-focus-blue-700: var(--oxblood);
+  --color-focus-blue-800: var(--oxblood);
+  --color-focus-blue-900: var(--oxblood-tint);
+
+  /* Stationery red */
+  --color-rust-50: var(--red-tint);
+  --color-rust-100: var(--red-tint);
+  --color-rust-200: var(--red-tint);
+  --color-rust-700: var(--red);
+  --color-rust-800: var(--red);
+
+  /* Auditor's green */
+  --color-ledger-green-50: var(--green-tint);
+  --color-ledger-green-100: var(--green-tint);
+  --color-ledger-green-200: var(--green-tint);
+  --color-ledger-green-300: var(--green);
+  --color-ledger-green-400: var(--green);
+  --color-ledger-green-700: var(--green);
+  --color-ledger-green-800: var(--green);
+  --color-ledger-green-900: var(--green);
+
+  /* The yellow duplicate sheet: pending */
+  --color-brass-400: var(--pending-sheet);
+  --color-brass-500: var(--pending-sheet);
+  --color-brass-600: var(--pending-ink);
+  --color-brass-700: var(--pending-ink);
+  --color-amber-50: var(--pending-tint);
+  --color-amber-300: var(--pending-sheet);
+  --color-amber-400: var(--pending-sheet);
+  --color-amber-500: var(--pending-sheet);
+  --color-amber-600: var(--pending-ink);
+  --color-amber-700: var(--pending-ink);
+  --color-amber-800: var(--pending-ink);
+  --color-amber-900: var(--pending-ink);
+  --color-amber-950: var(--pending-tint);
+
+  /* Square rules; controls get the slightest round of a cut card */
+  --radius-xs: 2px;
+  --radius-sm: 3px;
+  --radius: 3px;
+  --radius-md: 3px;
+  --radius-lg: 3px;
+  --radius-xl: 3px;
+  --radius-2xl: 3px;
+  --radius-3xl: 3px;
+
+  /* Paper does not cast shadows on the desk. Only a sheet lifted over the
+     page does: menus, dialogs and the command palette. */
+  --shadow-2xs: 0 0 #0000;
+  --shadow-xs: 0 0 #0000;
+  --shadow-sm: 0 0 #0000;
+  --shadow: 0 0 #0000;
+  --shadow-md: 0 0 #0000;
+  --shadow-lg: 0 10px 28px -12px rgb(12 16 24 / 0.28), 0 2px 6px rgb(12 16 24 / 0.08);
+  --shadow-xl: 0 18px 40px -16px rgb(12 16 24 / 0.32), 0 3px 8px rgb(12 16 24 / 0.08);
+  --shadow-2xl: 0 24px 56px -20px rgb(12 16 24 / 0.36), 0 4px 10px rgb(12 16 24 / 0.10);
+
+  /* No frosted glass */
+  --blur-xs: 0px;
+  --blur-sm: 0px;
+  --blur: 0px;
+  --blur-md: 0px;
 }
 
 @layer base {
   :root {
-    /* Light mode: a cool, luminous canvas with dark financial ink. */
-    --paper-50: #F5F7FB;
-    --paper-100: #FFFFFF;
-    --ink-900: #17213A;
-    --slate-500: #667085;
-    --brass-500: #F4B54A;
-    --ledger-green-700: #157A5B;
-    --rust-700: #C3414D;
-    --focus-blue-500: #3B5BDB;
-    --surface-soft: #F8FAFD;
-    --surface-muted: #EEF2F8;
-    --line-subtle: rgba(23, 33, 58, 0.08);
-    --line-strong: rgba(23, 33, 58, 0.14);
-    --sidebar-bg: #101A30;
-    --sidebar-surface: #1A2742;
-    --sidebar-ink: #F8FAFC;
-    --sidebar-muted: #93A4C4;
-    --shadow-color: 28, 43, 78;
+    color-scheme: light;
+
+    --paper-ground: #FBFCFD;
+    --paper-sheet: #FFFFFF;
+    --paper-tab: #EEF2F7;
+    --feint: #D5E0EE;
+    --feint-strong: #A9BEDA;
+
+    --ink: #1A1D24;
+    --graphite-700: #343A46;
+    --graphite-600: #4B5361;
+    --graphite-500: #5F6776;
+    --graphite-400: #8C93A0;
+
+    --ink-blue: #1C3F94;
+    --red: #B3202F;
+    --red-tint: #FBECEC;
+    --green: #1E6B45;
+    --green-tint: #E7F2EC;
+    --pending-ink: #7A5A00;
+    --pending-sheet: #F4DB7A;
+    --pending-tint: #FBF3D6;
+
+    --oxblood: #5A1A1F;
+    --oxblood-fill: #5A1A1F;
+    --oxblood-fill-hover: #45121A;
+    --oxblood-tint: #F6ECEC;
+    --red-fill: #B3202F;
+    --green-fill: #1E6B45;
+
+    --field: #7F899B;
+
+    --spine: #5A1A1F;
+    --spine-raised: #6B2228;
+    --spine-ink: #F6EDEA;
+    --spine-muted: #D9B8B4;
+    --spine-rule: rgb(246 237 234 / 0.14);
+
+    --lift: 0 18px 40px -16px rgb(12 16 24 / 0.32), 0 3px 8px rgb(12 16 24 / 0.08);
   }
 
+  /* The carbon sheet */
   .dark {
-    /* Dark mode */
-    --paper-50: #0C1220;
-    --paper-100: #121B2D;
-    --ink-900: #F3F6FC;
-    --slate-500: #9AA9C3;
-    --brass-500: #F6C661;
-    --ledger-green-700: #48C99B;
-    --rust-700: #FB7E8C;
-    --focus-blue-500: #7B9CFF;
-    --surface-soft: #172238;
-    --surface-muted: #1C2942;
-    --line-subtle: rgba(226, 232, 240, 0.09);
-    --line-strong: rgba(226, 232, 240, 0.16);
-    --sidebar-bg: #090F1D;
-    --sidebar-surface: #121D31;
-    --sidebar-ink: #F8FAFC;
-    --sidebar-muted: #9BAAC5;
-    --shadow-color: 0, 0, 0;
+    color-scheme: dark;
+
+    --paper-ground: #0F131B;
+    --paper-sheet: #151A24;
+    --paper-tab: #1C2230;
+    --feint: #253043;
+    --feint-strong: #34435C;
+
+    --ink: #E6E9EF;
+    --graphite-700: #CDD2DB;
+    --graphite-600: #B3BAC6;
+    --graphite-500: #9AA2B0;
+    --graphite-400: #6E7686;
+
+    --ink-blue: #A9BEFF;
+    --red: #FF8C8F;
+    --red-tint: #2E1719;
+    --green: #6FCF9B;
+    --green-tint: #15271E;
+    --pending-ink: #F2D16B;
+    --pending-sheet: #6B5A1E;
+    --pending-tint: #2A2412;
+
+    --oxblood: #E9A7AB;
+    --oxblood-fill: #8E2F37;
+    --oxblood-fill-hover: #A23842;
+    --oxblood-tint: #2A1A1D;
+    --red-fill: #A3303B;
+    --green-fill: #1F6B47;
+
+    --field: #5E6A80;
+
+    --spine: #2B1014;
+    --spine-raised: #3A161B;
+    --spine-ink: #F3E6E4;
+    --spine-muted: #C9A3A1;
+    --spine-rule: rgb(243 230 228 / 0.12);
+
+    --lift: 0 18px 40px -16px rgb(0 0 0 / 0.6), 0 3px 8px rgb(0 0 0 / 0.3);
   }
 
   html {
     min-width: 320px;
-    background: var(--paper-50);
+    background: var(--paper-ground);
     text-rendering: optimizeLegibility;
+    -webkit-text-size-adjust: 100%;
   }
 
   body {
     min-height: 100vh;
-    background-color: var(--paper-50);
-    color: var(--color-ink-900);
+    background-color: var(--paper-ground);
+    color: var(--ink);
     font-family: var(--font-sans);
+    font-stretch: 100%;
+    font-feature-settings: "tnum" 1, "lnum" 1;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
+    caret-color: var(--ink-blue);
   }
 
   button, input, select, textarea {
     font: inherit;
+    font-feature-settings: inherit;
   }
 
   ::selection {
-    background: color-mix(in srgb, var(--focus-blue-500) 24%, transparent);
+    background: color-mix(in srgb, var(--ink-blue) 20%, transparent);
+    color: inherit;
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--oxblood);
+    outline-offset: 2px;
+  }
+
+  a {
+    text-underline-offset: 3px;
+    text-decoration-thickness: 1px;
+  }
+
+  kbd {
+    font-family: var(--font-sans);
+    font-stretch: 85%;
+    font-size: 0.6875rem;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+  }
+
+  * {
+    scrollbar-color: color-mix(in srgb, var(--graphite-400) 55%, transparent) transparent;
+    scrollbar-width: thin;
   }
 }
 
 @layer utilities {
+  /* Printed stationery: the condensed capitals a counter book is ruled with. */
+  .font-serif {
+    font-stretch: 78%;
+    letter-spacing: -0.005em;
+  }
+
+  .ll-printed {
+    font-family: var(--font-sans);
+    font-stretch: 72%;
+    font-weight: 650;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+  }
+
+  .ll-heading {
+    font-family: var(--font-sans);
+    font-stretch: 78%;
+    font-weight: 650;
+    letter-spacing: -0.01em;
+  }
+
+  /* A figure written into the book. Colour comes from its tone class, never
+     from here: a utility declared after Tailwind's own would override
+     text-ledger-red on a loss and text-ink-900 on a printed total. */
+  .ll-figure {
+    font-family: var(--font-sans);
+    font-stretch: 100%;
+    font-variant-numeric: tabular-nums lining-nums;
+  }
+
+  .tabular-currency {
+    font-family: var(--font-sans);
+    font-variant-numeric: tabular-nums lining-nums;
+    font-stretch: 100%;
+  }
+
+  /* Legacy names kept so nothing breaks; each now speaks the book.
+     `.page-kicker` is deliberately gone: an eyebrow above a heading is not
+     part of this world, and removing the class keeps any view from reviving it. */
   .app-shell {
     position: relative;
     isolation: isolate;
-    background: var(--paper-50);
+    background: var(--paper-ground);
   }
 
   .app-page-container {
@@ -98,149 +321,140 @@
   }
 
   .app-topbar {
-    background: color-mix(in srgb, var(--paper-50) 86%, transparent);
-    border-color: var(--line-subtle);
-    backdrop-filter: blur(18px);
-    -webkit-backdrop-filter: blur(18px);
+    background: var(--paper-sheet);
+    border-color: var(--feint-strong);
   }
 
-  .surface-card {
-    background: var(--paper-100);
-    border: 1px solid var(--line-subtle);
-    border-radius: 0.75rem;
-    box-shadow: 0 1px 2px rgba(var(--shadow-color), 0.04), 0 7px 20px rgba(var(--shadow-color), 0.035);
-  }
-
-  .page-kicker {
-    color: var(--slate-500);
-    font-family: var(--font-sans);
-    font-size: 0.6875rem;
-    font-weight: 650;
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
-  }
-
+  .surface-card,
   .dashboard-widget {
-    overflow: hidden;
-    background: color-mix(in srgb, var(--paper-100) 97%, transparent);
-    border: 1px solid var(--line-subtle);
-    border-radius: 0.75rem;
-    box-shadow: 0 1px 2px rgba(var(--shadow-color), 0.04), 0 7px 20px rgba(var(--shadow-color), 0.035);
+    background: var(--paper-sheet);
+    border: 1px solid var(--feint);
+    border-radius: 0;
   }
 
-  .dashboard-widget::before {
-    display: none;
-  }
-
-  .dashboard-widget:hover {
-    border-color: var(--line-strong);
-    box-shadow: 0 9px 24px rgba(var(--shadow-color), 0.07);
-  }
-
-  .dashboard-widget-primary {
-    background: var(--sidebar-bg);
-    border-color: rgba(255, 255, 255, 0.08);
-  }
-
-  .dashboard-widget-primary .text-ink-900,
-  .dashboard-widget-primary .text-slate-600 {
-    color: var(--sidebar-ink);
-  }
-
-  .dashboard-widget-primary .text-slate-500,
-  .dashboard-widget-primary .text-slate-400 {
-    color: var(--sidebar-muted);
-  }
-
-  .dashboard-widget-primary .border-ink-900\/5 {
-    border-color: rgba(255, 255, 255, 0.09);
-  }
-
-  .app-shell .rounded-sm {
-    border-radius: 0.375rem;
-  }
-
-  .app-shell .rounded-xl {
-    border-radius: 0.5rem;
-  }
-
-  .app-shell .rounded-2xl {
-    border-radius: 0.75rem;
-  }
-
-  .app-shell .shadow-xs,
-  .app-shell .shadow-2xs {
-    box-shadow: 0 1px 2px rgba(var(--shadow-color), 0.06);
-  }
-
-  .app-shell button:focus-visible,
-  .app-shell input:focus-visible,
-  .app-shell select:focus-visible,
-  .app-shell textarea:focus-visible {
-    outline: 3px solid color-mix(in srgb, var(--focus-blue-500) 24%, transparent);
-    outline-offset: 2px;
-  }
-
-  .app-shell input,
-  .app-shell select,
-  .app-shell textarea {
-    border-color: var(--line-strong);
-    transition: border-color 160ms ease, box-shadow 160ms ease, background 160ms ease;
-  }
-
-  .app-shell input:focus,
-  .app-shell select:focus,
-  .app-shell textarea:focus {
-    border-color: var(--focus-blue-500);
-    box-shadow: 0 0 0 3px color-mix(in srgb, var(--focus-blue-500) 12%, transparent);
-  }
-
-  .app-shell table {
-    border-collapse: separate;
-    border-spacing: 0;
-  }
-
-  .app-shell thead {
-    background: color-mix(in srgb, var(--surface-muted) 74%, transparent);
-  }
-
-  .app-shell tbody tr {
-    transition: background-color 150ms ease;
-  }
-
-  .app-shell tbody tr:hover {
-    background: color-mix(in srgb, var(--focus-blue-500) 3.5%, transparent);
-  }
-
-  .app-shell ::-webkit-scrollbar {
-    width: 0.625rem;
-    height: 0.625rem;
-  }
-
-  .app-shell ::-webkit-scrollbar-thumb {
-    border: 0.18rem solid transparent;
-    border-radius: 999px;
-    background: color-mix(in srgb, var(--slate-500) 38%, transparent);
-    background-clip: padding-box;
-  }
-
-  .tabular-currency {
-    font-family: var(--font-mono);
-    font-variant-numeric: tabular-nums;
-  }
-  
   .ledger-divider {
-    border-bottom: 1px solid var(--line-strong);
-    position: relative;
-    margin-bottom: 3px;
+    border-bottom: 1px solid var(--feint-strong);
   }
-  .ledger-divider::after {
-    content: '';
-    position: absolute;
-    bottom: -3px;
-    left: 0;
-    right: 72%;
-    border-bottom: 1px solid var(--focus-blue-500);
+
+  /* The total: a single rule above, a double rule below, in stationery red. */
+  .ll-total {
+    border-top: 1px solid var(--red);
+    border-bottom: 3px double var(--red);
+  }
+
+  /* The red double margin line down the left of a page. */
+  .ll-margin {
+    background-image:
+      linear-gradient(var(--red), var(--red)),
+      linear-gradient(var(--red), var(--red));
+    background-size: 1px 100%, 1px 100%;
+    background-position: left 0 top 0, left 3px top 0;
+    background-repeat: no-repeat;
+  }
+
+  .ll-lift {
+    box-shadow: var(--lift);
+  }
+
+  /* Bookcloth: flat oxblood. A drawn weave aliased into scanlines on 1x screens. */
+  .ll-cloth {
+    background-color: var(--spine);
+  }
+
+  /* A pen stroke made once. Paths set pathLength="1". */
+  .ll-pen {
+    stroke-dasharray: 1;
+    stroke-dashoffset: 1;
+    animation: ll-pen-stroke 140ms cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  }
+}
+
+@keyframes ll-pen-stroke {
+  to { stroke-dashoffset: 0; }
+}
+
+/*
+ * Unlayered: these win over utility classes on purpose. They are the book's
+ * rules for every table and form control in the app, so no screen can drift
+ * back to loose rows, grey fills or unthemed fields.
+ */
+/* Separate, not collapsed: under border-collapse a total's red top rule loses
+   the tie to the feint bottom rule of the row above and never draws. */
+:is(.app-shell, .ll-layer) table {
+  border-collapse: separate;
+  border-spacing: 0;
+  font-variant-numeric: tabular-nums lining-nums;
+}
+
+:is(.app-shell, .ll-layer) thead,
+:is(.app-shell, .ll-layer) thead tr {
+  background: transparent;
+}
+
+:is(.app-shell, .ll-layer) thead th {
+  padding-top: 0.5rem;
+  padding-bottom: 0.4rem;
+  color: var(--graphite-600);
+  font-stretch: 72%;
+  font-size: 0.6875rem;
+  font-weight: 650;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  border-bottom: 1px solid var(--feint-strong);
+  white-space: nowrap;
+}
+
+:is(.app-shell, .ll-layer) tbody td {
+  padding-top: 0.5rem;
+  padding-bottom: 0.5rem;
+  border-bottom: 1px solid var(--feint);
+}
+
+:is(.app-shell, .ll-layer) tbody tr:hover {
+  background: color-mix(in srgb, var(--paper-tab) 70%, transparent);
+}
+
+:is(.app-shell, .ll-layer) input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="color"]),
+:is(.app-shell, .ll-layer) select,
+:is(.app-shell, .ll-layer) textarea {
+  border-color: var(--field);
+  border-radius: 3px;
+  background-color: var(--paper-sheet);
+  color: var(--ink);
+}
+
+:is(.app-shell, .ll-layer) input::placeholder,
+:is(.app-shell, .ll-layer) textarea::placeholder {
+  color: var(--graphite-500);
+  opacity: 1;
+}
+
+:is(.app-shell, .ll-layer) input:focus,
+:is(.app-shell, .ll-layer) select:focus,
+:is(.app-shell, .ll-layer) textarea:focus {
+  border-color: var(--oxblood);
+  box-shadow: 0 0 0 1px var(--oxblood);
+  outline: none;
+}
+
+:is(.app-shell, .ll-layer) input[type="checkbox"],
+:is(.app-shell, .ll-layer) input[type="radio"] {
+  accent-color: var(--oxblood-fill);
+}
+
+/* Dark mode splits the binding: link text is light, a filled button is deep. */
+.dark .bg-focus-blue-500,
+.dark .bg-focus-blue-600,
+.dark .bg-focus-blue-700 { background-color: var(--oxblood-fill); }
+.dark .hover\:bg-focus-blue-600:hover,
+.dark .hover\:bg-focus-blue-700:hover { background-color: var(--oxblood-fill-hover); }
+.dark .bg-rust-700 { background-color: var(--red-fill); }
+.dark .bg-ledger-green-700 { background-color: var(--green-fill); }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
   }
 }
 
@@ -258,14 +472,10 @@
   * {
     box-shadow: none !important;
   }
-  /* Ensure structural boundaries are visible if needed, but mostly hide UI chrome */
   nav, header, aside, .action-bar {
     display: none !important;
   }
   .ledger-divider {
-    border-bottom: 1px solid black;
-  }
-  .ledger-divider::after {
     border-bottom: 1px solid black;
   }
 }

@@ -1,104 +1,176 @@
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { useAppStore } from '../../store';
 import { format } from 'date-fns';
+import Papa from 'papaparse';
+import { useAppStore } from '../../store';
+import { Amount } from '../ledger/Amount';
+import { PageHeading, SkeletonRows, EmptyNote, LoadProblem, buttonClass } from '../ledger/Page';
 
-const RESOURCE_TYPE_FILTERS: Record<string, string> = {
-  'All Events': '',
-  'Journal Entries': 'JOURNAL_ENTRY',
-  'Accounts': 'ACCOUNT'
+const RESOURCE_NAMES: Record<string, string> = {
+  JOURNAL_ENTRY: 'Journal entry',
+  ACCOUNT: 'Account',
+  BANK_TRANSACTION: 'Bank line',
+  BILL: 'Bill',
+  INVOICE: 'Invoice',
+  USER_ROLE: 'Role',
+  TEAM_MEMBER: 'Team member',
 };
 
-export function AuditLogView() {
-  const { currentOrgId } = useAppStore();
-  const [searchQuery, setSearchQuery] = useState('');
-  const [resourceFilter, setResourceFilter] = useState('All Events');
+const ACTION_NAMES: Record<string, string> = { CREATE: 'Created', UPDATE: 'Changed', DELETE: 'Removed', VOID: 'Voided', POST: 'Posted' };
 
-  const { data: auditData, isLoading: auditLoading } = useQuery({
+const DETAIL_NAMES: Record<string, string> = {
+  memo: 'Particulars',
+  amountCents: 'Amount',
+  totalCents: 'Total',
+  email: 'Email',
+  role: 'Role',
+  name: 'Name',
+  code: 'Code',
+  type: 'Type',
+  status: 'Status',
+  referenceNo: 'Reference',
+  invoiceNumber: 'Invoice',
+  billNumber: 'Bill',
+};
+
+const readableKey = (key: string) =>
+  DETAIL_NAMES[key] || key.replace(/Cents$/, '').replace(/([A-Z])/g, ' $1').replace(/_/g, ' ').replace(/^./, (c) => c.toUpperCase()).trim();
+
+/** The simple fields of a details object, in order, without internal ids. */
+function detailEntries(details: any): [string, string | number][] {
+  if (!details || typeof details !== 'object') return [];
+  return Object.entries(details)
+    .filter(([k, v]) => v !== null && v !== undefined && v !== '' && typeof v !== 'object' && !/id$/i.test(k))
+    .slice(0, 4) as [string, string | number][];
+}
+
+/** Plain text of the details, for search. */
+function describe(details: any): string {
+  return detailEntries(details)
+    .map(([k, v]) => `${readableKey(k)} ${/Cents$/.test(k) ? Number(v) / 100 : v}`)
+    .join(' ');
+}
+
+export function AuditLogView() {
+  const { currentOrgId, activeCompany } = useAppStore();
+  const baseCurrency = activeCompany?.baseCurrency || 'KES';
+  const [searchQuery, setSearchQuery] = useState('');
+  const [resourceFilter, setResourceFilter] = useState('');
+
+  const audit = useQuery({
     queryKey: ['audit-logs', currentOrgId],
     queryFn: async () => {
       const res = await fetch('/api/audit', { headers: { 'x-org-id': currentOrgId } });
       if (!res.ok) throw new Error('Failed to fetch audit logs');
       return res.json();
-    }
+    },
   });
 
-  const allLogs = auditData?.logs || [];
-  const logs = allLogs.filter((log: any) => {
-    const matchesResource = !RESOURCE_TYPE_FILTERS[resourceFilter] || log.resourceType === RESOURCE_TYPE_FILTERS[resourceFilter];
-    const haystack = `${log.action} ${log.resourceType} ${log.userId} ${JSON.stringify(log.details || {})}`.toLowerCase();
-    const matchesSearch = !searchQuery || haystack.includes(searchQuery.toLowerCase());
-    return matchesResource && matchesSearch;
+  const team = useQuery({
+    queryKey: ['team', currentOrgId],
+    queryFn: async () => {
+      const res = await fetch('/api/team', { headers: { 'x-org-id': currentOrgId } });
+      if (!res.ok) throw new Error('Failed to fetch team');
+      return res.json();
+    },
   });
+
+  const who = (userId?: string) => {
+    if (!userId) return 'System';
+    const member = (team.data?.members || []).find((m: any) => m.userId === userId);
+    return member ? member.email : `User ${userId.slice(0, 8)}`;
+  };
+
+  const allLogs: any[] = audit.data?.logs || [];
+  const resourceTypes = Array.from(new Set(allLogs.map((l) => l.resourceType).filter(Boolean)));
+  const logs = allLogs.filter((log) => {
+    const matchesResource = !resourceFilter || log.resourceType === resourceFilter;
+    const haystack = `${log.action} ${RESOURCE_NAMES[log.resourceType] || log.resourceType} ${who(log.userId)} ${describe(log.details)}`.toLowerCase();
+    return matchesResource && (!searchQuery || haystack.includes(searchQuery.toLowerCase()));
+  });
+
+  const exportCsv = () => {
+    const csv = Papa.unparse(
+      logs.map((log) => ({
+        Time: log.timestamp || '',
+        By: who(log.userId),
+        Action: log.action || '',
+        Record: log.resourceType || '',
+        RecordId: log.resourceId || '',
+        Details: JSON.stringify(log.details || {}),
+      })),
+    );
+    const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8;' }));
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `audit_log_${format(new Date(), 'yyyyMMdd')}.csv`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  };
 
   return (
-    <div className="max-w-6xl mx-auto space-y-6">
-      <div className="flex items-center justify-between mb-2">
-        <div>
-          <h1 className="text-2xl font-serif text-ink-900">Audit Logs</h1>
-          <p className="text-slate-500 mt-1">Immutable chronological record of ledger events.</p>
-        </div>
-      </div>
-      
-      <div className="ledger-divider mb-6"></div>
+    <div className="space-y-5 pb-16">
+      <PageHeading
+        title="Audit log"
+        note="Every change to accounts, entries and the team, in the order it happened. Entries cannot be edited or removed."
+        actions={
+          <button type="button" onClick={exportCsv} disabled={!logs.length} className={buttonClass.secondary}>
+            Export CSV
+          </button>
+        }
+      />
 
-      <div className="bg-paper-100 border border-ink-900/10 shadow-sm rounded-sm">
-        <div className="p-4 border-b border-ink-900/10 flex gap-4">
-          <input
-            type="text"
-            placeholder="Search logs..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="border border-ink-900/20 px-3 py-1.5 rounded-sm w-64 text-sm focus:outline-none focus:ring-1 focus:ring-ink-900"
-          />
-          <select
-            value={resourceFilter}
-            onChange={(e) => setResourceFilter(e.target.value)}
-            className="border border-ink-900/20 px-3 py-1.5 rounded-sm text-sm focus:outline-none focus:ring-1 focus:ring-ink-900 bg-paper-100"
-          >
-            {Object.keys(RESOURCE_TYPE_FILTERS).map((label) => (
-              <option key={label}>{label}</option>
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
+        <label className="block sm:w-72">
+          <span className="block text-[13px] font-semibold text-ink-900">Search</span>
+          <input type="search" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="mt-1.5 h-9 w-full border px-3 text-[14px]" />
+        </label>
+        <label className="block sm:w-52">
+          <span className="block text-[13px] font-semibold text-ink-900">Record</span>
+          <select value={resourceFilter} onChange={(e) => setResourceFilter(e.target.value)} className="mt-1.5 h-9 w-full border px-2.5 text-[14px]">
+            <option value="">All records</option>
+            {resourceTypes.map((t) => (
+              <option key={t} value={t}>{RESOURCE_NAMES[t] || t}</option>
             ))}
           </select>
-        </div>
-        
-        <table className="w-full text-sm text-left">
-          <thead className="bg-paper-100 border-b border-ink-900/10 text-xs uppercase text-slate-500">
-            <tr>
-              <th className="px-4 py-3 font-semibold">Timestamp</th>
-              <th className="px-4 py-3 font-semibold">User</th>
-              <th className="px-4 py-3 font-semibold">Action</th>
-              <th className="px-4 py-3 font-semibold">Resource Type</th>
-              <th className="px-4 py-3 font-semibold">Details</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-ink-900/5">
-            {auditLoading ? (
-              <tr><td colSpan={5} className="px-4 py-8 text-center text-slate-500">Loading audit logs...</td></tr>
-            ) : logs.length === 0 ? (
-              <tr><td colSpan={5} className="px-4 py-8 text-center text-slate-500">{allLogs.length === 0 ? 'No audit logs found.' : 'No logs match your search/filter.'}</td></tr>
-            ) : (
-              logs.map((log: any) => (
-                <tr key={log.id} className="hover:bg-paper-50 transition-colors">
-                  <td className="px-4 py-3 text-ink-900 font-medium">
-                    {format(new Date(log.timestamp), 'MMM d, yyyy HH:mm')}
-                  </td>
-                  <td className="px-4 py-3 text-slate-600">{log.userId}</td>
-                  <td className="px-4 py-3">
-                    <span className="bg-ink-900/5 text-ink-900 px-2 py-0.5 rounded text-xs font-medium">
-                      {log.action}
-                    </span>
-                  </td>
-                  <td className="px-4 py-3 text-slate-600">{log.resourceType}</td>
-                  <td className="px-4 py-3 text-slate-500 text-xs truncate max-w-xs" title={JSON.stringify(log.details)}>
-                    {JSON.stringify(log.details)}
-                  </td>
-                </tr>
-              ))
-            )}
-          </tbody>
-        </table>
+        </label>
       </div>
+
+      {audit.isError ? (
+        <LoadProblem what="the audit log" path="/api/audit" onRetry={() => audit.refetch()} />
+      ) : audit.isLoading ? (
+        <SkeletonRows label="Loading the audit log" />
+      ) : logs.length === 0 ? (
+        <EmptyNote>{allLogs.length === 0 ? 'Nothing has been recorded yet. Changes to accounts, entries and the team appear here as they happen.' : 'No entries match this search.'}</EmptyNote>
+      ) : (
+        <ol className="border-t border-feint-strong" aria-label="Audit log, newest first">
+          {logs.map((log) => (
+            <li key={log.id} className="grid grid-cols-1 gap-1 border-b border-feint py-2.5 sm:grid-cols-[9.5rem_minmax(0,1fr)] sm:gap-4">
+              <time dateTime={log.timestamp} className="ll-figure text-[13px] text-graphite-600">
+                {log.timestamp ? format(new Date(log.timestamp), 'dd/MM/yyyy HH:mm') : '–'}
+              </time>
+              <div className="min-w-0">
+                <p className="text-[14px] text-ink-900">
+                  <span className="font-semibold">{ACTION_NAMES[log.action] || log.action}</span> {(RESOURCE_NAMES[log.resourceType] || log.resourceType || 'record').toLowerCase()}
+                  <span className="text-graphite-600"> by {who(log.userId)}</span>
+                </p>
+                {detailEntries(log.details).length > 0 && (
+                  <p className="mt-0.5 flex flex-wrap items-baseline gap-x-3 gap-y-0.5 text-[12.5px] text-graphite-600">
+                    {detailEntries(log.details).map(([k, v]) => (
+                      <span key={k} className="inline-flex items-baseline gap-1">
+                        {readableKey(k)}
+                        {/Cents$/.test(k) ? <Amount cents={Number(v)} currency={baseCurrency} size="xs" tone="ink" /> : <span className="text-ink-900">{String(v)}</span>}
+                      </span>
+                    ))}
+                  </p>
+                )}
+              </div>
+            </li>
+          ))}
+        </ol>
+      )}
     </div>
   );
 }

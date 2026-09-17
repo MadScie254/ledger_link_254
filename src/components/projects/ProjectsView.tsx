@@ -1,40 +1,54 @@
-import { formatCurrency, formatCurrencyFromFloat } from '../../utils/currency';
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { useAppStore } from '../../store';
 import { format } from 'date-fns';
+import { useAppStore } from '../../store';
+import { Amount } from '../ledger/Amount';
+import { Mark } from '../ledger/Mark';
+import { Dialog, Field } from '../ledger/Dialog';
+import { PageHeading, IndexTabs, SkeletonRows, EmptyNote, LoadProblem, buttonClass } from '../ledger/Page';
 
-const tabs = ['Project list', 'Job costing', 'Time tracking'];
+type Tab = 'Projects' | 'Hours';
 
 export function ProjectsView() {
-  const [activeTab, setActiveTab] = useState('Project list');
+  const [activeTab, setActiveTab] = useState<Tab>('Projects');
   const [isAddingProject, setIsAddingProject] = useState(false);
+  const [projectError, setProjectError] = useState('');
   const [timesheetProjectId, setTimesheetProjectId] = useState('');
   const [timesheetDate, setTimesheetDate] = useState(format(new Date(), 'yyyy-MM-dd'));
   const [timesheetHours, setTimesheetHours] = useState('');
   const [timesheetNotes, setTimesheetNotes] = useState('');
   const [timesheetError, setTimesheetError] = useState('');
 
-  const { currentOrgId } = useAppStore();
+  const { currentOrgId, activeCompany } = useAppStore();
+  const baseCurrency = activeCompany?.baseCurrency || 'KES';
   const queryClient = useQueryClient();
 
-  const { data: projectsData, isLoading } = useQuery({
+  const projectsQuery = useQuery({
     queryKey: ['projects', currentOrgId],
     queryFn: async () => {
       const res = await fetch('/api/projects', { headers: { 'x-org-id': currentOrgId } });
       if (!res.ok) throw new Error('Failed to fetch projects');
       return res.json();
-    }
+    },
   });
 
-  const { data: timeEntriesData, isLoading: timeEntriesLoading } = useQuery({
+  const customersQuery = useQuery({
+    queryKey: ['customers', currentOrgId],
+    queryFn: async () => {
+      const res = await fetch('/api/customers', { headers: { 'x-org-id': currentOrgId } });
+      if (!res.ok) throw new Error('Failed to fetch customers');
+      return res.json();
+    },
+  });
+
+  const timeQuery = useQuery({
     queryKey: ['time-entries', currentOrgId],
     queryFn: async () => {
       const res = await fetch('/api/time-entries', { headers: { 'x-org-id': currentOrgId } });
       if (!res.ok) throw new Error('Failed to fetch time entries');
       return res.json();
     },
-    enabled: activeTab === 'Time tracking'
+    enabled: activeTab === 'Hours',
   });
 
   const submitTimesheetMutation = useMutation({
@@ -46,23 +60,22 @@ export function ProjectsView() {
           projectId: timesheetProjectId,
           entryDate: timesheetDate,
           hours: parseFloat(timesheetHours || '0'),
-          description: timesheetNotes || undefined
-        })
+          description: timesheetNotes || undefined,
+        }),
       });
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
-        throw new Error(data.error || 'Failed to submit timesheet');
+        throw new Error(data.error || 'The hours could not be saved.');
       }
       return res.json();
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['time-entries', currentOrgId] });
-      setTimesheetProjectId('');
       setTimesheetHours('');
       setTimesheetNotes('');
       setTimesheetError('');
     },
-    onError: (err: any) => setTimesheetError(err.message)
+    onError: (err: any) => setTimesheetError(err.message),
   });
 
   const addProjectMutation = useMutation({
@@ -70,290 +83,267 @@ export function ProjectsView() {
       const res = await fetch('/api/projects', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'x-org-id': currentOrgId },
-        body: JSON.stringify(project)
+        body: JSON.stringify(project),
       });
-      if (!res.ok) throw new Error('Failed to add project');
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.error || 'The project could not be saved.');
+      }
       return res.json();
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['projects', currentOrgId] });
       setIsAddingProject(false);
-    }
+      setProjectError('');
+    },
+    onError: (err: any) => setProjectError(err.message),
   });
 
-  const projects = projectsData?.projects || [];
+  const projects: any[] = projectsQuery.data?.projects || [];
+  const customers: any[] = customersQuery.data?.customers || [];
+  const customerName = (id?: string) => customers.find((c) => c.id === id)?.displayName;
+  const entries: any[] = timeQuery.data?.entries || [];
+  const totalBudget = projects.reduce((s, p) => s + (p.budgetCents || 0), 0);
+  const totalCost = projects.reduce((s, p) => s + (p.costCents || 0), 0);
+  const totalHours = entries.reduce((s, e) => s + (e.hours || 0), 0);
+
+  const used = (p: any) => {
+    const budget = p.budgetCents || 0;
+    const cost = p.costCents || 0;
+    if (!budget) return <span className="text-[12px] text-graphite-600">No budget</span>;
+    const pct = Math.round((cost / budget) * 100);
+    return cost > budget ? (
+      <Mark kind="circled" label={`${pct}% · over budget`} />
+    ) : (
+      <span className="ll-figure text-ink-900">{pct}%</span>
+    );
+  };
+
+  const closeProjectDialog = () => {
+    setIsAddingProject(false);
+    setProjectError('');
+  };
 
   return (
-    <div className="max-w-6xl mx-auto">
-      <div className="flex items-center justify-between mb-2">
-        <h1 className="text-2xl font-serif text-ink-900">Projects & Jobs</h1>
-        {activeTab === 'Project list' && (
-          <button 
-            onClick={() => setIsAddingProject(true)}
-            className="bg-sidebar-bg text-sidebar-ink  px-4 py-2 text-sm font-medium rounded-sm hover:bg-sidebar-bg/90 transition-colors"
-          >
-            Create Project
+    <div className="space-y-5 pb-16">
+      <PageHeading
+        title="Projects"
+        note={<>Budget against cost posted to each job, and the hours logged to it · Figures in {baseCurrency}</>}
+        actions={
+          <button type="button" onClick={() => setIsAddingProject(true)} className={buttonClass.primary}>
+            Open a project
           </button>
-        )}
-      </div>
-      <div className="ledger-divider mb-6"></div>
+        }
+      />
 
-      <div className="flex space-x-6 border-b border-ink-900/10 mb-6 overflow-x-auto">
-        {tabs.map(tab => (
-          <button
-            key={tab}
-            onClick={() => setActiveTab(tab)}
-            className={`pb-3 text-sm font-medium transition-colors border-b-2 whitespace-nowrap ${
-              activeTab === tab 
-                ? 'border-brass-500 text-ink-900' 
-                : 'border-transparent text-slate-500 hover:text-ink-900 hover:border-ink-900/20'
-            }`}
-          >
-            {tab}
-          </button>
-        ))}
-      </div>
+      <IndexTabs
+        label="Projects"
+        active={activeTab}
+        onChange={(id) => setActiveTab(id as Tab)}
+        tabs={[
+          { id: 'Projects', name: 'Budget and cost', count: projects.length },
+          { id: 'Hours', name: 'Hours logged' },
+        ]}
+      />
 
-      {activeTab === 'Project list' && (
-        <div className="bg-paper-100 border border-ink-900/10 shadow-sm rounded-sm overflow-hidden">
-          <table className="w-full text-sm text-left">
-            <thead className="bg-paper-100 border-b border-ink-900/10 text-xs uppercase text-slate-500">
-              <tr>
-                <th className="px-4 py-3 font-semibold">Project Name</th>
-                <th className="px-4 py-3 font-semibold">Client</th>
-                <th className="px-4 py-3 font-semibold text-right">Budget</th>
-                <th className="px-4 py-3 font-semibold text-right">Cost to Date</th>
-                <th className="px-4 py-3 font-semibold">Status</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-ink-900/5">
-              {isLoading ? (
-                <tr><td colSpan={5} className="px-4 py-8 text-center text-slate-500">Loading projects...</td></tr>
-              ) : projects.length === 0 ? (
-                <tr><td colSpan={5} className="px-4 py-8 text-center text-slate-500">No projects found. Create one to get started.</td></tr>
-              ) : (
-                projects.map((proj: any) => {
-                  const budget = (proj.budgetCents || 0) / 100;
-                  // Pull actual cost if available, otherwise 0
-                  const cost = (proj.costCents || 0) / 100; 
-                  
-                  return (
-                    <tr key={proj.id} className="hover:bg-paper-50 transition-colors cursor-pointer group">
-                      <td className="px-4 py-3 font-medium text-ink-900">{proj.name}</td>
-                      <td className="px-4 py-3 text-slate-500">{proj.clientName || '-'}</td>
-                      <td className="px-4 py-3 tabular-currency text-right text-ink-900">
-                        {formatCurrencyFromFloat(budget)}
-                      </td>
-                      <td className="px-4 py-3 tabular-currency text-right text-rust-700">
-                        {formatCurrencyFromFloat(cost)}
-                      </td>
-                      <td className="px-4 py-3">
-                        <span className="inline-flex items-center px-2 py-1 rounded text-xs font-medium bg-ledger-green-700/10 text-ledger-green-700">
-                          {proj.status}
-                        </span>
-                      </td>
-                    </tr>
-                  );
-                })
-              )}
-            </tbody>
-          </table>
-        </div>
-      )}
-
-      {activeTab === 'Job costing' && (
-        <div className="bg-paper-100 border border-ink-900/10 shadow-sm rounded-sm p-8 max-w-4xl mx-auto">
-          <div className="text-center mb-8">
-             <h3 className="text-lg font-medium text-ink-900">Job Costing Analysis</h3>
-             <p className="text-sm text-slate-500">Compare actual expenses against project budgets in real-time.</p>
-          </div>
-          
-          <div className="space-y-6">
-            {projects.length === 0 ? (
-              <p className="text-center text-slate-500">No active projects available for analysis.</p>
-            ) : (
-              projects.map((proj: any) => {
-                const budget = proj.budgetCents / 100;
-                const cost = (proj.costCents || 0) / 100;
-                const percentage = Math.min(Math.round((cost / budget) * 100), 100) || 0;
-                const isOver = cost > budget;
-                
-                return (
-                  <div key={proj.id} className="border border-ink-900/10 rounded-sm p-5 bg-paper-50">
-                    <div className="flex justify-between items-center mb-3">
-                      <div>
-                        <h4 className="font-semibold text-ink-900">{proj.name}</h4>
-                        <p className="text-xs text-slate-500">Client: {proj.clientName || 'Internal'}</p>
-                      </div>
-                      <div className="text-right">
-                        <p className="text-sm font-medium tabular-currency">
-                          <span className={isOver ? 'text-rust-700' : 'text-ink-900'}>{formatCurrencyFromFloat(cost)}</span>
-                          <span className="text-slate-400 mx-1">/</span>
-                          <span className="text-slate-600">{formatCurrencyFromFloat(budget)}</span>
-                        </p>
-                      </div>
-                    </div>
-                    <div className="w-full bg-ink-900/10 rounded-full h-2">
-                      <div 
-                        className={`h-2 rounded-full ${isOver ? 'bg-rust-700' : 'bg-ledger-green-700'}`} 
-                        style={{ width: `${percentage}%` }}
-                      ></div>
-                    </div>
-                    <p className="text-xs text-slate-500 mt-2 text-right">{percentage}% used</p>
-                  </div>
-                );
-              })
-            )}
-          </div>
-        </div>
-      )}
-
-      {activeTab === 'Time tracking' && (
-        <div className="max-w-4xl mx-auto space-y-6">
-          <div className="bg-paper-100 border border-ink-900/10 shadow-sm rounded-sm p-6">
-            <h3 className="text-lg font-medium text-ink-900 mb-1">Log Hours</h3>
-            <p className="text-sm text-slate-500 mb-4">Record billable hours against a project.</p>
-
-            {timesheetError && (
-              <div className="mb-4 p-2.5 bg-rust-700/10 border border-rust-700/20 text-rust-700 text-xs rounded-sm">
-                {timesheetError}
-              </div>
-            )}
-
-            <form
-              onSubmit={(e) => {
-                e.preventDefault();
-                setTimesheetError('');
-                submitTimesheetMutation.mutate();
-              }}
-              className="grid grid-cols-1 md:grid-cols-4 gap-4 items-end"
-            >
-              <div className="md:col-span-2">
-                <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">Project *</label>
-                <select
-                  required
-                  value={timesheetProjectId}
-                  onChange={(e) => setTimesheetProjectId(e.target.value)}
-                  className="w-full bg-paper-100 border border-ink-900/20 text-ink-900 text-sm rounded-sm px-3 py-2 focus:ring-1 focus:ring-focus-blue-500 outline-none"
-                >
-                  <option value="">Select a project...</option>
-                  {projects.map((p: any) => (
-                    <option key={p.id} value={p.id}>{p.name}</option>
-                  ))}
-                </select>
-              </div>
-              <div>
-                <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">Date *</label>
-                <input
-                  required
-                  type="date"
-                  value={timesheetDate}
-                  onChange={(e) => setTimesheetDate(e.target.value)}
-                  className="w-full bg-paper-100 border border-ink-900/20 text-ink-900 text-sm rounded-sm px-3 py-2 focus:ring-1 focus:ring-focus-blue-500 outline-none"
-                />
-              </div>
-              <div>
-                <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">Hours *</label>
-                <input
-                  required
-                  type="number"
-                  min="0.25"
-                  max="24"
-                  step="0.25"
-                  value={timesheetHours}
-                  onChange={(e) => setTimesheetHours(e.target.value)}
-                  placeholder="8"
-                  className="w-full bg-paper-100 border border-ink-900/20 text-ink-900 text-sm rounded-sm px-3 py-2 focus:ring-1 focus:ring-focus-blue-500 outline-none"
-                />
-              </div>
-              <div className="md:col-span-3">
-                <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">Notes</label>
-                <input
-                  type="text"
-                  value={timesheetNotes}
-                  onChange={(e) => setTimesheetNotes(e.target.value)}
-                  placeholder="What did you work on?"
-                  className="w-full bg-paper-100 border border-ink-900/20 text-ink-900 text-sm rounded-sm px-3 py-2 focus:ring-1 focus:ring-focus-blue-500 outline-none"
-                />
-              </div>
-              <button
-                type="submit"
-                disabled={submitTimesheetMutation.isPending}
-                className="bg-sidebar-bg text-sidebar-ink px-6 py-2 text-sm font-medium rounded-sm hover:bg-sidebar-bg/90 transition-colors disabled:opacity-50"
-              >
-                {submitTimesheetMutation.isPending ? 'Submitting...' : 'Submit Timesheet'}
+      {activeTab === 'Projects' &&
+        (projectsQuery.isError ? (
+          <LoadProblem what="projects" path="/api/projects" onRetry={() => projectsQuery.refetch()} />
+        ) : projectsQuery.isLoading ? (
+          <SkeletonRows label="Loading projects" />
+        ) : projects.length === 0 ? (
+          <EmptyNote
+            action={
+              <button type="button" onClick={() => setIsAddingProject(true)} className={buttonClass.quiet}>
+                Open the first project
               </button>
-            </form>
-          </div>
-
-          <div className="bg-paper-100 border border-ink-900/10 shadow-sm rounded-sm overflow-hidden">
-            <table className="w-full text-sm text-left">
-              <thead className="bg-paper-100 border-b border-ink-900/10 text-xs uppercase text-slate-500">
-                <tr>
-                  <th className="px-4 py-3 font-semibold">Date</th>
-                  <th className="px-4 py-3 font-semibold">Project</th>
-                  <th className="px-4 py-3 font-semibold text-right">Hours</th>
-                  <th className="px-4 py-3 font-semibold">Notes</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-ink-900/5">
-                {timeEntriesLoading ? (
-                  <tr><td colSpan={4} className="px-4 py-8 text-center text-slate-500">Loading timesheets...</td></tr>
-                ) : !timeEntriesData?.entries?.length ? (
-                  <tr><td colSpan={4} className="px-4 py-8 text-center text-slate-500">No hours logged yet.</td></tr>
-                ) : (
-                  timeEntriesData.entries.map((entry: any) => (
-                    <tr key={entry.id} className="hover:bg-paper-50">
-                      <td className="px-4 py-3 text-slate-500 whitespace-nowrap">{format(new Date(entry.entryDate), 'MMM d, yyyy')}</td>
-                      <td className="px-4 py-3 font-medium text-ink-900">{entry.projectName}</td>
-                      <td className="px-4 py-3 text-right tabular-currency text-ink-900">{entry.hours}</td>
-                      <td className="px-4 py-3 text-slate-600">{entry.description || '-'}</td>
+            }
+          >
+            No projects yet. Each job is listed with its budget, the cost posted against it and how much of the budget is used.
+          </EmptyNote>
+        ) : (
+          <>
+            <ul className="sm:hidden" aria-label={`Projects, figures in ${baseCurrency}`}>
+              {projects.map((p) => (
+                <li key={p.id} className="border-b border-feint py-3">
+                  <div className="flex items-baseline justify-between gap-3">
+                    <span className="min-w-0 truncate text-[14.5px] text-ink-900">{p.name}</span>
+                    {used(p)}
+                  </div>
+                  <div className="mt-1 flex items-baseline justify-between gap-3 text-[12.5px] text-graphite-600">
+                    <span className="truncate">{customerName(p.customerId) || 'Internal'} · {p.status}</span>
+                    <span className="shrink-0">
+                      <Amount cents={p.costCents || 0} currency={baseCurrency} size="xs" tone="ink" /> of <Amount cents={p.budgetCents || 0} currency={baseCurrency} size="xs" tone="ink" />
+                    </span>
+                  </div>
+                </li>
+              ))}
+            </ul>
+            <div className="hidden sm:block relative overflow-x-auto">
+              <table className="w-full min-w-[46rem] text-[13.5px]">
+                <caption className="sr-only">Projects, figures in {baseCurrency}</caption>
+                <thead>
+                  <tr>
+                    <th scope="col" className="pr-4 text-left">Project</th>
+                    <th scope="col" className="pr-4 text-left">Customer</th>
+                    <th scope="col" className="pr-4 text-left">Status</th>
+                    <th scope="col" className="pr-4 text-right">Budget</th>
+                    <th scope="col" className="pr-4 text-right">Cost to date</th>
+                    <th scope="col" className="text-right">Used</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {projects.map((p) => (
+                    <tr key={p.id}>
+                      <td className="pr-4 text-ink-900">
+                        {p.projectCode && <span className="mr-2 whitespace-nowrap ll-figure font-semibold">{p.projectCode}</span>}
+                        {p.name}
+                      </td>
+                      <td className="pr-4 text-graphite-600">{customerName(p.customerId) || 'Internal'}</td>
+                      <td className="pr-4 text-graphite-600">{p.status}</td>
+                      <td className="pr-4 text-right whitespace-nowrap"><Amount cents={p.budgetCents || 0} currency={baseCurrency} tone="ink" /></td>
+                      <td className="pr-4 text-right whitespace-nowrap"><Amount cents={p.costCents || 0} currency={baseCurrency} tone="ink" /></td>
+                      <td className="text-right whitespace-nowrap">{used(p)}</td>
                     </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      )}
+                  ))}
+                </tbody>
+                <tfoot>
+                  <tr>
+                    <th scope="row" colSpan={3} className="ll-total py-2 pr-4 text-left font-semibold text-ink-900">
+                      All projects
+                    </th>
+                    <td className="ll-total py-2 pr-4 text-right whitespace-nowrap font-semibold"><Amount cents={totalBudget} currency={baseCurrency} tone="ink" /></td>
+                    <td className="ll-total py-2 pr-4 text-right whitespace-nowrap font-semibold"><Amount cents={totalCost} currency={baseCurrency} tone="ink" /></td>
+                    <td className="ll-total py-2" />
+                  </tr>
+                </tfoot>
+              </table>
+            </div>
+          </>
+        ))}
 
-      {/* Add Project Modal */}
-      {isAddingProject && (
-        <div className="fixed inset-0 bg-ink-900/20 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-paper-100 rounded-sm shadow-xl border border-ink-900/10 w-full max-w-md p-6">
-            <h3 className="text-xl font-serif text-ink-900 mb-4">Create Project</h3>
-            <form onSubmit={(e) => {
+      {activeTab === 'Hours' && (
+        <div className="space-y-6">
+          <form
+            onSubmit={(e) => {
               e.preventDefault();
-              const fd = new FormData(e.currentTarget);
-              addProjectMutation.mutate({
-                name: fd.get('name'),
-                clientName: fd.get('clientName'),
-                budgetCents: Math.round(parseFloat(fd.get('budget') as string) * 100),
-              });
-            }} className="space-y-4">
-              <div>
-                <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">Project Name *</label>
-                <input required name="name" type="text" className="w-full bg-paper-100 border border-ink-900/20 text-ink-900 text-sm rounded-sm px-3 py-2 focus:ring-1 focus:ring-focus-blue-500 outline-none" />
-              </div>
-              <div>
-                <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">Client Name</label>
-                <input name="clientName" type="text" className="w-full bg-paper-100 border border-ink-900/20 text-ink-900 text-sm rounded-sm px-3 py-2 focus:ring-1 focus:ring-focus-blue-500 outline-none" />
-              </div>
-              <div>
-                <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">Project Budget *</label>
-                <input required name="budget" type="number" step="0.01" min="0" placeholder="0.00" className="w-full bg-paper-100 border border-ink-900/20 text-ink-900 text-sm rounded-sm px-3 py-2 focus:ring-1 focus:ring-focus-blue-500 outline-none tabular-currency" />
-              </div>
+              setTimesheetError('');
+              submitTimesheetMutation.mutate();
+            }}
+            className="ll-margin grid grid-cols-1 gap-4 p-4 sm:grid-cols-2 lg:grid-cols-[2fr_1fr_1fr]"
+            aria-label="Log hours"
+          >
+            <Field label="Project">
+              <select required value={timesheetProjectId} onChange={(e) => setTimesheetProjectId(e.target.value)}>
+                <option value="">Choose a project</option>
+                {projects.map((p) => (
+                  <option key={p.id} value={p.id}>{p.name}</option>
+                ))}
+              </select>
+            </Field>
+            <Field label="Date">
+              <input required type="date" value={timesheetDate} onChange={(e) => setTimesheetDate(e.target.value)} />
+            </Field>
+            <Field label="Hours" hint="In quarter hours">
+              <input required type="number" inputMode="decimal" min="0.25" max="24" step="0.25" value={timesheetHours} onChange={(e) => setTimesheetHours(e.target.value)} className="tabular-currency" />
+            </Field>
+            <div className="sm:col-span-2 lg:col-span-2">
+              <Field label="What was done" error={timesheetError || undefined}>
+                <input type="text" value={timesheetNotes} onChange={(e) => setTimesheetNotes(e.target.value)} />
+              </Field>
+            </div>
+            <div className="flex items-end">
+              <button type="submit" disabled={submitTimesheetMutation.isPending} className={`${buttonClass.secondary} h-10 w-full`}>
+                {submitTimesheetMutation.isPending ? 'Saving' : 'Log these hours'}
+              </button>
+            </div>
+          </form>
 
-              <div className="flex justify-end space-x-3 pt-6 border-t border-ink-900/10 mt-6">
-                <button type="button" onClick={() => setIsAddingProject(false)} className="px-4 py-2 text-sm font-medium text-slate-500 hover:text-ink-900">Cancel</button>
-                <button type="submit" disabled={addProjectMutation.isPending} className="bg-sidebar-bg text-sidebar-ink  px-4 py-2 text-sm font-medium rounded-sm hover:bg-sidebar-bg/90 transition-colors disabled:opacity-50">
-                  {addProjectMutation.isPending ? 'Saving...' : 'Save Project'}
-                </button>
-              </div>
-            </form>
-          </div>
+          {timeQuery.isError ? (
+            <LoadProblem what="hours logged" path="/api/time-entries" onRetry={() => timeQuery.refetch()} />
+          ) : timeQuery.isLoading ? (
+            <SkeletonRows label="Loading hours logged" />
+          ) : entries.length === 0 ? (
+            <EmptyNote>No hours logged yet. Each entry is listed here by date, with the project and what was done.</EmptyNote>
+          ) : (
+            <div className="relative overflow-x-auto">
+              <table className="w-full min-w-[30rem] text-[13.5px]">
+                <caption className="sr-only">Hours logged, latest 100</caption>
+                <thead>
+                  <tr>
+                    <th scope="col" className="pr-4 text-left">Date</th>
+                    <th scope="col" className="pr-4 text-left">Project</th>
+                    <th scope="col" className="pr-4 text-left">What was done</th>
+                    <th scope="col" className="text-right">Hours</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {entries.map((entry) => (
+                    <tr key={entry.id}>
+                      <td className="pr-4 whitespace-nowrap text-graphite-600">{format(new Date(entry.entryDate), 'dd/MM/yyyy')}</td>
+                      <td className="pr-4 text-ink-900">{entry.projectName}</td>
+                      <td className="pr-4 text-graphite-600">{entry.description || '–'}</td>
+                      <td className="text-right ll-figure text-ink-900">{entry.hours.toFixed(2)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+                <tfoot>
+                  <tr>
+                    <th scope="row" colSpan={3} className="ll-total py-2 pr-4 text-left font-semibold text-ink-900">Hours shown</th>
+                    <td className="ll-total py-2 text-right ll-figure font-semibold text-ink-900">{totalHours.toFixed(2)}</td>
+                  </tr>
+                </tfoot>
+              </table>
+            </div>
+          )}
         </div>
       )}
+
+      <Dialog
+        open={isAddingProject}
+        onClose={closeProjectDialog}
+        title="Open a project"
+        note="Costs posted against it are tracked against the budget."
+        footer={
+          <>
+            <button type="button" onClick={closeProjectDialog} className={buttonClass.secondary}>
+              Cancel
+            </button>
+            <button type="submit" form="project-form" disabled={addProjectMutation.isPending} className={buttonClass.primary}>
+              {addProjectMutation.isPending ? 'Saving' : 'Open project'}
+            </button>
+          </>
+        }
+      >
+        <form
+          id="project-form"
+          onSubmit={(e) => {
+            e.preventDefault();
+            const fd = new FormData(e.currentTarget);
+            addProjectMutation.mutate({
+              name: fd.get('name'),
+              customerId: fd.get('customerId') || undefined,
+              budgetCents: Math.round(parseFloat((fd.get('budget') as string) || '0') * 100),
+            });
+          }}
+          className="space-y-4"
+        >
+          <Field label="Project name">
+            <input required name="name" type="text" />
+          </Field>
+          <Field label="Customer" hint="Leave as internal for work not billed to a customer">
+            <select name="customerId" defaultValue="">
+              <option value="">Internal</option>
+              {customers.map((c) => (
+                <option key={c.id} value={c.id}>{c.displayName}</option>
+              ))}
+            </select>
+          </Field>
+          <Field label={`Budget (${baseCurrency})`} error={projectError || undefined}>
+            <input required name="budget" type="number" inputMode="decimal" step="0.01" min="0" className="tabular-currency" />
+          </Field>
+        </form>
+      </Dialog>
     </div>
   );
 }

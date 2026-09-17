@@ -1,9 +1,9 @@
-import React from 'react';
-import { formatCurrency } from '../../utils/currency';
-import { useState } from 'react';
+import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAppStore } from '../../store';
-import { Plus, Edit2, Trash2, PieChart, X } from 'lucide-react';
+import { Amount } from '../ledger/Amount';
+import { Dialog, Field } from '../ledger/Dialog';
+import { SkeletonRows, EmptyNote, LoadProblem, buttonClass } from '../ledger/Page';
 
 interface Budget {
   id: string;
@@ -15,59 +15,60 @@ interface Budget {
   spentCents: number;
 }
 
+const PERIOD_NAME: Record<Budget['period'], string> = { MONTHLY: 'Monthly', QUARTERLY: 'Quarterly', YEARLY: 'Yearly' };
+
 export function BudgetPlanner() {
-  const { currentOrgId } = useAppStore();
+  const { currentOrgId, activeCompany } = useAppStore();
+  const baseCurrency = activeCompany?.baseCurrency || 'KES';
   const queryClient = useQueryClient();
   const [isAdding, setIsAdding] = useState(false);
   const [editingBudget, setEditingBudget] = useState<Budget | null>(null);
   const [editLimit, setEditLimit] = useState('');
   const [newBudget, setNewBudget] = useState({ categoryId: '', amount: '', period: 'MONTHLY' as Budget['period'] });
   const [formError, setFormError] = useState('');
+  const [rowError, setRowError] = useState('');
 
-  const { data: budgetsData, isLoading: budgetsLoading } = useQuery({
+  const budgetsQuery = useQuery({
     queryKey: ['budgets', currentOrgId],
     queryFn: async () => {
       const res = await fetch('/api/budgets', { headers: { 'x-org-id': currentOrgId } });
       if (!res.ok) throw new Error('Failed to fetch budgets');
       return res.json();
-    }
+    },
   });
 
   const { data: accountsData } = useQuery({
     queryKey: ['accounts', currentOrgId],
     queryFn: async () => {
       const res = await fetch('/api/accounts', { headers: { 'x-org-id': currentOrgId } });
+      if (!res.ok) throw new Error('Failed to fetch accounts');
       return res.json();
-    }
+    },
   });
 
-  const budgets: Budget[] = budgetsData?.budgets || [];
+  const budgets: Budget[] = budgetsQuery.data?.budgets || [];
   const expenses = accountsData?.accounts?.filter((a: any) => a.type === 'EXPENSE') || [];
+  const totalLimit = budgets.reduce((s, b) => s + b.limitCents, 0);
+  const totalSpent = budgets.reduce((s, b) => s + b.spentCents, 0);
 
   const createMutation = useMutation({
     mutationFn: async () => {
       const res = await fetch('/api/budgets', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'x-org-id': currentOrgId },
-        body: JSON.stringify({
-          accountId: newBudget.categoryId,
-          period: newBudget.period,
-          limitCents: Math.round(parseFloat(newBudget.amount || '0') * 100)
-        })
+        body: JSON.stringify({ accountId: newBudget.categoryId, period: newBudget.period, limitCents: Math.round(parseFloat(newBudget.amount || '0') * 100) }),
       });
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
-        throw new Error(data.error || 'Failed to create budget');
+        throw new Error(data.error || 'The budget could not be saved.');
       }
       return res.json();
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['budgets', currentOrgId] });
-      setIsAdding(false);
-      setNewBudget({ categoryId: '', amount: '', period: 'MONTHLY' });
-      setFormError('');
+      closeAdd();
     },
-    onError: (err: any) => setFormError(err.message)
+    onError: (err: any) => setFormError(err.message),
   });
 
   const updateMutation = useMutation({
@@ -75,28 +76,40 @@ export function BudgetPlanner() {
       const res = await fetch(`/api/budgets/${id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json', 'x-org-id': currentOrgId },
-        body: JSON.stringify({ limitCents })
+        body: JSON.stringify({ limitCents }),
       });
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
-        throw new Error(data.error || 'Failed to update budget');
+        throw new Error(data.error || 'The limit could not be changed.');
       }
       return res.json();
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['budgets', currentOrgId] });
       setEditingBudget(null);
-    }
+      setFormError('');
+    },
+    onError: (err: any) => setFormError(err.message),
   });
 
   const deleteMutation = useMutation({
     mutationFn: async (id: string) => {
       const res = await fetch(`/api/budgets/${id}`, { method: 'DELETE', headers: { 'x-org-id': currentOrgId } });
-      if (!res.ok) throw new Error('Failed to delete budget');
+      if (!res.ok) throw new Error('The budget could not be removed.');
       return res.json();
     },
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['budgets', currentOrgId] })
+    onSuccess: () => {
+      setRowError('');
+      queryClient.invalidateQueries({ queryKey: ['budgets', currentOrgId] });
+    },
+    onError: (err: any) => setRowError(err.message),
   });
+
+  function closeAdd() {
+    setIsAdding(false);
+    setNewBudget({ categoryId: '', amount: '', period: 'MONTHLY' });
+    setFormError('');
+  }
 
   const handleAddBudget = (e: React.FormEvent) => {
     e.preventDefault();
@@ -104,213 +117,188 @@ export function BudgetPlanner() {
     createMutation.mutate();
   };
 
+  const rowActions = (b: Budget) => (
+    <span className="inline-flex gap-3">
+      <button
+        type="button"
+        onClick={() => {
+          setFormError('');
+          setEditingBudget(b);
+          setEditLimit((b.limitCents / 100).toString());
+        }}
+        className={buttonClass.quiet}
+      >
+        Change limit
+      </button>
+      <button
+        type="button"
+        onClick={() => {
+          if (window.confirm(`Remove the budget for ${b.categoryName}? Postings to the account are not affected.`)) deleteMutation.mutate(b.id);
+        }}
+        className={`${buttonClass.quiet} text-ledger-red`}
+      >
+        Remove
+      </button>
+    </span>
+  );
+
   return (
-    <div className="space-y-6">
-      <div className="flex justify-between items-center bg-paper-100 border border-ink-900/10 shadow-sm rounded-sm p-4">
-        <div className="flex items-center space-x-3">
-          <div className="bg-focus-blue-500/10 p-2 rounded-full">
-            <PieChart className="h-6 w-6 text-focus-blue-500" />
-          </div>
-          <div>
-            <h3 className="text-lg font-medium text-ink-900">Monthly Budget Planner</h3>
-            <p className="text-sm text-slate-500">Track and manage your spending limits by category.</p>
-          </div>
-        </div>
-        <button
-          onClick={() => setIsAdding(true)}
-          className="bg-sidebar-bg text-sidebar-ink px-4 py-2 text-sm font-medium rounded-sm hover:bg-sidebar-bg/90 transition-colors flex items-center"
-        >
-          <Plus className="h-4 w-4 mr-2" /> New Budget
+    <div className="space-y-4">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+        <p className="max-w-2xl text-[13.5px] text-graphite-600">
+          A spending limit for each expense account. Spent is the account’s balance from all postings to date, not only the current period.
+        </p>
+        <button type="button" onClick={() => setIsAdding(true)} className={`${buttonClass.secondary} shrink-0`}>
+          Set a budget
         </button>
       </div>
 
-      {budgetsLoading ? (
-        <div className="p-16 text-center text-slate-500 bg-paper-100 border border-ink-900/10 rounded-sm">Loading budgets...</div>
+      {rowError && (
+        <p role="alert" className="text-[13.5px] text-ledger-red">
+          {rowError}
+        </p>
+      )}
+
+      {budgetsQuery.isError ? (
+        <LoadProblem what="budgets" path="/api/budgets" onRetry={() => budgetsQuery.refetch()} />
+      ) : budgetsQuery.isLoading ? (
+        <SkeletonRows label="Loading budgets" rows={4} />
       ) : budgets.length === 0 ? (
-        <div className="p-16 text-center text-slate-500 bg-paper-100 border border-ink-900/10 rounded-sm">
-          No budgets set yet. Create one to start tracking spending against a limit.
-        </div>
+        <EmptyNote>No budgets yet. Each expense account with a limit is listed here with what has been spent and what remains.</EmptyNote>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {budgets.map(budget => {
-            const percent = budget.limitCents > 0 ? Math.min((budget.spentCents / budget.limitCents) * 100, 100) : 0;
-            const isOver = budget.spentCents > budget.limitCents;
-
-            return (
-              <div key={budget.id} className="bg-paper-100 border border-ink-900/10 shadow-sm rounded-sm p-5 flex flex-col relative overflow-hidden">
-                <div className="flex justify-between items-start mb-4">
-                  <h4 className="font-medium text-ink-900">{budget.categoryName}</h4>
-                  <div className="flex space-x-2">
-                    <button
-                      onClick={() => {
-                        setEditingBudget(budget);
-                        setEditLimit((budget.limitCents / 100).toString());
-                      }}
-                      className="text-slate-400 hover:text-ink-900"
-                      title="Edit limit"
-                    >
-                      <Edit2 className="h-4 w-4" />
-                    </button>
-                    <button
-                      onClick={() => {
-                        if (confirm(`Delete the budget for ${budget.categoryName}?`)) {
-                          deleteMutation.mutate(budget.id);
-                        }
-                      }}
-                      className="text-slate-400 hover:text-rust-700"
-                      title="Delete budget"
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </button>
+        <>
+          <ul className="sm:hidden" aria-label={`Budgets, figures in ${baseCurrency}`}>
+            {budgets.map((b) => {
+              const remaining = b.limitCents - b.spentCents;
+              return (
+                <li key={b.id} className="border-b border-feint py-3">
+                  <div className="flex items-baseline justify-between gap-3">
+                    <span className="min-w-0 truncate text-[14.5px] text-ink-900">{b.categoryName}</span>
+                    <Amount cents={remaining} currency={baseCurrency} size="sm" tone="result" />
                   </div>
-                </div>
-
-                <div className="mt-auto">
-                  <div className="flex justify-between text-sm mb-2">
-                    <span className="text-slate-600">Spent: <span className="font-medium text-ink-900">{formatCurrency(budget.spentCents)}</span></span>
-                    <span className="text-slate-600">Limit: <span className="font-medium text-ink-900">{formatCurrency(budget.limitCents)}</span></span>
+                  <div className="mt-1 flex items-baseline justify-between gap-3 text-[12.5px] text-graphite-600">
+                    <span>
+                      {PERIOD_NAME[b.period]} limit <Amount cents={b.limitCents} currency={baseCurrency} size="xs" tone="ink" />
+                    </span>
+                    <span>{remaining < 0 ? 'over' : 'remaining'}</span>
                   </div>
-
-                  <div className="h-2 w-full bg-paper-100 rounded-full overflow-hidden">
-                    <div
-                      className={`h-full ${isOver ? 'bg-rust-700' : percent > 80 ? 'bg-brass-500' : 'bg-focus-blue-500'}`}
-                      style={{ width: `${percent}%` }}
-                    ></div>
-                  </div>
-
-                  <div className="mt-2 text-xs text-right">
-                    {isOver ? (
-                      <span className="text-rust-700 font-medium">{formatCurrency(budget.spentCents - budget.limitCents)} over budget</span>
-                    ) : (
-                      <span className="text-slate-500">{formatCurrency(budget.limitCents - budget.spentCents)} remaining</span>
-                    )}
-                  </div>
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      )}
-
-      {isAdding && (
-        <div className="fixed inset-0 bg-ink-900/20 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-paper-100 rounded-sm shadow-xl border border-ink-900/10 w-full max-w-md p-6">
-            <h3 className="text-xl font-serif text-ink-900 mb-4">Create New Budget</h3>
-
-            {formError && (
-              <div className="mb-4 p-2.5 bg-rust-700/10 border border-rust-700/20 text-rust-700 text-xs rounded-sm">
-                {formError}
-              </div>
-            )}
-
-            <form onSubmit={handleAddBudget} className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-ink-900 mb-1">Expense Category</label>
-                <select
-                  required
-                  value={newBudget.categoryId}
-                  onChange={(e) => setNewBudget({ ...newBudget, categoryId: e.target.value })}
-                  className="w-full border border-ink-900/20 rounded-sm px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-ink-900 bg-paper-100"
-                >
-                  <option value="">Select an expense account...</option>
-                  {expenses.map((acc: any) => (
-                    <option key={acc.id} value={acc.id}>{acc.code} - {acc.name}</option>
-                  ))}
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-ink-900 mb-1">Period</label>
-                <select
-                  value={newBudget.period}
-                  onChange={(e) => setNewBudget({ ...newBudget, period: e.target.value as Budget['period'] })}
-                  className="w-full border border-ink-900/20 rounded-sm px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-ink-900 bg-paper-100"
-                >
-                  <option value="MONTHLY">Monthly</option>
-                  <option value="QUARTERLY">Quarterly</option>
-                  <option value="YEARLY">Yearly</option>
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-ink-900 mb-1">Spending Limit (KES)</label>
-                <input
-                  type="number"
-                  required
-                  min="0"
-                  step="0.01"
-                  value={newBudget.amount}
-                  onChange={(e) => setNewBudget({ ...newBudget, amount: e.target.value })}
-                  className="w-full border border-ink-900/20 rounded-sm px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-ink-900 bg-paper-100"
-                />
-              </div>
-
-              <div className="flex justify-end space-x-3 pt-4 border-t border-ink-900/10">
-                <button
-                  type="button"
-                  onClick={() => { setIsAdding(false); setFormError(''); }}
-                  className="px-4 py-2 text-sm font-medium text-slate-600 hover:text-ink-900 transition-colors"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={createMutation.isPending}
-                  className="bg-sidebar-bg text-sidebar-ink px-4 py-2 text-sm font-medium rounded-sm hover:bg-sidebar-bg/90 transition-colors disabled:opacity-50"
-                >
-                  {createMutation.isPending ? 'Saving...' : 'Save Budget'}
-                </button>
-              </div>
-            </form>
+                  <div className="mt-2">{rowActions(b)}</div>
+                </li>
+              );
+            })}
+          </ul>
+          <div className="hidden sm:block relative overflow-x-auto">
+            <table className="w-full text-[13.5px]">
+              <caption className="sr-only">Budgets, figures in {baseCurrency}</caption>
+              <thead>
+                <tr>
+                  <th scope="col" className="w-16 pr-4 text-left">Code</th>
+                  <th scope="col" className="pr-4 text-left">Account</th>
+                  <th scope="col" className="pr-4 text-left">Period</th>
+                  <th scope="col" className="pr-4 text-right">Limit</th>
+                  <th scope="col" className="pr-4 text-right">Spent</th>
+                  <th scope="col" className="pr-4 text-right">Remaining</th>
+                  <th scope="col" className="text-right"><span className="sr-only">Actions</span></th>
+                </tr>
+              </thead>
+              <tbody>
+                {budgets.map((b) => {
+                  const remaining = b.limitCents - b.spentCents;
+                  return (
+                    <tr key={b.id}>
+                      <td className="w-16 pr-4 ll-figure font-semibold text-ink-900">{b.accountCode || '–'}</td>
+                      <td className="pr-4 text-ink-900">
+                        {b.categoryName}
+                      </td>
+                      <td className="pr-4 text-graphite-600">{PERIOD_NAME[b.period]}</td>
+                      <td className="pr-4 text-right whitespace-nowrap"><Amount cents={b.limitCents} currency={baseCurrency} tone="ink" /></td>
+                      <td className="pr-4 text-right whitespace-nowrap"><Amount cents={b.spentCents} currency={baseCurrency} tone="ink" /></td>
+                      <td className="pr-4 text-right whitespace-nowrap"><Amount cents={remaining} currency={baseCurrency} tone="result" /></td>
+                      <td className="text-right whitespace-nowrap">{rowActions(b)}</td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+              <tfoot>
+                <tr>
+                  <th scope="row" colSpan={3} className="ll-total py-2 pr-4 text-left font-semibold text-ink-900">All budgets</th>
+                  <td className="ll-total py-2 pr-4 text-right whitespace-nowrap font-semibold"><Amount cents={totalLimit} currency={baseCurrency} tone="ink" /></td>
+                  <td className="ll-total py-2 pr-4 text-right whitespace-nowrap font-semibold"><Amount cents={totalSpent} currency={baseCurrency} tone="ink" /></td>
+                  <td className="ll-total py-2 pr-4 text-right whitespace-nowrap font-semibold"><Amount cents={totalLimit - totalSpent} currency={baseCurrency} tone="result" /></td>
+                  <td className="ll-total py-2" />
+                </tr>
+              </tfoot>
+            </table>
           </div>
-        </div>
+        </>
       )}
 
-      {editingBudget && (
-        <div className="fixed inset-0 bg-ink-900/20 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-paper-100 rounded-sm shadow-xl border border-ink-900/10 w-full max-w-sm p-6">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-xl font-serif text-ink-900">Edit Budget Limit</h3>
-              <button onClick={() => setEditingBudget(null)} className="text-slate-400 hover:text-ink-900">
-                <X className="h-5 w-5" />
-              </button>
-            </div>
-            <form
-              onSubmit={(e) => {
-                e.preventDefault();
-                updateMutation.mutate({ id: editingBudget.id, limitCents: Math.round(parseFloat(editLimit || '0') * 100) });
-              }}
-              className="space-y-4"
-            >
-              <div>
-                <label className="block text-sm font-medium text-ink-900 mb-1">{editingBudget.categoryName} — New Limit (KES)</label>
-                <input
-                  type="number"
-                  required
-                  min="0"
-                  step="0.01"
-                  value={editLimit}
-                  onChange={(e) => setEditLimit(e.target.value)}
-                  className="w-full border border-ink-900/20 rounded-sm px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-ink-900 bg-paper-100"
-                  autoFocus
-                />
-              </div>
-              <div className="flex justify-end space-x-3 pt-2">
-                <button type="button" onClick={() => setEditingBudget(null)} className="px-4 py-2 text-sm font-medium text-slate-600 hover:text-ink-900">
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={updateMutation.isPending}
-                  className="bg-sidebar-bg text-sidebar-ink px-4 py-2 text-sm font-medium rounded-sm hover:bg-sidebar-bg/90 transition-colors disabled:opacity-50"
-                >
-                  {updateMutation.isPending ? 'Saving...' : 'Save'}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
+      <Dialog
+        open={isAdding}
+        onClose={closeAdd}
+        title="Set a budget"
+        footer={
+          <>
+            <button type="button" onClick={closeAdd} className={buttonClass.secondary}>
+              Cancel
+            </button>
+            <button type="submit" form="budget-form" disabled={createMutation.isPending} className={buttonClass.primary}>
+              {createMutation.isPending ? 'Saving' : 'Save budget'}
+            </button>
+          </>
+        }
+      >
+        <form id="budget-form" onSubmit={handleAddBudget} className="space-y-4">
+          <Field label="Expense account">
+            <select required value={newBudget.categoryId} onChange={(e) => setNewBudget({ ...newBudget, categoryId: e.target.value })}>
+              <option value="">Choose an account</option>
+              {expenses.map((acc: any) => (
+                <option key={acc.id} value={acc.id}>{acc.code} · {acc.name}</option>
+              ))}
+            </select>
+          </Field>
+          <Field label="Period">
+            <select value={newBudget.period} onChange={(e) => setNewBudget({ ...newBudget, period: e.target.value as Budget['period'] })}>
+              <option value="MONTHLY">Monthly</option>
+              <option value="QUARTERLY">Quarterly</option>
+              <option value="YEARLY">Yearly</option>
+            </select>
+          </Field>
+          <Field label={`Limit (${baseCurrency})`} error={formError || undefined}>
+            <input type="number" required min="0" step="0.01" inputMode="decimal" value={newBudget.amount} onChange={(e) => setNewBudget({ ...newBudget, amount: e.target.value })} className="tabular-currency" />
+          </Field>
+        </form>
+      </Dialog>
+
+      <Dialog
+        open={!!editingBudget}
+        onClose={() => setEditingBudget(null)}
+        title="Change the limit"
+        note={editingBudget ? `${editingBudget.categoryName}, ${PERIOD_NAME[editingBudget.period].toLowerCase()}` : undefined}
+        width="sm"
+        footer={
+          <>
+            <button type="button" onClick={() => setEditingBudget(null)} className={buttonClass.secondary}>
+              Cancel
+            </button>
+            <button type="submit" form="budget-limit-form" disabled={updateMutation.isPending} className={buttonClass.primary}>
+              {updateMutation.isPending ? 'Saving' : 'Save limit'}
+            </button>
+          </>
+        }
+      >
+        <form
+          id="budget-limit-form"
+          onSubmit={(e) => {
+            e.preventDefault();
+            if (editingBudget) updateMutation.mutate({ id: editingBudget.id, limitCents: Math.round(parseFloat(editLimit || '0') * 100) });
+          }}
+        >
+          <Field label={`New limit (${baseCurrency})`} error={formError || undefined}>
+            <input type="number" required min="0" step="0.01" inputMode="decimal" value={editLimit} onChange={(e) => setEditLimit(e.target.value)} className="tabular-currency" />
+          </Field>
+        </form>
+      </Dialog>
     </div>
   );
 }

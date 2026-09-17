@@ -1,45 +1,63 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
-import { 
-  Search, 
-  FileText, 
-  Users, 
-  Building2, 
-  Package, 
-  CreditCard, 
-  Receipt, 
-  PieChart, 
-  Sliders, 
-  ArrowRight, 
-  Sparkles, 
-  Plus, 
-  FolderGit2, 
-  ShieldCheck, 
-  Activity,
-  DollarSign
-} from 'lucide-react';
-import { useAppStore } from '../../store';
+import { Search } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
-import { formatCurrency } from '../../utils/currency';
+import { useAppStore } from '../../store';
+import { Amount } from '../ledger/Amount';
+
+type Section = 'Pages' | 'Reports' | 'Invoices' | 'Bills' | 'Customers' | 'Vendors' | 'Stock' | 'Accounts';
 
 interface SearchItem {
   id: string;
   title: string;
   subtitle?: string;
-  category: 'Views & Tools' | 'Invoices & Sales' | 'Customers' | 'Vendors & Bills' | 'Inventory Items' | 'Accounts' | 'Reports' | 'Actions';
-  icon: React.ElementType;
+  category: Section;
+  /** A figure printed at the right of the row, in the base currency. */
+  cents?: number;
   shortcut?: string;
-  badge?: string;
   action: () => void;
 }
+
+/** Pages under the names the sidebar gives them, with the same number keys App.tsx listens for. */
+const PAGES: { view: string; title: string; subtitle: string; shortcut?: string }[] = [
+  { view: 'Home / Dashboard', title: 'Home', subtitle: 'Cash, what is owed and what is due', shortcut: '1' },
+  { view: 'Banking', title: 'Banking', subtitle: 'Statement lines, matches and rules', shortcut: '4' },
+  { view: 'Sales', title: 'Sales', subtitle: 'Invoices and what customers owe', shortcut: '2' },
+  { view: 'Customer Hub', title: 'Customers', subtitle: 'Customer records and balances' },
+  { view: 'Expenses & Bills', title: 'Bills and expenses', subtitle: 'Supplier bills, receipts and payments', shortcut: '3' },
+  { view: 'Accounting', title: 'Accounting', subtitle: 'Chart of accounts, journal entries and budgets', shortcut: '5' },
+  { view: 'Reports', title: 'Reports', subtitle: 'Statements, ledgers and tax summaries', shortcut: '6' },
+  { view: 'Tax', title: 'Tax', subtitle: 'VAT position, eTIMS and the filing calendar' },
+  { view: 'Payroll', title: 'Payroll', subtitle: 'Employees, pay runs and statutory returns' },
+  { view: 'Inventory', title: 'Inventory', subtitle: 'Stock items and reorder points' },
+  { view: 'Projects', title: 'Projects', subtitle: 'Budget against cost, and hours logged' },
+  { view: 'Business Feed', title: 'Business feed', subtitle: 'Questions about the books' },
+  { view: 'Team', title: 'Team', subtitle: 'Who can open these books' },
+  { view: 'Apps / Integrations', title: 'Integrations', subtitle: 'Connections that are and are not built' },
+  { view: 'Audit Logs', title: 'Audit log', subtitle: 'Every change to accounts, entries and the team' },
+  { view: 'Settings', title: 'Settings', subtitle: 'Companies, currencies and security' },
+  { view: 'System Health', title: 'System health', subtitle: 'Response and render times in this browser' },
+];
+
+const REPORTS: { title: string; subtitle: string }[] = [
+  { title: 'Profit and loss', subtitle: 'Sales less cost of sales and expenses' },
+  { title: 'Balance sheet', subtitle: 'Assets, liabilities and equity' },
+  { title: 'Cash flow statement', subtitle: 'Operating, investing and financing' },
+  { title: 'General ledger', subtitle: 'Every line posted to one account' },
+  { title: 'Trial balance', subtitle: 'Every account, debits against credits' },
+  { title: 'VAT and eTIMS summary', subtitle: 'Output and input VAT for the period' },
+  { title: 'Receivables by age', subtitle: 'What customers owe, by how late' },
+  { title: 'Payables by age', subtitle: 'What the business owes, by how late' },
+];
 
 export function CommandPalette() {
   const [query, setQuery] = useState('');
   const [selectedIndex, setSelectedIndex] = useState(0);
-  const { setActiveView, isCommandPaletteOpen, setCommandPaletteOpen, currentOrgId } = useAppStore();
+  const { setActiveView, isCommandPaletteOpen, setCommandPaletteOpen, currentOrgId, activeCompany } = useAppStore();
+  const baseCurrency = activeCompany?.baseCurrency || 'KES';
   const inputRef = useRef<HTMLInputElement>(null);
   const listRef = useRef<HTMLUListElement>(null);
 
-  // Global Keyboard Listener (Cmd+K / Ctrl+K)
+  // Global keyboard listener (Ctrl+K / Cmd+K)
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
@@ -51,412 +69,169 @@ export function CommandPalette() {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [isCommandPaletteOpen, setCommandPaletteOpen]);
 
-  // Focus input when opened
   useEffect(() => {
     if (isCommandPaletteOpen) {
       setQuery('');
       setSelectedIndex(0);
-      setTimeout(() => inputRef.current?.focus(), 50);
+      setTimeout(() => inputRef.current?.focus(), 0);
     }
   }, [isCommandPaletteOpen]);
 
-  // Fetch dynamic entities for live search
-  const { data: invoicesData } = useQuery({
-    queryKey: ['invoices', currentOrgId],
+  const listQuery = (key: string, path: string, field: string) => ({
+    queryKey: [key, currentOrgId],
     queryFn: async () => {
-      const res = await fetch('/api/invoices', { headers: { 'x-org-id': currentOrgId } });
-      if (!res.ok) return { invoices: [] };
+      const res = await fetch(path, { headers: { 'x-org-id': currentOrgId } });
+      if (!res.ok) return { [field]: [] };
       return res.json();
     },
     enabled: isCommandPaletteOpen && Boolean(currentOrgId),
   });
 
-  const { data: customersData } = useQuery({
-    queryKey: ['customers', currentOrgId],
-    queryFn: async () => {
-      const res = await fetch('/api/customers', { headers: { 'x-org-id': currentOrgId } });
-      if (!res.ok) return { customers: [] };
-      return res.json();
-    },
-    enabled: isCommandPaletteOpen && Boolean(currentOrgId),
-  });
+  const { data: invoicesData } = useQuery(listQuery('invoices', '/api/invoices', 'invoices'));
+  const { data: customersData } = useQuery(listQuery('customers', '/api/customers', 'customers'));
+  const { data: vendorsData } = useQuery(listQuery('vendors', '/api/vendors', 'vendors'));
+  const { data: itemsData } = useQuery(listQuery('inventory', '/api/inventory', 'items'));
+  const { data: billsData } = useQuery(listQuery('bills', '/api/bills', 'bills'));
+  const { data: accountsData } = useQuery(listQuery('accounts', '/api/accounts', 'accounts'));
 
-  const { data: vendorsData } = useQuery({
-    queryKey: ['vendors', currentOrgId],
-    queryFn: async () => {
-      const res = await fetch('/api/vendors', { headers: { 'x-org-id': currentOrgId } });
-      if (!res.ok) return { vendors: [] };
-      return res.json();
-    },
-    enabled: isCommandPaletteOpen && Boolean(currentOrgId),
-  });
-
-  const { data: itemsData } = useQuery({
-    queryKey: ['items', currentOrgId],
-    queryFn: async () => {
-      const res = await fetch('/api/inventory', { headers: { 'x-org-id': currentOrgId } });
-      if (!res.ok) return { items: [] };
-      return res.json();
-    },
-    enabled: isCommandPaletteOpen && Boolean(currentOrgId),
-  });
-
-  const { data: billsData } = useQuery({
-    queryKey: ['bills', currentOrgId],
-    queryFn: async () => {
-      const res = await fetch('/api/bills', { headers: { 'x-org-id': currentOrgId } });
-      if (!res.ok) return { bills: [] };
-      return res.json();
-    },
-    enabled: isCommandPaletteOpen && Boolean(currentOrgId),
-  });
-
-  const { data: accountsData } = useQuery({
-    queryKey: ['accounts', currentOrgId],
-    queryFn: async () => {
-      const res = await fetch('/api/accounts', { headers: { 'x-org-id': currentOrgId } });
-      if (!res.ok) return { accounts: [] };
-      return res.json();
-    },
-    enabled: isCommandPaletteOpen && Boolean(currentOrgId),
-  });
-
-  // Build searchable items list
   const allItems: SearchItem[] = useMemo(() => {
-    const items: SearchItem[] = [
-      // Views & Modules
-      {
-        id: 'view-dashboard',
-        title: 'Home / Dashboard',
-        subtitle: 'Executive KPIs, Cash Flow & Financial Health',
-        category: 'Views & Tools',
-        icon: Sliders,
-        shortcut: '1',
-        action: () => { setActiveView('Home / Dashboard'); setCommandPaletteOpen(false); }
-      },
-      {
-        id: 'view-sales',
-        title: 'Sales & Invoicing',
-        subtitle: 'Customer Invoices, Recurring Billing & Quotes',
-        category: 'Views & Tools',
-        icon: FileText,
-        shortcut: '2',
-        action: () => { setActiveView('Sales'); setCommandPaletteOpen(false); }
-      },
-      {
-        id: 'view-expenses',
-        title: 'Expenses & Bills',
-        subtitle: 'Vendor Invoices, Receipts & Operational Costs',
-        category: 'Views & Tools',
-        icon: Receipt,
-        shortcut: '3',
-        action: () => { setActiveView('Expenses & Bills'); setCommandPaletteOpen(false); }
-      },
-      {
-        id: 'view-banking',
-        title: 'Banking & M-Pesa Feed',
-        subtitle: 'Bank Feeds, AI Reconciliations & Rule Categorization',
-        category: 'Views & Tools',
-        icon: CreditCard,
-        shortcut: '4',
-        action: () => { setActiveView('Banking'); setCommandPaletteOpen(false); }
-      },
-      {
-        id: 'view-accounting',
-        title: 'Accounting & Journal Entries',
-        subtitle: 'General Ledger, Chart of Accounts & Trial Balances',
-        category: 'Views & Tools',
-        icon: FolderGit2,
-        shortcut: '5',
-        action: () => { setActiveView('Accounting'); setCommandPaletteOpen(false); }
-      },
-      {
-        id: 'view-reports',
-        title: 'Reports & Statements',
-        subtitle: 'Balance Sheet, P&L, Cash Flow, Tax Summary',
-        category: 'Views & Tools',
-        icon: PieChart,
-        shortcut: '6',
-        action: () => { setActiveView('Reports'); setCommandPaletteOpen(false); }
-      },
-      {
-        id: 'view-customers',
-        title: 'Customer Hub (CRM)',
-        subtitle: 'Client Profiles, Credit Limits & Interaction Logs',
-        category: 'Views & Tools',
-        icon: Users,
-        action: () => { setActiveView('Customer Hub'); setCommandPaletteOpen(false); }
-      },
-      {
-        id: 'view-inventory',
-        title: 'Inventory & Stock Control',
-        subtitle: 'Product Catalogue, Reorder Triggers & Stock Valuation',
-        category: 'Views & Tools',
-        icon: Package,
-        action: () => { setActiveView('Inventory'); setCommandPaletteOpen(false); }
-      },
-      {
-        id: 'view-audit',
-        title: 'Audit Logs & Governance',
-        subtitle: 'Immutable Ledger Activity & Telemetry Tracker',
-        category: 'Views & Tools',
-        icon: ShieldCheck,
-        action: () => { setActiveView('Audit Logs'); setCommandPaletteOpen(false); }
-      },
-      {
-        id: 'view-health',
-        title: 'System Health & Integrations',
-        subtitle: 'WebSocket status, API endpoints & sync latencies',
-        category: 'Views & Tools',
-        icon: Activity,
-        action: () => { setActiveView('System Health'); setCommandPaletteOpen(false); }
-      },
+    const go = (view: string) => () => {
+      setActiveView(view);
+      setCommandPaletteOpen(false);
+    };
+    const customerNames = new Map<string, string>((customersData?.customers || []).map((c: any) => [c.id, c.displayName || c.name]));
+    const vendorNames = new Map<string, string>((vendorsData?.vendors || []).map((v: any) => [v.id, v.displayName || v.name]));
 
-      // Financial Reports
-      {
-        id: 'rep-pnl',
-        title: 'Profit & Loss Statement (Income Statement)',
-        subtitle: 'Revenue, COGS, Gross Margin & Net Operating Income',
-        category: 'Reports',
-        icon: PieChart,
-        badge: 'PDF Ready',
-        action: () => { setActiveView('Reports'); setCommandPaletteOpen(false); }
-      },
-      {
-        id: 'rep-bs',
-        title: 'Balance Sheet (Statement of Financial Position)',
-        subtitle: 'Current Assets, Non-Current Liabilities & Total Equity',
-        category: 'Reports',
-        icon: PieChart,
-        badge: 'PDF Ready',
-        action: () => { setActiveView('Reports'); setCommandPaletteOpen(false); }
-      },
-      {
-        id: 'rep-cf',
-        title: 'Cash Flow Statement',
-        subtitle: 'Operating, Investing & Financing Cash Movements',
-        category: 'Reports',
-        icon: DollarSign,
-        badge: 'PDF Ready',
-        action: () => { setActiveView('Reports'); setCommandPaletteOpen(false); }
-      },
-      {
-        id: 'rep-tb',
-        title: 'Trial Balance',
-        subtitle: 'Pre-Closing Debit & Credit Verification Ledger',
-        category: 'Reports',
-        icon: FolderGit2,
-        badge: 'PDF Ready',
-        action: () => { setActiveView('Reports'); setCommandPaletteOpen(false); }
-      },
-      {
-        id: 'rep-tax',
-        title: 'Tax Summary & KRA Withholding Statement',
-        subtitle: '16% Output VAT, 2% WH VAT & Digital Service Tax',
-        category: 'Reports',
-        icon: ShieldCheck,
-        badge: 'PDF Ready',
-        action: () => { setActiveView('Reports'); setCommandPaletteOpen(false); }
-      },
+    const items: SearchItem[] = [
+      ...PAGES.map((p) => ({ id: `page-${p.view}`, title: p.title, subtitle: p.subtitle, category: 'Pages' as const, shortcut: p.shortcut, action: go(p.view) })),
+      ...REPORTS.map((r) => ({ id: `report-${r.title}`, title: r.title, subtitle: r.subtitle, category: 'Reports' as const, action: go('Reports') })),
     ];
 
-    // Invoices
-    if (invoicesData?.invoices) {
-      invoicesData.invoices.forEach((inv: any) => {
-        items.push({
-          id: `inv-${inv.id}`,
-          title: `Invoice #${inv.invoiceNumber || inv.id.substring(0, 8)}`,
-          subtitle: `${inv.customerName || 'Customer'} • KES ${formatCurrency(inv.totalCents || 0)} • Status: ${inv.status}`,
-          category: 'Invoices & Sales',
-          icon: FileText,
-          badge: inv.status,
-          action: () => {
-            setActiveView('Sales');
-            setCommandPaletteOpen(false);
-          }
-        });
+    (invoicesData?.invoices || []).forEach((inv: any) => {
+      items.push({
+        id: `inv-${inv.id}`,
+        title: inv.invoiceNo || inv.invoiceNumber || 'Invoice',
+        subtitle: customerNames.get(inv.customerId) || undefined,
+        category: 'Invoices',
+        cents: inv.totalCents || 0,
+        action: go('Sales'),
       });
-    }
+    });
 
-    // Customers
-    if (customersData?.customers) {
-      customersData.customers.forEach((c: any) => {
-        items.push({
-          id: `cust-${c.id}`,
-          title: c.name,
-          subtitle: `${c.email || 'No email'} • Phone: ${c.phone || 'N/A'} • Status: ${c.status || 'ACTIVE'}`,
-          category: 'Customers',
-          icon: Users,
-          badge: c.status || 'ACTIVE',
-          action: () => {
-            setActiveView('Customer Hub');
-            setCommandPaletteOpen(false);
-          }
-        });
+    (billsData?.bills || []).forEach((b: any) => {
+      items.push({
+        id: `bill-${b.id}`,
+        title: b.billNumber || 'Bill',
+        subtitle: vendorNames.get(b.vendorId) || undefined,
+        category: 'Bills',
+        cents: b.totalCents || 0,
+        action: go('Expenses & Bills'),
       });
-    }
+    });
 
-    // Vendors
-    if (vendorsData?.vendors) {
-      vendorsData.vendors.forEach((v: any) => {
-        items.push({
-          id: `vend-${v.id}`,
-          title: v.name,
-          subtitle: `${v.category || 'Vendor'} • PIN: ${v.taxPin || 'N/A'} • Payment Terms: ${v.paymentTerms || 'Net 30'}`,
-          category: 'Vendors & Bills',
-          icon: Building2,
-          action: () => {
-            setActiveView('Expenses & Bills');
-            setCommandPaletteOpen(false);
-          }
-        });
+    (customersData?.customers || []).forEach((c: any) => {
+      items.push({
+        id: `cust-${c.id}`,
+        title: c.displayName || c.name || 'Customer',
+        subtitle: [c.email, c.phone].filter(Boolean).join(' · ') || undefined,
+        category: 'Customers',
+        action: go('Customer Hub'),
       });
-    }
+    });
 
-    // Bills
-    if (billsData?.bills) {
-      billsData.bills.forEach((b: any) => {
-        items.push({
-          id: `bill-${b.id}`,
-          title: `Bill #${b.billNumber || b.id.substring(0, 8)}`,
-          subtitle: `${b.vendorName || 'Vendor'} • KES ${formatCurrency(b.totalCents || 0)} • Status: ${b.status}`,
-          category: 'Vendors & Bills',
-          icon: Receipt,
-          badge: b.status,
-          action: () => {
-            setActiveView('Expenses & Bills');
-            setCommandPaletteOpen(false);
-          }
-        });
+    (vendorsData?.vendors || []).forEach((v: any) => {
+      items.push({
+        id: `vend-${v.id}`,
+        title: v.displayName || v.name || 'Vendor',
+        subtitle: [v.kraPin && `KRA PIN ${v.kraPin}`, v.email].filter(Boolean).join(' · ') || undefined,
+        category: 'Vendors',
+        action: go('Expenses & Bills'),
       });
-    }
+    });
 
-    // Items
-    if (itemsData?.items) {
-      itemsData.items.forEach((item: any) => {
-        items.push({
-          id: `item-${item.id}`,
-          title: item.name,
-          subtitle: `SKU: ${item.sku || 'N/A'} • Price: KES ${formatCurrency(item.unitPriceCents || 0)} • Stock: ${item.stockQuantity || 0} units`,
-          category: 'Inventory Items',
-          icon: Package,
-          action: () => {
-            setActiveView('Inventory');
-            setCommandPaletteOpen(false);
-          }
-        });
+    (itemsData?.items || []).forEach((item: any) => {
+      items.push({
+        id: `item-${item.id}`,
+        title: item.name || 'Stock item',
+        subtitle: `${item.sku ? `${item.sku} · ` : ''}${item.quantityOnHand ?? 0} on hand`,
+        category: 'Stock',
+        action: go('Inventory'),
       });
-    }
+    });
 
-    // Accounts
-    if (accountsData?.accounts) {
-      accountsData.accounts.forEach((acc: any) => {
-        items.push({
-          id: `acc-${acc.id}`,
-          title: `${acc.code} - ${acc.name}`,
-          subtitle: `Classification: ${acc.type} • Balance: KES ${formatCurrency(acc.balanceCents || 0)}`,
-          category: 'Accounts',
-          icon: FolderGit2,
-          badge: acc.type,
-          action: () => {
-            setActiveView('Accounting');
-            setCommandPaletteOpen(false);
-          }
-        });
+    (accountsData?.accounts || []).forEach((acc: any) => {
+      items.push({
+        id: `acc-${acc.id}`,
+        title: `${acc.code} ${acc.name}`,
+        subtitle: acc.type ? acc.type.charAt(0) + acc.type.slice(1).toLowerCase() : undefined,
+        category: 'Accounts',
+        action: go('Accounting'),
       });
-    }
+    });
 
     return items;
   }, [invoicesData, customersData, vendorsData, itemsData, billsData, accountsData, setActiveView, setCommandPaletteOpen]);
 
-  // Fuzzy Search filter & score
   const filteredItems = useMemo(() => {
-    if (!query.trim()) return allItems.slice(0, 25);
+    if (!query.trim()) return allItems.filter((i) => i.category === 'Pages');
 
     const q = query.toLowerCase();
-    const scored = allItems.map((item) => {
-      let score = 0;
-      const titleLower = item.title.toLowerCase();
-      const subLower = (item.subtitle || '').toLowerCase();
-      const catLower = item.category.toLowerCase();
-
-      if (titleLower === q) score += 100;
-      else if (titleLower.startsWith(q)) score += 50;
-      else if (titleLower.includes(q)) score += 30;
-
-      if (subLower.includes(q)) score += 15;
-      if (catLower.includes(q)) score += 10;
-
-      // Character match bonus
-      let charIdx = 0;
-      let matchedCount = 0;
-      for (const char of q) {
-        const found = titleLower.indexOf(char, charIdx);
-        if (found !== -1) {
-          matchedCount++;
-          charIdx = found + 1;
-        }
-      }
-      if (matchedCount === q.length) score += 10;
-
-      return { item, score };
-    });
-
-    return scored
-      .filter(s => s.score > 0)
+    return allItems
+      .map((item) => {
+        let score = 0;
+        const title = item.title.toLowerCase();
+        if (title === q) score += 100;
+        else if (title.startsWith(q)) score += 50;
+        else if (title.includes(q)) score += 30;
+        if ((item.subtitle || '').toLowerCase().includes(q)) score += 15;
+        if (item.category.toLowerCase().includes(q)) score += 10;
+        return { item, score };
+      })
+      .filter((s) => s.score > 0)
       .sort((a, b) => b.score - a.score)
-      .map(s => s.item)
+      .map((s) => s.item)
       .slice(0, 30);
   }, [allItems, query]);
 
-  // Key navigation
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'ArrowDown') {
       e.preventDefault();
-      setSelectedIndex(prev => (prev + 1 < filteredItems.length ? prev + 1 : 0));
+      setSelectedIndex((prev) => (prev + 1 < filteredItems.length ? prev + 1 : 0));
     } else if (e.key === 'ArrowUp') {
       e.preventDefault();
-      setSelectedIndex(prev => (prev - 1 >= 0 ? prev - 1 : filteredItems.length - 1));
+      setSelectedIndex((prev) => (prev - 1 >= 0 ? prev - 1 : filteredItems.length - 1));
     } else if (e.key === 'Enter') {
       e.preventDefault();
-      if (filteredItems[selectedIndex]) {
-        filteredItems[selectedIndex].action();
-      }
+      filteredItems[selectedIndex]?.action();
     } else if (e.key === 'Escape') {
       setCommandPaletteOpen(false);
     }
   };
 
-  // Scroll active item into view
   useEffect(() => {
-    if (listRef.current) {
-      const activeEl = listRef.current.children[selectedIndex] as HTMLElement;
-      if (activeEl) {
-        activeEl.scrollIntoView({ block: 'nearest' });
-      }
-    }
+    const activeEl = listRef.current?.querySelector<HTMLElement>(`[data-index="${selectedIndex}"]`);
+    activeEl?.scrollIntoView({ block: 'nearest' });
   }, [selectedIndex]);
 
   if (!isCommandPaletteOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-[100] flex items-start justify-center pt-16 sm:pt-24 px-4">
-      {/* Backdrop */}
-      <div 
-        className="fixed inset-0 bg-ink-900/60 backdrop-blur-xs transition-opacity animate-in fade-in duration-150" 
-        onClick={() => setCommandPaletteOpen(false)}
-      />
+    <div className="fixed inset-0 z-[100] flex items-start justify-center px-3 pt-14 sm:px-4 sm:pt-24">
+      <div className="fixed inset-0 bg-black/45" onClick={() => setCommandPaletteOpen(false)} aria-hidden="true" />
 
-      {/* Modal Dialog */}
-      <div className="relative w-full max-w-2xl bg-paper-100 rounded-sm shadow-2xl overflow-hidden border border-ink-900/20 z-10 flex flex-col max-h-[80vh]">
-        {/* Search Bar Header */}
-        <div className="flex items-center px-4 py-3 border-b border-ink-900/10 bg-paper-50">
-          <Search className="h-5 w-5 text-slate-400 mr-3 shrink-0" />
+      <div className="ll-lift relative z-10 flex max-h-[80vh] w-full max-w-2xl flex-col border border-feint-strong border-t-2 border-t-ink-900 bg-paper-100" role="dialog" aria-modal="true" aria-label="Find">
+        <div className="flex items-center gap-3 border-b border-feint px-4 py-2.5">
+          <Search className="h-5 w-5 shrink-0 text-graphite-600" aria-hidden="true" />
           <input
             ref={inputRef}
             type="text"
-            className="w-full bg-transparent border-0 text-ink-900 placeholder-slate-400 focus:ring-0 sm:text-base outline-none font-medium"
-            placeholder="Type a command, invoice #, customer name, or ledger code..."
+            role="combobox"
+            aria-expanded="true"
+            aria-controls="find-results"
+            aria-activedescendant={filteredItems[selectedIndex] ? `find-${filteredItems[selectedIndex].id}` : undefined}
+            aria-label="Find a page, customer, invoice or account"
+            className="h-9 w-full border-0 bg-transparent text-[15px] text-ink-900 outline-none focus:ring-0"
+            placeholder="Find a page, customer, invoice or account"
             value={query}
             onChange={(e) => {
               setQuery(e.target.value);
@@ -464,102 +239,58 @@ export function CommandPalette() {
             }}
             onKeyDown={handleKeyDown}
           />
-          <kbd className="hidden sm:inline-flex items-center px-2 py-1 text-[11px] font-mono font-medium text-slate-400 bg-paper-100 border border-ink-900/10 rounded-sm">
-            ESC
-          </kbd>
+          <kbd className="hidden shrink-0 border border-field px-1.5 py-0.5 text-[11px] text-graphite-600 sm:inline">Esc</kbd>
         </div>
 
-        {/* Results List */}
-        <ul 
-          ref={listRef}
-          className="overflow-y-auto py-2 divide-y divide-ink-900/5 text-sm"
-        >
+        <ul ref={listRef} id="find-results" role="listbox" className="overflow-y-auto">
           {filteredItems.length === 0 ? (
-            <li className="px-6 py-12 text-center text-slate-400">
-              <Search className="h-8 w-8 mx-auto mb-2 opacity-40" />
-              <p className="font-medium text-ink-900">No records found for "{query}"</p>
-              <p className="text-xs text-slate-500 mt-1">Try searching by client name, invoice number (e.g. INV-100), or report type.</p>
+            <li className="px-5 py-10 text-center">
+              <p className="text-[14px] text-ink-900">Nothing found for “{query}”.</p>
+              <p className="mt-1 text-[12.5px] text-graphite-600">Try a customer name, an invoice number such as INV-2026-0041, or an account code.</p>
             </li>
           ) : (
             filteredItems.map((item, index) => {
-              const Icon = item.icon;
               const isSelected = index === selectedIndex;
-
+              const startsSection = index === 0 || filteredItems[index - 1].category !== item.category;
               return (
-                <li
-                  key={item.id}
-                  onMouseEnter={() => setSelectedIndex(index)}
-                  onClick={() => item.action()}
-                  className={`px-4 py-2.5 cursor-pointer transition-colors flex items-center justify-between group ${
-                    isSelected 
-                      ? 'bg-focus-blue-500 text-white ' 
-                      : 'hover:bg-paper-50 text-ink-900'
-                  }`}
-                >
-                  <div className="flex items-center space-x-3 min-w-0 pr-2">
-                    <div className={`p-2 rounded-sm shrink-0 ${
-                      isSelected 
-                        ? 'bg-white/20 text-white ' 
-                        : 'bg-paper-100 text-slate-600'
-                    }`}>
-                      <Icon className="h-4 w-4" />
-                    </div>
+                <React.Fragment key={item.id}>
+                  {startsSection && (
+                    <li role="presentation" className="border-b border-ink-900 px-4 pb-1 pt-3">
+                      <span className="ll-printed text-[10.5px] text-graphite-600">{item.category}</span>
+                    </li>
+                  )}
+                  <li
+                    id={`find-${item.id}`}
+                    data-index={index}
+                    role="option"
+                    aria-selected={isSelected}
+                    onMouseEnter={() => setSelectedIndex(index)}
+                    onClick={() => item.action()}
+                    className={`flex cursor-pointer items-baseline justify-between gap-3 border-b border-feint px-4 py-2.5 ${isSelected ? 'bg-paper-200' : ''}`}
+                  >
                     <div className="min-w-0">
-                      <p className={`font-semibold truncate text-sm ${isSelected ? 'text-white ' : 'text-ink-900'}`}>
-                        {item.title}
-                      </p>
-                      {item.subtitle && (
-                        <p className={`text-xs truncate ${isSelected ? 'text-white/80 dark:text-slate-800' : 'text-slate-500'}`}>
-                          {item.subtitle}
-                        </p>
-                      )}
+                      <p className={`truncate text-[14px] text-ink-900 ${isSelected ? 'font-semibold' : ''}`}>{item.title}</p>
+                      {item.subtitle && <p className="truncate text-[12.5px] text-graphite-600">{item.subtitle}</p>}
                     </div>
-                  </div>
-
-                  <div className="flex items-center space-x-2 shrink-0">
-                    {item.badge && (
-                      <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
-                        isSelected 
-                          ? 'bg-white/30 text-white ' 
-                          : 'bg-ink-900/5 text-slate-600'
-                      }`}>
-                        {item.badge}
-                      </span>
-                    )}
-                    <span className={`text-[11px] font-mono ${isSelected ? 'text-white/70' : 'text-slate-400'}`}>
-                      {item.category}
-                    </span>
-                    {item.shortcut && (
-                      <kbd className={`px-1.5 py-0.5 text-[10px] font-mono rounded ${
-                        isSelected ? 'bg-white/20 text-white' : 'bg-paper-100 text-slate-500 border border-ink-900/10'
-                      }`}>
-                        {item.shortcut}
-                      </kbd>
-                    )}
-                    <ArrowRight className={`h-3.5 w-3.5 opacity-0 group-hover:opacity-100 transition-opacity ${
-                      isSelected ? 'opacity-100 text-white' : 'text-slate-400'
-                    }`} />
-                  </div>
-                </li>
+                    <div className="flex shrink-0 items-baseline gap-3">
+                      {item.cents !== undefined && <Amount cents={item.cents} currency={baseCurrency} size="sm" tone="ink" />}
+                      {item.shortcut && <kbd className="border border-field px-1.5 py-0.5 text-[10.5px] text-graphite-600">{item.shortcut}</kbd>}
+                    </div>
+                  </li>
+                </React.Fragment>
               );
             })
           )}
         </ul>
 
-        {/* Footer info */}
-        <div className="px-4 py-2 border-t border-ink-900/10 bg-paper-50 flex items-center justify-between text-[11px] text-slate-500">
-          <div className="flex items-center space-x-4">
-            <span className="flex items-center space-x-1">
-              <kbd className="px-1 py-0.5 bg-paper-100 border border-ink-900/10 rounded">↑</kbd>
-              <kbd className="px-1 py-0.5 bg-paper-100 border border-ink-900/10 rounded">↓</kbd>
-              <span className="ml-1">Navigate</span>
-            </span>
-            <span className="flex items-center space-x-1">
-              <kbd className="px-1.5 py-0.5 bg-paper-100 border border-ink-900/10 rounded">↵</kbd>
-              <span className="ml-1">Select</span>
-            </span>
-          </div>
-          <span className="font-mono text-slate-400">Ledgerline Global Navigation</span>
+        <div className="flex items-center gap-4 border-t border-feint px-4 py-2 text-[11.5px] text-graphite-600">
+          <span>
+            <kbd className="border border-field px-1">↑</kbd> <kbd className="border border-field px-1">↓</kbd> to move
+          </span>
+          <span>
+            <kbd className="border border-field px-1">Enter</kbd> to open
+          </span>
+          <span className="hidden sm:inline">Number keys open pages from anywhere</span>
         </div>
       </div>
     </div>

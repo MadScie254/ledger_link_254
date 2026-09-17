@@ -3,24 +3,9 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAppStore } from '../../store';
 import { useEntityForm, EntityType } from '../../hooks/useEntityForm';
 import { formatCurrency } from '../../utils/currency';
-import {
-  X,
-  Package,
-  Building2,
-  Users,
-  UserPlus,
-  BookOpen,
-  Receipt,
-  FileText,
-  Percent,
-  MapPin,
-  CreditCard,
-  FileSpreadsheet,
-  RotateCcw,
-  Sparkles,
-  AlertCircle,
-  CheckCircle2
-} from 'lucide-react';
+import { Dialog } from '../ledger/Dialog';
+import { Amount } from '../ledger/Amount';
+import { buttonClass } from '../ledger/Page';
 
 interface DynamicQuickAddModalProps {
   isOpen: boolean;
@@ -288,42 +273,57 @@ export function DynamicQuickAddModal({
   const unitProfit = numPrice - numCost;
   const marginPct = numPrice > 0 ? ((unitProfit / numPrice) * 100).toFixed(1) : '0.0';
 
-  return (
-    <div className="fixed inset-0 bg-ink-900/40 backdrop-blur-xs z-50 flex items-center justify-center p-4 overflow-y-auto">
-      <div className="bg-paper-100 rounded-sm shadow-2xl border border-ink-900/10 w-full max-w-3xl my-8 overflow-hidden flex flex-col max-h-[90vh]">
-        {/* Dynamic Context Header */}
-        <div className="px-6 py-4 border-b border-ink-900/10 bg-paper-50  flex items-center justify-between">
-          <div className="flex items-center space-x-3">
-            <span className="p-2 bg-sidebar-bg text-sidebar-ink rounded-xs">
-              {selectedType === 'ITEM' && <Package className="h-5 w-5" />}
-              {selectedType === 'VENDOR' && <Building2 className="h-5 w-5" />}
-              {selectedType === 'CUSTOMER' && <Users className="h-5 w-5" />}
-              {selectedType === 'EMPLOYEE' && <UserPlus className="h-5 w-5" />}
-              {selectedType === 'ACCOUNT' && <BookOpen className="h-5 w-5" />}
-            </span>
-            <div>
-              <div className="flex items-center space-x-2">
-                <h2 className="text-lg font-serif text-ink-900 font-medium">
-                  New {selectedType === 'ITEM' ? 'Inventory Item' : selectedType === 'VENDOR' ? 'Vendor / Supplier' : selectedType === 'CUSTOMER' ? 'Customer Profile' : selectedType === 'EMPLOYEE' ? 'Employee Record' : 'Chart of Account'}
-                </h2>
-                <span className="px-2 py-0.5 text-[10px] font-medium bg-brass-500/15 text-brass-700 dark:text-brass-400 rounded-xs flex items-center space-x-1">
-                  <Sparkles className="h-3 w-3" />
-                  <span>Context: {activeView}</span>
-                </span>
-                {isDirty && (
-                  <span className="px-1.5 py-0.5 text-[9px] font-mono bg-amber-500/15 text-amber-700 rounded">
-                    Unsaved Draft
-                  </span>
-                )}
-              </div>
-              <p className="text-xs text-slate-500 mt-0.5">
-                Context-aware creation with automated ledger linking and KRA compliance checks.
-              </p>
-            </div>
-          </div>
+  const TYPE_NAME: Record<string, string> = { ITEM: 'stock item', VENDOR: 'vendor', CUSTOMER: 'customer', EMPLOYEE: 'employee', ACCOUNT: 'account' };
+  const subTabs: { id: typeof activeSubTab; name: string; show: boolean }[] = [
+    { id: 'general', name: 'Details', show: true },
+    { id: 'financial', name: selectedType === 'ITEM' ? 'Pricing' : selectedType === 'EMPLOYEE' ? 'Pay' : 'Terms', show: ['ITEM', 'VENDOR', 'CUSTOMER', 'EMPLOYEE'].includes(selectedType) },
+    { id: 'tax', name: 'Tax and KRA', show: ['ITEM', 'VENDOR', 'CUSTOMER', 'EMPLOYEE'].includes(selectedType) },
+    { id: 'address', name: 'Address', show: ['VENDOR', 'CUSTOMER'].includes(selectedType) },
+  ];
 
-          <div className="flex items-center space-x-2">
-            {/* Quick Entity Type Switcher */}
+  return (
+    <Dialog
+      open={isOpen}
+      onClose={onClose}
+      width="xl"
+      title={`New ${TYPE_NAME[selectedType] || 'record'}`}
+      note={isDirty ? 'Your entries are kept as a draft on this device until you save or discard them.' : undefined}
+      footer={
+        <>
+          {serverError && (
+            <p role="alert" className="mr-auto text-[13px] text-ledger-red">
+              {serverError}
+            </p>
+          )}
+          <button type="button" onClick={onClose} className={buttonClass.secondary}>
+            Cancel
+          </button>
+          <button type="submit" form="quick-add-form" disabled={createMutation.isPending} className={buttonClass.primary}>
+            {createMutation.isPending ? 'Saving' : `Save ${TYPE_NAME[selectedType] || 'record'}`}
+          </button>
+        </>
+      }
+    >
+      <div className="-mt-1 mb-4 flex flex-col gap-3 border-b border-feint sm:flex-row sm:items-end sm:justify-between">
+        <div className="flex gap-4 overflow-x-auto text-[13px]" role="tablist" aria-label="Sections">
+          {subTabs
+            .filter((t) => t.show)
+            .map((t) => (
+              <button
+                key={t.id}
+                type="button"
+                role="tab"
+                aria-selected={activeSubTab === t.id}
+                onClick={() => setActiveSubTab(t.id)}
+                className={`-mb-px whitespace-nowrap border-b-2 py-2 ${activeSubTab === t.id ? 'border-oxblood font-semibold text-ink-900' : 'border-transparent text-graphite-600 hover:text-ink-900'}`}
+              >
+                {t.name}
+              </button>
+            ))}
+        </div>
+        {!overrideType && (
+          <label className="mb-2 flex items-center gap-2 text-[12.5px] text-graphite-600">
+            Record
             <select
               value={selectedType}
               onChange={(e) => {
@@ -331,108 +331,28 @@ export function DynamicQuickAddModal({
                 setActiveSubTab('general');
                 setServerError(null);
               }}
-              className="text-xs font-medium border border-ink-900/20 rounded-sm px-2.5 py-1.5 bg-paper-100 text-ink-900 focus:outline-none focus:ring-1 focus:ring-focus-blue-500"
+              className="h-8 border px-2 text-[13px] text-ink-900"
             >
-              <option value="ITEM">Inventory Item</option>
-              <option value="VENDOR">Vendor / Supplier</option>
-              <option value="CUSTOMER">Customer / Client</option>
-              <option value="EMPLOYEE">Employee / Staff</option>
-              <option value="ACCOUNT">Chart of Account</option>
+              <option value="ITEM">Stock item</option>
+              <option value="VENDOR">Vendor</option>
+              <option value="CUSTOMER">Customer</option>
+              <option value="EMPLOYEE">Employee</option>
+              <option value="ACCOUNT">Account</option>
             </select>
-            <button
-              onClick={onClose}
-              className="p-1.5 text-slate-400 hover:text-ink-900 rounded-sm transition-colors"
-            >
-              <X className="h-5 w-5" />
-            </button>
-          </div>
-        </div>
-
-        {/* Draft Notice if Restored */}
-        {hasRecoveredDraft && isDirty && (
-          <div className="px-6 py-2 bg-amber-50 dark:bg-amber-950/30 border-b border-amber-500/20 flex items-center justify-between text-xs text-amber-800 dark:text-amber-300">
-            <span className="flex items-center">
-              <CheckCircle2 className="h-3.5 w-3.5 mr-1.5 text-amber-600" />
-              Restored your saved {selectedType.toLowerCase()} draft from earlier.
-            </span>
-            <button
-              type="button"
-              onClick={discardDraft}
-              className="text-[11px] underline hover:text-amber-900 font-medium"
-            >
-              Discard Draft
-            </button>
-          </div>
+          </label>
         )}
+      </div>
 
-        {/* Sub Tabs */}
-        <div className="flex items-center space-x-1 px-6 pt-2.5 border-b border-ink-900/10 bg-paper-100/30 text-xs font-medium overflow-x-auto">
-          <button
-            type="button"
-            onClick={() => setActiveSubTab('general')}
-            className={`pb-2.5 px-3 border-b-2 transition-colors whitespace-nowrap flex items-center ${
-              activeSubTab === 'general'
-                ? 'border-ink-900 text-ink-900 font-semibold'
-                : 'border-transparent text-slate-500 hover:text-ink-900'
-            }`}
-          >
-            <FileSpreadsheet className="h-3.5 w-3.5 mr-1.5" /> General Details
+      {hasRecoveredDraft && isDirty && (
+        <p className="mb-4 flex flex-wrap items-baseline justify-between gap-2 border-y border-feint py-2 text-[13px] text-ink-900">
+          <span>Your unsaved {TYPE_NAME[selectedType] || 'record'} from earlier has been put back.</span>
+          <button type="button" onClick={discardDraft} className={buttonClass.quiet}>
+            Discard it
           </button>
+        </p>
+      )}
 
-          {(selectedType === 'ITEM' || selectedType === 'VENDOR' || selectedType === 'CUSTOMER' || selectedType === 'EMPLOYEE') && (
-            <button
-              type="button"
-              onClick={() => setActiveSubTab('financial')}
-              className={`pb-2.5 px-3 border-b-2 transition-colors whitespace-nowrap flex items-center ${
-                activeSubTab === 'financial'
-                  ? 'border-ink-900 text-ink-900 font-semibold'
-                  : 'border-transparent text-slate-500 hover:text-ink-900'
-              }`}
-            >
-              <CreditCard className="h-3.5 w-3.5 mr-1.5" />
-              {selectedType === 'ITEM' ? 'Pricing & Valuation' : selectedType === 'EMPLOYEE' ? 'Salary & Deductions' : 'Financial & Terms'}
-            </button>
-          )}
-
-          {(selectedType === 'VENDOR' || selectedType === 'CUSTOMER' || selectedType === 'EMPLOYEE' || selectedType === 'ITEM') && (
-            <button
-              type="button"
-              onClick={() => setActiveSubTab('tax')}
-              className={`pb-2.5 px-3 border-b-2 transition-colors whitespace-nowrap flex items-center ${
-                activeSubTab === 'tax'
-                  ? 'border-ink-900 text-ink-900 font-semibold'
-                  : 'border-transparent text-slate-500 hover:text-ink-900'
-              }`}
-            >
-              <Percent className="h-3.5 w-3.5 mr-1.5" /> Tax & Statutory (KRA)
-            </button>
-          )}
-
-          {(selectedType === 'VENDOR' || selectedType === 'CUSTOMER') && (
-            <button
-              type="button"
-              onClick={() => setActiveSubTab('address')}
-              className={`pb-2.5 px-3 border-b-2 transition-colors whitespace-nowrap flex items-center ${
-                activeSubTab === 'address'
-                  ? 'border-ink-900 text-ink-900 font-semibold'
-                  : 'border-transparent text-slate-500 hover:text-ink-900'
-              }`}
-            >
-              <MapPin className="h-3.5 w-3.5 mr-1.5" /> Address & Location
-            </button>
-          )}
-        </div>
-
-        {/* Server or Form-level Errors */}
-        {serverError && (
-          <div className="mx-6 mt-4 p-3 bg-rust-700/10 border border-rust-700/20 text-rust-700 text-xs rounded-sm flex items-center space-x-2">
-            <AlertCircle className="h-4 w-4 shrink-0" />
-            <span>{serverError}</span>
-          </div>
-        )}
-
-        {/* Form Body */}
-        <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto p-6 space-y-5">
+        <form id="quick-add-form" onSubmit={handleSubmit} className="space-y-5">
           {/* ========================================================================= */}
           {/* 1. INVENTORY ITEM FORM                                                    */}
           {/* ========================================================================= */}
@@ -442,119 +362,114 @@ export function DynamicQuickAddModal({
                 <div className="space-y-4">
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                     <div className="md:col-span-2">
-                      <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">
-                        Item / Product Name *
+                      <label htmlFor="qa-name-0" className="block text-[13px] font-semibold text-ink-900 mb-1.5">
+                        Item name
                       </label>
                       <input
                         required
-                        name="name"
+                        id="qa-name-0" name="name"
                         value={values.name || ''}
                         onChange={handleInputChange}
                         onBlur={handleBlur}
-                        placeholder="e.g., Enterprise Server Rack 42U"
-                        className={`w-full bg-paper-100 border ${errors.name ? 'border-rust-700' : 'border-ink-900/20'} text-ink-900 text-sm rounded-sm px-3 py-2 focus:ring-1 focus:ring-focus-blue-500 outline-none`}
+                        className={`w-full border ${errors.name ? 'border-ledger-red' : ''} h-10 px-3 text-[14px]`}
                       />
-                      {errors.name && <p className="text-[11px] text-rust-700 mt-1">{errors.name}</p>}
+                      {errors.name && <p className="mt-1 text-[12.5px] text-ledger-red">{errors.name}</p>}
                     </div>
                     <div>
-                      <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">
-                        Item Classification *
+                      <label htmlFor="qa-itemType-1" className="block text-[13px] font-semibold text-ink-900 mb-1.5">
+                        Kind of item
                       </label>
                       <select
-                        name="itemType"
+                        id="qa-itemType-1" name="itemType"
                         value={values.itemType || 'Physical Product'}
                         onChange={handleInputChange}
-                        className="w-full bg-paper-100 border border-ink-900/20 text-ink-900 text-sm rounded-sm px-3 py-2 focus:ring-1 focus:ring-focus-blue-500 outline-none"
+                        className="w-full h-10 border px-3 text-[14px]"
                       >
-                        <option value="Physical Product">Physical Product (Tracked)</option>
-                        <option value="Digital Service">Digital Service (Untracked)</option>
-                        <option value="Raw Material">Raw Material / Component</option>
-                        <option value="Consumable">Office Consumable</option>
+                        <option value="Physical Product">Stocked goods</option>
+                        <option value="Digital Service">Service, not stocked</option>
+                        <option value="Raw Material">Raw material</option>
+                        <option value="Consumable">Consumable</option>
                       </select>
                     </div>
                   </div>
 
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                     <div>
-                      <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">
-                        SKU Code
+                      <label htmlFor="qa-sku-2" className="block text-[13px] font-semibold text-ink-900 mb-1.5">
+                        SKU
                       </label>
                       <input
-                        name="sku"
+                        id="qa-sku-2" name="sku"
                         value={values.sku || ''}
                         onChange={handleInputChange}
-                        placeholder="e.g., SRV-42U-001"
-                        className="w-full bg-paper-100 border border-ink-900/20 text-ink-900 text-sm rounded-sm px-3 py-2 focus:ring-1 focus:ring-focus-blue-500 outline-none font-mono"
+                        className="w-full h-10 border px-3 text-[14px] ll-figure"
                       />
                     </div>
                     <div>
-                      <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">
-                        Barcode / EAN
+                      <label htmlFor="qa-barcode-3" className="block text-[13px] font-semibold text-ink-900 mb-1.5">
+                        Barcode
                       </label>
                       <input
-                        name="barcode"
+                        id="qa-barcode-3" name="barcode"
                         value={values.barcode || ''}
                         onChange={handleInputChange}
-                        placeholder="e.g., 616110029381"
-                        className="w-full bg-paper-100 border border-ink-900/20 text-ink-900 text-sm rounded-sm px-3 py-2 focus:ring-1 focus:ring-focus-blue-500 outline-none font-mono"
+                        className="w-full h-10 border px-3 text-[14px] ll-figure"
                       />
                     </div>
                     <div>
-                      <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">
+                      <label htmlFor="qa-category-4" className="block text-[13px] font-semibold text-ink-900 mb-1.5">
                         Category
                       </label>
                       <input
-                        name="category"
+                        id="qa-category-4" name="category"
                         value={values.category || ''}
                         onChange={handleInputChange}
-                        placeholder="e.g., Hardware & IT"
-                        className="w-full bg-paper-100 border border-ink-900/20 text-ink-900 text-sm rounded-sm px-3 py-2 focus:ring-1 focus:ring-focus-blue-500 outline-none"
+                        className="w-full h-10 border px-3 text-[14px]"
                       />
                     </div>
                   </div>
 
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                     <div>
-                      <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">
-                        Unit of Measure
+                      <label htmlFor="qa-unitOfMeasure-5" className="block text-[13px] font-semibold text-ink-900 mb-1.5">
+                        Unit
                       </label>
                       <select
-                        name="unitOfMeasure"
+                        id="qa-unitOfMeasure-5" name="unitOfMeasure"
                         value={values.unitOfMeasure || 'Units'}
                         onChange={handleInputChange}
-                        className="w-full bg-paper-100 border border-ink-900/20 text-ink-900 text-sm rounded-sm px-3 py-2 focus:ring-1 focus:ring-focus-blue-500 outline-none"
+                        className="w-full h-10 border px-3 text-[14px]"
                       >
-                        <option value="Units">Units (pcs)</option>
-                        <option value="Hours">Hours (hr)</option>
-                        <option value="Kilograms">Kilograms (kg)</option>
-                        <option value="Meters">Meters (m)</option>
-                        <option value="Boxes">Boxes (box)</option>
-                        <option value="Liters">Liters (L)</option>
+                        <option value="Units">Pieces</option>
+                        <option value="Hours">Hours</option>
+                        <option value="Kilograms">Kilograms</option>
+                        <option value="Meters">Metres</option>
+                        <option value="Boxes">Boxes</option>
+                        <option value="Liters">Litres</option>
                       </select>
                     </div>
                     <div>
-                      <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">
-                        Warehouse Location
+                      <label htmlFor="qa-location-6" className="block text-[13px] font-semibold text-ink-900 mb-1.5">
+                        Where it is kept
                       </label>
                       <input
-                        name="location"
+                        id="qa-location-6" name="location"
                         value={values.location || ''}
                         onChange={handleInputChange}
-                        placeholder="e.g., Warehouse A - Bin 14"
-                        className="w-full bg-paper-100 border border-ink-900/20 text-ink-900 text-sm rounded-sm px-3 py-2 focus:ring-1 focus:ring-focus-blue-500 outline-none"
+                        className="w-full h-10 border px-3 text-[14px]"
                       />
                     </div>
                     <div>
-                      <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">
-                        Preferred Vendor
+                      <label htmlFor="qa-preferredVendorId-7" className="block text-[13px] font-semibold text-ink-900 mb-1.5">
+                        Usual supplier
                       </label>
                       <select
-                        name="preferredVendorId"
+                        id="qa-preferredVendorId-7" name="preferredVendorId"
                         value={values.preferredVendorId || ''}
                         onChange={handleInputChange}
-                        className="w-full bg-paper-100 border border-ink-900/20 text-ink-900 text-sm rounded-sm px-3 py-2 focus:ring-1 focus:ring-focus-blue-500 outline-none"
+                        className="w-full h-10 border px-3 text-[14px]"
                       >
-                        <option value="">None / Unassigned</option>
+                        <option value="">None</option>
                         {vendors.map((v: any) => (
                           <option key={v.id} value={v.id}>{v.displayName}</option>
                         ))}
@@ -563,16 +478,15 @@ export function DynamicQuickAddModal({
                   </div>
 
                   <div>
-                    <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">
-                      Item Description & Specifications
+                    <label htmlFor="qa-description-8" className="block text-[13px] font-semibold text-ink-900 mb-1.5">
+                      Description
                     </label>
                     <textarea
-                      name="description"
+                      id="qa-description-8" name="description"
                       rows={3}
                       value={values.description || ''}
                       onChange={handleInputChange}
-                      placeholder="Detailed catalog description visible on client invoices..."
-                      className="w-full bg-paper-100 border border-ink-900/20 text-ink-900 text-sm rounded-sm px-3 py-2 focus:ring-1 focus:ring-focus-blue-500 outline-none resize-none"
+                      className="w-full border px-3 py-2 text-[14px] resize-none"
                     />
                   </div>
                 </div>
@@ -582,87 +496,83 @@ export function DynamicQuickAddModal({
                 <div className="space-y-4">
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
-                      <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">
-                        Selling Price (KES) *
+                      <label htmlFor="qa-price-9" className="block text-[13px] font-semibold text-ink-900 mb-1.5">
+                        Selling price (KES)
                       </label>
                       <input
                         required
-                        name="price"
+                        id="qa-price-9" name="price"
                         type="number"
                         step="0.01"
                         min="0"
-                        placeholder="0.00"
                         value={values.price || ''}
                         onChange={handleInputChange}
                         onBlur={handleBlur}
-                        className={`w-full bg-paper-100 border ${errors.price ? 'border-rust-700' : 'border-ink-900/20'} text-ink-900 text-sm rounded-sm px-3 py-2 focus:ring-1 focus:ring-focus-blue-500 outline-none tabular-currency`}
+                        className={`w-full border ${errors.price ? 'border-ledger-red' : ''} h-10 px-3 text-[14px] text-right tabular-currency text-ink-blue`}
                       />
-                      {errors.price && <p className="text-[11px] text-rust-700 mt-1">{errors.price}</p>}
+                      {errors.price && <p className="mt-1 text-[12.5px] text-ledger-red">{errors.price}</p>}
                     </div>
                     <div>
-                      <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">
-                        Cost Price / Purchase Price (KES) *
+                      <label htmlFor="qa-cost-10" className="block text-[13px] font-semibold text-ink-900 mb-1.5">
+                        Cost price (KES)
                       </label>
                       <input
                         required
-                        name="cost"
+                        id="qa-cost-10" name="cost"
                         type="number"
                         step="0.01"
                         min="0"
-                        placeholder="0.00"
                         value={values.cost || ''}
                         onChange={handleInputChange}
                         onBlur={handleBlur}
-                        className={`w-full bg-paper-100 border ${errors.cost ? 'border-rust-700' : 'border-ink-900/20'} text-ink-900 text-sm rounded-sm px-3 py-2 focus:ring-1 focus:ring-focus-blue-500 outline-none tabular-currency`}
+                        className={`w-full border ${errors.cost ? 'border-ledger-red' : ''} h-10 px-3 text-[14px] text-right tabular-currency text-ink-blue`}
                       />
-                      {errors.cost && <p className="text-[11px] text-rust-700 mt-1">{errors.cost}</p>}
+                      {errors.cost && <p className="mt-1 text-[12.5px] text-ledger-red">{errors.cost}</p>}
                     </div>
                   </div>
 
                   {/* Profit Margin Preview Card */}
-                  <div className="p-3.5 bg-paper-50  border border-ink-900/10 rounded-sm flex items-center justify-between text-xs">
-                    <div>
-                      <span className="text-slate-500">Gross Margin Estimate: </span>
-                      <span className="font-semibold text-ink-900 ml-1 font-mono">{marginPct}%</span>
-                    </div>
-                    <div>
-                      <span className="text-slate-500">Gross Profit per unit: </span>
-                      <span className={`font-semibold ml-1 ${unitProfit >= 0 ? 'text-ledger-green-700' : 'text-rust-700'}`}>
-                        {formatCurrency(Math.round(unitProfit * 100))}
-                      </span>
-                    </div>
+                  <div className="ll-margin flex flex-wrap items-baseline justify-between gap-x-6 gap-y-1 p-3.5 text-[13px]" aria-live="polite">
+                    <p>
+                      <span className="text-graphite-600">Gross margin </span>
+                      <span className="ll-figure font-semibold text-ink-900">{marginPct}%</span>
+                    </p>
+                    <p className="inline-flex items-baseline gap-1.5">
+                      <span className="text-graphite-600">Profit per unit</span>
+                      <Amount cents={Math.round(unitProfit * 100)} tone="result" size="sm" />
+                    </p>
                   </div>
 
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
-                      <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">
-                        Sales Income Account (Ledger)
+                      <label htmlFor="qa-incomeAccountId-11" className="block text-[13px] font-semibold text-ink-900 mb-1.5">
+                        Income account
                       </label>
                       <select
-                        name="incomeAccountId"
+                        id="qa-incomeAccountId-11" name="incomeAccountId"
                         value={values.incomeAccountId || ''}
                         onChange={handleInputChange}
-                        className="w-full bg-paper-100 border border-ink-900/20 text-ink-900 text-sm rounded-sm px-3 py-2 focus:ring-1 focus:ring-focus-blue-500 outline-none"
+                        className="w-full h-10 border px-3 text-[14px]"
                       >
                         <option value="">Default: 4000 - Sales Revenue</option>
                         {incomeAccounts.map((a: any) => (
-                          <option key={a.id} value={a.id}>{a.code} - {a.name}</option>
+                          <option key={a.id} value={a.id}>{a.code} · {a.name}</option>
                         ))}
                       </select>
                     </div>
                     <div>
-                      <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">
-                        COGS / Expense Account (Ledger)
+                      <label htmlFor="qa-expenseAccountId-12" className="block text-[13px] font-semibold text-ink-900 mb-1.5">
+                        Cost of sales account
                       </label>
                       <select
-                        name="expenseAccountId"
+                        id="qa-expenseAccountId-12" name="expenseAccountId"
                         value={values.expenseAccountId || ''}
                         onChange={handleInputChange}
-                        className="w-full bg-paper-100 border border-ink-900/20 text-ink-900 text-sm rounded-sm px-3 py-2 focus:ring-1 focus:ring-focus-blue-500 outline-none"
+                        className="w-full h-10 border px-3 text-[14px]"
                       >
                         <option value="">Default: 5000 - Cost of Goods Sold</option>
                         {expenseAccounts.map((a: any) => (
-                          <option key={a.id} value={a.id}>{a.code} - {a.name}</option>
+                          <option key={a.id} value={a.id}>{a.code} · {a.name}</option>
                         ))}
                       </select>
                     </div>
@@ -670,43 +580,43 @@ export function DynamicQuickAddModal({
 
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-2">
                     <div>
-                      <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">
-                        Opening Quantity
+                      <label htmlFor="qa-quantityOnHand-13" className="block text-[13px] font-semibold text-ink-900 mb-1.5">
+                        Opening quantity
                       </label>
                       <input
-                        name="quantityOnHand"
+                        id="qa-quantityOnHand-13" name="quantityOnHand"
                         type="number"
                         min="0"
                         value={values.quantityOnHand || '0'}
                         onChange={handleInputChange}
-                        className="w-full bg-paper-100 border border-ink-900/20 text-ink-900 text-sm rounded-sm px-3 py-2 focus:ring-1 focus:ring-focus-blue-500 outline-none"
+                        className="w-full h-10 border px-3 text-[14px]"
                       />
                     </div>
                     <div>
-                      <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">
-                        Reorder Alert Trigger *
+                      <label htmlFor="qa-reorderPoint-14" className="block text-[13px] font-semibold text-ink-900 mb-1.5">
+                        Reorder point
                       </label>
                       <input
                         required
-                        name="reorderPoint"
+                        id="qa-reorderPoint-14" name="reorderPoint"
                         type="number"
                         min="0"
                         value={values.reorderPoint || '5'}
                         onChange={handleInputChange}
-                        className="w-full bg-paper-100 border border-ink-900/20 text-ink-900 text-sm rounded-sm px-3 py-2 focus:ring-1 focus:ring-focus-blue-500 outline-none"
+                        className="w-full h-10 border px-3 text-[14px]"
                       />
                     </div>
                     <div>
-                      <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">
-                        Target Optimal Stock
+                      <label htmlFor="qa-targetStock-15" className="block text-[13px] font-semibold text-ink-900 mb-1.5">
+                        Target stock level
                       </label>
                       <input
-                        name="targetStock"
+                        id="qa-targetStock-15" name="targetStock"
                         type="number"
                         min="0"
                         value={values.targetStock || '20'}
                         onChange={handleInputChange}
-                        className="w-full bg-paper-100 border border-ink-900/20 text-ink-900 text-sm rounded-sm px-3 py-2 focus:ring-1 focus:ring-focus-blue-500 outline-none"
+                        className="w-full h-10 border px-3 text-[14px]"
                       />
                     </div>
                   </div>
@@ -717,31 +627,30 @@ export function DynamicQuickAddModal({
                 <div className="space-y-4">
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
-                      <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">
-                        Applicable VAT Rate
+                      <label htmlFor="qa-taxRate-16" className="block text-[13px] font-semibold text-ink-900 mb-1.5">
+                        VAT rate
                       </label>
                       <select
-                        name="taxRate"
+                        id="qa-taxRate-16" name="taxRate"
                         value={values.taxRate || '16'}
                         onChange={handleInputChange}
-                        className="w-full bg-paper-100 border border-ink-900/20 text-ink-900 text-sm rounded-sm px-3 py-2 focus:ring-1 focus:ring-focus-blue-500 outline-none"
+                        className="w-full h-10 border px-3 text-[14px]"
                       >
-                        <option value="16">16% Standard VAT</option>
-                        <option value="8">8% Petroleum / Special Rate</option>
-                        <option value="0">0% Zero-Rated Export</option>
-                        <option value="-1">Exempt from VAT</option>
+                        <option value="16">16%, standard rate</option>
+                        <option value="8">8%, petroleum</option>
+                        <option value="0">0%, zero-rated</option>
+                        <option value="-1">Exempt</option>
                       </select>
                     </div>
                     <div>
-                      <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">
-                        KRA eTIMS HS / Tariff Code
+                      <label htmlFor="qa-notes-17" className="block text-[13px] font-semibold text-ink-900 mb-1.5">
+                        eTIMS item code (HS code)
                       </label>
                       <input
-                        name="notes"
+                        id="qa-notes-17" name="notes"
                         value={values.notes || ''}
                         onChange={handleInputChange}
-                        placeholder="e.g., 8471.50.00"
-                        className="w-full bg-paper-100 border border-ink-900/20 text-ink-900 text-sm rounded-sm px-3 py-2 focus:ring-1 focus:ring-focus-blue-500 outline-none font-mono"
+                        className="w-full h-10 border px-3 text-[14px] ll-figure"
                       />
                     </div>
                   </div>
@@ -759,105 +668,99 @@ export function DynamicQuickAddModal({
                 <div className="space-y-4">
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
-                      <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">
-                        Company / Trade Name *
+                      <label htmlFor="qa-displayName-18" className="block text-[13px] font-semibold text-ink-900 mb-1.5">
+                        Trading name
                       </label>
                       <input
                         required
-                        name="displayName"
+                        id="qa-displayName-18" name="displayName"
                         value={values.displayName || ''}
                         onChange={handleInputChange}
                         onBlur={handleBlur}
-                        placeholder="e.g., Safaricom Business Ltd"
-                        className={`w-full bg-paper-100 border ${errors.displayName ? 'border-rust-700' : 'border-ink-900/20'} text-ink-900 text-sm rounded-sm px-3 py-2 focus:ring-1 focus:ring-focus-blue-500 outline-none`}
+                        className={`w-full border ${errors.displayName ? 'border-ledger-red' : ''} h-10 px-3 text-[14px]`}
                       />
-                      {errors.displayName && <p className="text-[11px] text-rust-700 mt-1">{errors.displayName}</p>}
+                      {errors.displayName && <p className="mt-1 text-[12.5px] text-ledger-red">{errors.displayName}</p>}
                     </div>
                     <div>
-                      <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">
-                        Legal Registered Entity Name
+                      <label htmlFor="qa-legalName-19" className="block text-[13px] font-semibold text-ink-900 mb-1.5">
+                        Registered name
                       </label>
                       <input
-                        name="legalName"
+                        id="qa-legalName-19" name="legalName"
                         value={values.legalName || ''}
                         onChange={handleInputChange}
-                        placeholder="e.g., Safaricom PLC"
-                        className="w-full bg-paper-100 border border-ink-900/20 text-ink-900 text-sm rounded-sm px-3 py-2 focus:ring-1 focus:ring-focus-blue-500 outline-none"
+                        className="w-full h-10 border px-3 text-[14px]"
                       />
                     </div>
                   </div>
 
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                     <div>
-                      <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">
-                        Vendor Category
+                      <label htmlFor="qa-category-20" className="block text-[13px] font-semibold text-ink-900 mb-1.5">
+                        Kind of supplier
                       </label>
                       <select
-                        name="category"
+                        id="qa-category-20" name="category"
                         value={values.category || 'Direct Supplier'}
                         onChange={handleInputChange}
-                        className="w-full bg-paper-100 border border-ink-900/20 text-ink-900 text-sm rounded-sm px-3 py-2 focus:ring-1 focus:ring-focus-blue-500 outline-none"
+                        className="w-full h-10 border px-3 text-[14px]"
                       >
-                        <option value="Direct Supplier">Direct Inventory Supplier</option>
-                        <option value="Professional Services">Professional & Legal Services</option>
+                        <option value="Direct Supplier">Stock supplier</option>
+                        <option value="Professional Services">Professional services</option>
                         <option value="Utilities & Telecoms">Utilities & Telecoms</option>
                         <option value="Logistics & Transport">Logistics & Transport</option>
-                        <option value="Equipment & Rent">Equipment & Lease</option>
+                        <option value="Equipment & Rent">Equipment and leases</option>
                         <option value="Marketing & Media">Marketing & Media</option>
                       </select>
                     </div>
                     <div>
-                      <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">
-                        Contact Person
+                      <label htmlFor="qa-contactPerson-21" className="block text-[13px] font-semibold text-ink-900 mb-1.5">
+                        Contact person
                       </label>
                       <input
-                        name="contactPerson"
+                        id="qa-contactPerson-21" name="contactPerson"
                         value={values.contactPerson || ''}
                         onChange={handleInputChange}
-                        placeholder="e.g., Grace Muthoni"
-                        className="w-full bg-paper-100 border border-ink-900/20 text-ink-900 text-sm rounded-sm px-3 py-2 focus:ring-1 focus:ring-focus-blue-500 outline-none"
+                        className="w-full h-10 border px-3 text-[14px]"
                       />
                     </div>
                     <div>
-                      <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">
-                        Primary Email
+                      <label htmlFor="qa-email-22" className="block text-[13px] font-semibold text-ink-900 mb-1.5">
+                        Email
                       </label>
                       <input
-                        name="email"
+                        id="qa-email-22" name="email"
                         type="email"
                         value={values.email || ''}
                         onChange={handleInputChange}
                         onBlur={handleBlur}
-                        placeholder="accounts@vendor.co.ke"
-                        className={`w-full bg-paper-100 border ${errors.email ? 'border-rust-700' : 'border-ink-900/20'} text-ink-900 text-sm rounded-sm px-3 py-2 focus:ring-1 focus:ring-focus-blue-500 outline-none`}
+                        className={`w-full border ${errors.email ? 'border-ledger-red' : ''} h-10 px-3 text-[14px]`}
                       />
-                      {errors.email && <p className="text-[11px] text-rust-700 mt-1">{errors.email}</p>}
+                      {errors.email && <p className="mt-1 text-[12.5px] text-ledger-red">{errors.email}</p>}
                     </div>
                   </div>
 
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
-                      <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">
-                        Phone Number
+                      <label htmlFor="qa-phone-23" className="block text-[13px] font-semibold text-ink-900 mb-1.5">
+                        Phone
                       </label>
                       <input
-                        name="phone"
+                        id="qa-phone-23" name="phone"
                         value={values.phone || ''}
                         onChange={handleInputChange}
-                        placeholder="+254 700 000000"
-                        className="w-full bg-paper-100 border border-ink-900/20 text-ink-900 text-sm rounded-sm px-3 py-2 focus:ring-1 focus:ring-focus-blue-500 outline-none"
+                        className="w-full h-10 border px-3 text-[14px]"
                       />
                     </div>
                     <div>
-                      <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">
-                        M-Pesa Till / Paybill Number
+                      <label htmlFor="qa-mpesaNumber-24" className="block text-[13px] font-semibold text-ink-900 mb-1.5">
+                        M-Pesa till or paybill
                       </label>
                       <input
-                        name="mpesaNumber"
+                        id="qa-mpesaNumber-24" name="mpesaNumber"
                         value={values.mpesaNumber || ''}
                         onChange={handleInputChange}
-                        placeholder="e.g., Paybill 888999 (Acc: 001)"
-                        className="w-full bg-paper-100 border border-ink-900/20 text-ink-900 text-sm rounded-sm px-3 py-2 focus:ring-1 focus:ring-focus-blue-500 outline-none font-mono"
+                        className="w-full h-10 border px-3 text-[14px] ll-figure"
                       />
                     </div>
                   </div>
@@ -868,88 +771,85 @@ export function DynamicQuickAddModal({
                 <div className="space-y-4">
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                     <div>
-                      <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">
-                        Payment Terms
+                      <label htmlFor="qa-paymentTerms-25" className="block text-[13px] font-semibold text-ink-900 mb-1.5">
+                        Payment terms
                       </label>
                       <select
-                        name="paymentTerms"
+                        id="qa-paymentTerms-25" name="paymentTerms"
                         value={values.paymentTerms || 'Net 30'}
                         onChange={handleInputChange}
-                        className="w-full bg-paper-100 border border-ink-900/20 text-ink-900 text-sm rounded-sm px-3 py-2 focus:ring-1 focus:ring-focus-blue-500 outline-none"
+                        className="w-full h-10 border px-3 text-[14px]"
                       >
-                        <option value="Due on Receipt">Due on Receipt</option>
-                        <option value="Net 15">Net 15 Days</option>
-                        <option value="Net 30">Net 30 Days</option>
-                        <option value="Net 60">Net 60 Days</option>
+                        <option value="Due on Receipt">On receipt</option>
+                        <option value="Net 15">15 days</option>
+                        <option value="Net 30">30 days</option>
+                        <option value="Net 60">60 days</option>
                       </select>
                     </div>
                     <div>
-                      <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">
-                        Billing Currency
+                      <label htmlFor="qa-currency-26" className="block text-[13px] font-semibold text-ink-900 mb-1.5">
+                        Currency
                       </label>
                       <select
-                        name="currency"
+                        id="qa-currency-26" name="currency"
                         value={values.currency || 'KES'}
                         onChange={handleInputChange}
-                        className="w-full bg-paper-100 border border-ink-900/20 text-ink-900 text-sm rounded-sm px-3 py-2 focus:ring-1 focus:ring-focus-blue-500 outline-none font-mono"
+                        className="w-full h-10 border px-3 text-[14px] ll-figure"
                       >
-                        <option value="KES">KES - Kenyan Shilling</option>
-                        <option value="USD">USD - US Dollar</option>
-                        <option value="EUR">EUR - Euro</option>
-                        <option value="GBP">GBP - British Pound</option>
+                        <option value="KES">KES · Kenyan Shilling</option>
+                        <option value="USD">USD · US Dollar</option>
+                        <option value="EUR">EUR · Euro</option>
+                        <option value="GBP">GBP · British Pound</option>
                       </select>
                     </div>
                     <div>
-                      <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">
-                        Default Expense Account
+                      <label htmlFor="qa-defaultAccountId-27" className="block text-[13px] font-semibold text-ink-900 mb-1.5">
+                        Usual expense account
                       </label>
                       <select
-                        name="defaultAccountId"
+                        id="qa-defaultAccountId-27" name="defaultAccountId"
                         value={values.defaultAccountId || ''}
                         onChange={handleInputChange}
-                        className="w-full bg-paper-100 border border-ink-900/20 text-ink-900 text-sm rounded-sm px-3 py-2 focus:ring-1 focus:ring-focus-blue-500 outline-none"
+                        className="w-full h-10 border px-3 text-[14px]"
                       >
-                        <option value="">Select Expense Account...</option>
+                        <option value="">Choose an account</option>
                         {expenseAccounts.map((a: any) => (
-                          <option key={a.id} value={a.id}>{a.code} - {a.name}</option>
+                          <option key={a.id} value={a.id}>{a.code} · {a.name}</option>
                         ))}
                       </select>
                     </div>
                   </div>
 
-                  <div className="p-4 bg-paper-50  border border-ink-900/10 rounded-sm space-y-3">
-                    <h4 className="text-xs font-semibold text-ink-900 uppercase tracking-wider">
+                  <div className="ll-margin p-4 space-y-3">
+                    <h4 className="text-[13.5px] font-semibold text-ink-900">
                       Bank Settlement Details
                     </h4>
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                       <div>
-                        <label className="block text-xs text-slate-500 mb-1">Bank Name</label>
+                        <label htmlFor="qa-bankName-b0" className="block text-[12.5px] text-graphite-600 mb-1">Bank</label>
                         <input
-                          name="bankName"
+                          id="qa-bankName-b0" name="bankName"
                           value={values.bankName || ''}
                           onChange={handleInputChange}
-                          placeholder="e.g., Standard Chartered"
-                          className="w-full bg-paper-100 border border-ink-900/20 text-ink-900 text-sm rounded-sm px-2.5 py-1.5 focus:ring-1 focus:ring-focus-blue-500 outline-none"
+                          className="w-full h-9 border px-2.5 text-[13.5px]"
                         />
                       </div>
                       <div>
-                        <label className="block text-xs text-slate-500 mb-1">Branch</label>
+                        <label htmlFor="qa-bankBranch-b1" className="block text-[12.5px] text-graphite-600 mb-1">Branch</label>
                         <input
-                          name="bankBranch"
+                          id="qa-bankBranch-b1" name="bankBranch"
                           value={values.bankBranch || ''}
                           onChange={handleInputChange}
-                          placeholder="e.g., Westlands"
-                          className="w-full bg-paper-100 border border-ink-900/20 text-ink-900 text-sm rounded-sm px-2.5 py-1.5 focus:ring-1 focus:ring-focus-blue-500 outline-none"
+                          className="w-full h-9 border px-2.5 text-[13.5px]"
                         />
                       </div>
                       <div>
-                        <label className="block text-xs text-slate-500 mb-1">Account Number</label>
+                        <label htmlFor="qa-bankAccountNo-b2" className="block text-[12.5px] text-graphite-600 mb-1">Account number</label>
                         <input
-                          name="bankAccountNo"
+                          id="qa-bankAccountNo-b2" name="bankAccountNo"
                           value={values.bankAccountNo || ''}
                           onChange={handleInputChange}
-                          placeholder="010203040500"
-                          className="w-full bg-paper-100 border border-ink-900/20 text-ink-900 text-sm rounded-sm px-2.5 py-1.5 focus:ring-1 focus:ring-focus-blue-500 outline-none font-mono"
+                          className="w-full h-9 border px-2.5 text-[13.5px] ll-figure"
                         />
                       </div>
                     </div>
@@ -961,29 +861,27 @@ export function DynamicQuickAddModal({
                 <div className="space-y-4">
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
-                      <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">
-                        KRA PIN Number *
+                      <label htmlFor="qa-kraPin-28" className="block text-[13px] font-semibold text-ink-900 mb-1.5">
+                        KRA PIN
                       </label>
                       <input
-                        name="kraPin"
+                        id="qa-kraPin-28" name="kraPin"
                         value={values.kraPin || ''}
                         onChange={handleInputChange}
                         onBlur={handleBlur}
-                        placeholder="P051234567Z"
-                        className={`w-full bg-paper-100 border ${errors.kraPin ? 'border-rust-700' : 'border-ink-900/20'} text-ink-900 text-sm rounded-sm px-3 py-2 focus:ring-1 focus:ring-focus-blue-500 outline-none font-mono uppercase`}
+                        className={`w-full border ${errors.kraPin ? 'border-ledger-red' : ''} h-10 px-3 text-[14px] ll-figure uppercase`}
                       />
-                      {errors.kraPin && <p className="text-[11px] text-rust-700 mt-1">{errors.kraPin}</p>}
+                      {errors.kraPin && <p className="mt-1 text-[12.5px] text-ledger-red">{errors.kraPin}</p>}
                     </div>
                     <div>
-                      <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">
-                        VAT Registration Number
+                      <label htmlFor="qa-vatNumber-29" className="block text-[13px] font-semibold text-ink-900 mb-1.5">
+                        VAT number
                       </label>
                       <input
-                        name="vatNumber"
+                        id="qa-vatNumber-29" name="vatNumber"
                         value={values.vatNumber || ''}
                         onChange={handleInputChange}
-                        placeholder="VAT-0091238"
-                        className="w-full bg-paper-100 border border-ink-900/20 text-ink-900 text-sm rounded-sm px-3 py-2 focus:ring-1 focus:ring-focus-blue-500 outline-none font-mono"
+                        className="w-full h-10 border px-3 text-[14px] ll-figure"
                       />
                     </div>
                   </div>
@@ -993,43 +891,42 @@ export function DynamicQuickAddModal({
               {activeSubTab === 'address' && (
                 <div className="space-y-4">
                   <div>
-                    <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">
-                      Street Address & Building
+                    <label htmlFor="qa-address-30" className="block text-[13px] font-semibold text-ink-900 mb-1.5">
+                      Street and building
                     </label>
                     <input
-                      name="address"
+                      id="qa-address-30" name="address"
                       value={values.address || ''}
                       onChange={handleInputChange}
-                      placeholder="e.g., 5th Floor, Delta Corner Tower A, Chiromo Rd"
-                      className="w-full bg-paper-100 border border-ink-900/20 text-ink-900 text-sm rounded-sm px-3 py-2 focus:ring-1 focus:ring-focus-blue-500 outline-none"
+                      className="w-full h-10 border px-3 text-[14px]"
                     />
                   </div>
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                     <div>
-                      <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">City</label>
+                      <label htmlFor="qa-city-31" className="block text-[13px] font-semibold text-ink-900 mb-1.5">Town or city</label>
                       <input
-                        name="city"
+                        id="qa-city-31" name="city"
                         value={values.city || 'Nairobi'}
                         onChange={handleInputChange}
-                        className="w-full bg-paper-100 border border-ink-900/20 text-ink-900 text-sm rounded-sm px-3 py-2 focus:ring-1 focus:ring-focus-blue-500 outline-none"
+                        className="w-full h-10 border px-3 text-[14px]"
                       />
                     </div>
                     <div>
-                      <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">Postal Code</label>
+                      <label htmlFor="qa-postalCode-32" className="block text-[13px] font-semibold text-ink-900 mb-1.5">Postal code</label>
                       <input
-                        name="postalCode"
+                        id="qa-postalCode-32" name="postalCode"
                         value={values.postalCode || '00100'}
                         onChange={handleInputChange}
-                        className="w-full bg-paper-100 border border-ink-900/20 text-ink-900 text-sm rounded-sm px-3 py-2 focus:ring-1 focus:ring-focus-blue-500 outline-none"
+                        className="w-full h-10 border px-3 text-[14px]"
                       />
                     </div>
                     <div>
-                      <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">Country</label>
+                      <label htmlFor="qa-country-33" className="block text-[13px] font-semibold text-ink-900 mb-1.5">Country</label>
                       <input
-                        name="country"
+                        id="qa-country-33" name="country"
                         value={values.country || 'Kenya'}
                         onChange={handleInputChange}
-                        className="w-full bg-paper-100 border border-ink-900/20 text-ink-900 text-sm rounded-sm px-3 py-2 focus:ring-1 focus:ring-focus-blue-500 outline-none"
+                        className="w-full h-10 border px-3 text-[14px]"
                       />
                     </div>
                   </div>
@@ -1047,77 +944,73 @@ export function DynamicQuickAddModal({
                 <div className="space-y-4">
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
-                      <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">
-                        Customer / Client Name *
+                      <label htmlFor="qa-displayName-34" className="block text-[13px] font-semibold text-ink-900 mb-1.5">
+                        Customer name
                       </label>
                       <input
                         required
-                        name="displayName"
+                        id="qa-displayName-34" name="displayName"
                         value={values.displayName || ''}
                         onChange={handleInputChange}
                         onBlur={handleBlur}
-                        placeholder="e.g., Apex Holdings Kenya"
-                        className={`w-full bg-paper-100 border ${errors.displayName ? 'border-rust-700' : 'border-ink-900/20'} text-ink-900 text-sm rounded-sm px-3 py-2 focus:ring-1 focus:ring-focus-blue-500 outline-none`}
+                        className={`w-full border ${errors.displayName ? 'border-ledger-red' : ''} h-10 px-3 text-[14px]`}
                       />
-                      {errors.displayName && <p className="text-[11px] text-rust-700 mt-1">{errors.displayName}</p>}
+                      {errors.displayName && <p className="mt-1 text-[12.5px] text-ledger-red">{errors.displayName}</p>}
                     </div>
                     <div>
-                      <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">
-                        Legal Business Name
+                      <label htmlFor="qa-legalName-35" className="block text-[13px] font-semibold text-ink-900 mb-1.5">
+                        Registered name
                       </label>
                       <input
-                        name="legalName"
+                        id="qa-legalName-35" name="legalName"
                         value={values.legalName || ''}
                         onChange={handleInputChange}
-                        placeholder="e.g., Apex Holdings Limited"
-                        className="w-full bg-paper-100 border border-ink-900/20 text-ink-900 text-sm rounded-sm px-3 py-2 focus:ring-1 focus:ring-focus-blue-500 outline-none"
+                        className="w-full h-10 border px-3 text-[14px]"
                       />
                     </div>
                   </div>
 
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                     <div>
-                      <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">
-                        Account Type
+                      <label htmlFor="qa-customerType-36" className="block text-[13px] font-semibold text-ink-900 mb-1.5">
+                        Kind of customer
                       </label>
                       <select
-                        name="customerType"
+                        id="qa-customerType-36" name="customerType"
                         value={values.customerType || 'Corporate'}
                         onChange={handleInputChange}
-                        className="w-full bg-paper-100 border border-ink-900/20 text-ink-900 text-sm rounded-sm px-3 py-2 focus:ring-1 focus:ring-focus-blue-500 outline-none"
+                        className="w-full h-10 border px-3 text-[14px]"
                       >
-                        <option value="Corporate">Corporate / Enterprise</option>
-                        <option value="SME">SME / Small Business</option>
-                        <option value="Individual">Individual Consumer</option>
-                        <option value="Government">Government / NGO</option>
+                        <option value="Corporate">Company</option>
+                        <option value="SME">Small business</option>
+                        <option value="Individual">Individual</option>
+                        <option value="Government">Government or NGO</option>
                       </select>
                     </div>
                     <div>
-                      <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">
-                        Contact Person
+                      <label htmlFor="qa-contactPerson-37" className="block text-[13px] font-semibold text-ink-900 mb-1.5">
+                        Contact person
                       </label>
                       <input
-                        name="contactPerson"
+                        id="qa-contactPerson-37" name="contactPerson"
                         value={values.contactPerson || ''}
                         onChange={handleInputChange}
-                        placeholder="e.g., Alex Kimani"
-                        className="w-full bg-paper-100 border border-ink-900/20 text-ink-900 text-sm rounded-sm px-3 py-2 focus:ring-1 focus:ring-focus-blue-500 outline-none"
+                        className="w-full h-10 border px-3 text-[14px]"
                       />
                     </div>
                     <div>
-                      <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">
-                        Primary Email
+                      <label htmlFor="qa-email-38" className="block text-[13px] font-semibold text-ink-900 mb-1.5">
+                        Email
                       </label>
                       <input
-                        name="email"
+                        id="qa-email-38" name="email"
                         type="email"
                         value={values.email || ''}
                         onChange={handleInputChange}
                         onBlur={handleBlur}
-                        placeholder="billing@apexholdings.co.ke"
-                        className={`w-full bg-paper-100 border ${errors.email ? 'border-rust-700' : 'border-ink-900/20'} text-ink-900 text-sm rounded-sm px-3 py-2 focus:ring-1 focus:ring-focus-blue-500 outline-none`}
+                        className={`w-full border ${errors.email ? 'border-ledger-red' : ''} h-10 px-3 text-[14px]`}
                       />
-                      {errors.email && <p className="text-[11px] text-rust-700 mt-1">{errors.email}</p>}
+                      {errors.email && <p className="mt-1 text-[12.5px] text-ledger-red">{errors.email}</p>}
                     </div>
                   </div>
                 </div>
@@ -1127,49 +1020,48 @@ export function DynamicQuickAddModal({
                 <div className="space-y-4">
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                     <div>
-                      <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">
-                        Credit Limit (KES)
+                      <label htmlFor="qa-creditLimit-39" className="block text-[13px] font-semibold text-ink-900 mb-1.5">
+                        Credit limit (KES)
                       </label>
                       <input
-                        name="creditLimit"
+                        id="qa-creditLimit-39" name="creditLimit"
                         type="number"
                         step="0.01"
                         min="0"
                         value={values.creditLimit || '0'}
                         onChange={handleInputChange}
-                        placeholder="0.00 (0 for unlimited)"
-                        className="w-full bg-paper-100 border border-ink-900/20 text-ink-900 text-sm rounded-sm px-3 py-2 focus:ring-1 focus:ring-focus-blue-500 outline-none tabular-currency"
+                        className="w-full h-10 border px-3 text-[14px] text-right tabular-currency text-ink-blue"
                       />
                     </div>
                     <div>
-                      <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">
-                        Standard Payment Terms
+                      <label htmlFor="qa-paymentTerms-40" className="block text-[13px] font-semibold text-ink-900 mb-1.5">
+                        Payment terms
                       </label>
                       <select
-                        name="paymentTerms"
+                        id="qa-paymentTerms-40" name="paymentTerms"
                         value={values.paymentTerms || 'Net 30'}
                         onChange={handleInputChange}
-                        className="w-full bg-paper-100 border border-ink-900/20 text-ink-900 text-sm rounded-sm px-3 py-2 focus:ring-1 focus:ring-focus-blue-500 outline-none"
+                        className="w-full h-10 border px-3 text-[14px]"
                       >
-                        <option value="Due on Receipt">Due on Receipt</option>
-                        <option value="Net 15">Net 15 Days</option>
-                        <option value="Net 30">Net 30 Days</option>
-                        <option value="Net 60">Net 60 Days</option>
+                        <option value="Due on Receipt">On receipt</option>
+                        <option value="Net 15">15 days</option>
+                        <option value="Net 30">30 days</option>
+                        <option value="Net 60">60 days</option>
                       </select>
                     </div>
                     <div>
-                      <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">
-                        Default Discount %
+                      <label htmlFor="qa-discountPercent-41" className="block text-[13px] font-semibold text-ink-900 mb-1.5">
+                        Usual discount (%)
                       </label>
                       <input
-                        name="discountPercent"
+                        id="qa-discountPercent-41" name="discountPercent"
                         type="number"
                         step="0.1"
                         min="0"
                         max="100"
                         value={values.discountPercent || '0'}
                         onChange={handleInputChange}
-                        className="w-full bg-paper-100 border border-ink-900/20 text-ink-900 text-sm rounded-sm px-3 py-2 focus:ring-1 focus:ring-focus-blue-500 outline-none font-mono"
+                        className="w-full h-10 border px-3 text-[14px] ll-figure"
                       />
                     </div>
                   </div>
@@ -1180,18 +1072,17 @@ export function DynamicQuickAddModal({
                 <div className="space-y-4">
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
-                      <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">
-                        KRA PIN Number
+                      <label htmlFor="qa-kraPin-42" className="block text-[13px] font-semibold text-ink-900 mb-1.5">
+                        KRA PIN
                       </label>
                       <input
-                        name="kraPin"
+                        id="qa-kraPin-42" name="kraPin"
                         value={values.kraPin || ''}
                         onChange={handleInputChange}
                         onBlur={handleBlur}
-                        placeholder="A012345678Z"
-                        className={`w-full bg-paper-100 border ${errors.kraPin ? 'border-rust-700' : 'border-ink-900/20'} text-ink-900 text-sm rounded-sm px-3 py-2 focus:ring-1 focus:ring-focus-blue-500 outline-none font-mono uppercase`}
+                        className={`w-full border ${errors.kraPin ? 'border-ledger-red' : ''} h-10 px-3 text-[14px] ll-figure uppercase`}
                       />
-                      {errors.kraPin && <p className="text-[11px] text-rust-700 mt-1">{errors.kraPin}</p>}
+                      {errors.kraPin && <p className="mt-1 text-[12.5px] text-ledger-red">{errors.kraPin}</p>}
                     </div>
                   </div>
                 </div>
@@ -1200,15 +1091,14 @@ export function DynamicQuickAddModal({
               {activeSubTab === 'address' && (
                 <div className="space-y-4">
                   <div>
-                    <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">
-                      Billing Address
+                    <label htmlFor="qa-billingAddress-43" className="block text-[13px] font-semibold text-ink-900 mb-1.5">
+                      Billing address
                     </label>
                     <input
-                      name="billingAddress"
+                      id="qa-billingAddress-43" name="billingAddress"
                       value={values.billingAddress || ''}
                       onChange={handleInputChange}
-                      placeholder="e.g., Riverside Green Square, Building B"
-                      className="w-full bg-paper-100 border border-ink-900/20 text-ink-900 text-sm rounded-sm px-3 py-2 focus:ring-1 focus:ring-focus-blue-500 outline-none"
+                      className="w-full h-10 border px-3 text-[14px]"
                     />
                   </div>
                 </div>
@@ -1225,83 +1115,78 @@ export function DynamicQuickAddModal({
                 <div className="space-y-4">
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                     <div>
-                      <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">
-                        First Name *
+                      <label htmlFor="qa-firstName-44" className="block text-[13px] font-semibold text-ink-900 mb-1.5">
+                        First name
                       </label>
                       <input
                         required
-                        name="firstName"
+                        id="qa-firstName-44" name="firstName"
                         value={values.firstName || ''}
                         onChange={handleInputChange}
                         onBlur={handleBlur}
-                        placeholder="e.g., Kevin"
-                        className={`w-full bg-paper-100 border ${errors.firstName ? 'border-rust-700' : 'border-ink-900/20'} text-ink-900 text-sm rounded-sm px-3 py-2 focus:ring-1 focus:ring-focus-blue-500 outline-none`}
+                        className={`w-full border ${errors.firstName ? 'border-ledger-red' : ''} h-10 px-3 text-[14px]`}
                       />
-                      {errors.firstName && <p className="text-[11px] text-rust-700 mt-1">{errors.firstName}</p>}
+                      {errors.firstName && <p className="mt-1 text-[12.5px] text-ledger-red">{errors.firstName}</p>}
                     </div>
                     <div>
-                      <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">
-                        Middle Name
+                      <label htmlFor="qa-middleName-45" className="block text-[13px] font-semibold text-ink-900 mb-1.5">
+                        Middle name
                       </label>
                       <input
-                        name="middleName"
+                        id="qa-middleName-45" name="middleName"
                         value={values.middleName || ''}
                         onChange={handleInputChange}
-                        placeholder="e.g., Omondi"
-                        className="w-full bg-paper-100 border border-ink-900/20 text-ink-900 text-sm rounded-sm px-3 py-2 focus:ring-1 focus:ring-focus-blue-500 outline-none"
+                        className="w-full h-10 border px-3 text-[14px]"
                       />
                     </div>
                     <div>
-                      <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">
-                        Last Name *
+                      <label htmlFor="qa-lastName-46" className="block text-[13px] font-semibold text-ink-900 mb-1.5">
+                        Last name
                       </label>
                       <input
                         required
-                        name="lastName"
+                        id="qa-lastName-46" name="lastName"
                         value={values.lastName || ''}
                         onChange={handleInputChange}
                         onBlur={handleBlur}
-                        placeholder="e.g., Mwangi"
-                        className={`w-full bg-paper-100 border ${errors.lastName ? 'border-rust-700' : 'border-ink-900/20'} text-ink-900 text-sm rounded-sm px-3 py-2 focus:ring-1 focus:ring-focus-blue-500 outline-none`}
+                        className={`w-full border ${errors.lastName ? 'border-ledger-red' : ''} h-10 px-3 text-[14px]`}
                       />
-                      {errors.lastName && <p className="text-[11px] text-rust-700 mt-1">{errors.lastName}</p>}
+                      {errors.lastName && <p className="mt-1 text-[12.5px] text-ledger-red">{errors.lastName}</p>}
                     </div>
                   </div>
 
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                     <div>
-                      <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">
-                        National ID / Passport No.
+                      <label htmlFor="qa-nationalId-47" className="block text-[13px] font-semibold text-ink-900 mb-1.5">
+                        National ID or passport
                       </label>
                       <input
-                        name="nationalId"
+                        id="qa-nationalId-47" name="nationalId"
                         value={values.nationalId || ''}
                         onChange={handleInputChange}
-                        placeholder="e.g., 28941029"
-                        className="w-full bg-paper-100 border border-ink-900/20 text-ink-900 text-sm rounded-sm px-3 py-2 focus:ring-1 focus:ring-focus-blue-500 outline-none font-mono"
+                        className="w-full h-10 border px-3 text-[14px] ll-figure"
                       />
                     </div>
                     <div>
-                      <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">
-                        Job Title
+                      <label htmlFor="qa-jobTitle-48" className="block text-[13px] font-semibold text-ink-900 mb-1.5">
+                        Job title
                       </label>
                       <input
-                        name="jobTitle"
+                        id="qa-jobTitle-48" name="jobTitle"
                         value={values.jobTitle || ''}
                         onChange={handleInputChange}
-                        placeholder="e.g., Financial Accountant"
-                        className="w-full bg-paper-100 border border-ink-900/20 text-ink-900 text-sm rounded-sm px-3 py-2 focus:ring-1 focus:ring-focus-blue-500 outline-none"
+                        className="w-full h-10 border px-3 text-[14px]"
                       />
                     </div>
                     <div>
-                      <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">
+                      <label htmlFor="qa-department-49" className="block text-[13px] font-semibold text-ink-900 mb-1.5">
                         Department
                       </label>
                       <select
-                        name="department"
+                        id="qa-department-49" name="department"
                         value={values.department || 'Finance & Accounting'}
                         onChange={handleInputChange}
-                        className="w-full bg-paper-100 border border-ink-900/20 text-ink-900 text-sm rounded-sm px-3 py-2 focus:ring-1 focus:ring-focus-blue-500 outline-none"
+                        className="w-full h-10 border px-3 text-[14px]"
                       >
                         <option value="Finance & Accounting">Finance & Accounting</option>
                         <option value="Engineering & IT">Engineering & IT</option>
@@ -1318,49 +1203,48 @@ export function DynamicQuickAddModal({
                 <div className="space-y-4">
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                     <div>
-                      <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">
-                        Base Monthly Salary (KES) *
+                      <label htmlFor="qa-baseSalary-50" className="block text-[13px] font-semibold text-ink-900 mb-1.5">
+                        Basic monthly salary (KES)
                       </label>
                       <input
                         required
-                        name="baseSalary"
+                        id="qa-baseSalary-50" name="baseSalary"
                         type="number"
                         step="0.01"
                         min="0"
                         value={values.baseSalary || ''}
                         onChange={handleInputChange}
                         onBlur={handleBlur}
-                        placeholder="0.00"
-                        className={`w-full bg-paper-100 border ${errors.baseSalary ? 'border-rust-700' : 'border-ink-900/20'} text-ink-900 text-sm rounded-sm px-3 py-2 focus:ring-1 focus:ring-focus-blue-500 outline-none tabular-currency`}
+                        className={`w-full border ${errors.baseSalary ? 'border-ledger-red' : ''} h-10 px-3 text-[14px] text-right tabular-currency text-ink-blue`}
                       />
-                      {errors.baseSalary && <p className="text-[11px] text-rust-700 mt-1">{errors.baseSalary}</p>}
+                      {errors.baseSalary && <p className="mt-1 text-[12.5px] text-ledger-red">{errors.baseSalary}</p>}
                     </div>
                     <div>
-                      <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">
-                        Housing Allowance (KES)
+                      <label htmlFor="qa-housingAllowance-51" className="block text-[13px] font-semibold text-ink-900 mb-1.5">
+                        Housing allowance (KES)
                       </label>
                       <input
-                        name="housingAllowance"
+                        id="qa-housingAllowance-51" name="housingAllowance"
                         type="number"
                         step="0.01"
                         min="0"
                         value={values.housingAllowance || '0'}
                         onChange={handleInputChange}
-                        className="w-full bg-paper-100 border border-ink-900/20 text-ink-900 text-sm rounded-sm px-3 py-2 focus:ring-1 focus:ring-focus-blue-500 outline-none tabular-currency"
+                        className="w-full h-10 border px-3 text-[14px] text-right tabular-currency text-ink-blue"
                       />
                     </div>
                     <div>
-                      <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">
-                        Transport Allowance (KES)
+                      <label htmlFor="qa-transportAllowance-52" className="block text-[13px] font-semibold text-ink-900 mb-1.5">
+                        Transport allowance (KES)
                       </label>
                       <input
-                        name="transportAllowance"
+                        id="qa-transportAllowance-52" name="transportAllowance"
                         type="number"
                         step="0.01"
                         min="0"
                         value={values.transportAllowance || '0'}
                         onChange={handleInputChange}
-                        className="w-full bg-paper-100 border border-ink-900/20 text-ink-900 text-sm rounded-sm px-3 py-2 focus:ring-1 focus:ring-focus-blue-500 outline-none tabular-currency"
+                        className="w-full h-10 border px-3 text-[14px] text-right tabular-currency text-ink-blue"
                       />
                     </div>
                   </div>
@@ -1371,41 +1255,38 @@ export function DynamicQuickAddModal({
                 <div className="space-y-4">
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                     <div>
-                      <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">
-                        KRA PIN Number *
+                      <label htmlFor="qa-kraPin-53" className="block text-[13px] font-semibold text-ink-900 mb-1.5">
+                        KRA PIN
                       </label>
                       <input
-                        name="kraPin"
+                        id="qa-kraPin-53" name="kraPin"
                         value={values.kraPin || ''}
                         onChange={handleInputChange}
                         onBlur={handleBlur}
-                        placeholder="A012345678Z"
-                        className={`w-full bg-paper-100 border ${errors.kraPin ? 'border-rust-700' : 'border-ink-900/20'} text-ink-900 text-sm rounded-sm px-3 py-2 focus:ring-1 focus:ring-focus-blue-500 outline-none font-mono uppercase`}
+                        className={`w-full border ${errors.kraPin ? 'border-ledger-red' : ''} h-10 px-3 text-[14px] ll-figure uppercase`}
                       />
-                      {errors.kraPin && <p className="text-[11px] text-rust-700 mt-1">{errors.kraPin}</p>}
+                      {errors.kraPin && <p className="mt-1 text-[12.5px] text-ledger-red">{errors.kraPin}</p>}
                     </div>
                     <div>
-                      <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">
-                        NSSF Member Number
+                      <label htmlFor="qa-nssfNumber-54" className="block text-[13px] font-semibold text-ink-900 mb-1.5">
+                        NSSF number
                       </label>
                       <input
-                        name="nssfNumber"
+                        id="qa-nssfNumber-54" name="nssfNumber"
                         value={values.nssfNumber || ''}
                         onChange={handleInputChange}
-                        placeholder="e.g., 00192841"
-                        className="w-full bg-paper-100 border border-ink-900/20 text-ink-900 text-sm rounded-sm px-3 py-2 focus:ring-1 focus:ring-focus-blue-500 outline-none font-mono"
+                        className="w-full h-10 border px-3 text-[14px] ll-figure"
                       />
                     </div>
                     <div>
-                      <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">
-                        SHIF / NHIF Number
+                      <label htmlFor="qa-shifNumber-55" className="block text-[13px] font-semibold text-ink-900 mb-1.5">
+                        SHIF number
                       </label>
                       <input
-                        name="shifNumber"
+                        id="qa-shifNumber-55" name="shifNumber"
                         value={values.shifNumber || ''}
                         onChange={handleInputChange}
-                        placeholder="e.g., 8839210"
-                        className="w-full bg-paper-100 border border-ink-900/20 text-ink-900 text-sm rounded-sm px-3 py-2 focus:ring-1 focus:ring-focus-blue-500 outline-none font-mono"
+                        className="w-full h-10 border px-3 text-[14px] ll-figure"
                       />
                     </div>
                   </div>
@@ -1421,114 +1302,82 @@ export function DynamicQuickAddModal({
             <div className="space-y-4">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">
-                    Account Code (GL Number) *
+                  <label htmlFor="qa-code-56" className="block text-[13px] font-semibold text-ink-900 mb-1.5">
+                    Account code
                   </label>
                   <input
                     required
-                    name="code"
+                    id="qa-code-56" name="code"
                     value={values.code || ''}
                     onChange={handleInputChange}
                     onBlur={handleBlur}
-                    placeholder="e.g. 5210"
-                    className={`w-full bg-paper-100 border ${errors.code ? 'border-rust-700' : 'border-ink-900/20'} text-ink-900 text-sm rounded-sm px-3 py-2 focus:ring-1 focus:ring-focus-blue-500 outline-none font-mono`}
+                    className={`w-full border ${errors.code ? 'border-ledger-red' : ''} h-10 px-3 text-[14px] ll-figure`}
                   />
-                  {errors.code && <p className="text-[11px] text-rust-700 mt-1">{errors.code}</p>}
+                  {errors.code && <p className="mt-1 text-[12.5px] text-ledger-red">{errors.code}</p>}
                 </div>
                 <div>
-                  <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">
-                    Account Name *
+                  <label htmlFor="qa-name-57" className="block text-[13px] font-semibold text-ink-900 mb-1.5">
+                    Account name
                   </label>
                   <input
                     required
-                    name="name"
+                    id="qa-name-57" name="name"
                     value={values.name || ''}
                     onChange={handleInputChange}
                     onBlur={handleBlur}
-                    placeholder="e.g., Software & Cloud Subscriptions"
-                    className={`w-full bg-paper-100 border ${errors.name ? 'border-rust-700' : 'border-ink-900/20'} text-ink-900 text-sm rounded-sm px-3 py-2 focus:ring-1 focus:ring-focus-blue-500 outline-none`}
+                    className={`w-full border ${errors.name ? 'border-ledger-red' : ''} h-10 px-3 text-[14px]`}
                   />
-                  {errors.name && <p className="text-[11px] text-rust-700 mt-1">{errors.name}</p>}
+                  {errors.name && <p className="mt-1 text-[12.5px] text-ledger-red">{errors.name}</p>}
                 </div>
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">
-                    Classification Category *
+                  <label htmlFor="qa-type-58" className="block text-[13px] font-semibold text-ink-900 mb-1.5">
+                    Type
                   </label>
                   <select
-                    name="type"
+                    id="qa-type-58" name="type"
                     value={values.type || 'EXPENSE'}
                     onChange={handleInputChange}
-                    className="w-full bg-paper-100 border border-ink-900/20 text-ink-900 text-sm rounded-sm px-3 py-2 focus:ring-1 focus:ring-focus-blue-500 outline-none"
+                    className="w-full h-10 border px-3 text-[14px]"
                   >
-                    <option value="ASSET">ASSET (Debit Normal)</option>
-                    <option value="LIABILITY">LIABILITY (Credit Normal)</option>
-                    <option value="EQUITY">EQUITY (Credit Normal)</option>
-                    <option value="INCOME">INCOME (Credit Normal)</option>
-                    <option value="EXPENSE">EXPENSE (Debit Normal)</option>
+                    <option value="ASSET">Asset</option>
+                    <option value="LIABILITY">Liability</option>
+                    <option value="EQUITY">Equity</option>
+                    <option value="INCOME">Income</option>
+                    <option value="EXPENSE">Expense</option>
                   </select>
                 </div>
                 <div>
-                  <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">
-                    Subtype Classification
+                  <label htmlFor="qa-subtype-59" className="block text-[13px] font-semibold text-ink-900 mb-1.5">
+                    Subtype
                   </label>
                   <input
-                    name="subtype"
+                    id="qa-subtype-59" name="subtype"
                     value={values.subtype || ''}
                     onChange={handleInputChange}
-                    placeholder="e.g., Operating Expense / Current Asset"
-                    className="w-full bg-paper-100 border border-ink-900/20 text-ink-900 text-sm rounded-sm px-3 py-2 focus:ring-1 focus:ring-focus-blue-500 outline-none"
+                    className="w-full h-10 border px-3 text-[14px]"
                   />
                 </div>
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">
-                  Description / Purpose
+                <label htmlFor="qa-description-60" className="block text-[13px] font-semibold text-ink-900 mb-1.5">
+                  What it is for
                 </label>
                 <textarea
-                  name="description"
+                  id="qa-description-60" name="description"
                   rows={3}
                   value={values.description || ''}
                   onChange={handleInputChange}
-                  placeholder="Internal audit and financial accounting guidelines for this ledger code..."
-                  className="w-full bg-paper-100 border border-ink-900/20 text-ink-900 text-sm rounded-sm px-3 py-2 focus:ring-1 focus:ring-focus-blue-500 outline-none resize-none"
+                  className="w-full border px-3 py-2 text-[14px] resize-none"
                 />
               </div>
             </div>
           )}
 
-          {/* Footer Controls */}
-          <div className="flex justify-between items-center pt-5 border-t border-ink-900/10 mt-6">
-            <div className="text-xs text-slate-400">
-              {isDirty ? (
-                <span className="text-amber-700 dark:text-amber-400 font-medium">● Form has unsaved edits (Draft auto-saved)</span>
-              ) : (
-                <span>All changes saved</span>
-              )}
-            </div>
-
-            <div className="flex space-x-3">
-              <button
-                type="button"
-                onClick={onClose}
-                className="px-4 py-2 text-sm font-medium text-slate-500 hover:text-ink-900"
-              >
-                Cancel
-              </button>
-              <button
-                type="submit"
-                disabled={createMutation.isPending}
-                className="bg-sidebar-bg text-sidebar-ink  px-5 py-2 text-sm font-medium rounded-sm hover:bg-sidebar-bg/90 transition-colors disabled:opacity-50 flex items-center space-x-2"
-              >
-                <span>{createMutation.isPending ? 'Saving Record...' : `Create ${selectedType.charAt(0) + selectedType.slice(1).toLowerCase()}`}</span>
-              </button>
-            </div>
-          </div>
         </form>
-      </div>
-    </div>
+    </Dialog>
   );
 }

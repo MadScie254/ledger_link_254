@@ -1,5 +1,4 @@
-import React from 'react';
-import { Trash2, CheckCircle, X, Printer, Download, Sparkles } from 'lucide-react';
+import { X } from 'lucide-react';
 
 export interface BulkActionBarProps {
   selectedCount: number;
@@ -14,6 +13,10 @@ export interface BulkActionBarProps {
   entityName?: string;
 }
 
+/**
+ * A slip laid over the foot of the page while rows are selected. It appears
+ * instantly, like the selection that summons it.
+ */
 export function BulkActionBar({
   selectedCount,
   totalCount,
@@ -24,85 +27,52 @@ export function BulkActionBar({
   onExport,
   onPrint,
   isLoading = false,
-  entityName = 'items'
+  entityName = 'items',
 }: BulkActionBarProps) {
   if (selectedCount === 0) return null;
 
-  return (
-    <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-40 animate-in fade-in slide-in-from-bottom-5 duration-200">
-      <div className="bg-sidebar-bg text-sidebar-ink  dark:border-ink-900/30 border border-ink-900/20 px-4 py-2.5 rounded-sm shadow-2xl flex items-center space-x-3 text-xs sm:text-sm">
-        {/* Selection Count */}
-        <div className="flex items-center space-x-2 pr-3 border-r border-white/20">
-          <span className="bg-brass-500 text-ink-900 font-bold px-2 py-0.5 rounded-full text-xs">
-            {selectedCount}
-          </span>
-          <span className="font-medium whitespace-nowrap text-slate-200">
-            {selectedCount === 1 ? `1 ${entityName.slice(0, -1) || 'item'}` : `${selectedCount} ${entityName}`} selected
-          </span>
-        </div>
+  const noun = selectedCount === 1 ? entityName.replace(/s$/, '') || 'item' : entityName;
+  const action = 'h-8 px-2.5 text-[13px] text-ink-900 border border-field hover:border-ink-900 disabled:opacity-50 whitespace-nowrap';
 
-        {/* Status Update Dropdown/Buttons */}
+  return (
+    <div className="fixed inset-x-3 bottom-3 z-40 sm:inset-x-auto sm:left-1/2 sm:-translate-x-1/2" role="region" aria-label="Actions for selected rows">
+      <div className="ll-lift flex flex-wrap items-center gap-x-3 gap-y-2 border border-feint-strong border-t-2 border-t-ink-900 bg-paper-100 px-3 py-2">
+        <p className="mr-1 text-[13.5px] text-ink-900 whitespace-nowrap" aria-live="polite">
+          <span className="ll-figure font-semibold">{selectedCount}</span> {noun} selected
+          {totalCount ? <span className="text-graphite-600"> of {totalCount}</span> : null}
+        </p>
+
         {statusOptions.length > 0 && onStatusUpdate && (
-          <div className="flex items-center space-x-1">
-            <span className="text-slate-400 text-xs hidden sm:inline">Set status:</span>
+          <div className="flex flex-wrap items-center gap-1.5">
+            <span className="hidden text-[12.5px] text-graphite-600 sm:inline">Mark as</span>
             {statusOptions.map((opt) => (
-              <button
-                key={opt.value}
-                onClick={() => onStatusUpdate(opt.value)}
-                disabled={isLoading}
-                className="px-2.5 py-1 text-xs bg-white/10 hover:bg-white/20 rounded-sm font-medium transition-colors disabled:opacity-50 whitespace-nowrap"
-              >
+              <button key={opt.value} type="button" onClick={() => onStatusUpdate(opt.value)} disabled={isLoading} className={action}>
                 {opt.label}
               </button>
             ))}
           </div>
         )}
 
-        {/* Export / Print */}
         {onExport && (
-          <button
-            onClick={onExport}
-            disabled={isLoading}
-            className="flex items-center space-x-1 px-2.5 py-1 bg-white/10 hover:bg-white/20 rounded-sm font-medium transition-colors disabled:opacity-50"
-            title="Export Selected"
-          >
-            <Download className="w-3.5 h-3.5" />
-            <span className="hidden sm:inline">Export</span>
+          <button type="button" onClick={onExport} disabled={isLoading} className={action}>
+            Export
           </button>
         )}
 
         {onPrint && (
-          <button
-            onClick={onPrint}
-            disabled={isLoading}
-            className="flex items-center space-x-1 px-2.5 py-1 bg-white/10 hover:bg-white/20 rounded-sm font-medium transition-colors disabled:opacity-50"
-            title="Print Selected"
-          >
-            <Printer className="w-3.5 h-3.5" />
-            <span className="hidden sm:inline">Print</span>
+          <button type="button" onClick={onPrint} disabled={isLoading} className={action}>
+            Print
           </button>
         )}
 
-        {/* Batch Delete */}
         {onDelete && (
-          <button
-            onClick={onDelete}
-            disabled={isLoading}
-            className="flex items-center space-x-1 px-3 py-1 bg-rust-700 hover:bg-rust-800 text-white rounded-sm font-bold transition-colors disabled:opacity-50"
-            title="Delete Selected"
-          >
-            <Trash2 className="w-3.5 h-3.5" />
-            <span>Delete</span>
+          <button type="button" onClick={onDelete} disabled={isLoading} className="h-8 px-2.5 text-[13px] font-semibold text-ledger-red border border-ledger-red hover:bg-ledger-red hover:text-white disabled:opacity-50">
+            Delete
           </button>
         )}
 
-        {/* Clear Selection */}
-        <button
-          onClick={onClearSelection}
-          className="p-1 hover:bg-white/10 rounded-sm text-slate-400 hover:text-white transition-colors ml-1"
-          title="Clear Selection"
-        >
-          <X className="w-4 h-4" />
+        <button type="button" onClick={onClearSelection} aria-label="Clear selection" className="ml-auto p-1 text-graphite-600 hover:text-ink-900">
+          <X className="h-4 w-4" aria-hidden="true" />
         </button>
       </div>
     </div>
