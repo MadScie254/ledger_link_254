@@ -111,7 +111,9 @@ export function Sidebar() {
 
       <div className="px-4 py-3.5 shrink-0 border-t border-[var(--spine-rule)]">
         <p className="text-[11px] text-sidebar-muted">Signed in as</p>
-        <p className="mt-0.5 text-[12.5px] text-sidebar-ink truncate">{user?.email || 'Unknown user'}</p>
+        <p className="mt-0.5 text-[12.5px] text-sidebar-ink truncate">
+          {user?.user_metadata?.full_name || user?.email || 'Signed-in account'}
+        </p>
         <button
           type="button"
           onClick={() => void signOut()}

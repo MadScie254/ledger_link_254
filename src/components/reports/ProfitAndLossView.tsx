@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { format } from 'date-fns';
 import { useQuery } from '@tanstack/react-query';
-import * as XLSX from 'xlsx';
+import { downloadCsv } from '../../utils/exportCsv';
 import { useAppStore } from '../../store';
 import { FinancialPDFEngine } from '../../utils/pdfExport';
 import { StatementPage, StatementSection, StatementLine, StatementSubtotal, StatementResult } from '../ledger/Statement';
@@ -83,7 +83,7 @@ export function ProfitAndLossView({ onBack }: { onBack: () => void }) {
     );
   };
 
-  const handleExportExcel = () => {
+  const handleExportCsv = () => {
     if (!data) return;
     const rows: (string | number)[][] = [['Account', 'Total (KES)'], ['Income', '']];
     income.forEach((i: any) => rows.push(['  ' + i.name, i.amountCents / 100]));
@@ -92,9 +92,7 @@ export function ProfitAndLossView({ onBack }: { onBack: () => void }) {
     rows.push(['Total Cost of Sales', totalCostOfSales / 100], ['Gross Profit', grossProfit / 100], ['Expenses', '']);
     expenses.forEach((i: any) => rows.push(['  ' + i.name, i.amountCents / 100]));
     rows.push(['Total Expenses', totalExpenses / 100], ['Net Profit', netProfit / 100]);
-    const workbook = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(workbook, XLSX.utils.aoa_to_sheet(rows), 'Profit and Loss');
-    XLSX.writeFile(workbook, 'profit_and_loss.xlsx');
+    downloadCsv('profit_and_loss.csv', rows);
   };
 
   const isEmpty = !report.isLoading && income.length + costOfSales.length + expenses.length === 0;
@@ -106,7 +104,7 @@ export function ProfitAndLossView({ onBack }: { onBack: () => void }) {
       onBack={onBack}
       loading={report.isLoading}
       problem={report.isError ? { what: 'the profit and loss statement', path: '/api/reports/pnl', onRetry: () => report.refetch() } : null}
-      onExcel={handleExportExcel}
+      onCsv={handleExportCsv}
       onPdf={handleExportPDF}
       controls={
         <label>

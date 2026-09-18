@@ -11,6 +11,7 @@ import { Amount } from '../ledger/Amount';
 import { Mark } from '../ledger/Mark';
 import { PageHeading, IndexTabs, buttonClass } from '../ledger/Page';
 import { Dialog, Field } from '../ledger/Dialog';
+import { SUPPORTED_CURRENCIES } from '../../utils/currency';
 
 const tabs = ['Vendors', 'Bills', 'Expenses', 'Bill payments'];
 
@@ -23,8 +24,13 @@ export function ExpensesView() {
   const [selectedEntity, setSelectedEntity] = useState<{ type: 'VENDOR' | 'BILL'; id: string; data: any } | null>(null);
   const [selectedBillIds, setSelectedBillIds] = useState<string[]>([]);
   const [selectedVendorIds, setSelectedVendorIds] = useState<string[]>([]);
+  const [billIdempotencyKey, setBillIdempotencyKey] = useState(() => crypto.randomUUID());
+  const [batchPaymentAccountId, setBatchPaymentAccountId] = useState('');
   
-  const { currentOrgId, activeCompany } = useAppStore();
+  const { currentOrgId, activeCompany, exchangeRates } = useAppStore();
+  const baseCurrency = activeCompany?.baseCurrency || 'KES';
+  const [billCurrency, setBillCurrency] = useState(baseCurrency);
+  const [billExchangeRate, setBillExchangeRate] = useState('1');
   const queryClient = useQueryClient();
 
   const { data: vendorsData, isLoading: vendorsLoading } = useQuery({
@@ -59,7 +65,7 @@ export function ExpensesView() {
       const res = await fetch('/api/bills', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'x-org-id': currentOrgId },
-        body: JSON.stringify({ orgId: currentOrgId, ...bill })
+        body: JSON.stringify({ ...bill, idempotencyKey: billIdempotencyKey })
       });
       if (!res.ok) {
         const error = await res.json();
@@ -78,6 +84,9 @@ export function ExpensesView() {
     setIsCreatingBill(false);
     setScannedData(null);
     createBillMutation.reset();
+    setBillIdempotencyKey(crypto.randomUUID());
+    setBillCurrency(baseCurrency);
+    setBillExchangeRate('1');
   }
 
   // Bulk Delete Bills
@@ -97,32 +106,34 @@ export function ExpensesView() {
     }
   });
 
-  // Bulk Status Bills — "PAID" records a real cash payment (posts a ledger
-  // entry via /api/bills/batch-pay); other statuses just update the label.
-  const bulkStatusBillsMutation = useMutation({
-    mutationFn: async ({ ids, status }: { ids: string[], status: string }) => {
-      if (status === 'PAID') {
-        const res = await fetch('/api/bills/batch-pay', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', 'x-org-id': currentOrgId },
-          body: JSON.stringify({ billIds: ids })
-        });
-        if (!res.ok) throw new Error('Failed to record bill payments');
-        return res.json();
-      }
-      const res = await fetch('/api/bulk/status-update', {
+  const batchPaymentMutation = useMutation({
+    mutationFn: async ({ targetBills, sourceAccountId }: { targetBills: any[]; sourceAccountId: string }) => {
+      const paymentDate = format(new Date(), 'yyyy-MM-dd');
+      const res = await fetch('/api/bills/batch-pay', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'x-org-id': currentOrgId },
-        body: JSON.stringify({ entityType: 'BILLS', ids, status })
+        body: JSON.stringify({
+          payments: targetBills.map((bill) => ({
+            billId: bill.id,
+            amountCents: bill.amountDueCents,
+            paymentDate,
+            sourceAccountId,
+            idempotencyKey: crypto.randomUUID(),
+          })),
+        })
       });
-      if (!res.ok) throw new Error('Failed to update bills');
-      return res.json();
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(body.error || 'Failed to record bill payments');
+      if (body.failed > 0) throw new Error(`${body.paid} payment(s) posted; ${body.failed} failed. Refresh and review the open bills.`);
+      return body;
     },
     onSuccess: () => {
+      setSelectedBillIds([]);
+    },
+    onSettled: () => {
       queryClient.invalidateQueries({ queryKey: ['bills', currentOrgId] });
       queryClient.invalidateQueries({ queryKey: ['accounts', currentOrgId] });
-      setSelectedBillIds([]);
-    }
+    },
   });
 
   // Bulk Delete Vendors
@@ -145,14 +156,14 @@ export function ExpensesView() {
   const vendors = vendorsData?.vendors || [];
   const bills = billsData?.bills || [];
   const expenseAccounts = accountsData?.accounts?.filter((a: any) => a.type === 'EXPENSE' || a.type === 'COGS') || [];
+  const paymentAccounts = accountsData?.accounts?.filter((a: any) => a.type === 'ASSET' && a.isActive !== false) || [];
 
   const isAllBillsSelected = bills.length > 0 && selectedBillIds.length === bills.length;
   const isAllVendorsSelected = vendors.length > 0 && selectedVendorIds.length === vendors.length;
 
-  const baseCurrency = activeCompany?.baseCurrency || 'KES';
   const vendorName = (id: string) => vendors.find((v: any) => v.id === id)?.displayName;
-  const openBills = bills.filter((b: any) => b.status === 'OPEN' || b.status === 'SENT');
-  const openBillsTotal = openBills.reduce((sum: number, b: any) => sum + (b.totalCents || 0), 0);
+  const openBills = bills.filter((b: any) => Number(b.amountDueCents || 0) > 0 && b.status !== 'VOID');
+  const openBillsTotal = openBills.reduce((sum: number, b: any) => sum + (b.amountDueCents || 0), 0);
   const scannedVendorId = vendors.find((v: any) => v.displayName === scannedData?.vendor)?.id || '';
   const scannedVendorUnknown = !!scannedData?.vendor && !scannedVendorId;
   const billsTotal = bills.reduce((sum: number, b: any) => sum + (b.totalCents || 0), 0);
@@ -422,21 +433,29 @@ export function ExpensesView() {
                 </span>
                 <Amount cents={openBillsTotal} currency={baseCurrency} tone="ink" />
               </div>
+              <Field label="Pay from" hint={paymentAccounts.length === 0 ? 'Add an active cash or bank asset account before posting payments.' : undefined}>
+                <select value={batchPaymentAccountId} onChange={(event) => setBatchPaymentAccountId(event.target.value)}>
+                  <option value="">Choose an account</option>
+                  {paymentAccounts.map((account: any) => (
+                    <option key={account.id} value={account.id}>{account.code} · {account.name}</option>
+                  ))}
+                </select>
+              </Field>
               <button
                 type="button"
                 onClick={() => {
                   if (window.confirm(`Post payment for ${openBills.length} open bill(s)? This writes entries to the ledger.`)) {
-                    bulkStatusBillsMutation.mutate({ ids: openBills.map((b: any) => b.id), status: 'PAID' });
+                    batchPaymentMutation.mutate({ targetBills: openBills, sourceAccountId: batchPaymentAccountId });
                   }
                 }}
-                disabled={bulkStatusBillsMutation.isPending}
+                disabled={batchPaymentMutation.isPending || !batchPaymentAccountId}
                 className={buttonClass.secondary}
               >
-                {bulkStatusBillsMutation.isPending ? 'Posting' : 'Post these payments'}
+                {batchPaymentMutation.isPending ? 'Posting' : 'Post these payments'}
               </button>
-              {bulkStatusBillsMutation.isError && (
+              {batchPaymentMutation.isError && (
                 <p role="alert" className="text-[13px] text-ledger-red">
-                  {(bulkStatusBillsMutation.error as Error).message}
+                  {(batchPaymentMutation.error as Error).message}
                 </p>
               )}
             </>
@@ -455,12 +474,7 @@ export function ExpensesView() {
               bulkDeleteBillsMutation.mutate(selectedBillIds);
             }
           }}
-          statusOptions={[
-            { label: 'Paid', value: 'PAID' },
-            { label: 'Pending', value: 'PENDING' },
-          ]}
-          onStatusUpdate={(status) => bulkStatusBillsMutation.mutate({ ids: selectedBillIds, status })}
-          isLoading={bulkDeleteBillsMutation.isPending || bulkStatusBillsMutation.isPending}
+          isLoading={bulkDeleteBillsMutation.isPending}
         />
       )}
 
@@ -530,11 +544,24 @@ export function ExpensesView() {
           onSubmit={(e) => {
             e.preventDefault();
             const fd = new FormData(e.currentTarget);
+            const amountCents = Math.round(parseFloat(fd.get('amount') as string) * 100);
+            const taxRate = Number(fd.get('taxRate')) || 0;
+            const exchangeRate = Number(billExchangeRate);
+            const isForeign = billCurrency !== baseCurrency;
+            const baseAmountCents = isForeign ? Math.round(amountCents / exchangeRate) : amountCents;
             createBillMutation.mutate({
               vendorId: fd.get('vendorId'),
               billDate: fd.get('billDate'),
               dueDate: fd.get('dueDate'),
-              lines: [{ description: fd.get('description'), accountId: fd.get('accountId'), amountCents: Math.round(parseFloat(fd.get('amount') as string) * 100) }],
+              currency: billCurrency,
+              exchangeRate,
+              lines: [{
+                description: fd.get('description'),
+                accountId: fd.get('accountId'),
+                amountCents: baseAmountCents,
+                foreignAmountCents: isForeign ? amountCents : undefined,
+                taxCents: Math.round(baseAmountCents * taxRate / 100),
+              }],
             });
           }}
           className="grid grid-cols-1 gap-4 sm:grid-cols-2"
@@ -561,11 +588,42 @@ export function ExpensesView() {
           <Field label="Due">
             <input required name="dueDate" type="date" defaultValue={format(new Date(Date.now() + 30 * 86400000), 'yyyy-MM-dd')} />
           </Field>
-          <Field label="Particulars">
-            <input name="description" type="text" defaultValue={scannedData?.vendor ? `Receipt from ${scannedData.vendor}` : ''} />
+          <Field label="Currency">
+            <select
+              value={billCurrency}
+              onChange={(event) => {
+                const next = event.target.value;
+                setBillCurrency(next);
+                setBillExchangeRate(next === baseCurrency ? '1' : String(exchangeRates[next] || 1));
+              }}
+            >
+              {SUPPORTED_CURRENCIES.map((currency) => (
+                <option key={currency.code} value={currency.code}>{currency.code} · {currency.name}</option>
+              ))}
+            </select>
           </Field>
-          <Field label={`Amount (${baseCurrency})`}>
+          {billCurrency !== baseCurrency && (
+            <Field label={`${billCurrency} per 1 ${baseCurrency}`}>
+              <input
+                required
+                type="number"
+                min="0.00000001"
+                step="any"
+                inputMode="decimal"
+                value={billExchangeRate}
+                onChange={(event) => setBillExchangeRate(event.target.value)}
+                className="text-right tabular-currency"
+              />
+            </Field>
+          )}
+          <Field label="Particulars">
+            <input required name="description" type="text" defaultValue={scannedData?.vendor ? `Receipt from ${scannedData.vendor}` : ''} />
+          </Field>
+          <Field label={`Amount (${billCurrency})`}>
             <input required name="amount" type="number" step="0.01" min="0.01" inputMode="decimal" defaultValue={scannedData?.amount || ''} className="text-right tabular-currency text-ink-blue" />
+          </Field>
+          <Field label="VAT percentage" hint="Enter zero for exempt or non-taxable purchases.">
+            <input required name="taxRate" type="number" step="0.01" min="0" max="100" inputMode="decimal" defaultValue="0" className="text-right tabular-currency" />
           </Field>
         </form>
       </Dialog>

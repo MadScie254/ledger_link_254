@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { ArrowLeft, Download } from 'lucide-react';
-import * as XLSX from 'xlsx';
+import { downloadCsv } from '../../utils/exportCsv';
 import { useAppStore } from '../../store';
 import { PageHeading, buttonClass } from '../ledger/Page';
 import { RunningLedger } from '../ledger/RunningLedger';
@@ -36,17 +36,17 @@ export function GeneralLedgerView({ onBack, initialAccountName = '' }: { onBack:
   });
   const lines = linesData?.lines || [];
 
-  const handleExportExcel = () => {
+  const handleExportCsv = () => {
     const chronological = [...lines].sort((a: any, b: any) => new Date(a.date).getTime() - new Date(b.date).getTime());
     let balance = 0;
     const rows = chronological.map((l: any) => {
       balance += Number(l.debit || 0) - Number(l.credit || 0);
       return [l.date, l.sourceType, l.memo || '', Number(l.debit || 0) / 100, Number(l.credit || 0) / 100, balance / 100];
     });
-    const ws = XLSX.utils.aoa_to_sheet([[`Date`, 'Source', 'Particulars', `Debit (${currency})`, `Credit (${currency})`, `Balance (${currency})`], ...rows]);
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, 'General Ledger');
-    XLSX.writeFile(wb, `general_ledger_${selectedAccountName.replace(/\s+/g, '_')}.xlsx`);
+    downloadCsv(
+      `general_ledger_${selectedAccountName.replace(/\s+/g, '_')}.csv`,
+      [[`Date`, 'Source', 'Particulars', `Debit (${currency})`, `Credit (${currency})`, `Balance (${currency})`], ...rows],
+    );
   };
 
   const accountLabel = selectedAccount ? `${selectedAccount.code} ${selectedAccount.name}` : selectedAccountName;
@@ -62,8 +62,8 @@ export function GeneralLedgerView({ onBack, initialAccountName = '' }: { onBack:
         note={<>Every line posted to one account, oldest first · Figures in {currency}</>}
         actions={
           lines.length > 0 && (
-            <button type="button" onClick={handleExportExcel} className={buttonClass.secondary}>
-              <Download className="w-4 h-4" aria-hidden="true" /> Export Excel
+            <button type="button" onClick={handleExportCsv} className={buttonClass.secondary}>
+              <Download className="w-4 h-4" aria-hidden="true" /> Export CSV
             </button>
           )
         }

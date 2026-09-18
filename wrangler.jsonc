@@ -12,7 +12,7 @@
   "observability": {
     "enabled": true
   },
-  // Secrets (SUPABASE_SERVICE_ROLE_KEY, GEMINI_API_KEY) are set via
+  // Secrets (SUPABASE_SECRET_KEY, GEMINI_API_KEY) are set via
   // `wrangler secret put <NAME>` — never committed here. Non-secret vars
   // below are safe to keep in source control.
   "vars": {

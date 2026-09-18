@@ -1,7 +1,7 @@
 import { useState } from 'react';
-import { format } from 'date-fns';
+import { format, subMonths } from 'date-fns';
 import { useQuery } from '@tanstack/react-query';
-import * as XLSX from 'xlsx';
+import { downloadCsv } from '../../utils/exportCsv';
 import { useAppStore } from '../../store';
 import { FinancialPDFEngine } from '../../utils/pdfExport';
 import { StatementPage, StatementSection, StatementLine, StatementSubtotal, StatementResult } from '../ledger/Statement';
@@ -9,7 +9,8 @@ import { Mark } from '../ledger/Mark';
 
 export function TaxSummaryView({ onBack }: { onBack: () => void }) {
   const { currentOrgId, activeCompany } = useAppStore();
-  const [period, setPeriod] = useState('August 2026');
+  const [period, setPeriod] = useState(() => format(new Date(), 'MMMM yyyy'));
+  const taxPeriods = Array.from({ length: 12 }, (_, index) => format(subMonths(new Date(), index), 'MMMM yyyy'));
 
   const report = useQuery({
     queryKey: ['reports_tax_summary', currentOrgId, period],
@@ -76,7 +77,7 @@ export function TaxSummaryView({ onBack }: { onBack: () => void }) {
     );
   };
 
-  const handleExportExcel = () => {
+  const handleExportCsv = () => {
     const excelRows = [
       ['Tax Section', 'Base Amount (KES)', 'Tax Rate', 'Tax Amount (KES)'],
       ['Standard Rated Sales (Output VAT)', outputVat.standardRatedSalesCents / 100, '16%', outputVat.taxAmountCents / 100],
@@ -84,9 +85,7 @@ export function TaxSummaryView({ onBack }: { onBack: () => void }) {
       ['Withholding VAT (WHVAT 2%)', '', '2%', withholdingTaxVat.withheldAmountCents / 100],
       ['NET VAT PAYABLE TO KRA', '', '', netVatPayableCents / 100],
     ];
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(excelRows), 'KRA VAT Summary');
-    XLSX.writeFile(wb, 'kra_vat_summary.xlsx');
+    downloadCsv('kra_vat_summary.csv', excelRows);
   };
 
   return (
@@ -96,17 +95,13 @@ export function TaxSummaryView({ onBack }: { onBack: () => void }) {
       onBack={onBack}
       loading={report.isLoading}
       problem={report.isError ? { what: 'the tax summary', path: '/api/reports/tax-summary', onRetry: () => report.refetch() } : null}
-      onExcel={handleExportExcel}
+      onCsv={handleExportCsv}
       onPdf={handleExportPDF}
       controls={
         <label>
           <span className="sr-only">Period</span>
           <select value={period} onChange={(e) => setPeriod(e.target.value)} className="h-9 px-2.5 text-[13.5px] border border-field rounded-sm bg-paper-100 text-ink-900">
-            <option>August 2026</option>
-            <option>July 2026</option>
-            <option>June 2026</option>
-            <option>Q2 2026</option>
-            <option>Q1 2026</option>
+            {taxPeriods.map((option) => <option key={option}>{option}</option>)}
           </select>
         </label>
       }

@@ -30,6 +30,7 @@ export function AccountingView() {
   const [jeLines, setJeLines] = useState([{ accountId: '', debit: 0, credit: 0 }, { accountId: '', debit: 0, credit: 0 }]);
   const [jeMemo, setJeMemo] = useState('');
   const [jeDate, setJeDate] = useState(format(new Date(), 'yyyy-MM-dd'));
+  const [jeIdempotencyKey, setJeIdempotencyKey] = useState(() => crypto.randomUUID());
   const [importNote, setImportNote] = useState<{ ok: boolean; text: string } | null>(null);
 
   const queryClient = useQueryClient();
@@ -150,6 +151,7 @@ export function AccountingView() {
     setIsAddingJE(false);
     setJeLines([{ accountId: '', debit: 0, credit: 0 }, { accountId: '', debit: 0, credit: 0 }]);
     setJeMemo('');
+    setJeIdempotencyKey(crypto.randomUUID());
     addJeMutation.reset();
   }
 
@@ -177,6 +179,7 @@ export function AccountingView() {
       entryDate: jeDate,
       memo: jeMemo,
       sourceType: 'MANUAL',
+      idempotencyKey: jeIdempotencyKey,
       lines: formattedLines
     });
   };

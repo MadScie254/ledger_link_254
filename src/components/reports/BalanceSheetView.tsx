@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { format } from 'date-fns';
 import { useQuery } from '@tanstack/react-query';
-import * as XLSX from 'xlsx';
+import { downloadCsv } from '../../utils/exportCsv';
 import { useAppStore } from '../../store';
 import { FinancialPDFEngine } from '../../utils/pdfExport';
 import { StatementPage, StatementSection, StatementLine, StatementSubtotal, StatementResult, useStatementFigures } from '../ledger/Statement';
@@ -75,7 +75,7 @@ export function BalanceSheetView({ onBack }: { onBack: () => void }) {
     );
   };
 
-  const handleExportExcel = () => {
+  const handleExportCsv = () => {
     const rows = [
       ['Account Name', 'Amount (KES)'],
       ['CURRENT ASSETS', ''],
@@ -92,9 +92,7 @@ export function BalanceSheetView({ onBack }: { onBack: () => void }) {
       ['Total Equity', totalEquity / 100],
       ['TOTAL LIABILITIES & EQUITY', totalLiabilitiesAndEquity / 100],
     ];
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(rows), 'Balance Sheet');
-    XLSX.writeFile(wb, 'balance_sheet.xlsx');
+    downloadCsv('balance_sheet.csv', rows);
   };
 
   return (
@@ -104,7 +102,7 @@ export function BalanceSheetView({ onBack }: { onBack: () => void }) {
       onBack={onBack}
       loading={report.isLoading}
       problem={report.isError ? { what: 'the balance sheet', path: '/api/reports/balance-sheet', onRetry: () => report.refetch() } : null}
-      onExcel={handleExportExcel}
+      onCsv={handleExportCsv}
       onPdf={handleExportPDF}
       controls={
         <label>

@@ -14,9 +14,9 @@ interface TeamMember {
 }
 
 const ROLE_NOTE: Record<TeamMember['role'], string> = {
-  owner: 'Holds the organization',
-  admin: 'Can invite, change roles and settings',
-  member: 'Can post and read the books',
+  owner: 'Holds the organization and posts to the books',
+  admin: 'Posts to the books, invites members, changes roles and settings',
+  member: 'Can read the books; posting needs an owner or admin',
 };
 
 export function TeamView() {

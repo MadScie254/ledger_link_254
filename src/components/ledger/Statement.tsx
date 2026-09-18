@@ -24,7 +24,7 @@ export function StatementPage({
   period,
   onBack,
   controls,
-  onExcel,
+  onCsv,
   onPdf,
   loading,
   problem,
@@ -34,7 +34,7 @@ export function StatementPage({
   period: string;
   onBack: () => void;
   controls?: React.ReactNode;
-  onExcel?: () => void;
+  onCsv?: () => void;
   onPdf?: () => void;
   loading?: boolean;
   problem?: { what: string; path: string; onRetry?: () => void } | null;
@@ -59,9 +59,9 @@ export function StatementPage({
         actions={
           <div className="flex flex-wrap items-center gap-2 no-print">
             {controls}
-            {onExcel && (
-              <button type="button" onClick={onExcel} className={buttonClass.secondary}>
-                Excel
+            {onCsv && (
+              <button type="button" onClick={onCsv} className={buttonClass.secondary}>
+                CSV
               </button>
             )}
             <button type="button" onClick={() => window.print()} className={buttonClass.secondary}>

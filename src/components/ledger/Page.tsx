@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useRef } from 'react';
 
 /**
  * The shared furniture of a page in the book: its heading ruled heavy below,
@@ -50,11 +50,17 @@ export function IndexTabs<T extends string>({
   onChange: (id: T) => void;
   label: string;
 }) {
+  const selectedTabRef = useRef<HTMLButtonElement>(null);
+
+  useEffect(() => {
+    selectedTabRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
+  }, [active]);
+
   return (
     <div
       role="tablist"
       aria-label={label}
-      className="flex gap-6 overflow-x-auto border-b border-feint-strong max-sm:pr-10 max-sm:[mask-image:linear-gradient(to_right,#000_82%,transparent)]"
+      className="flex snap-x scroll-px-4 gap-6 overflow-x-auto border-b border-feint-strong pr-4 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
     >
       {tabs.map((tab) => {
         const selected = tab.id === active;
@@ -63,9 +69,10 @@ export function IndexTabs<T extends string>({
             key={tab.id}
             type="button"
             role="tab"
+            ref={selected ? selectedTabRef : undefined}
             aria-selected={selected}
             onClick={() => onChange(tab.id)}
-            className={`-mb-px shrink-0 border-b-2 pb-2 pt-3 text-[14px] ${
+            className={`-mb-px shrink-0 snap-start border-b-2 pb-2 pt-3 text-[14px] ${
               selected ? 'border-oxblood font-semibold text-ink-900' : 'border-transparent text-graphite-600 hover:text-ink-900'
             }`}
           >

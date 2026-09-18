@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { format } from 'date-fns';
 import { useQuery } from '@tanstack/react-query';
-import * as XLSX from 'xlsx';
+import { downloadCsv } from '../../utils/exportCsv';
 import { useAppStore } from '../../store';
 import { FinancialPDFEngine } from '../../utils/pdfExport';
 import { StatementPage, StatementSection, StatementLine, StatementSubtotal, StatementResult } from '../ledger/Statement';
@@ -68,7 +68,7 @@ export function CashFlowView({ onBack }: { onBack: () => void }) {
     );
   };
 
-  const handleExportExcel = () => {
+  const handleExportCsv = () => {
     const rows = [
       ['Item Description', 'Amount (KES)'],
       ['OPERATING ACTIVITIES', ''],
@@ -84,9 +84,7 @@ export function CashFlowView({ onBack }: { onBack: () => void }) {
       ['Beginning Cash Balance', beginningCashCents / 100],
       ['Ending Cash Balance', endingCashCents / 100],
     ];
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(rows), 'Cash Flow');
-    XLSX.writeFile(wb, 'cash_flow.xlsx');
+    downloadCsv('cash_flow.csv', rows);
   };
 
   const section = (title: string, lines: any[], totalLabel: string, total: number) => (
@@ -103,7 +101,7 @@ export function CashFlowView({ onBack }: { onBack: () => void }) {
       onBack={onBack}
       loading={report.isLoading}
       problem={report.isError ? { what: 'the cash flow statement', path: '/api/reports/cash-flow', onRetry: () => report.refetch() } : null}
-      onExcel={handleExportExcel}
+      onCsv={handleExportCsv}
       onPdf={handleExportPDF}
       controls={
         <label>

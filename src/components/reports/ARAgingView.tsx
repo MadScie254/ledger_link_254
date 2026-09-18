@@ -1,6 +1,6 @@
 import { format } from 'date-fns';
 import { useQuery } from '@tanstack/react-query';
-import * as XLSX from 'xlsx';
+import { downloadCsv } from '../../utils/exportCsv';
 import { useAppStore } from '../../store';
 import { FinancialPDFEngine } from '../../utils/pdfExport';
 import { StatementPage, useStatementFigures } from '../ledger/Statement';
@@ -69,14 +69,12 @@ export function AgingReport({ onBack, title, endpoint, partyLabel, queryKey }: A
     );
   };
 
-  const handleExportExcel = () => {
+  const handleExportCsv = () => {
     const excelRows = [
       ['Reference', partyLabel, 'Due Date', 'Days Past Due', 'Bucket', 'Amount Due (KES)'],
       ...rows.map((r: any) => [r.referenceNo, r.partyName, r.dueDate || '', r.daysPastDue, BUCKET_LABELS[r.bucket] || r.bucket, r.amountDueCents / 100]),
     ];
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(excelRows), title.slice(0, 31));
-    XLSX.writeFile(wb, `${queryKey}.xlsx`);
+    downloadCsv(`${queryKey}.csv`, excelRows);
   };
 
   return (
@@ -86,7 +84,7 @@ export function AgingReport({ onBack, title, endpoint, partyLabel, queryKey }: A
       onBack={onBack}
       loading={report.isLoading}
       problem={report.isError ? { what: title.toLowerCase(), path: endpoint, onRetry: () => report.refetch() } : null}
-      onExcel={handleExportExcel}
+      onCsv={handleExportCsv}
       onPdf={handleExportPDF}
     >
       {/* The buckets as analysis columns: how much is waiting, and for how long. */}

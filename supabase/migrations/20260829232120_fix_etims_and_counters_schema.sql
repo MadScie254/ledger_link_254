@@ -4,6 +4,30 @@
 -- types, adding FKs, and adding proper org-scoped policies (both tables are append-only logs,
 -- like audit_logs and journal_lines: insert + select only, no update/delete via the API).
 
+-- These two tables predated the migration history backfilled from the live
+-- Supabase project. Define their legacy shape here so `supabase db reset` can
+-- reproduce that history from an empty database; existing projects are a no-op.
+CREATE TABLE IF NOT EXISTS public.etims_submissions (
+  id               UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  org_id           TEXT NOT NULL,
+  invoice_id       TEXT NOT NULL,
+  status           TEXT NOT NULL DEFAULT 'PENDING',
+  details          JSONB,
+  kra_control_code TEXT,
+  qr_code_url      TEXT,
+  submitted_at     TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE TABLE IF NOT EXISTS public.document_counters (
+  org_id      TEXT NOT NULL,
+  doc_type    TEXT NOT NULL,
+  next_number INTEGER NOT NULL DEFAULT 1,
+  PRIMARY KEY (org_id, doc_type)
+);
+
+ALTER TABLE public.etims_submissions ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.document_counters ENABLE ROW LEVEL SECURITY;
+
 ALTER TABLE public.etims_submissions
   ALTER COLUMN org_id TYPE uuid USING org_id::uuid,
   ALTER COLUMN invoice_id TYPE uuid USING invoice_id::uuid;

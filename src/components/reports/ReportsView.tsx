@@ -74,7 +74,7 @@ export function ReportsView() {
     <div className="space-y-6 pb-16">
       <PageHeading
         title="Reports"
-        note={<>Financial statements and schedules, each with PDF and Excel export</>}
+        note={<>Financial statements and schedules, each with PDF and CSV export</>}
         actions={
           <label className="flex items-center gap-2 text-[13px] text-graphite-600">
             <span>Show figures in</span>

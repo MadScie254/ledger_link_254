@@ -71,6 +71,16 @@ export class BankingService {
     if (!matchText?.trim()) throw new Error('Match text is required.');
     if (!targetAccountId) throw new Error('A target account is required.');
 
+    const { data: targetAccount, error: accountError } = await supabase
+      .from('accounts')
+      .select('id')
+      .eq('org_id', orgId)
+      .eq('id', targetAccountId)
+      .eq('is_active', true)
+      .maybeSingle();
+    if (accountError) throw accountError;
+    if (!targetAccount) throw new Error('The target account is inactive or belongs to another organization.');
+
     const { data, error } = await supabase
       .from('bank_rules')
       .insert({ org_id: orgId, match_text: matchText.trim(), target_account_id: targetAccountId, created_by: createdBy || null })
@@ -353,11 +363,35 @@ export class BankingService {
       
     if (txError) throw new Error('Transaction not found');
     if (tx.status === 'MATCHED') throw new Error('Transaction is already matched');
+    if (!Number.isSafeInteger(Number(tx.amount_cents)) || Number(tx.amount_cents) <= 0) {
+      throw new Error('Bank transaction amount must be a positive integer number of cents.');
+    }
 
     let finalJournalEntryId = existingJournalEntryId;
 
+    if (finalJournalEntryId) {
+      const { data: existingEntry, error: entryError } = await supabase
+        .from('journal_entries')
+        .select('id')
+        .eq('org_id', orgId)
+        .eq('id', finalJournalEntryId)
+        .maybeSingle();
+      if (entryError) throw entryError;
+      if (!existingEntry) throw new Error('The selected journal entry belongs to another organization or does not exist.');
+    }
+
     if (!finalJournalEntryId) {
       if (!targetAccountId) throw new Error('Must provide either targetAccountId or existingJournalEntryId');
+
+      const { data: targetAccount, error: accountError } = await supabase
+        .from('accounts')
+        .select('id')
+        .eq('org_id', orgId)
+        .eq('id', targetAccountId)
+        .eq('is_active', true)
+        .maybeSingle();
+      if (accountError) throw accountError;
+      if (!targetAccount) throw new Error('The target account is inactive or belongs to another organization.');
       
       // Get the bank account (Code 1000)
       const bankAccount = await AccountService.getAccountByCode(orgId, '1000');
@@ -381,18 +415,25 @@ export class BankingService {
         sourceType: 'BANK',
         sourceId: transactionId,
         createdBy: userId,
+        idempotencyKey: `bank-match:${transactionId}`,
         lines
       });
     }
 
     // Mark as matched
-    await supabase
+    const { data: matchedTransaction, error: matchError } = await supabase
       .from('bank_transactions')
       .update({
-        status: 'MATCHED'
+        status: 'MATCHED',
+        matched_journal_entry_id: finalJournalEntryId,
       })
       .eq('org_id', orgId)
-      .eq('id', transactionId);
+      .eq('id', transactionId)
+      .neq('status', 'MATCHED')
+      .select('id')
+      .maybeSingle();
+    if (matchError) throw matchError;
+    if (!matchedTransaction) throw new Error('Transaction was already matched by another request.');
 
     return finalJournalEntryId;
   }

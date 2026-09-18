@@ -1,6 +1,5 @@
 import { getSupabase } from './supabase';
 import { JournalEntryInput, LedgerEngineError } from './types';
-import { AuditService } from './audit';
 
 export class LedgerService {
   /**
@@ -24,22 +23,12 @@ export class LedgerService {
       p_source_id: input.sourceId || null,
       p_reference_no: input.referenceNo || null,
       p_created_by: input.createdBy || null,
-      p_lines: input.lines
+      p_lines: input.lines,
+      p_idempotency_key: input.idempotencyKey?.trim() || null,
     });
 
     if (error) {
       throw new LedgerEngineError(`Failed to post journal entry: ${error.message}`);
-    }
-
-    if (input.createdBy) {
-      await AuditService.logEvent({
-        orgId: input.orgId,
-        userId: input.createdBy,
-        action: 'CREATE',
-        resourceType: 'JOURNAL_ENTRY',
-        resourceId: entryId,
-        details: { memo: input.memo, sourceType: input.sourceType }
-      });
     }
 
     return entryId;
@@ -77,7 +66,11 @@ export class LedgerService {
         credit: line.credit,
         description: line.description,
         entityType: line.entity_type,
-        entityId: line.entity_id
+        entityId: line.entity_id,
+        currency: line.currency,
+        foreignDebit: line.foreign_debit,
+        foreignCredit: line.foreign_credit,
+        exchangeRate: line.exchange_rate,
       }))
     }));
   }

@@ -1,6 +1,12 @@
 import { getSupabase } from './supabase';
-import { LedgerService } from './ledger';
-import { AccountService } from './accounts';
+
+export interface BillLineInput {
+  description: string;
+  accountId: string;
+  amountCents: number;
+  foreignAmountCents?: number;
+  taxCents?: number;
+}
 
 export interface BillInput {
   orgId: string;
@@ -10,15 +16,109 @@ export interface BillInput {
   dueDate: string;
   currency?: string;
   exchangeRate?: number;
-  foreignAmountCents?: number;
   notes?: string;
-  lines: {
-    description: string;
-    accountId: string;
-    amountCents: number;
-    foreignAmountCents?: number;
-  }[];
+  lines: BillLineInput[];
+  idempotencyKey: string;
   createdBy: string;
+}
+
+export interface BillPaymentInput {
+  amountCents: number;
+  paymentDate: string;
+  sourceAccountId: string;
+  idempotencyKey: string;
+  createdBy: string;
+}
+
+export interface BillBatchPaymentInput extends Omit<BillPaymentInput, 'createdBy'> {
+  billId: string;
+}
+
+function mapBillLine(row: any) {
+  return {
+    id: row.id,
+    billId: row.bill_id,
+    description: row.description,
+    accountId: row.account_id,
+    amountCents: Number(row.amount_cents) || 0,
+    foreignAmountCents: row.foreign_amount_cents == null ? null : Number(row.foreign_amount_cents),
+    taxCents: Number(row.tax_cents) || 0,
+    foreignTaxCents: Number(row.foreign_tax_cents) || 0,
+    createdAt: row.created_at,
+  };
+}
+
+function mapBillPayment(row: any) {
+  return {
+    id: row.id,
+    billId: row.bill_id,
+    amountCents: Number(row.amount_cents) || 0,
+    currency: row.currency,
+    foreignAmountCents: Number(row.foreign_amount_cents) || 0,
+    exchangeRate: Number(row.exchange_rate) || 1,
+    paymentDate: row.payment_date,
+    accountId: row.account_id,
+    journalEntryId: row.journal_entry_id,
+    createdAt: row.created_at,
+  };
+}
+
+function mapBill(row: any) {
+  return {
+    id: row.id,
+    orgId: row.org_id,
+    billNumber: row.bill_number,
+    billNo: row.bill_number,
+    vendorId: row.vendor_id,
+    date: row.date,
+    billDate: row.date,
+    dueDate: row.due_date,
+    subtotalCents: Number(row.subtotal_cents) || 0,
+    taxCents: Number(row.tax_cents) || 0,
+    totalCents: Number(row.total_cents) || 0,
+    amountDueCents: Number(row.amount_due_cents) || 0,
+    status: row.status,
+    currency: row.currency,
+    exchangeRate: row.exchange_rate == null ? null : Number(row.exchange_rate),
+    foreignAmountCents: row.foreign_amount_cents == null ? null : Number(row.foreign_amount_cents),
+    notes: row.notes,
+    createdBy: row.created_by,
+    createdAt: row.created_at,
+    lines: (row.bill_lines || []).map(mapBillLine),
+    payments: (row.bill_payments || []).map(mapBillPayment),
+  };
+}
+
+async function assertBillRelations(orgId: string, vendorId: string, lines: BillLineInput[]) {
+  const supabase = getSupabase();
+  const accountIds = [...new Set(lines.map((line) => line.accountId))];
+  const [{ data: vendor, error: vendorError }, { data: accounts, error: accountsError }] = await Promise.all([
+    supabase.from('vendors').select('id').eq('org_id', orgId).eq('id', vendorId).maybeSingle(),
+    supabase.from('accounts').select('id, is_active').eq('org_id', orgId).in('id', accountIds),
+  ]);
+
+  if (vendorError) throw vendorError;
+  if (!vendor) throw new Error('The selected vendor does not belong to this organization.');
+  if (accountsError) throw accountsError;
+
+  const activeAccountIds = new Set((accounts || []).filter((account: any) => account.is_active !== false).map((account: any) => account.id));
+  const missingAccount = accountIds.find((accountId) => !activeAccountIds.has(accountId));
+  if (missingAccount) throw new Error('One or more bill accounts do not belong to this organization or are inactive.');
+}
+
+async function assertPaymentAccount(orgId: string, accountId: string) {
+  const supabase = getSupabase();
+  const { data, error } = await supabase
+    .from('accounts')
+    .select('id, type, is_active')
+    .eq('org_id', orgId)
+    .eq('id', accountId)
+    .maybeSingle();
+
+  if (error) throw error;
+  if (!data || data.is_active === false || data.type !== 'ASSET') {
+    throw new Error('The payment account must be an active asset account in this organization.');
+  }
 }
 
 export class BillService {
@@ -26,279 +126,135 @@ export class BillService {
     const supabase = getSupabase();
     const { data, error } = await supabase
       .from('bills')
-      .select('*')
+      .select('*, bill_lines(*), bill_payments(*)')
       .eq('org_id', orgId)
       .order('created_at', { ascending: false });
-      
+
     if (error) throw error;
-    
-    return (data || []).map(row => ({
-      id: row.id,
-      orgId: row.org_id,
-      billNumber: row.bill_number,
-      vendorId: row.vendor_id,
-      date: row.date,
-      billDate: row.date,
-      dueDate: row.due_date,
-      subtotalCents: row.subtotal_cents,
-      taxCents: row.tax_cents,
-      totalCents: row.total_cents,
-      amountDueCents: row.amount_due_cents,
-      status: row.status,
-      currency: row.currency,
-      exchangeRate: row.exchange_rate,
-      foreignAmountCents: row.foreign_amount_cents,
-      notes: row.notes,
-      createdBy: row.created_by,
-      createdAt: row.created_at
-    }));
+    return (data || []).map(mapBill);
   }
 
-  static async createBill(input: BillInput) {
-    const supabase = getSupabase();
-    const currency = (input.currency || 'KES').toUpperCase();
+  static async createBill(input: BillInput): Promise<string> {
+    await assertBillRelations(input.orgId, input.vendorId, input.lines);
+
+    const currency = (input.currency || 'KES').trim().toUpperCase();
     const exchangeRate = input.exchangeRate && input.exchangeRate > 0 ? input.exchangeRate : 1;
-    
-    // 1. Find Accounts Payable account (Code 2000)
-    const apAccount = await AccountService.getAccountByCode(input.orgId, '2000');
-    if (!apAccount) {
-      throw new Error('A/P account (2000) not found. Please import the standard chart of accounts.');
-    }
+    const lines = input.lines.map((line) => ({
+      description: line.description.trim(),
+      accountId: line.accountId,
+      amountCents: Math.trunc(line.amountCents),
+      foreignAmountCents: line.foreignAmountCents == null ? null : Math.trunc(line.foreignAmountCents),
+      taxCents: Math.trunc(line.taxCents || 0),
+    }));
 
-    // 2. Calculate Total in foreign and base currency
-    let totalCents = 0;
-    let totalForeignCents = 0;
-    for (const line of input.lines) {
-      const lineForeign = line.foreignAmountCents || line.amountCents;
-      totalForeignCents += lineForeign;
-      totalCents += line.amountCents;
-    }
+    const supabase = getSupabase();
+    const { data, error } = await supabase.rpc('create_bill_with_journal', {
+      p_org_id: input.orgId,
+      p_vendor_id: input.vendorId,
+      p_bill_date: input.billDate,
+      p_due_date: input.dueDate,
+      p_currency: currency,
+      p_exchange_rate: exchangeRate,
+      p_notes: input.notes?.trim() || null,
+      p_created_by: input.createdBy,
+      p_idempotency_key: input.idempotencyKey,
+      p_lines: lines,
+    });
 
-    if (totalCents === 0 && totalForeignCents > 0) {
-      totalCents = Math.round(totalForeignCents / exchangeRate);
-    }
+    if (error) throw error;
+    if (typeof data !== 'string') throw new Error('Bill creation did not return a bill ID.');
+    return data;
+  }
 
-    // 3. Prepare Ledger Lines (Credit A/P in base currency equivalent, Debit Expense/COGS)
-    const journalLines = [
-      {
-        accountId: apAccount.id,
-        debit: 0,
-        credit: totalCents,
-        description: currency !== 'KES' ? `Bill A/P (${currency} ${(totalForeignCents / 100).toFixed(2)} @ ${exchangeRate})` : undefined,
-        entityType: 'VENDOR' as const,
-        entityId: input.vendorId,
-      }
-    ];
-
-    for (const line of input.lines) {
-      const lineAmountCents = line.amountCents || Math.round((line.foreignAmountCents || 0) / exchangeRate);
-      journalLines.push({
-        accountId: line.accountId,
-        debit: lineAmountCents,
-        credit: 0,
-        description: line.description,
-        entityType: 'VENDOR' as const,
-        entityId: input.vendorId,
-      });
-    }
-
-    const { data: counterData, error: counterError } = await supabase.rpc('increment_and_get', { p_org_id: input.orgId, p_doc_type: 'BILL' });
-    if (counterError) throw counterError;
-    const billNo = `BILL-${new Date(input.billDate).getFullYear()}-${String(counterData).padStart(4, '0')}`;
-
-    // 4. Save Bill Record (we save it first to get the ID for the ledger)
-    const { data: bill, error: billError } = await supabase
-      .from('bills')
-      .insert({
-        org_id: input.orgId,
-        vendor_id: input.vendorId,
-        bill_number: billNo,
-        date: input.billDate,
-        due_date: input.dueDate,
-        subtotal_cents: totalCents,
-        tax_cents: 0,
-        total_cents: totalCents,
-        amount_due_cents: totalCents,
-        status: 'OPEN',
-        currency: currency,
-        notes: input.notes || null,
-        created_by: input.createdBy || null
-      })
-      .select('id')
-      .single();
-      
-    if (billError) throw billError;
-    const billRefId = bill.id;
-
-    // 5. Post to Ledger Core (Asserts double-entry integrity)
-    try {
-      await LedgerService.postJournalEntry({
-        orgId: input.orgId,
-        entryDate: input.billDate,
-        memo: `Bill ${billNo}${currency !== 'KES' ? ` [${currency}]` : ''}`,
-        sourceType: 'BILL',
-        sourceId: billRefId,
-        referenceNo: billNo,
-        createdBy: input.createdBy,
-        lines: journalLines
-      });
-    } catch (error) {
-      const { error: cleanupError } = await supabase
+  static async recordPayment(orgId: string, billId: string, input: BillPaymentInput) {
+    const supabase = getSupabase();
+    const [billResult] = await Promise.all([
+      supabase
         .from('bills')
-        .delete()
-        .eq('id', billRefId)
-        .eq('org_id', input.orgId);
+        .select('id, status, amount_due_cents')
+        .eq('org_id', orgId)
+        .eq('id', billId)
+        .maybeSingle(),
+      assertPaymentAccount(orgId, input.sourceAccountId),
+    ]);
 
-      if (cleanupError) {
-        console.error('Failed to remove bill after ledger posting failed:', cleanupError);
+    if (billResult.error) throw billResult.error;
+    const bill = billResult.data;
+    if (!bill) throw new Error('Bill not found in this organization.');
+    if (bill.status === 'VOID') throw new Error('A void bill cannot be paid.');
+    if (input.amountCents > Number(bill.amount_due_cents)) throw new Error('Payment cannot exceed the bill amount due.');
+
+    const { data, error } = await supabase.rpc('pay_bill', {
+      p_org_id: orgId,
+      p_bill_id: billId,
+      p_amount_cents: Math.trunc(input.amountCents),
+      p_payment_date: input.paymentDate,
+      p_source_account_id: input.sourceAccountId,
+      p_idempotency_key: input.idempotencyKey,
+      p_created_by: input.createdBy,
+    });
+
+    if (error) throw error;
+    return data as {
+      paymentId: string;
+      journalEntryId: string;
+      amountDueCents: number;
+      status: string;
+    };
+  }
+
+  static async recordBatchPayment(
+    orgId: string,
+    payments: BillBatchPaymentInput[],
+    paidBy: string,
+  ): Promise<{ paid: number; failed: number; errors: Array<{ index: number; message: string }> }> {
+    let paid = 0;
+    const errors: Array<{ index: number; message: string }> = [];
+
+    for (const [index, payment] of payments.entries()) {
+      try {
+        const { billId, ...paymentInput } = payment;
+        await this.recordPayment(orgId, billId, { ...paymentInput, createdBy: paidBy });
+        paid += 1;
+      } catch (err) {
+        errors.push({ index, message: err instanceof Error ? err.message : 'Payment failed.' });
       }
-      throw error;
     }
 
-    return billRefId;
+    return { paid, failed: errors.length, errors };
   }
 
   static async voidBill(orgId: string, billId: string, voidedBy: string) {
     const supabase = getSupabase();
-    
-    // Get bill to void
-    const { data: bill, error: billError } = await supabase
-      .from('bills')
-      .select('*')
-      .eq('id', billId)
-      .eq('org_id', orgId)
-      .single();
-      
-    if (billError || !bill) {
-      throw new Error('Bill not found or already voided');
-    }
-    
-    if (bill.status === 'VOID') {
-      return; // Already voided
-    }
-
-    // Reverse the journal entries FIRST. Only flip the bill's status once
-    // the reversing entry has actually posted, so a failed reversal never
-    // leaves the bill marked VOID with the original ledger entry still live.
-    const journalEntries = await LedgerService.getJournalEntries(orgId);
-    const originalEntry = journalEntries.find(je => je.sourceType === 'BILL' && je.sourceId === billId);
-
-    if (originalEntry) {
-      const reversingLines = originalEntry.lines.map(line => ({
-        accountId: line.accountId,
-        debit: line.credit,
-        credit: line.debit,
-        description: `VOID: ${line.description || ''}`,
-        entityType: line.entityType,
-        entityId: line.entityId
-      }));
-
-      await LedgerService.postJournalEntry({
-        orgId: orgId,
-        entryDate: new Date().toISOString().split('T')[0],
-        memo: `Void Bill ${bill.bill_number}`,
-        sourceType: 'BILL',
-        sourceId: billId,
-        referenceNo: `VOID-${bill.bill_number}`,
-        createdBy: voidedBy,
-        lines: reversingLines
-      });
-    }
-
-    // Update bill status only after the reversal succeeded (or there was no
-    // original entry to reverse).
-    const { error: updateError } = await supabase
-      .from('bills')
-      .update({ status: 'VOID' })
-      .eq('id', billId);
-
-    if (updateError) throw updateError;
-  }
-
-  /**
-   * Records a real cash payment against an open bill: posts a Debit A/P
-   * (2000) / Credit Cash (1000) journal entry, then marks the bill PAID.
-   * Previously "batch bill payment" only flipped the status label via the
-   * generic bulk-status-update endpoint with no corresponding ledger entry.
-   */
-  static async recordPayment(orgId: string, billId: string, paymentDate: string, paidBy: string): Promise<void> {
-    const supabase = getSupabase();
-
-    const { data: bill, error: billError } = await supabase
-      .from('bills')
-      .select('*')
-      .eq('id', billId)
-      .eq('org_id', orgId)
-      .single();
-
-    if (billError || !bill) throw new Error('Bill not found.');
-    if (bill.status === 'PAID') return;
-    if (bill.status === 'VOID') throw new Error('Cannot pay a voided bill.');
-    if (!bill.amount_due_cents || bill.amount_due_cents <= 0) throw new Error('Bill has no amount due.');
-
-    const apAccount = await AccountService.getAccountByCode(orgId, '2000');
-    const cashAccount = await AccountService.getAccountByCode(orgId, '1000');
-    if (!apAccount || !cashAccount) {
-      throw new Error('A/P (2000) or Cash (1000) account not found. Seed the chart of accounts.');
-    }
-
-    await LedgerService.postJournalEntry({
-      orgId,
-      entryDate: paymentDate,
-      memo: `Payment for Bill ${bill.bill_number}`,
-      sourceType: 'PAYMENT',
-      sourceId: billId,
-      referenceNo: `PAY-${bill.bill_number}`,
-      createdBy: paidBy,
-      lines: [
-        { accountId: apAccount.id, debit: bill.amount_due_cents, credit: 0, description: `Settle Bill ${bill.bill_number}` },
-        { accountId: cashAccount.id, debit: 0, credit: bill.amount_due_cents, description: `Cash paid for Bill ${bill.bill_number}` }
-      ]
+    const { error } = await supabase.rpc('void_bill_with_reversal', {
+      p_org_id: orgId,
+      p_bill_id: billId,
+      p_void_date: new Date().toISOString().slice(0, 10),
+      p_created_by: voidedBy,
     });
-
-    const { error: updateError } = await supabase
-      .from('bills')
-      .update({ status: 'PAID', amount_due_cents: 0 })
-      .eq('id', billId)
-      .eq('org_id', orgId);
-
-    if (updateError) throw updateError;
+    if (error) throw error;
   }
 
-  static async recordBatchPayment(orgId: string, billIds: string[], paymentDate: string, paidBy: string): Promise<{ paid: number; failed: number }> {
-    let paid = 0;
-    let failed = 0;
-    for (const billId of billIds) {
-      try {
-        await this.recordPayment(orgId, billId, paymentDate, paidBy);
-        paid++;
-      } catch (err) {
-        failed++;
-      }
-    }
-    return { paid, failed };
-  }
-
-  static async updateBill(orgId: string, id: string, input: any) {
+  static async updateBill(orgId: string, id: string, input: { dueDate?: string; notes?: string; status?: never }) {
     const supabase = getSupabase();
-
-    if (input.status !== undefined) {
+    if ((input as any).status !== undefined) {
       throw new Error('Bill status must be changed through a dedicated payment or void workflow.');
     }
-    
-    // Only allow metadata updates
-    const updateData: any = {};
+
+    const updateData: Record<string, unknown> = {};
     if (input.dueDate !== undefined) updateData.due_date = input.dueDate;
-    if (input.notes !== undefined) updateData.notes = input.notes;
-    
+    if (input.notes !== undefined) updateData.notes = input.notes.trim() || null;
+
     if (Object.keys(updateData).length > 0) {
-      const { error } = await supabase
+      const { data, error } = await supabase
         .from('bills')
         .update(updateData)
         .eq('id', id)
-        .eq('org_id', orgId);
-        
+        .eq('org_id', orgId)
+        .select('id')
+        .maybeSingle();
       if (error) throw error;
+      if (!data) throw new Error('Bill not found in this organization.');
     }
   }
 }

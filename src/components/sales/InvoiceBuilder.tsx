@@ -14,10 +14,11 @@ interface Line {
   description: string;
   accountId: string;
   amount: string;
+  taxRate: string;
 }
 
 /** Particulars, account, amount and a remove control, shared by the column heads and every line. */
-const LINE_GRID = 'sm:grid-cols-[minmax(0,1fr)_14rem_10rem_2rem]';
+const LINE_GRID = 'sm:grid-cols-[minmax(0,1fr)_14rem_5rem_10rem_2rem]';
 
 const toCents = (value: string) => Math.round(parseFloat(value || '0') * 100) || 0;
 
@@ -36,10 +37,11 @@ export function InvoiceBuilder({ onDone }: { onDone: () => void }) {
   const [dueDate, setDueDate] = useState(format(addDays(new Date(), 30), 'yyyy-MM-dd'));
   const [currency, setCurrency] = useState(base);
   const [rate, setRate] = useState('1');
-  const [lines, setLines] = useState<Line[]>([{ key: 1, description: '', accountId: '', amount: '' }]);
+  const [lines, setLines] = useState<Line[]>([{ key: 1, description: '', accountId: '', amount: '', taxRate: '0' }]);
   const [isAddingCustomer, setIsAddingCustomer] = useState(false);
   const [problem, setProblem] = useState('');
   const [isPosting, setIsPosting] = useState(false);
+  const [idempotencyKey] = useState(() => crypto.randomUUID());
 
   const customersQuery = useQuery({
     queryKey: ['customers', currentOrgId],
@@ -63,10 +65,18 @@ export function InvoiceBuilder({ onDone }: { onDone: () => void }) {
   const incomeAccounts: any[] = (accountsQuery.data?.accounts || []).filter((a: any) => a.type === 'INCOME');
   const isForeign = currency !== base;
   const rateNum = parseFloat(rate) > 0 ? parseFloat(rate) : 1;
-  const totalCents = lines.reduce((s, l) => s + toCents(l.amount), 0);
+  const subtotalCents = lines.reduce((sum, line) => sum + toCents(line.amount), 0);
+  const baseTaxCents = lines.reduce((sum, line) => {
+    const netCents = toCents(line.amount);
+    const taxRate = Number(line.taxRate) || 0;
+    const baseNetCents = isForeign ? Math.round(netCents / rateNum) : netCents;
+    return sum + Math.round(baseNetCents * taxRate / 100);
+  }, 0);
+  const displayedTaxCents = isForeign ? Math.round(baseTaxCents * rateNum) : baseTaxCents;
+  const totalCents = subtotalCents + displayedTaxCents;
 
   const setLine = (key: number, patch: Partial<Line>) => setLines((prev) => prev.map((l) => (l.key === key ? { ...l, ...patch } : l)));
-  const addLine = () => setLines((prev) => [...prev, { key: Math.max(...prev.map((l) => l.key)) + 1, description: '', accountId: incomeAccounts[0]?.id || '', amount: '' }]);
+  const addLine = () => setLines((prev) => [...prev, { key: Math.max(...prev.map((l) => l.key)) + 1, description: '', accountId: incomeAccounts[0]?.id || '', amount: '', taxRate: '0' }]);
   const removeLine = (key: number) => setLines((prev) => (prev.length > 1 ? prev.filter((l) => l.key !== key) : prev));
 
   const changeCurrency = (code: string) => {
@@ -77,7 +87,7 @@ export function InvoiceBuilder({ onDone }: { onDone: () => void }) {
   const post = async (e: React.FormEvent) => {
     e.preventDefault();
     setProblem('');
-    if (totalCents <= 0) {
+    if (subtotalCents <= 0) {
       setProblem('Enter an amount on at least one line.');
       return;
     }
@@ -92,11 +102,19 @@ export function InvoiceBuilder({ onDone }: { onDone: () => void }) {
           dueDate: new Date(dueDate).toISOString(),
           currency,
           exchangeRate: rateNum,
+          idempotencyKey,
           // A foreign line is sent as its foreign amount; the server converts it
           // to the base currency at the invoice rate before posting.
           lines: lines
             .filter((l) => toCents(l.amount) > 0)
-            .map((l) => (isForeign ? { description: l.description, accountId: l.accountId, amountCents: 0, foreignAmountCents: toCents(l.amount) } : { description: l.description, accountId: l.accountId, amountCents: toCents(l.amount) })),
+            .map((l) => {
+              const foreignOrBaseNet = toCents(l.amount);
+              const baseNet = isForeign ? Math.round(foreignOrBaseNet / rateNum) : foreignOrBaseNet;
+              const taxCents = Math.round(baseNet * (Number(l.taxRate) || 0) / 100);
+              return isForeign
+                ? { description: l.description, accountId: l.accountId, amountCents: baseNet, foreignAmountCents: foreignOrBaseNet, taxCents }
+                : { description: l.description, accountId: l.accountId, amountCents: baseNet, taxCents };
+            }),
         }),
       });
       if (!res.ok) {
@@ -172,6 +190,7 @@ export function InvoiceBuilder({ onDone }: { onDone: () => void }) {
               <div className={`hidden border-b border-feint-strong pb-1.5 sm:grid ${LINE_GRID}`} aria-hidden="true">
                 <span className="ll-printed text-[11px] text-graphite-600">Particulars</span>
                 <span className="ll-printed text-[11px] text-graphite-600">Income account</span>
+                <span className="ll-printed text-right text-[11px] text-graphite-600">VAT %</span>
                 <span className="ll-printed text-right text-[11px] text-graphite-600">Amount</span>
                 <span />
               </div>
@@ -190,6 +209,19 @@ export function InvoiceBuilder({ onDone }: { onDone: () => void }) {
                           <option key={a.id} value={a.id}>{a.code} · {a.name}</option>
                         ))}
                       </select>
+                    </label>
+                    <label className="block">
+                      <span className="mb-1 block text-[12.5px] text-graphite-600 sm:sr-only">Line {i + 1} VAT percentage</span>
+                      <input
+                        type="number"
+                        min="0"
+                        max="100"
+                        step="0.01"
+                        inputMode="decimal"
+                        value={l.taxRate}
+                        onChange={(e) => setLine(l.key, { taxRate: e.target.value })}
+                        className="h-10 w-full border px-2 text-right tabular-currency sm:h-9"
+                      />
                     </label>
                     <div className="flex items-end gap-2">
                       <label className="block min-w-0 flex-1">
@@ -221,18 +253,28 @@ export function InvoiceBuilder({ onDone }: { onDone: () => void }) {
                   </li>
                 ))}
               </ol>
-              <div className="ll-total flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1 py-2 sm:pr-[calc(2rem+0.75rem)]">
-                <span className="font-semibold text-ink-900">
-                  Total
-                  {isForeign && totalCents > 0 && (
-                    <span className="ml-2 font-normal text-graphite-600">
-                      posts as <Amount cents={Math.round(totalCents / rateNum)} currency={base} size="xs" tone="ink" />
-                    </span>
-                  )}
-                </span>
-                <span className="font-semibold" aria-live="polite">
-                  <Amount cents={totalCents} currency={currency} tone="ink" />
-                </span>
+              <div className="sm:pr-[calc(2rem+0.75rem)]">
+                <div className="flex items-baseline justify-between gap-4 border-b border-feint py-1.5 text-[13px] text-graphite-600">
+                  <span>Subtotal</span>
+                  <Amount cents={subtotalCents} currency={currency} size="xs" tone="ink" />
+                </div>
+                <div className="flex items-baseline justify-between gap-4 border-b border-feint py-1.5 text-[13px] text-graphite-600">
+                  <span>VAT</span>
+                  <Amount cents={displayedTaxCents} currency={currency} size="xs" tone="ink" />
+                </div>
+                <div className="ll-total flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1 py-2">
+                  <span className="font-semibold text-ink-900">
+                    Total
+                    {isForeign && totalCents > 0 && (
+                      <span className="ml-2 font-normal text-graphite-600">
+                        posts as <Amount cents={Math.round(subtotalCents / rateNum) + baseTaxCents} currency={base} size="xs" tone="ink" />
+                      </span>
+                    )}
+                  </span>
+                  <span className="font-semibold" aria-live="polite">
+                    <Amount cents={totalCents} currency={currency} tone="ink" />
+                  </span>
+                </div>
               </div>
             </div>
             <button type="button" onClick={addLine} className={`${buttonClass.quiet} mt-3`}>

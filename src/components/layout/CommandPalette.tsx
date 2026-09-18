@@ -274,7 +274,7 @@ export function CommandPalette() {
                     </div>
                     <div className="flex shrink-0 items-baseline gap-3">
                       {item.cents !== undefined && <Amount cents={item.cents} currency={baseCurrency} size="sm" tone="ink" />}
-                      {item.shortcut && <kbd className="border border-field px-1.5 py-0.5 text-[10.5px] text-graphite-600">{item.shortcut}</kbd>}
+                      {item.shortcut && <kbd className="hidden border border-field px-1.5 py-0.5 text-[10.5px] text-graphite-600 sm:inline">{item.shortcut}</kbd>}
                     </div>
                   </li>
                 </React.Fragment>
@@ -283,14 +283,17 @@ export function CommandPalette() {
           )}
         </ul>
 
-        <div className="flex items-center gap-4 border-t border-feint px-4 py-2 text-[11.5px] text-graphite-600">
-          <span>
-            <kbd className="border border-field px-1">↑</kbd> <kbd className="border border-field px-1">↓</kbd> to move
-          </span>
-          <span>
-            <kbd className="border border-field px-1">Enter</kbd> to open
-          </span>
-          <span className="hidden sm:inline">Number keys open pages from anywhere</span>
+        <div className="border-t border-feint px-4 py-2 text-[11.5px] text-graphite-600">
+          <span className="sm:hidden">Tap a result to open it</span>
+          <div className="hidden items-center gap-4 sm:flex">
+            <span>
+              <kbd className="border border-field px-1">↑</kbd> <kbd className="border border-field px-1">↓</kbd> to move
+            </span>
+            <span>
+              <kbd className="border border-field px-1">Enter</kbd> to open
+            </span>
+            <span>Number keys open pages from anywhere</span>
+          </div>
         </div>
       </div>
     </div>

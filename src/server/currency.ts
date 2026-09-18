@@ -157,140 +157,110 @@ export class CurrencyService {
   static async calculateUnrealizedFX(orgId: string, baseCurrency: string = 'KES'): Promise<UnrealizedFXBreakdown> {
     const supabase = getSupabase();
     const liveRates = await this.fetchLiveRates(baseCurrency);
+    if (liveRates.source === 'System Base Reserves (Offline Safe)') {
+      throw new Error('Live exchange rates are unavailable. FX revaluation was not calculated from fallback rates.');
+    }
     const rates = liveRates.rates;
-
-    const getBaseMultiplier = (foreignCurrency: string, rateValue?: number): number => {
-      const curr = foreignCurrency.toUpperCase();
-      if (curr === baseCurrency.toUpperCase()) return 1;
-      const r = rateValue || rates[curr];
-      if (!r || r === 0) return 1;
-      return 1 / r;
-    };
-
+    const normalizedBase = baseCurrency.toUpperCase();
     const breakdownItems: UnrealizedFXBreakdown['items'] = [];
     let receivablesGainLossCents = 0;
     let payablesGainLossCents = 0;
-    let bankHoldingsGainLossCents = 0;
+    const bankHoldingsGainLossCents = 0;
+
+    const relatedName = (relation: any, fallback: string) => {
+      const record = Array.isArray(relation) ? relation[0] : relation;
+      return record?.display_name || fallback;
+    };
+
+    const outstandingForeignAmount = (row: any) => {
+      const foreignTotal = Number(row.foreign_amount_cents);
+      const baseTotal = Number(row.total_cents);
+      const baseDue = Number(row.amount_due_cents);
+      if (!Number.isFinite(foreignTotal) || !Number.isFinite(baseTotal) || !Number.isFinite(baseDue) || baseTotal <= 0 || baseDue <= 0) {
+        return 0;
+      }
+      return Math.round(foreignTotal * (baseDue / baseTotal));
+    };
 
     // 1. Evaluate Open Receivables (Invoices)
     const { data: invoices, error: invoicesError } = await supabase
       .from('invoices')
-      .select('*')
+      .select('id, invoice_number, customer_id, currency, exchange_rate, foreign_amount_cents, total_cents, amount_due_cents, status, customer:customers(display_name)')
       .eq('org_id', orgId)
-      .neq('status', 'PAID');
+      .neq('status', 'PAID')
+      .neq('status', 'VOID');
 
-    if (!invoicesError && invoices) {
-      invoices.forEach(data => {
-        const foreignCurr = (data.currency || 'KES').toUpperCase();
-        const foreignAmountCents = data.foreign_amount_cents || data.total_cents || 0;
-        const bookedRate = data.exchange_rate || rates[foreignCurr] || 1;
-        const currentRate = rates[foreignCurr] || bookedRate;
+    if (invoicesError) throw invoicesError;
+    for (const data of invoices || []) {
+      const foreignCurr = (data.currency || normalizedBase).toUpperCase();
+      if (foreignCurr === normalizedBase) continue;
 
-        if (foreignCurr !== baseCurrency.toUpperCase()) {
-          const bookedBaseCents = Math.round(foreignAmountCents * getBaseMultiplier(foreignCurr, bookedRate));
-          const currentBaseCents = Math.round(foreignAmountCents * getBaseMultiplier(foreignCurr, currentRate));
-          const gainLossCents = currentBaseCents - bookedBaseCents;
+      const bookedRate = Number(data.exchange_rate);
+      const currentRate = Number(rates[foreignCurr]);
+      const foreignAmountCents = outstandingForeignAmount(data);
+      if (bookedRate <= 0 || currentRate <= 0 || foreignAmountCents <= 0) continue;
 
-          receivablesGainLossCents += gainLossCents;
-          breakdownItems.push({
-            id: data.id,
-            entityType: 'INVOICE',
-            referenceNo: data.invoice_number || `INV-${data.id.substring(0, 5)}`,
-            partyName: data.customer_id || 'International Client', // Need lookup for real name, simplifying for now
-            foreignCurrency: foreignCurr,
-            foreignAmountCents,
-            bookedRate,
-            currentRate,
-            bookedBaseCents,
-            currentBaseCents,
-            gainLossCents,
-            status: data.status || 'SENT'
-          });
-        }
+      const bookedBaseCents = Number(data.amount_due_cents);
+      const currentBaseCents = Math.round(foreignAmountCents / currentRate);
+      const gainLossCents = currentBaseCents - bookedBaseCents;
+      receivablesGainLossCents += gainLossCents;
+      breakdownItems.push({
+        id: data.id,
+        entityType: 'INVOICE',
+        referenceNo: data.invoice_number || `INV-${data.id.substring(0, 5)}`,
+        partyName: relatedName(data.customer, 'Customer'),
+        foreignCurrency: foreignCurr,
+        foreignAmountCents,
+        bookedRate,
+        currentRate,
+        bookedBaseCents,
+        currentBaseCents,
+        gainLossCents,
+        status: data.status || 'SENT'
       });
     }
 
     // 2. Evaluate Open Payables (Bills)
     const { data: bills, error: billsError } = await supabase
       .from('bills')
-      .select('*')
+      .select('id, bill_number, vendor_id, currency, exchange_rate, foreign_amount_cents, total_cents, amount_due_cents, status, vendor:vendors(display_name)')
       .eq('org_id', orgId)
-      .neq('status', 'PAID');
+      .neq('status', 'PAID')
+      .neq('status', 'VOID');
 
-    if (!billsError && bills) {
-      bills.forEach(data => {
-        const foreignCurr = (data.currency || 'KES').toUpperCase();
-        const foreignAmountCents = data.foreign_amount_cents || data.total_cents || 0;
-        const bookedRate = data.exchange_rate || rates[foreignCurr] || 1;
-        const currentRate = rates[foreignCurr] || bookedRate;
+    if (billsError) throw billsError;
+    for (const data of bills || []) {
+      const foreignCurr = (data.currency || normalizedBase).toUpperCase();
+      if (foreignCurr === normalizedBase) continue;
 
-        if (foreignCurr !== baseCurrency.toUpperCase()) {
-          const bookedBaseCents = Math.round(foreignAmountCents * getBaseMultiplier(foreignCurr, bookedRate));
-          const currentBaseCents = Math.round(foreignAmountCents * getBaseMultiplier(foreignCurr, currentRate));
-          const gainLossCents = bookedBaseCents - currentBaseCents;
+      const bookedRate = Number(data.exchange_rate);
+      const currentRate = Number(rates[foreignCurr]);
+      const foreignAmountCents = outstandingForeignAmount(data);
+      if (bookedRate <= 0 || currentRate <= 0 || foreignAmountCents <= 0) continue;
 
-          payablesGainLossCents += gainLossCents;
-          breakdownItems.push({
-            id: data.id,
-            entityType: 'BILL',
-            referenceNo: data.bill_number || `BILL-${data.id.substring(0, 5)}`,
-            partyName: data.vendor_id || 'Overseas Supplier', // Need lookup for real name
-            foreignCurrency: foreignCurr,
-            foreignAmountCents,
-            bookedRate,
-            currentRate,
-            bookedBaseCents,
-            currentBaseCents,
-            gainLossCents,
-            status: data.status || 'OPEN'
-          });
-        }
+      const bookedBaseCents = Number(data.amount_due_cents);
+      const currentBaseCents = Math.round(foreignAmountCents / currentRate);
+      const gainLossCents = bookedBaseCents - currentBaseCents;
+      payablesGainLossCents += gainLossCents;
+      breakdownItems.push({
+        id: data.id,
+        entityType: 'BILL',
+        referenceNo: data.bill_number || `BILL-${data.id.substring(0, 5)}`,
+        partyName: relatedName(data.vendor, 'Vendor'),
+        foreignCurrency: foreignCurr,
+        foreignAmountCents,
+        bookedRate,
+        currentRate,
+        bookedBaseCents,
+        currentBaseCents,
+        gainLossCents,
+        status: data.status || 'OPEN'
       });
     }
 
-    // 3. Evaluate Foreign Currency Bank / Cash Accounts
-    const { data: accounts, error: accountsError } = await supabase
-      .from('accounts')
-      .select('*')
-      .eq('org_id', orgId);
-
-    if (!accountsError && accounts) {
-      accounts.forEach(acc => {
-        const code = acc.code || '';
-        const name = (acc.name || '').toUpperCase();
-        
-        let foreignCurr = '';
-        if (code === '1010' || name.includes('USD')) foreignCurr = 'USD';
-        else if (code === '1020' || name.includes('EUR')) foreignCurr = 'EUR';
-        else if (name.includes('GBP')) foreignCurr = 'GBP';
-
-        if (foreignCurr && foreignCurr !== baseCurrency.toUpperCase()) {
-          const foreignAmountCents = 1500000; // Simulated
-          const bookedRate = (rates[foreignCurr] ? rates[foreignCurr] * 1.03 : 1);
-          const currentRate = rates[foreignCurr] || bookedRate;
-
-          const bookedBaseCents = Math.round(foreignAmountCents * getBaseMultiplier(foreignCurr, bookedRate));
-          const currentBaseCents = Math.round(foreignAmountCents * getBaseMultiplier(foreignCurr, currentRate));
-          const gainLossCents = currentBaseCents - bookedBaseCents;
-
-          bankHoldingsGainLossCents += gainLossCents;
-          breakdownItems.push({
-            id: acc.id,
-            entityType: 'BANK_ACCOUNT',
-            referenceNo: acc.code || '1010',
-            partyName: acc.name,
-            foreignCurrency: foreignCurr,
-            foreignAmountCents,
-            bookedRate,
-            currentRate,
-            bookedBaseCents,
-            currentBaseCents,
-            gainLossCents,
-            status: 'ACTIVE'
-          });
-        }
-      });
-    }
+    // Foreign bank holdings are deliberately omitted until balances store both
+    // their transaction-currency amount and historical carrying amount. Account
+    // names and guessed balances are not accounting evidence.
 
     const totalUnrealizedGainLossCents = receivablesGainLossCents + payablesGainLossCents + bankHoldingsGainLossCents;
 
@@ -320,8 +290,8 @@ export class CurrencyService {
       receivablesGainLossCents,
       payablesGainLossCents,
       bankHoldingsGainLossCents,
-      baseCurrency,
-      asOfDate: new Date().toISOString(),
+      baseCurrency: normalizedBase,
+      asOfDate: liveRates.date,
       items: breakdownItems,
       currencySummaries
     };

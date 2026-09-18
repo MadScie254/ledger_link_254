@@ -1,6 +1,6 @@
 import { format } from 'date-fns';
 import { useQuery } from '@tanstack/react-query';
-import * as XLSX from 'xlsx';
+import { downloadCsv } from '../../utils/exportCsv';
 import { useAppStore } from '../../store';
 import { FinancialPDFEngine } from '../../utils/pdfExport';
 import { StatementPage, useStatementFigures } from '../ledger/Statement';
@@ -52,15 +52,13 @@ export function TrialBalanceView({ onBack }: { onBack: () => void }) {
     );
   };
 
-  const handleExportExcel = () => {
+  const handleExportCsv = () => {
     const excelRows = [
       ['Account Code', 'Account Name', 'Type', 'Debit (KES)', 'Credit (KES)'],
       ...rows.map((r: any) => [r.code, r.name, r.type, (r.debitCents || 0) / 100, (r.creditCents || 0) / 100]),
       ['', 'TOTALS', isBalanced ? 'BALANCED' : 'UNBALANCED', totalDebit / 100, totalCredit / 100],
     ];
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(excelRows), 'Trial Balance');
-    XLSX.writeFile(wb, 'trial_balance.xlsx');
+    downloadCsv('trial_balance.csv', excelRows);
   };
 
   const figure = (cents: number) => (cents ? <Amount cents={shown(cents)} currency={currency} tone="ink" /> : <span className="text-graphite-400">–</span>);
@@ -72,7 +70,7 @@ export function TrialBalanceView({ onBack }: { onBack: () => void }) {
       onBack={onBack}
       loading={report.isLoading}
       problem={report.isError ? { what: 'the trial balance', path: '/api/reports/trial-balance', onRetry: () => report.refetch() } : null}
-      onExcel={handleExportExcel}
+      onCsv={handleExportCsv}
       onPdf={handleExportPDF}
     >
       {rows.length === 0 ? (

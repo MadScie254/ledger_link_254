@@ -9,6 +9,7 @@ import { EntityDrillDownModal } from '../common/EntityDrillDownModal';
 import { BulkActionBar } from '../common/BulkActionBar';
 import { useAppStore } from '../../store';
 import { Amount } from '../ledger/Amount';
+import { Dialog, Field } from '../ledger/Dialog';
 import { Mark } from '../ledger/Mark';
 import { PageHeading, PageNote, buttonClass } from '../ledger/Page';
 
@@ -18,6 +19,12 @@ export function SalesView() {
   const [isBuilding, setIsBuilding] = useState(false);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [selectedInvoice, setSelectedInvoice] = useState<any | null>(null);
+  const [paymentInvoice, setPaymentInvoice] = useState<any | null>(null);
+  const [paymentAmount, setPaymentAmount] = useState('');
+  const [paymentDate, setPaymentDate] = useState(format(new Date(), 'yyyy-MM-dd'));
+  const [depositAccountId, setDepositAccountId] = useState('');
+  const [paymentIdempotencyKey, setPaymentIdempotencyKey] = useState('');
+  const [paymentProblem, setPaymentProblem] = useState('');
 
   const queryClient = useQueryClient();
 
@@ -39,6 +46,15 @@ export function SalesView() {
     }
   });
 
+  const { data: accountsData } = useQuery({
+    queryKey: ['accounts', currentOrgId],
+    queryFn: async () => {
+      const res = await fetch('/api/accounts', { headers: { 'x-org-id': currentOrgId } });
+      if (!res.ok) throw new Error('Failed to fetch accounts');
+      return res.json();
+    }
+  });
+
   // Bulk Delete Invoices
   const bulkDeleteMutation = useMutation({
     mutationFn: async (ids: string[]) => {
@@ -56,20 +72,33 @@ export function SalesView() {
     }
   });
 
-  // Bulk Status Update Invoices
-  const bulkStatusMutation = useMutation({
-    mutationFn: async ({ ids, status }: { ids: string[], status: string }) => {
-      const res = await fetch('/api/bulk/status-update', {
+  const receivePaymentMutation = useMutation({
+    mutationFn: async (payment: { invoiceId: string; amountCents: number; paymentDate: string; depositAccountId: string; idempotencyKey: string }) => {
+      const res = await fetch(`/api/invoices/${payment.invoiceId}/payments`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'x-org-id': currentOrgId },
-        body: JSON.stringify({ entityType: 'INVOICES', ids, status })
+        body: JSON.stringify({
+          amountCents: payment.amountCents,
+          paymentDate: payment.paymentDate,
+          depositAccountId: payment.depositAccountId,
+          idempotencyKey: payment.idempotencyKey,
+        })
       });
-      if (!res.ok) throw new Error('Failed to update status');
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        throw new Error(body.error || 'The payment could not be recorded.');
+      }
       return res.json();
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['invoices', currentOrgId] });
+      queryClient.invalidateQueries({ queryKey: ['accounts', currentOrgId] });
       setSelectedIds([]);
+      setPaymentInvoice(null);
+      setPaymentProblem('');
+    },
+    onError: (error) => {
+      setPaymentProblem(error instanceof Error ? error.message : 'The payment could not be recorded.');
     }
   });
 
@@ -113,10 +142,44 @@ export function SalesView() {
 
   const baseCurrency = activeCompany?.baseCurrency || 'KES';
   const invoices: any[] = invoicesData?.invoices || [];
+  const depositAccounts: any[] = (accountsData?.accounts || []).filter((account: any) => account.type === 'ASSET' && account.isActive !== false);
   const customerName = (id: string) => customersData?.customers?.find((c: any) => c.id === id)?.displayName;
   const invoiceTotal = invoices.reduce((sum, inv) => sum + (inv.totalCents || 0), 0);
   const overdueCount = invoices.filter((inv) => inv.status === 'OVERDUE').length;
-  const openCount = invoices.filter((inv) => inv.status !== 'PAID' && inv.status !== 'DRAFT').length;
+  const openCount = invoices.filter((inv) => !['PAID', 'DRAFT', 'VOID'].includes(inv.status)).length;
+
+  const openPayment = (invoice: any) => {
+    setPaymentInvoice(invoice);
+    setPaymentAmount(((invoice.amountDueCents || 0) / 100).toFixed(2));
+    setPaymentDate(format(new Date(), 'yyyy-MM-dd'));
+    setDepositAccountId(depositAccounts[0]?.id || '');
+    setPaymentIdempotencyKey(crypto.randomUUID());
+    setPaymentProblem('');
+  };
+
+  const submitPayment = () => {
+    if (!paymentInvoice) return;
+    const amountCents = Math.round(Number(paymentAmount) * 100);
+    if (!Number.isSafeInteger(amountCents) || amountCents <= 0) {
+      setPaymentProblem('Enter a payment amount greater than zero.');
+      return;
+    }
+    if (amountCents > Number(paymentInvoice.amountDueCents || 0)) {
+      setPaymentProblem('Payment cannot exceed the amount due.');
+      return;
+    }
+    if (!depositAccountId) {
+      setPaymentProblem('Choose the account that received the money.');
+      return;
+    }
+    receivePaymentMutation.mutate({
+      invoiceId: paymentInvoice.id,
+      amountCents,
+      paymentDate,
+      depositAccountId,
+      idempotencyKey: paymentIdempotencyKey,
+    });
+  };
 
   const standing = (status: string) => {
     switch (status) {
@@ -126,6 +189,11 @@ export function SalesView() {
         return <Mark kind="circled" label="Overdue" />;
       case 'SENT':
         return <Mark kind="query" label="Awaiting payment" />;
+      case 'PARTIAL':
+      case 'PARTIALLY_PAID':
+        return <Mark kind="query" label="Part paid" />;
+      case 'VOID':
+        return <Mark kind="circled" label="Void" />;
       case 'DRAFT':
         return <span className="text-[12px] text-graphite-600">Draft, not sent</span>;
       default:
@@ -201,7 +269,12 @@ export function SalesView() {
                   )}
                 </div>
                 <div className="mt-1.5 flex items-center justify-between gap-3">
-                  {standing(inv.status)}
+                  <span className="flex items-center gap-2">
+                    {standing(inv.status)}
+                    {Number(inv.amountDueCents || 0) > 0 && inv.status !== 'VOID' && (
+                      <button type="button" onClick={() => openPayment(inv)} className={buttonClass.quiet}>Receive payment</button>
+                    )}
+                  </span>
                   <span className="text-[12px] text-graphite-600">{inv.etimsStatus === 'SUCCESS' ? `eTIMS signed ${inv.etimsControlCode}` : 'eTIMS queued'}</span>
                 </div>
               </li>
@@ -259,7 +332,23 @@ export function SalesView() {
                         {customerName(inv.customerId) || 'Customer not found'}
                       </button>
                     </td>
-                    <td className="pr-4 whitespace-nowrap">{standing(inv.status)}</td>
+                    <td className="pr-4 whitespace-nowrap">
+                      <div className="flex flex-col items-start gap-1">
+                        {standing(inv.status)}
+                        {Number(inv.amountDueCents || 0) > 0 && inv.status !== 'VOID' && (
+                          <button
+                            type="button"
+                            onClick={(event) => {
+                              event.stopPropagation();
+                              openPayment(inv);
+                            }}
+                            className={buttonClass.quiet}
+                          >
+                            Receive payment
+                          </button>
+                        )}
+                      </div>
+                    </td>
                     <td className="pr-4 whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
                       {inv.etimsStatus === 'SUCCESS' ? (
                         <a href={inv.etimsQrCodeUrl} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 text-[12px] text-ink-900 hover:underline">
@@ -300,15 +389,61 @@ export function SalesView() {
             bulkDeleteMutation.mutate(selectedIds);
           }
         }}
-        statusOptions={[
-          { label: 'Mark Paid', value: 'PAID' },
-          { label: 'Mark Sent', value: 'SENT' },
-          { label: 'Mark Draft', value: 'DRAFT' }
-        ]}
-        onStatusUpdate={(status) => bulkStatusMutation.mutate({ ids: selectedIds, status })}
         onExport={handleExportCSV}
-        isLoading={bulkDeleteMutation.isPending || bulkStatusMutation.isPending}
+        isLoading={bulkDeleteMutation.isPending}
       />
+
+      <Dialog
+        open={!!paymentInvoice}
+        onClose={() => {
+          if (!receivePaymentMutation.isPending) setPaymentInvoice(null);
+        }}
+        title="Receive payment"
+        note={paymentInvoice ? `${paymentInvoice.invoiceNo} · ${customerName(paymentInvoice.customerId) || 'Customer'}` : undefined}
+        footer={
+          <>
+            <button type="button" onClick={() => setPaymentInvoice(null)} disabled={receivePaymentMutation.isPending} className={buttonClass.secondary}>
+              Cancel
+            </button>
+            <button type="button" onClick={submitPayment} disabled={receivePaymentMutation.isPending || depositAccounts.length === 0} className={buttonClass.primary}>
+              {receivePaymentMutation.isPending ? 'Posting' : 'Post payment'}
+            </button>
+          </>
+        }
+      >
+        <div className="space-y-4">
+          <div className="ll-total flex items-baseline justify-between py-2 text-[13.5px]">
+            <span className="font-semibold text-ink-900">Amount due</span>
+            <Amount cents={paymentInvoice?.amountDueCents || 0} currency={baseCurrency} tone="ink" />
+          </div>
+          <Field label={`Amount received (${baseCurrency})`}>
+            <input
+              type="number"
+              min="0.01"
+              max={((paymentInvoice?.amountDueCents || 0) / 100).toFixed(2)}
+              step="0.01"
+              inputMode="decimal"
+              required
+              value={paymentAmount}
+              onChange={(event) => setPaymentAmount(event.target.value)}
+              className="tabular-currency"
+            />
+          </Field>
+          <Field label="Date received">
+            <input type="date" required value={paymentDate} onChange={(event) => setPaymentDate(event.target.value)} />
+          </Field>
+          <Field label="Deposit account" hint={depositAccounts.length === 0 ? 'Add an active bank or cash asset account before receiving payment.' : undefined}>
+            <select required value={depositAccountId} onChange={(event) => setDepositAccountId(event.target.value)}>
+              <option value="">Choose an account</option>
+              {depositAccounts.map((account: any) => (
+                <option key={account.id} value={account.id}>{account.code} · {account.name}</option>
+              ))}
+            </select>
+          </Field>
+          {paymentProblem && <p role="alert" className="text-[13px] text-ledger-red">{paymentProblem}</p>}
+          <p className="text-[12.5px] text-graphite-600">This posts cash or bank against accounts receivable. A smaller amount leaves the invoice part paid.</p>
+        </div>
+      </Dialog>
 
       {/* Invoice Drill-down Overlay */}
       <EntityDrillDownModal
