@@ -11,7 +11,7 @@ interface AuthContextType {
   signUp: (email: string, password: string) => Promise<{ error: any; needsEmailConfirmation: boolean }>;
 }
 
-const AuthContext = createContext<AuthContextType>({
+export const AuthContext = createContext<AuthContextType>({
   session: null,
   user: null,
   signOut: async () => {},

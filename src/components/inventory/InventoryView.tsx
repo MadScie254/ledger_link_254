@@ -67,6 +67,7 @@ export function InventoryView() {
   return (
     <div className="space-y-5 pb-16">
       <PageHeading
+        tourId="inventory-overview"
         title="Inventory"
         note={<>Stock on hand, at cost and at selling price · Figures in {baseCurrency}</>}
         actions={

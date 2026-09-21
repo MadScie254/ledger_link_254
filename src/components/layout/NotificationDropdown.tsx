@@ -205,6 +205,7 @@ export function NotificationDropdown() {
       <button
         type="button"
         id="notification-bell-btn"
+        data-tour="notifications"
         aria-label={unreadCount > 0 ? `Notifications, ${unreadCount} new` : 'Notifications'}
         aria-expanded={isOpen}
         onClick={() => setIsOpen(!isOpen)}

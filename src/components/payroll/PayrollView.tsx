@@ -168,6 +168,7 @@ export function PayrollView() {
   return (
     <div className="space-y-5">
       <PageHeading
+        tourId="payroll-overview"
         title="Payroll"
         note={<>Employees, pay runs and statutory deductions · Figures in {baseCurrency}</>}
         actions={

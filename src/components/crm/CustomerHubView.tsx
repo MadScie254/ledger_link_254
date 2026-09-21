@@ -98,6 +98,7 @@ export function CustomerHubView() {
   return (
     <div className="pb-16 space-y-5">
       <PageHeading
+        tourId="customers-overview"
         title="Customers"
         note={<>Who the business sells to and what each one owes · Figures in {baseCurrency}</>}
         actions={

@@ -127,6 +127,7 @@ export function ProjectsView() {
   return (
     <div className="space-y-5 pb-16">
       <PageHeading
+        tourId="projects-overview"
         title="Projects"
         note={<>Budget against cost posted to each job, and the hours logged to it · Figures in {baseCurrency}</>}
         actions={

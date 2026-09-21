@@ -39,6 +39,10 @@ BEGIN
 END;
 $$;
 
+-- Trigger function only: never callable through the Data API (matches
+-- 20260829232146_lock_down_trigger_function_grants.sql).
+REVOKE EXECUTE ON FUNCTION public.create_user_profile() FROM PUBLIC, anon, authenticated;
+
 CREATE TRIGGER on_auth_user_created_create_profile
   AFTER INSERT ON auth.users
   FOR EACH ROW EXECUTE FUNCTION public.create_user_profile();

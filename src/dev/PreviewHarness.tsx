@@ -6,6 +6,8 @@
  *   /__preview?view=Home%20/%20Dashboard&theme=dark
  *   /__preview/lock
  *   /__preview/ledger
+ *   /__preview/tour?step=0        the product tour (add &tour=ask for the welcome dialog)
+ *   ...&fail=/api/dashboard/metrics   make those routes answer 500
  *
  * The figures follow the seeded Riverside Hardware demo tenant. Customer and
  * supplier names are invented sample data.
@@ -35,6 +37,8 @@ import { AuditLogView } from '../components/audit/AuditLogView';
 import { SystemHealthView } from '../components/health/SystemHealthView';
 import { SettingsView } from '../components/settings/SettingsView';
 import { GeneralLedgerView } from '../components/reports/GeneralLedgerView';
+import { AuthContext } from '../context/AuthProvider';
+import { OnboardingProvider } from '../components/onboarding/OnboardingProvider';
 
 const ORG = {
   id: '146b2a09-11b0-47bd-a0ba-d9f27f1f12ec',
@@ -244,12 +248,31 @@ const PAYSLIPS = {
   ],
 };
 
+/** A stand-in session so the tour can run without signing in. Never leaves this file. */
+const PREVIEW_AUTH = {
+  session: { user: { id: 'preview-user' } } as any,
+  user: { id: 'preview-user' } as any,
+  signOut: async () => undefined,
+  signIn: async () => ({ error: null }),
+  signUp: async () => ({ error: null, needsEmailConfirmation: false }),
+};
+
 function installFixtureFetch() {
   const realFetch = window.fetch.bind(window);
   window.fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
     const url = new URL(typeof input === 'string' ? input : input instanceof URL ? input.href : input.url, window.location.origin);
     if (!url.pathname.startsWith('/api/')) return realFetch(input, init);
     const method = (init?.method || 'GET').toUpperCase();
+    // ?fail=/api/dashboard/metrics,/api/invoices answers those routes with a 500, to see error states.
+    const failing = (new URLSearchParams(window.location.search).get('fail') || '').split(',');
+    if (failing.includes(url.pathname)) {
+      return new Response(JSON.stringify({ error: 'Preview failure' }), { status: 500, headers: { 'Content-Type': 'application/json' } });
+    }
+    if (url.pathname === '/api/onboarding' && method === 'GET') {
+      const params = new URLSearchParams(window.location.search);
+      const state = { status: params.get('tour') === 'ask' ? 'NOT_ASKED' : 'IN_PROGRESS', step: Number(params.get('step') || 0) };
+      return new Response(JSON.stringify(state), { status: 200, headers: { 'Content-Type': 'application/json' } });
+    }
     const payslips = /^\/api\/payroll\/runs\/[^/]+\/payslips$/.test(url.pathname) ? PAYSLIPS : undefined;
     const body = method === 'GET' ? payslips ?? FIXTURES[url.pathname] ?? {} : { success: true };
     await new Promise((resolve) => setTimeout(resolve, 120));
@@ -307,6 +330,19 @@ function PreviewApp() {
   }
 
   const View = VIEWS[store.activeView] || DashboardView;
+  if (window.location.pathname.startsWith('/__preview/tour')) {
+    return (
+      <AuthContext.Provider value={PREVIEW_AUTH}>
+        <OnboardingProvider>
+          <TenantProvider>
+            <AppLayout>
+              <View />
+            </AppLayout>
+          </TenantProvider>
+        </OnboardingProvider>
+      </AuthContext.Provider>
+    );
+  }
   return (
     <TenantProvider>
       <AppLayout>
@@ -316,7 +352,24 @@ function PreviewApp() {
   );
 }
 
+/** ?motion=off answers the reduced-motion query, for headless checks where animation frames never run. */
+function forceReducedMotion() {
+  const real = window.matchMedia.bind(window);
+  window.matchMedia = (query: string) => {
+    const list = real(query);
+    if (!query.includes('prefers-reduced-motion')) return list;
+    return new Proxy(list, {
+      get: (target, key) => {
+        if (key === 'matches') return true;
+        const value = Reflect.get(target, key);
+        return typeof value === 'function' ? value.bind(target) : value;
+      },
+    });
+  };
+}
+
 export function mountPreview(root: Root) {
+  if (new URLSearchParams(window.location.search).get('motion') === 'off') forceReducedMotion();
   installFixtureFetch();
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   root.render(

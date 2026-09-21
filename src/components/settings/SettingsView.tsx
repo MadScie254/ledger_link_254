@@ -139,6 +139,7 @@ export function SettingsView() {
   return (
     <div className="space-y-5 pb-16">
       <PageHeading
+        tourId="settings-overview"
         title="Settings"
         note="Companies, currencies, the accounts postings use, and security"
         actions={

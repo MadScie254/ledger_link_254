@@ -224,6 +224,7 @@ export function AccountingView() {
   return (
     <div className="space-y-5">
       <PageHeading
+        tourId="accounting-overview"
         title="Accounting"
         note={<>The chart of accounts and every posted journal entry · Figures in {baseCurrency}</>}
         actions={

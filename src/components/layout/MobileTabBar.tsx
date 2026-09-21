@@ -15,6 +15,7 @@ export function MobileTabBar() {
 
   return (
     <nav
+      data-tour="sidebar-index"
       aria-label="Primary sections"
       className="fixed inset-x-0 bottom-0 z-40 border-t border-feint-strong bg-paper-100/95 pb-[env(safe-area-inset-bottom)] shadow-[0_-8px_28px_rgba(25,22,18,0.08)] backdrop-blur-md md:hidden"
     >
