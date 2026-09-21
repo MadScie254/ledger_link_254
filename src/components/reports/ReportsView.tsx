@@ -73,6 +73,7 @@ export function ReportsView() {
   return (
     <div className="space-y-6 pb-16">
       <PageHeading
+        tourId="reports-overview"
         title="Reports"
         note={<>Financial statements and schedules, each with PDF and CSV export</>}
         actions={

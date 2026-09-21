@@ -23,13 +23,15 @@ export function PageHeading({
   title,
   note,
   actions,
+  tourId,
 }: {
   title: string;
   note?: React.ReactNode;
   actions?: React.ReactNode;
+  tourId?: string;
 }) {
   return (
-    <header className="flex flex-col gap-4 border-b-2 border-ink-900 pb-3 sm:flex-row sm:items-end sm:justify-between">
+    <header data-tour={tourId} className="flex flex-col gap-4 border-b-2 border-ink-900 pb-3 sm:flex-row sm:items-end sm:justify-between">
       <div className="min-w-0">
         <h1 className="ll-heading text-[28px] sm:text-[34px] leading-[0.98] text-ink-900">{title}</h1>
         {note && <p className="mt-2 text-[13px] text-graphite-600">{note}</p>}

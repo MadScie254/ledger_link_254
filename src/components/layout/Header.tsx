@@ -83,7 +83,7 @@ export function Header() {
           <Menu className="h-5 w-5" />
         </button>
 
-        <nav aria-label="Where you are" className="flex min-w-0 items-center gap-1.5 text-[13px]">
+        <nav data-tour="app-location" aria-label="Where you are" className="flex min-w-0 items-center gap-1.5 text-[13px]">
           <div className="relative min-w-0 hidden sm:block">
             <button
               type="button"

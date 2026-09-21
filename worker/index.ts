@@ -22,6 +22,7 @@ import { CurrencyService } from '../src/server/currency';
 import { GeminiService } from '../src/server/gemini';
 import { BudgetService } from '../src/server/budgets';
 import { AIInsightsService } from '../src/server/aiInsights';
+import { OnboardingService } from '../src/server/onboarding';
 import {
   requireAuthenticationAndOrganization,
   requireOrganizationAdministrator,
@@ -169,6 +170,27 @@ const journalEntrySchema = z.object({
 });
 
 const bodyOf = (c: any) => c.req.json().catch(() => ({}));
+const onboardingSchema = z.object({
+  status: z.enum(['NOT_ASKED', 'IN_PROGRESS', 'SKIPPED', 'COMPLETED']),
+  step: z.number().int().min(0).max(50),
+}).strict();
+
+// --- Personal onboarding (not tied to the active organization) ---
+api.get('/onboarding', async (c) => {
+  try {
+    return c.json(await OnboardingService.getState(c.get('userId')));
+  } catch (err) { return serverError(c, err); }
+});
+
+api.patch('/onboarding', async (c) => {
+  try {
+    const state = onboardingSchema.parse(await bodyOf(c)) as {
+      status: 'NOT_ASKED' | 'IN_PROGRESS' | 'SKIPPED' | 'COMPLETED';
+      step: number;
+    };
+    return c.json(await OnboardingService.updateState(c.get('userId'), state));
+  } catch (err) { return clientError(c, err); }
+});
 
 // --- Reports ---
 api.get('/reports/pnl', async (c) => {

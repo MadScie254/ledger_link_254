@@ -136,6 +136,7 @@ export function TeamView() {
   return (
     <div className="max-w-4xl space-y-5 pb-16">
       <PageHeading
+        tourId="team-overview"
         title="Team"
         note={
           <>

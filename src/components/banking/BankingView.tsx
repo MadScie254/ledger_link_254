@@ -314,6 +314,7 @@ export function BankingView() {
   return (
     <div className="space-y-5">
       <PageHeading
+        tourId="banking-overview"
         title="Banking"
         note={<>Bank and M-Pesa statement lines, matched to the books · Figures in {baseCurrency}</>}
         actions={

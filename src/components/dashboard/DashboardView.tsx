@@ -678,7 +678,7 @@ export function DashboardView() {
       {metrics.isError ? (
         <Problem error={metrics.error} onRetry={() => metrics.refetch()} what="the figures for this page" />
       ) : metrics.isLoading ? (
-        <div className="grid grid-cols-2 lg:grid-cols-4 border-b border-feint-strong" aria-busy="true" aria-label="Loading figures">
+        <div data-tour="dashboard-summary" className="grid grid-cols-2 lg:grid-cols-4 border-b border-feint-strong" aria-busy="true" aria-label="Loading figures">
           {[0, 1, 2, 3].map((i) => (
             <div key={i} className={`py-4 px-4 space-y-3 ${i > 0 ? 'lg:border-l border-feint-strong' : ''}`}>
               <div className="h-3 w-16 bg-paper-200" />
@@ -688,7 +688,7 @@ export function DashboardView() {
           ))}
         </div>
       ) : columns.length > 0 ? (
-        <section aria-label="Position" className={`grid grid-cols-2 ${wideColumns === 4 ? 'lg:grid-cols-4' : wideColumns === 3 ? 'lg:grid-cols-3' : ''} border-b border-feint-strong`}>
+        <section data-tour="dashboard-summary" aria-label="Position" className={`grid grid-cols-2 ${wideColumns === 4 ? 'lg:grid-cols-4' : wideColumns === 3 ? 'lg:grid-cols-3' : ''} border-b border-feint-strong`}>
           {columns.map(renderColumn)}
         </section>
       ) : null}

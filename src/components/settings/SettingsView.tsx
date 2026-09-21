@@ -7,6 +7,8 @@ import { Mark } from '../ledger/Mark';
 import { Amount } from '../ledger/Amount';
 import { Dialog, Field } from '../ledger/Dialog';
 import { PageHeading, IndexTabs, EmptyNote, buttonClass } from '../ledger/Page';
+import { BookOpen } from 'lucide-react';
+import { useOnboarding } from '../onboarding/OnboardingProvider';
 
 type Tab = 'companies' | 'currencies' | 'accounting' | 'security';
 
@@ -33,6 +35,7 @@ export function SettingsView() {
   const [customRateValue, setCustomRateValue] = useState('');
   const [exportProblem, setExportProblem] = useState('');
   const base = activeCompany?.baseCurrency || 'KES';
+  const { restartTutorial, isReady: isOnboardingReady } = useOnboarding();
 
   const { data: orgsData, refetch: refetchOrgs } = useQuery({
     queryKey: ['organizations'],
@@ -382,6 +385,25 @@ export function SettingsView() {
           </section>
         </div>
       )}
+
+      <section data-tour="restart-tutorial" aria-labelledby="tutorial-heading" className="max-w-3xl border-t border-feint-strong pt-5">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex items-start gap-3">
+            <span className="border border-feint-strong bg-paper-200 p-2 text-oxblood" aria-hidden="true">
+              <BookOpen className="h-5 w-5" />
+            </span>
+            <div>
+              <h2 id="tutorial-heading" className="ll-heading text-[17px] text-ink-900">Ledger Link tutorial</h2>
+              <p className="mt-1 max-w-xl text-[13px] leading-relaxed text-graphite-600">
+                Review the main screens again. Restarting the tutorial does not change any records.
+              </p>
+            </div>
+          </div>
+          <button type="button" onClick={restartTutorial} disabled={!isOnboardingReady} className={`${buttonClass.secondary} shrink-0`}>
+            <BookOpen className="h-4 w-4" aria-hidden="true" /> Restart tutorial
+          </button>
+        </div>
+      </section>
 
       {isCompanyModalOpen && (
         <CompanyModal

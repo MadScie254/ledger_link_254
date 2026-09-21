@@ -13,6 +13,7 @@ import { fetchExchangeRates } from "./utils/currency";
 import { AuthProvider } from "./context/AuthProvider";
 import { useAuth } from "./context/AuthProvider";
 import type { OrganizationData } from "./store";
+import { OnboardingProvider } from "./components/onboarding/OnboardingProvider";
 
 const SalesView = lazy(() => import('./components/sales/SalesView').then((module) => ({ default: module.SalesView })));
 const BankingView = lazy(() => import('./components/banking/BankingView').then((module) => ({ default: module.BankingView })));
@@ -41,7 +42,9 @@ const viewFallback = (
 export default function App() {
   return (
     <AuthProvider>
-      <LedgerApp />
+      <OnboardingProvider>
+        <LedgerApp />
+      </OnboardingProvider>
     </AuthProvider>
   );
 }

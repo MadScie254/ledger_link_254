@@ -212,7 +212,7 @@ export function SalesView() {
               <button type="button" onClick={handleExportCSV} className={buttonClass.secondary}>
                 <Download className="h-4 w-4" aria-hidden="true" /> Export CSV
               </button>
-              <button type="button" onClick={() => setIsBuilding(true)} className={buttonClass.primary}>
+              <button data-tour="new-invoice" type="button" onClick={() => setIsBuilding(true)} className={buttonClass.primary}>
                 New invoice
               </button>
             </>

@@ -43,6 +43,7 @@ export function Dialog({
   children,
   footer,
   width = 'md',
+  showCloseButton = true,
 }: {
   open: boolean;
   onClose: () => void;
@@ -51,6 +52,7 @@ export function Dialog({
   children: React.ReactNode;
   footer?: React.ReactNode;
   width?: 'sm' | 'md' | 'lg' | 'xl';
+  showCloseButton?: boolean;
 }) {
   const titleId = useId();
   const layerRef = useRef<HTMLDivElement>(null);
@@ -131,9 +133,11 @@ export function Dialog({
             <h2 id={titleId} className="ll-heading text-[22px] leading-tight text-ink-900">{title}</h2>
             {note && <p className="mt-1 text-[13px] text-graphite-600">{note}</p>}
           </div>
-          <button type="button" data-dialog-close onClick={onClose} aria-label="Close" className="-mr-1 p-1 text-graphite-600 hover:text-ink-900">
-            <X className="h-5 w-5" aria-hidden="true" />
-          </button>
+          {showCloseButton && (
+            <button type="button" data-dialog-close onClick={onClose} aria-label="Close" className="-mr-1 p-1 text-graphite-600 hover:text-ink-900">
+              <X className="h-5 w-5" aria-hidden="true" />
+            </button>
+          )}
         </div>
         <div className="px-5 py-4">{children}</div>
         {footer && <div className="flex flex-wrap items-center justify-end gap-2 border-t border-feint px-5 py-3">{footer}</div>}
