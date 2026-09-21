@@ -150,6 +150,7 @@ export const useOnboarding = () => useContext(OnboardingContext);
 export function OnboardingProvider({ children }: { children: ReactNode }) {
   const { session } = useAuth();
   const setActiveView = useAppStore((state) => state.setActiveView);
+  const activeCompany = useAppStore((state) => state.activeCompany);
   const [state, setState] = useState<OnboardingState | null>(null);
   const [language, setLanguage] = useState<Language>('en');
   const [persistenceProblem, setPersistenceProblem] = useState('');
@@ -222,12 +223,19 @@ export function OnboardingProvider({ children }: { children: ReactNode }) {
   const handleSkip = useCallback(() => update('SKIPPED', state?.step || 0), [state?.step, update]);
   const handleComplete = useCallback(() => update('COMPLETED', TOUR_STEPS.length - 1), [update]);
 
-  const value = useMemo(() => ({ restartTutorial, isReady: Boolean(state) }), [restartTutorial, state]);
+  // A freshly authenticated account may still be on the required company
+  // setup page. Keep NOT_ASKED intact until real app screens and their tour
+  // targets exist; starting sooner would create a tour of missing elements.
+  const canTour = appReady && Boolean(activeCompany);
+  const value = useMemo(
+    () => ({ restartTutorial, isReady: Boolean(state) && Boolean(activeCompany) }),
+    [activeCompany, restartTutorial, state],
+  );
 
   return (
     <OnboardingContext.Provider value={value}>
       {children}
-      {appReady && state?.status === 'NOT_ASKED' && (
+      {canTour && state?.status === 'NOT_ASKED' && (
         <WelcomeDialog
           language={language}
           onLanguageChange={setLanguage}
@@ -235,7 +243,7 @@ export function OnboardingProvider({ children }: { children: ReactNode }) {
           onSkip={() => update('SKIPPED', 0)}
         />
       )}
-      {appReady && state?.status === 'IN_PROGRESS' && (
+      {canTour && state?.status === 'IN_PROGRESS' && (
         <ProductTour
           step={Math.min(state.step, TOUR_STEPS.length - 1)}
           language={language}
@@ -355,6 +363,7 @@ function ProductTour({
   useEffect(() => {
     let observer: ResizeObserver | undefined;
     let timer = 0;
+    let settleTimer = 0;
     let stopped = false;
     let trackedElement: HTMLElement | null = null;
     let remeasure: (() => void) | null = null;
@@ -385,7 +394,7 @@ function ProductTour({
       if (element && element.getClientRects().length > 0) {
         trackedElement = element;
         element.scrollIntoView({ behavior: reducedMotion ? 'auto' : 'smooth', block: 'center', inline: 'nearest' });
-        window.setTimeout(() => measure(element), reducedMotion ? 0 : 280);
+        settleTimer = window.setTimeout(() => measure(element), reducedMotion ? 0 : 280);
         observer = new ResizeObserver(() => measure(element));
         observer.observe(element);
         remeasure = () => measure(element);
@@ -406,6 +415,7 @@ function ProductTour({
     return () => {
       stopped = true;
       window.clearTimeout(timer);
+      window.clearTimeout(settleTimer);
       observer?.disconnect();
       if (remeasure && trackedElement) {
         window.removeEventListener('resize', remeasure);
@@ -493,7 +503,7 @@ function ProductTour({
           animate={{ opacity: 1, scale: 1 }}
           exit={reducedMotion ? undefined : { opacity: 0, scale: 0.97 }}
           transition={{ duration: reducedMotion ? 0 : 0.22, ease: 'easeOut' }}
-          className={`fixed z-[92] border border-feint-strong bg-paper-100 ll-lift focus:outline-none ${isMobile ? 'inset-x-0 bottom-0 w-full border-x-0 border-b-0 p-5 pb-[calc(1.25rem+env(safe-area-inset-bottom))]' : 'w-[min(23rem,calc(100vw-2rem))] p-5'}`}
+          className={`fixed z-[92] overflow-y-auto border border-feint-strong bg-paper-100 ll-lift focus:outline-none ${isMobile ? 'inset-x-0 bottom-0 max-h-[85vh] w-full border-x-0 border-b-0 p-5 pb-[calc(1.25rem+env(safe-area-inset-bottom))]' : 'max-h-[calc(100vh-2rem)] w-[min(23rem,calc(100vw-2rem))] p-5'}`}
           style={isMobile ? undefined : position}
         >
           {confirmSkip ? (

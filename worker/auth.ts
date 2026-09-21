@@ -46,8 +46,8 @@ export async function requireAuthenticationAndOrganization(c: Context<{ Variable
 
   c.set('userId', user.id);
 
-  // Users can list their organizations or create their first one without an
-  // existing organization selection.
+  // Personal onboarding and organization collection requests are authenticated
+  // but do not require an existing organization selection.
   if (isUserScopedRequest(c)) {
     return next();
   }
