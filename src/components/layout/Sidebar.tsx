@@ -38,6 +38,7 @@ const INDEX = [
       { view: 'Team', name: 'Team' },
       { view: 'Apps / Integrations', name: 'Integrations' },
       { view: 'Audit Logs', name: 'Audit log' },
+      { view: 'Documentation', name: 'Documentation' },
       { view: 'Settings', name: 'Settings' },
     ],
   },

@@ -36,6 +36,7 @@ import { AppsView } from '../components/apps/AppsView';
 import { AuditLogView } from '../components/audit/AuditLogView';
 import { SystemHealthView } from '../components/health/SystemHealthView';
 import { SettingsView } from '../components/settings/SettingsView';
+import { DocumentationView } from '../components/documentation/DocumentationView';
 import { GeneralLedgerView } from '../components/reports/GeneralLedgerView';
 import { AuthContext } from '../context/AuthProvider';
 import { OnboardingProvider } from '../components/onboarding/OnboardingProvider';
@@ -298,6 +299,7 @@ const VIEWS: Record<string, ComponentType> = {
   'Audit Logs': AuditLogView,
   'System Health': SystemHealthView,
   Settings: SettingsView,
+  Documentation: DocumentationView,
 };
 
 function PreviewApp() {
