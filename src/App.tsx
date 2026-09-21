@@ -32,6 +32,7 @@ const AppsView = lazy(() => import('./components/apps/AppsView').then((module) =
 const AuditLogView = lazy(() => import('./components/audit/AuditLogView').then((module) => ({ default: module.AuditLogView })));
 const SystemHealthView = lazy(() => import('./components/health/SystemHealthView').then((module) => ({ default: module.SystemHealthView })));
 const SettingsView = lazy(() => import('./components/settings/SettingsView').then((module) => ({ default: module.SettingsView })));
+const DocumentationView = lazy(() => import('./components/documentation/DocumentationView').then((module) => ({ default: module.DocumentationView })));
 
 const viewFallback = (
   <div className="flex min-h-64 items-center justify-center" role="status">
@@ -164,6 +165,7 @@ function LedgerApp() {
     if (activeView === "Audit Logs") return <AuditLogView />;
     if (activeView === "System Health") return <SystemHealthView />;
     if (activeView === "Settings") return <SettingsView />;
+    if (activeView === "Documentation") return <DocumentationView />;
     // Default catch-all
     return <DashboardView />;
   };
@@ -181,10 +183,11 @@ function LedgerApp() {
   }
 
   if (organizations && organizations.length === 0) {
+    const emptyOrganizationView = activeView === 'Documentation' ? <DocumentationView /> : <SettingsView />;
     return (
       <>
         <TenantProvider>
-          <AppLayout><Suspense fallback={viewFallback}><SettingsView /></Suspense></AppLayout>
+          <AppLayout><Suspense fallback={viewFallback}>{emptyOrganizationView}</Suspense></AppLayout>
         </TenantProvider>
         <UndoToast />
       </>

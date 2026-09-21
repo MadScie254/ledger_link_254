@@ -34,6 +34,7 @@ const PAGES: { view: string; title: string; subtitle: string; shortcut?: string 
   { view: 'Team', title: 'Team', subtitle: 'Who can open these books' },
   { view: 'Apps / Integrations', title: 'Integrations', subtitle: 'Connections that are and are not built' },
   { view: 'Audit Logs', title: 'Audit log', subtitle: 'Every change to accounts, entries and the team' },
+  { view: 'Documentation', title: 'Documentation', subtitle: 'Tutorials, troubleshooting and technical runbooks' },
   { view: 'Settings', title: 'Settings', subtitle: 'Companies, currencies and security' },
   { view: 'System Health', title: 'System health', subtitle: 'Response and render times in this browser' },
 ];

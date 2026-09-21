@@ -106,7 +106,7 @@ export const TOUR_STEPS: TourStep[] = [
     points: [
       point('Money', 'Day-to-day work: Home, Banking, Sales, Customers, Bills and expenses.', 'Money', 'Kazi za kila siku: Home, Banking, Sales, Customers, Bills and expenses.'),
       point('Books', 'Records and reports: Accounting, Reports, Tax, Payroll, Inventory, Projects.', 'Books', 'Rekodi na ripoti: Accounting, Reports, Tax, Payroll, Inventory, Projects.'),
-      point('Office', 'Running the business: Business feed, Team, Integrations, Audit log, Settings.', 'Office', 'Kuendesha biashara: Business feed, Team, Integrations, Audit log, Settings.'),
+      point('Office', 'Running the business: Business feed, Team, Integrations, Audit log, Documentation, Settings.', 'Office', 'Kuendesha biashara: Business feed, Team, Integrations, Audit log, Documentation, Settings.'),
     ],
   },
   {
@@ -429,6 +429,24 @@ export const TOUR_STEPS: TourStep[] = [
       point('Currencies', 'Exchange rates for foreign invoices and bills.', 'Currencies', 'Viwango vya kubadilisha fedha kwa ankara na bili za nje.'),
       point('Posting accounts', 'The accounts Ledger Link uses when it posts an invoice or a bill.', 'Posting accounts', 'Akaunti ambazo Ledger Link inatumia inapoweka ankara au bili.'),
       point('Security and export', 'Sign-in safety, and a CSV copy of your general ledger.', 'Security and export', 'Usalama wa kuingia, na nakala ya CSV ya general ledger yako.'),
+    ],
+  },
+  {
+    id: 'documentation',
+    chapter: 'office',
+    icon: 'help',
+    path: 'Office › Documentation',
+    view: 'Documentation',
+    target: '[data-tour="documentation-overview"]',
+    title: { en: 'Documentation: answers and guided work', sw: 'Documentation: majibu na mwongozo wa kazi' },
+    body: {
+      en: 'Use this page when you need a full tutorial, a plain-language answer, or a technical troubleshooting checklist. Search by task, error code or feature.',
+      sw: 'Tumia ukurasa huu unapohitaji mafunzo kamili, jibu rahisi au orodha ya ukaguzi wa tatizo la kiufundi. Tafuta kwa kazi, msimbo wa hitilafu au kipengele.',
+    },
+    points: [
+      point('Business tutorials', 'Exact steps for invoices, bills, banking, reports, payroll and more.', 'Business tutorials', 'Hatua kamili za ankara, bili, benki, ripoti, mishahara na mengine.'),
+      point('Technical operations', 'Architecture, API, database, deployment and security runbooks.', 'Technical operations', 'Miongozo ya usanifu, API, hifadhidata, usambazaji na usalama.'),
+      point('Troubleshooting', 'Symptoms, checks and safe fixes without blind retries.', 'Troubleshooting', 'Dalili, ukaguzi na marekebisho salama bila kujaribu tena bila uhakika.'),
     ],
   },
 
