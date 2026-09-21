@@ -16,6 +16,7 @@ export interface Organization {
   email?: string;
   website?: string;
   isDefault?: boolean;
+  isDemo?: boolean;
   createdAt?: any;
   updatedAt?: any;
 }
@@ -57,6 +58,7 @@ export class OrganizationService {
       email: d.email,
       website: d.website,
       isDefault: d.is_default,
+      isDemo: d.is_demo,
       createdAt: d.created_at,
       updatedAt: d.updated_at
     }));
@@ -90,6 +92,7 @@ export class OrganizationService {
       email: data.email,
       website: data.website,
       isDefault: data.is_default,
+      isDemo: data.is_demo,
       createdAt: data.created_at,
       updatedAt: data.updated_at
     };
@@ -113,7 +116,8 @@ export class OrganizationService {
         phone: data.phone || '',
         email: data.email || '',
         website: data.website || '',
-        is_default: false
+        is_default: false,
+        is_demo: data.isDemo === true,
       })
       .select('id')
       .single();
@@ -167,15 +171,35 @@ export class OrganizationService {
   }
 
   static async seedDefaultAccounts(orgId: string): Promise<void> {
+    const supabase = getSupabase();
+    const { data: organization, error } = await supabase
+      .from('organizations')
+      .select('base_currency')
+      .eq('id', orgId)
+      .single();
+    if (error) throw error;
+    const baseCurrency = String(organization.base_currency || 'KES').toUpperCase();
+    const { data: existingAccounts, error: existingAccountsError } = await supabase
+      .from('accounts')
+      .select('code')
+      .eq('org_id', orgId);
+    if (existingAccountsError) throw existingAccountsError;
+    const existingCodes = new Set((existingAccounts || []).map((account) => account.code));
+
     const standardAccounts = [
       { code: '1000', name: 'Cash equivalents (Operating Account)', type: 'ASSET' as const },
       { code: '1010', name: 'USD Bank Account (Foreign Holding)', type: 'ASSET' as const },
       { code: '1020', name: 'EUR Bank Account (Foreign Holding)', type: 'ASSET' as const },
       { code: '1050', name: 'M-Pesa Business Till / Paybill', type: 'ASSET' as const },
       { code: '1100', name: 'Accounts Receivable (A/R)', type: 'ASSET' as const },
+      { code: '1150', name: 'Recoverable VAT / Input Tax', type: 'ASSET' as const },
       { code: '1200', name: 'Inventory Asset', type: 'ASSET' as const },
       { code: '2000', name: 'Accounts Payable (A/P)', type: 'LIABILITY' as const },
-      { code: '2100', name: 'VAT & Tax Payable', type: 'LIABILITY' as const },
+      { code: '2100', name: 'Output VAT Payable', type: 'LIABILITY' as const },
+      { code: '2110', name: 'PAYE Payable', type: 'LIABILITY' as const },
+      { code: '2120', name: 'NSSF Payable', type: 'LIABILITY' as const },
+      { code: '2130', name: 'SHIF Payable', type: 'LIABILITY' as const },
+      { code: '2140', name: 'Affordable Housing Levy Payable', type: 'LIABILITY' as const },
       { code: '3000', name: "Owner's Equity / Share Capital", type: 'EQUITY' as const },
       { code: '3100', name: 'Retained Earnings', type: 'EQUITY' as const },
       { code: '4000', name: 'Sales Revenue & Billing', type: 'INCOME' as const },
@@ -183,13 +207,17 @@ export class OrganizationService {
       { code: '5000', name: 'Cost of Goods Sold (COGS)', type: 'COGS' as const },
       { code: '6000', name: 'Operating Expenses', type: 'EXPENSE' as const },
       { code: '6100', name: 'Salaries & Payroll Expense', type: 'EXPENSE' as const },
+      { code: '6110', name: 'Employer Payroll Contributions', type: 'EXPENSE' as const },
       { code: '6200', name: 'Office Rent & Utilities', type: 'EXPENSE' as const },
       { code: '8000', name: 'Unrealized FX Gain / Loss', type: 'INCOME' as const },
       { code: '8100', name: 'Realized FX Gain / Loss', type: 'INCOME' as const },
     ];
 
     for (const acc of standardAccounts) {
-      await AccountService.createAccount({ ...acc, orgId });
+      if (existingCodes.has(acc.code)) continue;
+      const currency = acc.code === '1010' ? 'USD' : acc.code === '1020' ? 'EUR' : baseCurrency;
+      await AccountService.createAccount({ ...acc, orgId, currency });
+      existingCodes.add(acc.code);
     }
   }
 }

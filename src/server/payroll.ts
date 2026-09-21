@@ -1,69 +1,76 @@
 import { getSupabase } from './supabase';
-import { LedgerService } from './ledger';
-import { AccountService } from './accounts';
+import { calculatePayslip } from '../utils/kenyaPayroll';
 
-export interface PayslipBreakdown {
+export { calculatePayslip } from '../utils/kenyaPayroll';
+export type { PayslipBreakdown } from '../utils/kenyaPayroll';
+
+const PAYROLL_ACCOUNT_CODES = {
+  salaryExpense: '6100',
+  employerExpense: '6110',
+  cash: '1000',
+  payePayable: '2110',
+  nssfPayable: '2120',
+  shifPayable: '2130',
+  ahlPayable: '2140',
+} as const;
+
+type PayrollAccountKey = keyof typeof PAYROLL_ACCOUNT_CODES;
+
+interface PayrollRpcPayslip {
+  employeeId: string;
   grossCents: number;
+  taxablePayCents: number;
   payeCents: number;
   nssfCents: number;
   shifCents: number;
   ahlCents: number;
+  employerNssfCents: number;
+  employerAhlCents: number;
   netCents: number;
+  rateVersion: string;
 }
 
-/**
- * Kenyan statutory payroll deductions, per the Finance Act 2023 / NSSF Act
- * (2013, amended 2023) / SHIF Act 2023 rates in effect for 2024/2025.
- * Bands can change by legislation — verify against current KRA/NSSF/SHA
- * guidance before relying on this for a real filing.
- */
-export function calculatePayslip(grossCents: number): PayslipBreakdown {
-  const gross = grossCents / 100;
+export interface RunPayrollRpcPayload {
+  p_org_id: string;
+  p_period: string;
+  p_pay_date: string;
+  p_rate_version: string;
+  p_created_by: string;
+  p_idempotency_key: string;
+  p_salary_expense_account_id: string;
+  p_employer_expense_account_id: string;
+  p_cash_account_id: string;
+  p_paye_payable_account_id: string;
+  p_nssf_payable_account_id: string;
+  p_shif_payable_account_id: string;
+  p_ahl_payable_account_id: string;
+  p_payslips: PayrollRpcPayslip[];
+}
 
-  // PAYE — graduated monthly bands (KES), then KES 2,400/month personal relief.
-  const bands = [
-    { upTo: 24000, rate: 0.10 },
-    { upTo: 32333, rate: 0.25 },
-    { upTo: 500000, rate: 0.30 },
-    { upTo: 800000, rate: 0.325 },
-    { upTo: Infinity, rate: 0.35 }
-  ];
-  let remaining = gross;
-  let lowerBound = 0;
-  let taxBeforeRelief = 0;
-  for (const band of bands) {
-    if (remaining <= 0) break;
-    const bandWidth = band.upTo - lowerBound;
-    const taxableInBand = Math.min(remaining, bandWidth);
-    taxBeforeRelief += taxableInBand * band.rate;
-    remaining -= taxableInBand;
-    lowerBound = band.upTo;
+async function getPayrollAccountIds(orgId: string): Promise<Record<PayrollAccountKey, string>> {
+  const supabase = getSupabase();
+  const codes = Object.values(PAYROLL_ACCOUNT_CODES);
+  const { data, error } = await supabase
+    .from('accounts')
+    .select('id, code, is_active')
+    .eq('org_id', orgId)
+    .in('code', codes);
+
+  if (error) throw error;
+
+  const idByCode = new Map(
+    (data || [])
+      .filter((account: any) => account.is_active !== false)
+      .map((account: any) => [account.code, account.id] as const),
+  );
+  const missingCodes = codes.filter((code) => !idByCode.has(code));
+  if (missingCodes.length > 0) {
+    throw new Error(`Payroll accounts are missing or inactive: ${missingCodes.join(', ')}.`);
   }
-  const PERSONAL_RELIEF = 2400;
-  const paye = Math.max(taxBeforeRelief - PERSONAL_RELIEF, 0);
 
-  // NSSF — 6% employee contribution, Tier I + Tier II, capped at the
-  // upper earnings limit (KES 36,000/month as of Feb 2025).
-  const NSSF_UEL = 36000;
-  const nssf = Math.min(gross, NSSF_UEL) * 0.06;
-
-  // SHIF (replaced NHIF in Oct 2024) — 2.75% of gross, minimum KES 300.
-  const shif = Math.max(gross * 0.0275, 300);
-
-  // Affordable Housing Levy — 1.5% of gross (employee portion).
-  const ahl = gross * 0.015;
-
-  const totalDeductions = paye + nssf + shif + ahl;
-  const net = gross - totalDeductions;
-
-  return {
-    grossCents: Math.round(gross * 100),
-    payeCents: Math.round(paye * 100),
-    nssfCents: Math.round(nssf * 100),
-    shifCents: Math.round(shif * 100),
-    ahlCents: Math.round(ahl * 100),
-    netCents: Math.round(net * 100)
-  };
+  return Object.fromEntries(
+    Object.entries(PAYROLL_ACCOUNT_CODES).map(([key, code]) => [key, idByCode.get(code)!]),
+  ) as Record<PayrollAccountKey, string>;
 }
 
 export class PayrollService {
@@ -156,103 +163,78 @@ export class PayrollService {
     if (error) throw error;
   }
 
-  static async runPayroll(orgId: string, period: string, payDate: string, createdBy?: string): Promise<string> {
+  static async runPayroll(
+    orgId: string,
+    period: string,
+    payDate: string,
+    createdBy: string,
+    idempotencyKey?: string,
+  ): Promise<string> {
+    const normalizedPeriod = period.trim();
+    if (!normalizedPeriod) throw new Error('A payroll period is required.');
+    if (normalizedPeriod.length > 100) throw new Error('Payroll period must be 100 characters or fewer.');
+    if (!createdBy?.trim()) throw new Error('A payroll actor is required.');
+
+    // Validates the pay date and selects the effective table before any remote
+    // work. The same shared function calculates every employee below.
+    const rateProbe = calculatePayslip(0, payDate);
     const supabase = getSupabase();
+    const [employeeResult, accountIds] = await Promise.all([
+      supabase
+        .from('employees')
+        .select('id, base_salary')
+        .eq('org_id', orgId)
+        .eq('status', 'Active'),
+      getPayrollAccountIds(orgId),
+    ]);
 
-    const { data: employees, error: empError } = await supabase
-      .from('employees')
-      .select('id, base_salary, status')
-      .eq('org_id', orgId)
-      .eq('status', 'Active');
+    if (employeeResult.error) throw employeeResult.error;
+    const employees = employeeResult.data || [];
+    if (employees.length === 0) throw new Error('No active employees to run payroll for.');
 
-    if (empError) throw empError;
-    if (!employees || employees.length === 0) throw new Error('No active employees to run payroll for.');
-
-    const { data: existingRun } = await supabase
-      .from('payroll_runs')
-      .select('id')
-      .eq('org_id', orgId)
-      .eq('period', period)
-      .maybeSingle();
-    if (existingRun) throw new Error(`Payroll for ${period} has already been processed.`);
-
-    const salaryAccount = await AccountService.getAccountByCode(orgId, '6100');
-    const cashAccount = await AccountService.getAccountByCode(orgId, '1000');
-    const vatPayableAccount = await AccountService.getAccountByCode(orgId, '2100');
-    if (!salaryAccount || !cashAccount) {
-      throw new Error('Salaries Expense (6100) or Cash (1000) account not found. Seed the chart of accounts first.');
-    }
-
-    const breakdowns = employees.map((emp: any) => ({
-      employeeId: emp.id,
-      ...calculatePayslip(emp.base_salary || 0)
-    }));
-
-    const totals = breakdowns.reduce((acc, b) => ({
-      grossCents: acc.grossCents + b.grossCents,
-      payeCents: acc.payeCents + b.payeCents,
-      nssfCents: acc.nssfCents + b.nssfCents,
-      shifCents: acc.shifCents + b.shifCents,
-      ahlCents: acc.ahlCents + b.ahlCents,
-      netCents: acc.netCents + b.netCents
-    }), { grossCents: 0, payeCents: 0, nssfCents: 0, shifCents: 0, ahlCents: 0, netCents: 0 });
-
-    const totalStatutoryCents = totals.payeCents + totals.nssfCents + totals.shifCents + totals.ahlCents;
-
-    // Post: Debit Salaries Expense (gross), Credit Cash (net pay),
-    // Credit a statutory payable account (all withholdings owed to KRA/NSSF/SHA).
-    const journalEntryId = await LedgerService.postJournalEntry({
-      orgId,
-      entryDate: payDate,
-      memo: `Payroll run ${period}`,
-      sourceType: 'PAYROLL',
-      referenceNo: period,
-      createdBy,
-      lines: [
-        { accountId: salaryAccount.id, debit: totals.grossCents, credit: 0, description: `Gross salaries — ${period}` },
-        { accountId: cashAccount.id, debit: 0, credit: totals.netCents, description: `Net pay disbursed — ${period}` },
-        ...(vatPayableAccount && totalStatutoryCents > 0
-          ? [{ accountId: vatPayableAccount.id, debit: 0, credit: totalStatutoryCents, description: `PAYE/NSSF/SHIF/AHL withheld — ${period}` }]
-          : [])
-      ]
+    const payslips: PayrollRpcPayslip[] = employees.map((employee: any) => {
+      const breakdown = calculatePayslip(employee.base_salary ?? 0, payDate);
+      return {
+        employeeId: employee.id,
+        grossCents: breakdown.grossCents,
+        taxablePayCents: breakdown.taxablePayCents,
+        payeCents: breakdown.payeCents,
+        nssfCents: breakdown.nssfCents,
+        shifCents: breakdown.shifCents,
+        ahlCents: breakdown.ahlCents,
+        employerNssfCents: breakdown.nssfCents,
+        employerAhlCents: breakdown.ahlCents,
+        netCents: breakdown.netCents,
+        rateVersion: breakdown.rateVersion,
+      };
     });
 
-    const { data: run, error: runError } = await supabase
-      .from('payroll_runs')
-      .insert({
-        org_id: orgId,
-        period,
-        pay_date: payDate,
-        journal_entry_id: journalEntryId,
-        total_gross_cents: totals.grossCents,
-        total_net_cents: totals.netCents,
-        total_paye_cents: totals.payeCents,
-        total_nssf_cents: totals.nssfCents,
-        total_shif_cents: totals.shifCents,
-        total_ahl_cents: totals.ahlCents,
-        created_by: createdBy || null
-      })
-      .select('id')
-      .single();
+    const effectiveIdempotencyKey = idempotencyKey?.trim()
+      || `payroll:${orgId}:${normalizedPeriod.toLowerCase()}:${payDate}`;
+    const payload: RunPayrollRpcPayload = {
+      p_org_id: orgId,
+      p_period: normalizedPeriod,
+      p_pay_date: payDate,
+      p_rate_version: rateProbe.rateVersion,
+      p_created_by: createdBy,
+      p_idempotency_key: effectiveIdempotencyKey,
+      p_salary_expense_account_id: accountIds.salaryExpense,
+      p_employer_expense_account_id: accountIds.employerExpense,
+      p_cash_account_id: accountIds.cash,
+      p_paye_payable_account_id: accountIds.payePayable,
+      p_nssf_payable_account_id: accountIds.nssfPayable,
+      p_shif_payable_account_id: accountIds.shifPayable,
+      p_ahl_payable_account_id: accountIds.ahlPayable,
+      p_payslips: payslips,
+    };
 
-    if (runError) throw runError;
+    const { data: runId, error } = await supabase.rpc('run_payroll_with_journal', payload);
+    if (error) throw new Error(`Payroll could not be posted atomically: ${error.message}`);
+    if (typeof runId !== 'string' || !runId) {
+      throw new Error('Payroll posting did not return a payroll run ID.');
+    }
 
-    const { error: payslipsError } = await supabase
-      .from('payslips')
-      .insert(breakdowns.map(b => ({
-        payroll_run_id: run.id,
-        employee_id: b.employeeId,
-        gross_cents: b.grossCents,
-        paye_cents: b.payeCents,
-        nssf_cents: b.nssfCents,
-        shif_cents: b.shifCents,
-        ahl_cents: b.ahlCents,
-        net_cents: b.netCents
-      })));
-
-    if (payslipsError) throw payslipsError;
-
-    return run.id;
+    return runId;
   }
 
   static async getPayrollRuns(orgId: string) {
@@ -274,6 +256,9 @@ export class PayrollService {
       totalNssfCents: row.total_nssf_cents,
       totalShifCents: row.total_shif_cents,
       totalAhlCents: row.total_ahl_cents,
+      totalEmployerNssfCents: row.total_employer_nssf_cents,
+      totalEmployerAhlCents: row.total_employer_ahl_cents,
+      rateVersion: row.rate_version,
       createdAt: row.created_at
     }));
   }
@@ -292,10 +277,14 @@ export class PayrollService {
       employeeId: row.employee_id,
       employeeName: row.employees ? `${row.employees.first_name} ${row.employees.last_name}` : 'Unknown',
       grossCents: row.gross_cents,
+      taxablePayCents: row.taxable_pay_cents,
       payeCents: row.paye_cents,
       nssfCents: row.nssf_cents,
       shifCents: row.shif_cents,
       ahlCents: row.ahl_cents,
+      employerNssfCents: row.employer_nssf_cents,
+      employerAhlCents: row.employer_ahl_cents,
+      rateVersion: row.rate_version,
       netCents: row.net_cents
     }));
   }

@@ -4,14 +4,15 @@ import { z } from 'zod';
 import { getSupabase } from '../src/server/supabase';
 import { AccountService } from '../src/server/accounts';
 import { CustomerService } from '../src/server/customers';
-import { InvoiceService } from '../src/server/invoices';
+import { InvoiceService, type InvoiceInput, type InvoicePaymentInput } from '../src/server/invoices';
 import { BankingService } from '../src/server/banking';
 import { VendorService } from '../src/server/vendors';
-import { BillService } from '../src/server/bills';
+import { BillService, type BillInput, type BillPaymentInput, type BillBatchPaymentInput } from '../src/server/bills';
 import { PayrollService } from '../src/server/payroll';
 import { InventoryService } from '../src/server/inventory';
 import { ProjectService } from '../src/server/projects';
 import { LedgerService } from '../src/server/ledger';
+import type { JournalEntryInput } from '../src/server/types';
 import { AuditService } from '../src/server/audit';
 import { DashboardService } from '../src/server/metrics';
 import { TeamService } from '../src/server/team';
@@ -21,6 +22,7 @@ import { CurrencyService } from '../src/server/currency';
 import { GeminiService } from '../src/server/gemini';
 import { BudgetService } from '../src/server/budgets';
 import { AIInsightsService } from '../src/server/aiInsights';
+import { OnboardingService } from '../src/server/onboarding';
 import {
   requireAuthenticationAndOrganization,
   requireOrganizationAdministrator,
@@ -93,7 +95,102 @@ const bulkStatusUpdateSchema = z.object({
   status: z.string().trim().min(1).max(32),
 });
 
+const dateSchema = z.string().trim().refine((value) => !Number.isNaN(Date.parse(value)), 'A valid date is required.')
+  .transform((value) => new Date(value).toISOString().slice(0, 10));
+const currencySchema = z.string().trim().toUpperCase().regex(/^[A-Z]{3}$/, 'Currency must be a three-letter ISO code.');
+const documentLineSchema = z.object({
+  description: z.string().trim().min(1).max(500),
+  accountId: z.string().uuid(),
+  amountCents: z.number().int().nonnegative(),
+  foreignAmountCents: z.number().int().positive().optional(),
+  taxCents: z.number().int().nonnegative().default(0),
+}).strict().refine((line) => line.amountCents > 0 || (line.foreignAmountCents || 0) > 0, {
+  message: 'Each line needs a base or foreign-currency amount.',
+});
+const documentBaseSchema = z.object({
+  dueDate: dateSchema,
+  currency: currencySchema.default('KES'),
+  exchangeRate: z.number().positive().finite().default(1),
+  notes: z.string().trim().max(4000).optional(),
+  idempotencyKey: z.string().uuid(),
+  lines: z.array(documentLineSchema).min(1).max(200),
+}).strict();
+const createInvoiceSchema = documentBaseSchema.extend({
+  customerId: z.string().uuid(),
+  issueDate: dateSchema,
+});
+const createBillSchema = documentBaseSchema.extend({
+  vendorId: z.string().uuid(),
+  billDate: dateSchema,
+});
+const documentUpdateSchema = z.object({
+  dueDate: dateSchema.optional(),
+  notes: z.string().trim().max(4000).optional(),
+}).strict();
+const invoicePaymentSchema = z.object({
+  amountCents: z.number().int().positive(),
+  paymentDate: dateSchema,
+  depositAccountId: z.string().uuid(),
+  idempotencyKey: z.string().uuid(),
+}).strict();
+const billPaymentSchema = z.object({
+  amountCents: z.number().int().positive(),
+  paymentDate: dateSchema,
+  sourceAccountId: z.string().uuid(),
+  idempotencyKey: z.string().uuid(),
+}).strict();
+const batchBillPaymentSchema = z.object({
+  payments: z.array(billPaymentSchema.extend({ billId: z.string().uuid() })).min(1).max(100),
+}).strict();
+const bulkDeleteSchema = z.object({
+  entityType: z.enum(['INVOICES', 'BILLS', 'CUSTOMERS', 'VENDORS', 'INVENTORY', 'EMPLOYEES']),
+  ids: z.array(z.string().uuid()).min(1).max(100),
+}).strict();
+const journalLineSchema = z.object({
+  accountId: z.string().uuid(),
+  debit: z.number().int().nonnegative(),
+  credit: z.number().int().nonnegative(),
+  description: z.string().trim().max(500).optional(),
+}).strict().refine((line) => (line.debit > 0) !== (line.credit > 0), {
+  message: 'Each journal line must have exactly one non-zero side.',
+});
+const journalEntrySchema = z.object({
+  entryDate: dateSchema,
+  memo: z.string().trim().max(1000).transform((value) => value || 'Manual journal entry'),
+  sourceType: z.enum(['MANUAL', 'ADJUSTMENT']).default('MANUAL'),
+  referenceNo: z.string().trim().max(100).optional(),
+  idempotencyKey: z.string().uuid().optional(),
+  lines: z.array(journalLineSchema).min(2).max(500),
+}).strict().superRefine((entry, context) => {
+  const debit = entry.lines.reduce((sum, line) => sum + line.debit, 0);
+  const credit = entry.lines.reduce((sum, line) => sum + line.credit, 0);
+  if (!Number.isSafeInteger(debit) || !Number.isSafeInteger(credit) || debit <= 0 || debit !== credit) {
+    context.addIssue({ code: z.ZodIssueCode.custom, message: 'Journal debits and credits must be equal, positive safe-integer cents.' });
+  }
+});
+
 const bodyOf = (c: any) => c.req.json().catch(() => ({}));
+const onboardingSchema = z.object({
+  status: z.enum(['NOT_ASKED', 'IN_PROGRESS', 'SKIPPED', 'COMPLETED']),
+  step: z.number().int().min(0).max(50),
+}).strict();
+
+// --- Personal onboarding (not tied to the active organization) ---
+api.get('/onboarding', async (c) => {
+  try {
+    return c.json(await OnboardingService.getState(c.get('userId')));
+  } catch (err) { return serverError(c, err); }
+});
+
+api.patch('/onboarding', async (c) => {
+  try {
+    const state = onboardingSchema.parse(await bodyOf(c)) as {
+      status: 'NOT_ASKED' | 'IN_PROGRESS' | 'SKIPPED' | 'COMPLETED';
+      step: number;
+    };
+    return c.json(await OnboardingService.updateState(c.get('userId'), state));
+  } catch (err) { return clientError(c, err); }
+});
 
 // --- Reports ---
 api.get('/reports/pnl', async (c) => {
@@ -224,23 +321,7 @@ api.get('/accounts', async (c) => {
 api.post('/accounts/seed', async (c) => {
   try {
     const orgId = c.get('orgId');
-    const standardAccounts = [
-      { code: '1000', name: 'Cash equivalents', type: 'ASSET' },
-      { code: '1100', name: 'Accounts Receivable (A/R)', type: 'ASSET' },
-      { code: '2000', name: 'Accounts Payable (A/P)', type: 'LIABILITY' },
-      { code: '3000', name: "Owner's Equity", type: 'EQUITY' },
-      { code: '4000', name: 'Sales Revenue', type: 'INCOME' },
-      { code: '5000', name: 'Cost of Goods Sold', type: 'COGS' },
-      { code: '6000', name: 'Operating Expenses', type: 'EXPENSE' },
-    ] as const;
-
-    for (const acc of standardAccounts) {
-      try {
-        await AccountService.createAccount({ ...acc, orgId });
-      } catch {
-        // Ignore if already exists
-      }
-    }
+    await OrganizationService.seedDefaultAccounts(orgId);
     return c.json({ success: true });
   } catch (err) { return serverError(c, err); }
 });
@@ -254,7 +335,7 @@ api.get('/journal-entries', async (c) => {
 
 api.post('/journal-entries', async (c) => {
   try {
-    const body = await bodyOf(c);
+    const body = journalEntrySchema.parse(await bodyOf(c)) as Omit<JournalEntryInput, 'orgId' | 'createdBy'>;
     const id = await LedgerService.postJournalEntry({ ...body, orgId: c.get('orgId'), createdBy: c.get('userId') });
     return c.json({ id });
   } catch (err) { return clientError(c, err); }
@@ -403,7 +484,7 @@ api.get('/invoices', async (c) => {
 
 api.post('/invoices', async (c) => {
   try {
-    const body = await bodyOf(c);
+    const body = createInvoiceSchema.parse(await bodyOf(c)) as Omit<InvoiceInput, 'orgId' | 'createdBy'>;
     const id = await InvoiceService.createInvoice({ ...body, orgId: c.get('orgId'), createdBy: c.get('userId') });
     return c.json({ id });
   } catch (err) { return clientError(c, err); }
@@ -411,8 +492,21 @@ api.post('/invoices', async (c) => {
 
 api.patch('/invoices/:id', async (c) => {
   try {
-    await InvoiceService.updateInvoice(c.get('orgId'), c.req.param('id'), await bodyOf(c));
+    const invoiceId = z.string().uuid().parse(c.req.param('id'));
+    await InvoiceService.updateInvoice(c.get('orgId'), invoiceId, documentUpdateSchema.parse(await bodyOf(c)));
     return c.json({ success: true });
+  } catch (err) { return clientError(c, err); }
+});
+
+api.post('/invoices/:id/payments', async (c) => {
+  try {
+    const invoiceId = z.string().uuid().parse(c.req.param('id'));
+    const body = invoicePaymentSchema.parse(await bodyOf(c)) as Omit<InvoicePaymentInput, 'createdBy'>;
+    const payment = await InvoiceService.receivePayment(c.get('orgId'), invoiceId, {
+      ...body,
+      createdBy: c.get('userId'),
+    });
+    return c.json(payment, 201);
   } catch (err) { return clientError(c, err); }
 });
 
@@ -446,7 +540,7 @@ api.get('/bills', async (c) => {
 
 api.post('/bills', async (c) => {
   try {
-    const body = await bodyOf(c);
+    const body = createBillSchema.parse(await bodyOf(c)) as Omit<BillInput, 'orgId' | 'createdBy'>;
     const id = await BillService.createBill({ ...body, orgId: c.get('orgId'), createdBy: c.get('userId') });
     return c.json({ id });
   } catch (err) { return clientError(c, err); }
@@ -454,16 +548,28 @@ api.post('/bills', async (c) => {
 
 api.patch('/bills/:id', async (c) => {
   try {
-    await BillService.updateBill(c.get('orgId'), c.req.param('id'), await bodyOf(c));
+    const billId = z.string().uuid().parse(c.req.param('id'));
+    await BillService.updateBill(c.get('orgId'), billId, documentUpdateSchema.parse(await bodyOf(c)));
     return c.json({ success: true });
+  } catch (err) { return clientError(c, err); }
+});
+
+api.post('/bills/:id/payments', async (c) => {
+  try {
+    const billId = z.string().uuid().parse(c.req.param('id'));
+    const body = billPaymentSchema.parse(await bodyOf(c)) as Omit<BillPaymentInput, 'createdBy'>;
+    const payment = await BillService.recordPayment(c.get('orgId'), billId, {
+      ...body,
+      createdBy: c.get('userId'),
+    });
+    return c.json(payment, 201);
   } catch (err) { return clientError(c, err); }
 });
 
 api.post('/bills/batch-pay', async (c) => {
   try {
-    const { billIds, paymentDate } = await bodyOf(c);
-    if (!Array.isArray(billIds) || billIds.length === 0) throw new Error('billIds array is required.');
-    const result = await BillService.recordBatchPayment(c.get('orgId'), billIds, paymentDate || new Date().toISOString().slice(0, 10), c.get('userId'));
+    const { payments } = batchBillPaymentSchema.parse(await bodyOf(c)) as { payments: BillBatchPaymentInput[] };
+    const result = await BillService.recordBatchPayment(c.get('orgId'), payments, c.get('userId'));
     return c.json(result);
   } catch (err) { return clientError(c, err); }
 });
@@ -593,10 +699,7 @@ api.post('/bulk/delete', async (c) => {
   try {
     const orgId = c.get('orgId');
     const userId = c.get('userId');
-    const { entityType, ids } = await bodyOf(c);
-    if (!Array.isArray(ids) || ids.length === 0) {
-      throw new Error('ids array is required');
-    }
+    const { entityType, ids } = bulkDeleteSchema.parse(await bodyOf(c));
 
     if (entityType === 'INVOICES') {
       for (const id of ids) await InvoiceService.voidInvoice(orgId, id, userId);

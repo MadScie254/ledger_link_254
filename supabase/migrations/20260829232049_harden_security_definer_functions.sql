@@ -169,4 +169,12 @@ $function$;
 
 -- 6. rls_auto_enable: this is an event-trigger function (fires automatically on CREATE TABLE).
 --    It should never be callable directly via RPC by anyone.
-REVOKE EXECUTE ON FUNCTION public.rls_auto_enable() FROM PUBLIC, anon, authenticated;
+--    Some fresh/local databases never had this live-project helper, so keep
+--    the hardening migration replayable without inventing an event trigger.
+DO $function$
+BEGIN
+  IF to_regprocedure('public.rls_auto_enable()') IS NOT NULL THEN
+    EXECUTE 'REVOKE EXECUTE ON FUNCTION public.rls_auto_enable() FROM PUBLIC, anon, authenticated';
+  END IF;
+END;
+$function$;

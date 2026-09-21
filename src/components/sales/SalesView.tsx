@@ -1,38 +1,34 @@
 import React, { useState } from 'react';
-import { formatCurrency, formatCurrencyFromFloat, SUPPORTED_CURRENCIES } from '../../utils/currency';
 import { useRenderTracker } from '../../utils/monitoring';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { format } from 'date-fns';
-import { Download, Trash, Tag, Globe } from 'lucide-react';
+import { Download } from 'lucide-react';
 import { ConfirmModal } from '../layout/ConfirmModal';
-import { RecurringInvoices } from './RecurringInvoices';
+import { InvoiceBuilder } from './InvoiceBuilder';
 import { EntityDrillDownModal } from '../common/EntityDrillDownModal';
 import { BulkActionBar } from '../common/BulkActionBar';
 import { useAppStore } from '../../store';
+import { Amount } from '../ledger/Amount';
+import { Dialog, Field } from '../ledger/Dialog';
+import { Mark } from '../ledger/Mark';
+import { PageHeading, PageNote, buttonClass } from '../ledger/Page';
 
 export function SalesView() {
   useRenderTracker("SalesView");
-  const { currentOrgId, activeCompany, exchangeRates } = useAppStore();
+  const { currentOrgId, activeCompany } = useAppStore();
   const [isBuilding, setIsBuilding] = useState(false);
-  const [activeTab, setActiveTab] = useState<'Invoices' | 'Recurring'>('Invoices');
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [selectedInvoice, setSelectedInvoice] = useState<any | null>(null);
-  const [invoiceCurrency, setInvoiceCurrency] = useState('KES');
-  const [invoiceExchangeRate, setInvoiceExchangeRate] = useState('1');
+  const [paymentInvoice, setPaymentInvoice] = useState<any | null>(null);
+  const [paymentAmount, setPaymentAmount] = useState('');
+  const [paymentDate, setPaymentDate] = useState(format(new Date(), 'yyyy-MM-dd'));
+  const [depositAccountId, setDepositAccountId] = useState('');
+  const [paymentIdempotencyKey, setPaymentIdempotencyKey] = useState('');
+  const [paymentProblem, setPaymentProblem] = useState('');
 
   const queryClient = useQueryClient();
 
-  const handleCurrencyChange = (curr: string) => {
-    setInvoiceCurrency(curr);
-    if (curr === (activeCompany?.baseCurrency || 'KES')) {
-      setInvoiceExchangeRate('1');
-    } else {
-      const rate = exchangeRates[curr] || 1;
-      setInvoiceExchangeRate(rate.toString());
-    }
-  };
-
-  const { data: invoicesData, isLoading: loadingInvoices } = useQuery({
+  const { data: invoicesData, isLoading: loadingInvoices, isError: invoicesError, refetch: refetchInvoices } = useQuery({
     queryKey: ['invoices', currentOrgId],
     queryFn: async () => {
       const res = await fetch('/api/invoices', { headers: { 'x-org-id': currentOrgId } });
@@ -54,7 +50,7 @@ export function SalesView() {
     queryKey: ['accounts', currentOrgId],
     queryFn: async () => {
       const res = await fetch('/api/accounts', { headers: { 'x-org-id': currentOrgId } });
-      if (!res.ok) throw new Error('Failed to fetch');
+      if (!res.ok) throw new Error('Failed to fetch accounts');
       return res.json();
     }
   });
@@ -76,20 +72,33 @@ export function SalesView() {
     }
   });
 
-  // Bulk Status Update Invoices
-  const bulkStatusMutation = useMutation({
-    mutationFn: async ({ ids, status }: { ids: string[], status: string }) => {
-      const res = await fetch('/api/bulk/status-update', {
+  const receivePaymentMutation = useMutation({
+    mutationFn: async (payment: { invoiceId: string; amountCents: number; paymentDate: string; depositAccountId: string; idempotencyKey: string }) => {
+      const res = await fetch(`/api/invoices/${payment.invoiceId}/payments`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'x-org-id': currentOrgId },
-        body: JSON.stringify({ entityType: 'INVOICES', ids, status })
+        body: JSON.stringify({
+          amountCents: payment.amountCents,
+          paymentDate: payment.paymentDate,
+          depositAccountId: payment.depositAccountId,
+          idempotencyKey: payment.idempotencyKey,
+        })
       });
-      if (!res.ok) throw new Error('Failed to update status');
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        throw new Error(body.error || 'The payment could not be recorded.');
+      }
       return res.json();
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['invoices', currentOrgId] });
+      queryClient.invalidateQueries({ queryKey: ['accounts', currentOrgId] });
       setSelectedIds([]);
+      setPaymentInvoice(null);
+      setPaymentProblem('');
+    },
+    onError: (error) => {
+      setPaymentProblem(error instanceof Error ? error.message : 'The payment could not be recorded.');
     }
   });
 
@@ -129,280 +138,244 @@ export function SalesView() {
     window.URL.revokeObjectURL(url);
   };
 
-  const handleCreateMockCustomer = async () => {
-    await fetch('/api/customers', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'x-org-id': 'default-org-id' },
-      body: JSON.stringify({ displayName: 'Acme Corp', email: 'billing@acme.com' })
-    });
-    queryClient.invalidateQueries({ queryKey: ['customers'] });
+  if (isBuilding) return <InvoiceBuilder onDone={() => setIsBuilding(false)} />;
+
+  const baseCurrency = activeCompany?.baseCurrency || 'KES';
+  const invoices: any[] = invoicesData?.invoices || [];
+  const depositAccounts: any[] = (accountsData?.accounts || []).filter((account: any) => account.type === 'ASSET' && account.isActive !== false);
+  const customerName = (id: string) => customersData?.customers?.find((c: any) => c.id === id)?.displayName;
+  const invoiceTotal = invoices.reduce((sum, inv) => sum + (inv.totalCents || 0), 0);
+  const overdueCount = invoices.filter((inv) => inv.status === 'OVERDUE').length;
+  const openCount = invoices.filter((inv) => !['PAID', 'DRAFT', 'VOID'].includes(inv.status)).length;
+
+  const openPayment = (invoice: any) => {
+    setPaymentInvoice(invoice);
+    setPaymentAmount(((invoice.amountDueCents || 0) / 100).toFixed(2));
+    setPaymentDate(format(new Date(), 'yyyy-MM-dd'));
+    setDepositAccountId(depositAccounts[0]?.id || '');
+    setPaymentIdempotencyKey(crypto.randomUUID());
+    setPaymentProblem('');
   };
 
-  const handleCreateInvoice = async (e: React.FormEvent) => {
-    e.preventDefault();
-    const formData = new FormData(e.target as HTMLFormElement);
-    const amountStr = formData.get('amount') as string;
-    const amountCents = Math.round(parseFloat(amountStr || '0') * 100);
-    const curr = (formData.get('currency') as string) || (activeCompany?.baseCurrency || 'KES');
-    const rate = parseFloat((formData.get('exchangeRate') as string) || '1');
+  const submitPayment = () => {
+    if (!paymentInvoice) return;
+    const amountCents = Math.round(Number(paymentAmount) * 100);
+    if (!Number.isSafeInteger(amountCents) || amountCents <= 0) {
+      setPaymentProblem('Enter a payment amount greater than zero.');
+      return;
+    }
+    if (amountCents > Number(paymentInvoice.amountDueCents || 0)) {
+      setPaymentProblem('Payment cannot exceed the amount due.');
+      return;
+    }
+    if (!depositAccountId) {
+      setPaymentProblem('Choose the account that received the money.');
+      return;
+    }
+    receivePaymentMutation.mutate({
+      invoiceId: paymentInvoice.id,
+      amountCents,
+      paymentDate,
+      depositAccountId,
+      idempotencyKey: paymentIdempotencyKey,
+    });
+  };
 
-    try {
-      const res = await fetch('/api/invoices', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'x-org-id': currentOrgId },
-        body: JSON.stringify({
-          customerId: formData.get('customerId'),
-          issueDate: new Date().toISOString(),
-          dueDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
-          currency: curr,
-          exchangeRate: rate,
-          lines: [{
-            description: formData.get('description'),
-            accountId: formData.get('accountId'),
-            amountCents
-          }]
-        })
-      });
-      if (!res.ok) {
-        const err = await res.json();
-        alert(err.error || 'Failed to create invoice');
-        return;
-      }
-      setIsBuilding(false);
-      queryClient.invalidateQueries({ queryKey: ['invoices'] });
-    } catch (err) {
-      console.error(err);
-      alert('Error creating invoice');
+  const standing = (status: string) => {
+    switch (status) {
+      case 'PAID':
+        return <Mark kind="tick" label="Paid" />;
+      case 'OVERDUE':
+        return <Mark kind="circled" label="Overdue" />;
+      case 'SENT':
+        return <Mark kind="query" label="Awaiting payment" />;
+      case 'PARTIAL':
+      case 'PARTIALLY_PAID':
+        return <Mark kind="query" label="Part paid" />;
+      case 'VOID':
+        return <Mark kind="circled" label="Void" />;
+      case 'DRAFT':
+        return <span className="text-[12px] text-graphite-600">Draft, not sent</span>;
+      default:
+        return <span className="text-[12px] text-graphite-600">{status.charAt(0) + status.slice(1).toLowerCase()}</span>;
     }
   };
 
-  if (isBuilding) {
-    const hasCustomers = customersData?.customers?.length > 0;
-    const incomeAccounts = accountsData?.accounts?.filter((a: any) => a.type === 'INCOME') || [];
-
-    return (
-      <div className="max-w-4xl mx-auto">
-        <div className="flex items-center justify-between mb-2">
-          <h1 className="text-2xl font-serif text-ink-900">New Invoice</h1>
-          <button 
-            onClick={() => setIsBuilding(false)}
-            className="text-slate-500 hover:text-ink-900 text-sm font-medium"
-          >
-            Cancel
-          </button>
-        </div>
-        <div className="ledger-divider mb-6"></div>
-
-        {!hasCustomers ? (
-          <div className="bg-paper-100 p-8 border border-ink-900/10 rounded-sm text-center">
-            <p className="text-slate-500 mb-4">You need a customer to create an invoice.</p>
-            <button 
-              onClick={handleCreateMockCustomer}
-              className="bg-sidebar-bg text-sidebar-ink  px-4 py-2 rounded-sm text-sm font-medium"
-            >
-              Add Sample Customer
-            </button>
-          </div>
-        ) : (
-          <form onSubmit={handleCreateInvoice} className="bg-paper-100 border border-ink-900/10 shadow-sm rounded-sm p-6 space-y-6">
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-              <div>
-                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">Customer *</label>
-                <select name="customerId" required className="w-full border border-ink-900/20 rounded-sm p-2 text-xs focus:ring-1 focus:ring-focus-blue-500 outline-none bg-paper-100">
-                  {customersData?.customers?.map((c: any) => (
-                    <option key={c.id} value={c.id}>{c.displayName}</option>
-                  ))}
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">Invoice Currency</label>
-                <select 
-                  name="currency" 
-                  value={invoiceCurrency} 
-                  onChange={(e) => handleCurrencyChange(e.target.value)}
-                  className="w-full border border-ink-900/20 rounded-sm p-2 text-xs focus:ring-1 focus:ring-focus-blue-500 outline-none bg-paper-100"
-                >
-                  {SUPPORTED_CURRENCIES.map((c) => (
-                    <option key={c.code} value={c.code}>{c.flag} {c.code} - {c.name}</option>
-                  ))}
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">Exchange Rate (vs {activeCompany?.baseCurrency || 'KES'})</label>
-                <input 
-                  type="number" 
-                  step="any"
-                  name="exchangeRate" 
-                  value={invoiceExchangeRate}
-                  onChange={(e) => setInvoiceExchangeRate(e.target.value)}
-                  className="w-full border border-ink-900/20 rounded-sm p-2 text-xs focus:ring-1 focus:ring-focus-blue-500 outline-none font-mono bg-paper-100"
-                />
-              </div>
-            </div>
-
-            <div className="border border-ink-900/10 rounded-sm overflow-hidden">
-              <table className="w-full text-sm text-left">
-                <thead className="bg-paper-100  border-b border-ink-900/10 text-xs uppercase text-slate-500">
-                  <tr>
-                    <th className="px-4 py-3 font-semibold w-1/2">Description</th>
-                    <th className="px-4 py-3 font-semibold">Income Account</th>
-                    <th className="px-4 py-3 font-semibold text-right">Amount ({invoiceCurrency})</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-ink-900/5">
-                  <tr className="bg-paper-100">
-                    <td className="p-2">
-                      <input name="description" required placeholder="Consulting services / export..." className="w-full border border-ink-900/20 rounded-sm p-2 outline-none focus:ring-1 focus:ring-focus-blue-500 text-xs" />
-                    </td>
-                    <td className="p-2">
-                      <select name="accountId" required className="w-full border border-ink-900/20 rounded-sm p-2 outline-none focus:ring-1 focus:ring-focus-blue-500 text-xs bg-paper-100">
-                        {incomeAccounts.map((a: any) => (
-                          <option key={a.id} value={a.id}>{a.code} - {a.name}</option>
-                        ))}
-                      </select>
-                    </td>
-                    <td className="p-2 text-right">
-                      <input name="amount" required type="number" step="0.01" min="0.01" placeholder="0.00" className="w-full text-right border border-ink-900/20 rounded-sm p-2 outline-none focus:ring-1 focus:ring-focus-blue-500 tabular-currency text-xs" />
-                    </td>
-                  </tr>
-                </tbody>
-              </table>
-            </div>
-
-            <div className="flex justify-end pt-4 border-t border-ink-900/10">
-              <button type="submit" className="bg-brass-500 text-ink-900 px-6 py-2 rounded-sm text-sm font-bold shadow-sm hover:bg-brass-500/90 transition-colors">
-                Save & Post to Ledger
-              </button>
-            </div>
-          </form>
-        )}
-      </div>
-    );
-  }
-
   return (
-    <div className="max-w-5xl mx-auto">
-      <div className="flex items-center justify-between mb-2">
-        <h1 className="text-2xl font-serif text-ink-900">Sales & Invoicing</h1>
-        {activeTab === 'Invoices' && (
-          <div className="flex space-x-2">
-            <button 
-              onClick={handleExportCSV}
-              className="bg-paper-100 border border-ink-900/20 text-ink-900 px-4 py-2 text-sm font-medium rounded-sm hover:bg-paper-50 transition-colors flex items-center"
-            >
-              <Download className="h-4 w-4 mr-2" /> Export
-            </button>
-            <button 
-              onClick={() => setIsBuilding(true)}
-              className="bg-sidebar-bg text-sidebar-ink  px-4 py-2 text-sm font-medium rounded-sm hover:bg-sidebar-bg/90 transition-colors"
-            >
-              Create Invoice
-            </button>
-          </div>
-)}
-      </div>
-      
-      <div className="flex space-x-6 mb-6">
-        <button
-          onClick={() => setActiveTab('Invoices')}
-          className={`pb-3 text-sm font-medium transition-colors border-b-2 whitespace-nowrap ${
-            activeTab === 'Invoices'
-              ? 'border-brass-500 text-ink-900'
-              : 'border-transparent text-slate-500 hover:text-ink-900 hover:border-ink-900/20'
-          }`}
-        >
-          One-Time Invoices
-        </button>
-        <button
-          onClick={() => setActiveTab('Recurring')}
-          className={`pb-3 text-sm font-medium transition-colors border-b-2 whitespace-nowrap ${
-            activeTab === 'Recurring'
-              ? 'border-brass-500 text-ink-900'
-              : 'border-transparent text-slate-500 hover:text-ink-900 hover:border-ink-900/20'
-          }`}
-        >
-          Recurring Invoices
-        </button>
-      </div>
+    <div>
+      <PageHeading
+        title="Sales"
+        note={<>{invoices.length} invoices for {activeCompany?.name || 'this organization'} · Figures in {baseCurrency}</>}
+        actions={
+          (
+            <>
+              <button type="button" onClick={handleExportCSV} className={buttonClass.secondary}>
+                <Download className="h-4 w-4" aria-hidden="true" /> Export CSV
+              </button>
+              <button data-tour="new-invoice" type="button" onClick={() => setIsBuilding(true)} className={buttonClass.primary}>
+                New invoice
+              </button>
+            </>
+          )
+        }
+      />
 
-      <div className="ledger-divider mb-6"></div>
-
-      {activeTab === 'Recurring' ? (
-        <RecurringInvoices />
+      {loadingInvoices ? (
+        <div aria-busy="true" aria-label="Loading invoices" className="mt-2">
+          {Array.from({ length: 6 }).map((_, i) => (
+            <div key={i} className="h-10 border-b border-feint flex items-center gap-6">
+              <div className="h-3 w-20 bg-paper-200" />
+              <div className="h-3 w-28 bg-paper-200" />
+              <div className="h-3 flex-1 bg-paper-200" />
+              <div className="h-3 w-24 bg-paper-200" />
+            </div>
+          ))}
+        </div>
+      ) : invoicesError ? (
+        <p role="alert" className="mt-4 flex flex-wrap items-center gap-x-3 gap-y-1 text-[13px]">
+          <Mark kind="circled" />
+          <span className="text-ink-900">Could not load invoices.</span>
+          <span className="text-graphite-600">GET /api/invoices did not complete.</span>
+          <button type="button" onClick={() => refetchInvoices()} className={buttonClass.quiet}>Try again</button>
+        </p>
+      ) : invoices.length === 0 ? (
+        <div className="py-8 max-w-xl text-[14px] text-graphite-600">
+          <p>No invoices yet. Each invoice you issue is listed here with its customer, standing and eTIMS signature, largest totals carried to the foot.</p>
+          <button type="button" onClick={() => setIsBuilding(true)} className={`${buttonClass.quiet} mt-2`}>Write the first invoice</button>
+        </div>
       ) : (
-
-
-      <div className="bg-paper-100 border border-ink-900/10 shadow-sm rounded-sm overflow-hidden">
-        {loadingInvoices ? (
-          <div className="p-16 text-center text-slate-500">Loading invoices...</div>
-        ) : invoicesData?.invoices?.length === 0 ? (
-          <div className="p-16 text-center text-slate-500">
-            <p className="mb-4">No invoices exist yet.</p>
-          </div>
-        ) : (
-          <table className="w-full text-sm text-left">
-            <thead className="bg-paper-100 border-b border-ink-900/10 text-xs uppercase text-slate-500">
-              <tr>
-                <th className="px-4 py-3 w-8">
-                  <input type="checkbox" className="rounded border-ink-900/20 text-focus-blue-500 focus:ring-focus-blue-500" onChange={handleSelectAll} checked={selectedIds.length > 0 && invoicesData?.invoices?.length === selectedIds.length} />
-                </th>
-                <th className="px-4 py-3 font-semibold">Date</th>
-                <th className="px-4 py-3 font-semibold">Invoice No</th>
-                <th className="px-4 py-3 font-semibold">Customer ID</th>
-                <th className="px-4 py-3 font-semibold">Status</th>
-                <th className="px-4 py-3 font-semibold">eTIMS Status</th>
-                <th className="px-4 py-3 font-semibold text-right">Total</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-ink-900/5">
-              {invoicesData?.invoices?.map((inv: any) => (
-                <tr 
-                  key={inv.id} 
-                  onClick={() => setSelectedInvoice(inv)}
-                  className="hover:bg-paper-50 dark:hover:bg-ink-900/40 transition-colors cursor-pointer"
-                >
-                  <td className="px-4 py-3 w-8" onClick={(e) => e.stopPropagation()}>
-                    <input type="checkbox" className="rounded border-ink-900/20 text-focus-blue-500 focus:ring-focus-blue-500" checked={selectedIds.includes(inv.id)} onChange={() => handleSelectOne(inv.id)} />
-                  </td>
-                  <td className="px-4 py-3 tabular-currency text-ink-900">
-                    {format(new Date(inv.issueDate), 'MMM d, yyyy')}
-                  </td>
-                  <td className="px-4 py-3 font-medium text-ink-900">{inv.invoiceNo}</td>
-                  <td className="px-4 py-3 text-slate-500">{inv.customerId.substring(0, 8)}...</td>
-                  <td className="px-4 py-3">
-                    <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-ledger-green-700/10 text-ledger-green-700">
-                      {inv.status}
+        <>
+          <PageNote>
+            <span>{openCount} open</span>
+            {overdueCount > 0 && <Mark kind="circled" label={`${overdueCount} overdue`} />}
+            <span>{invoices.length - openCount} paid or draft</span>
+          </PageNote>
+          {/* On a phone each invoice is a ruled entry: who and how much, then its number, date and standing. */}
+          <ul className="sm:hidden" aria-label={`Invoices, figures in ${baseCurrency}`}>
+            {invoices.map((inv: any) => (
+              <li key={inv.id} className="border-b border-feint py-3">
+                <div className="flex items-baseline justify-between gap-3">
+                  <button type="button" onClick={() => setSelectedInvoice(inv)} className="min-w-0 truncate text-left text-[14.5px] text-ink-900 hover:underline underline-offset-[3px]">
+                    {customerName(inv.customerId) || 'Customer not found'}
+                  </button>
+                  <Amount cents={inv.totalCents || 0} currency={baseCurrency} className="shrink-0" />
+                </div>
+                <div className="mt-1 flex items-center justify-between gap-3 text-[12.5px] text-graphite-600">
+                  <span>{inv.invoiceNo} · {format(new Date(inv.issueDate), 'dd/MM/yyyy')}</span>
+                  {inv.currency && inv.currency !== baseCurrency && (
+                    <span className="shrink-0">
+                      {inv.currency} <Amount cents={inv.foreignAmountCents || inv.totalCents} currency={inv.currency} size="xs" tone="ink" />
                     </span>
-                  </td>
-                  <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
-                    {inv.etimsStatus === 'SUCCESS' ? (
-                      <a href={inv.etimsQrCodeUrl} target="_blank" rel="noopener noreferrer" className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-focus-blue-500/10 text-focus-blue-500 hover:bg-focus-blue-500/20 transition-colors">
-                        ✓ {inv.etimsControlCode}
-                      </a>
-                    ) : (
-                      <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-slate-100 text-slate-500">
-                        Pending
-                      </span>
+                  )}
+                </div>
+                <div className="mt-1.5 flex items-center justify-between gap-3">
+                  <span className="flex items-center gap-2">
+                    {standing(inv.status)}
+                    {Number(inv.amountDueCents || 0) > 0 && inv.status !== 'VOID' && (
+                      <button type="button" onClick={() => openPayment(inv)} className={buttonClass.quiet}>Receive payment</button>
                     )}
-                  </td>
-                  <td className="px-4 py-3 tabular-currency text-right text-ink-900 font-medium">
-                    {inv.currency && inv.currency !== (activeCompany?.baseCurrency || 'KES') ? (
-                      <div>
-                        <span className="font-bold block">{inv.currency} {((inv.foreignAmountCents || inv.totalCents) / 100).toLocaleString('en-US', { minimumFractionDigits: 2 })}</span>
-                        <span className="text-[10px] text-slate-400 font-normal">({formatCurrency(inv.totalCents)})</span>
-                      </div>
-                    ) : (
-                      formatCurrency(inv.totalCents)
-                    )}
-                  </td>
+                  </span>
+                  <span className="text-[12px] text-graphite-600">{inv.etimsStatus === 'SUCCESS' ? `eTIMS signed ${inv.etimsControlCode}` : 'eTIMS queued'}</span>
+                </div>
+              </li>
+            ))}
+            <li className="ll-total mt-px flex items-baseline justify-between gap-3 py-2 text-[13.5px]">
+              <span className="font-semibold text-ink-900">Total of {invoices.length} {invoices.length === 1 ? 'invoice' : 'invoices'}</span>
+              <Amount cents={invoiceTotal} currency={baseCurrency} tone="ink" className="font-semibold" />
+            </li>
+          </ul>
+          <div className="hidden sm:block relative overflow-x-auto">
+            <table className="w-full text-[13.5px]">
+              <caption className="sr-only">Invoices, figures in {baseCurrency}</caption>
+              <thead>
+                <tr>
+                  <th scope="col" className="w-8 pr-2 text-left">
+                    <input
+                      type="checkbox"
+                      aria-label="Select all invoices"
+                      className="h-4 w-4"
+                      onChange={handleSelectAll}
+                      checked={selectedIds.length > 0 && invoices.length === selectedIds.length}
+                    />
+                  </th>
+                  <th scope="col" className="pr-4 text-left">Date</th>
+                  <th scope="col" className="pr-4 text-left">Invoice</th>
+                  <th scope="col" className="pr-4 text-left">Customer</th>
+                  <th scope="col" className="pr-4 text-left">Standing</th>
+                  <th scope="col" className="pr-4 text-left">eTIMS</th>
+                  <th scope="col" className="text-right">{baseCurrency}</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        )}
-      </div>
+              </thead>
+              <tbody>
+                {invoices.map((inv: any) => (
+                  <tr key={inv.id} onClick={() => setSelectedInvoice(inv)} className="cursor-pointer">
+                    <td className="w-8 pr-2" onClick={(e) => e.stopPropagation()}>
+                      <input
+                        type="checkbox"
+                        aria-label={`Select invoice ${inv.invoiceNo}`}
+                        className="h-4 w-4"
+                        checked={selectedIds.includes(inv.id)}
+                        onChange={() => handleSelectOne(inv.id)}
+                      />
+                    </td>
+                    <td className="pr-4 whitespace-nowrap text-graphite-600">{format(new Date(inv.issueDate), 'dd/MM/yyyy')}</td>
+                    <td className="pr-4 whitespace-nowrap text-graphite-600">{inv.invoiceNo}</td>
+                    <td className="pr-4">
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setSelectedInvoice(inv);
+                        }}
+                        className="text-left text-ink-900 hover:underline underline-offset-[3px]"
+                      >
+                        {customerName(inv.customerId) || 'Customer not found'}
+                      </button>
+                    </td>
+                    <td className="pr-4 whitespace-nowrap">
+                      <div className="flex flex-col items-start gap-1">
+                        {standing(inv.status)}
+                        {Number(inv.amountDueCents || 0) > 0 && inv.status !== 'VOID' && (
+                          <button
+                            type="button"
+                            onClick={(event) => {
+                              event.stopPropagation();
+                              openPayment(inv);
+                            }}
+                            className={buttonClass.quiet}
+                          >
+                            Receive payment
+                          </button>
+                        )}
+                      </div>
+                    </td>
+                    <td className="pr-4 whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
+                      {inv.etimsStatus === 'SUCCESS' ? (
+                        <a href={inv.etimsQrCodeUrl} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 text-[12px] text-ink-900 hover:underline">
+                          <Mark kind="tick" /> Signed {inv.etimsControlCode}
+                        </a>
+                      ) : (
+                        <span className="text-[12px] text-graphite-600">Queued</span>
+                      )}
+                    </td>
+                    <td className="text-right whitespace-nowrap">
+                      <Amount cents={inv.totalCents || 0} currency={baseCurrency} />
+                      {inv.currency && inv.currency !== baseCurrency && (
+                        <span className="block mt-1 text-[11.5px] text-graphite-600">
+                          {inv.currency} <Amount cents={inv.foreignAmountCents || inv.totalCents} currency={inv.currency} size="xs" tone="ink" />
+                        </span>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            <div className="ll-total mt-px flex items-baseline justify-between gap-4 py-2 text-[13.5px]">
+              <span className="font-semibold text-ink-900">Total of {invoices.length} {invoices.length === 1 ? 'invoice' : 'invoices'}</span>
+              <Amount cents={invoiceTotal} currency={baseCurrency} tone="ink" className="font-semibold" />
+            </div>
+          </div>
+        </>
       )}
 
       {/* Bulk Action Contextual Toolbar */}
@@ -416,15 +389,61 @@ export function SalesView() {
             bulkDeleteMutation.mutate(selectedIds);
           }
         }}
-        statusOptions={[
-          { label: 'Mark Paid', value: 'PAID' },
-          { label: 'Mark Sent', value: 'SENT' },
-          { label: 'Mark Draft', value: 'DRAFT' }
-        ]}
-        onStatusUpdate={(status) => bulkStatusMutation.mutate({ ids: selectedIds, status })}
         onExport={handleExportCSV}
-        isLoading={bulkDeleteMutation.isPending || bulkStatusMutation.isPending}
+        isLoading={bulkDeleteMutation.isPending}
       />
+
+      <Dialog
+        open={!!paymentInvoice}
+        onClose={() => {
+          if (!receivePaymentMutation.isPending) setPaymentInvoice(null);
+        }}
+        title="Receive payment"
+        note={paymentInvoice ? `${paymentInvoice.invoiceNo} · ${customerName(paymentInvoice.customerId) || 'Customer'}` : undefined}
+        footer={
+          <>
+            <button type="button" onClick={() => setPaymentInvoice(null)} disabled={receivePaymentMutation.isPending} className={buttonClass.secondary}>
+              Cancel
+            </button>
+            <button type="button" onClick={submitPayment} disabled={receivePaymentMutation.isPending || depositAccounts.length === 0} className={buttonClass.primary}>
+              {receivePaymentMutation.isPending ? 'Posting' : 'Post payment'}
+            </button>
+          </>
+        }
+      >
+        <div className="space-y-4">
+          <div className="ll-total flex items-baseline justify-between py-2 text-[13.5px]">
+            <span className="font-semibold text-ink-900">Amount due</span>
+            <Amount cents={paymentInvoice?.amountDueCents || 0} currency={baseCurrency} tone="ink" />
+          </div>
+          <Field label={`Amount received (${baseCurrency})`}>
+            <input
+              type="number"
+              min="0.01"
+              max={((paymentInvoice?.amountDueCents || 0) / 100).toFixed(2)}
+              step="0.01"
+              inputMode="decimal"
+              required
+              value={paymentAmount}
+              onChange={(event) => setPaymentAmount(event.target.value)}
+              className="tabular-currency"
+            />
+          </Field>
+          <Field label="Date received">
+            <input type="date" required value={paymentDate} onChange={(event) => setPaymentDate(event.target.value)} />
+          </Field>
+          <Field label="Deposit account" hint={depositAccounts.length === 0 ? 'Add an active bank or cash asset account before receiving payment.' : undefined}>
+            <select required value={depositAccountId} onChange={(event) => setDepositAccountId(event.target.value)}>
+              <option value="">Choose an account</option>
+              {depositAccounts.map((account: any) => (
+                <option key={account.id} value={account.id}>{account.code} · {account.name}</option>
+              ))}
+            </select>
+          </Field>
+          {paymentProblem && <p role="alert" className="text-[13px] text-ledger-red">{paymentProblem}</p>}
+          <p className="text-[12.5px] text-graphite-600">This posts cash or bank against accounts receivable. A smaller amount leaves the invoice part paid.</p>
+        </div>
+      </Dialog>
 
       {/* Invoice Drill-down Overlay */}
       <EntityDrillDownModal

@@ -1,6 +1,6 @@
 import { useState } from 'react';
+import { ChevronRight } from 'lucide-react';
 import { useAppStore } from '../../store';
-import { Info } from 'lucide-react';
 import { ProfitAndLossView } from './ProfitAndLossView';
 import { BalanceSheetView } from './BalanceSheetView';
 import { CashFlowView } from './CashFlowView';
@@ -8,208 +8,121 @@ import { TrialBalanceView } from './TrialBalanceView';
 import { TaxSummaryView } from './TaxSummaryView';
 import { ARAgingView, APAgingView } from './ARAgingView';
 import { GeneralLedgerView } from './GeneralLedgerView';
+import { PageHeading } from '../ledger/Page';
 
-const tabs = ['Standard reports', 'Custom report builder', 'Management report packs', 'Scheduled/emailed reports'];
-
-const standardReports = [
-  { name: 'Profit & Loss', desc: 'Shows your income and expenses to determine your net profit.', category: 'Business Overview' },
-  { name: 'Balance Sheet', desc: 'Lists what you own (assets), what you owe (liabilities), and what you invested (equity).', category: 'Business Overview' },
-  { name: 'Statement of Cash Flows', desc: 'Shows the cash flowing in and out of your business across operating, investing and financing.', category: 'Business Overview' },
-  { name: 'Tax Summary (KRA VAT & eTIMS)', desc: 'Official Kenya Revenue Authority VAT Return schedule, eTIMS invoice breakdown, and net liability.', category: 'Tax & Compliance' },
-  { name: 'Trial Balance', desc: 'Summarizes the debit and credit balances of each account on your chart of accounts with equality verification.', category: 'Accountant' },
-  { name: 'A/R Aging Summary', desc: 'Unpaid customer invoices, grouped by days past due.', category: 'Who owes you' },
-  { name: 'A/P Aging Summary', desc: 'Unpaid vendor bills, grouped by days past due.', category: 'What you owe' },
-  { name: 'General Ledger', desc: 'The beginning balance, transactions, and total for each account in your chart of accounts.', category: 'Accountant' },
+/**
+ * The contents page of the book's reports. Report ids are the keys the
+ * statement views are opened by; names are what the reader sees.
+ */
+const CONTENTS = [
+  {
+    section: 'The business at a glance',
+    reports: [
+      { id: 'Profit & Loss', name: 'Profit and loss', desc: 'Income less cost of sales and expenses, down to net profit.' },
+      { id: 'Balance Sheet', name: 'Balance sheet', desc: 'What the business owns, what it owes, and the equity between them.' },
+      { id: 'Statement of Cash Flows', name: 'Cash flow statement', desc: 'Cash in and out across operating, investing and financing.' },
+    ],
+  },
+  {
+    section: 'Who owes whom',
+    reports: [
+      { id: 'A/R Aging Summary', name: 'Receivables by age', desc: 'Unpaid customer invoices, grouped by days past due.' },
+      { id: 'A/P Aging Summary', name: 'Payables by age', desc: 'Unpaid supplier bills, grouped by days past due.' },
+    ],
+  },
+  {
+    section: 'For the accountant',
+    reports: [
+      { id: 'Trial Balance', name: 'Trial balance', desc: 'Every account’s debit or credit balance, with the totals that must agree.' },
+      { id: 'General Ledger', name: 'General ledger', desc: 'Every line posted to one account, with balances brought and carried forward.' },
+    ],
+  },
+  {
+    section: 'Tax',
+    reports: [
+      { id: 'Tax Summary (KRA VAT & eTIMS)', name: 'VAT and eTIMS summary', desc: 'Output and input VAT for the period, the net due to KRA, and the eTIMS invoice queue.' },
+    ],
+  },
 ];
 
 export function ReportsView() {
-  const { displayCurrency, setDisplayCurrency } = useAppStore();
-  const [activeTab, setActiveTab] = useState('Standard reports');
+  const { displayCurrency, setDisplayCurrency, activeCompany } = useAppStore();
+  const baseCurrency = activeCompany?.baseCurrency || 'KES';
   const [activeReport, setActiveReport] = useState<string | null>(null);
-  const [notBuiltMessage, setNotBuiltMessage] = useState<string | null>(null);
-  
-  // Group reports by category
-  const groupedReports = standardReports.reduce((acc, report) => {
-    if (!acc[report.category]) acc[report.category] = [];
-    acc[report.category].push(report);
-    return acc;
-  }, {} as Record<string, typeof standardReports>);
+  const back = () => setActiveReport(null);
 
-  if (activeReport === 'Profit & Loss') {
-    return <ProfitAndLossView onBack={() => setActiveReport(null)} />;
-  }
-
-  if (activeReport === 'Balance Sheet') {
-    return <BalanceSheetView onBack={() => setActiveReport(null)} />;
-  }
-
-  if (activeReport === 'Statement of Cash Flows') {
-    return <CashFlowView onBack={() => setActiveReport(null)} />;
-  }
-
-  if (activeReport === 'Trial Balance') {
-    return <TrialBalanceView onBack={() => setActiveReport(null)} />;
-  }
-
-  if (activeReport === 'Tax Summary (KRA VAT & eTIMS)') {
-    return <TaxSummaryView onBack={() => setActiveReport(null)} />;
-  }
-
-  if (activeReport === 'A/R Aging Summary') {
-    return <ARAgingView onBack={() => setActiveReport(null)} />;
-  }
-
-  if (activeReport === 'A/P Aging Summary') {
-    return <APAgingView onBack={() => setActiveReport(null)} />;
-  }
-
-  if (activeReport === 'General Ledger') {
-    return <GeneralLedgerView onBack={() => setActiveReport(null)} />;
+  switch (activeReport) {
+    case 'Profit & Loss':
+      return <ProfitAndLossView onBack={back} />;
+    case 'Balance Sheet':
+      return <BalanceSheetView onBack={back} />;
+    case 'Statement of Cash Flows':
+      return <CashFlowView onBack={back} />;
+    case 'Trial Balance':
+      return <TrialBalanceView onBack={back} />;
+    case 'Tax Summary (KRA VAT & eTIMS)':
+      return <TaxSummaryView onBack={back} />;
+    case 'A/R Aging Summary':
+      return <ARAgingView onBack={back} />;
+    case 'A/P Aging Summary':
+      return <APAgingView onBack={back} />;
+    case 'General Ledger':
+      return <GeneralLedgerView onBack={back} />;
   }
 
   return (
-    <div>
-      <section className="mb-6 flex flex-col gap-4 border-b border-ink-900/10 pb-6 sm:flex-row sm:items-end sm:justify-between">
-        <div>
-          <p className="page-kicker">Statements and schedules</p>
-          <h1 className="mt-2 text-3xl tracking-[-0.03em] font-serif font-semibold text-ink-900">Reports</h1>
-          <p className="mt-1.5 text-sm text-slate-500">Standard financial reports for review, export, and reconciliation.</p>
-        </div>
-        <div className="flex items-center space-x-2">
-          <label className="text-xs text-slate-500 font-semibold">Display currency</label>
-          <select 
-            value={displayCurrency}
-            onChange={(e) => setDisplayCurrency(e.target.value)}
-            className="bg-paper-50 border border-ink-900/15 text-ink-900 text-xs rounded-xl px-3 py-2 outline-none focus:ring-1 focus:ring-focus-blue-500"
-          >
-            <option value="KES">KES - Kenyan Shilling</option>
-            <option value="USD">USD - US Dollar</option>
-            <option value="EUR">EUR - Euro</option>
-            <option value="GBP">GBP - British Pound</option>
-            <option value="UGX">UGX - Ugandan Shilling</option>
-            <option value="TZS">TZS - Tanzanian Shilling</option>
-          </select>
-        </div>
-      </section>
-      <div className="ledger-divider mb-6"></div>
-
-      {/* Sub-navigation */}
-      <div className="flex gap-6 border-b border-ink-900/10 mb-6 overflow-x-auto">
-        {tabs.map(tab => (
-          <button
-            key={tab}
-            onClick={() => setActiveTab(tab)}
-            className={`pb-3 text-xs font-semibold transition-colors border-b-2 whitespace-nowrap ${
-              activeTab === tab
-                ? 'border-focus-blue-500 text-ink-900'
-                : 'border-transparent text-slate-500 hover:text-ink-900'
-            }`}
-          >
-            {tab}
-          </button>
-        ))}
-      </div>
-
-      {activeTab === 'Standard reports' && (
-        <div className="space-y-8">
-          {Object.entries(groupedReports).map(([category, reports]) => (
-            <div key={category}>
-              <h2 className="text-[11px] font-bold text-ink-900 uppercase tracking-[0.12em] mb-4 border-b border-ink-900/10 pb-2">
-                {category}
-              </h2>
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {reports.map(report => (
-                  <div 
-                    key={report.name} 
-                    onClick={() => setActiveReport(report.name)}
-                    className="surface-card group p-5 cursor-pointer flex flex-col h-full transition-colors hover:border-focus-blue-500/40"
-                  >
-                    <h3 className="text-base font-semibold text-focus-blue-500 group-hover:text-ink-900 transition-colors mb-2">
-                      {report.name}
-                    </h3>
-                    <p className="text-sm text-slate-500 leading-relaxed flex-1">
-                      {report.desc}
-                    </p>
-                  </div>
-                ))}
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
-
-      {activeTab === 'Custom report builder' && (
-        <div className="bg-paper-100 border border-ink-900/10 shadow-sm rounded-sm p-8 max-w-4xl mx-auto text-center">
-           <h3 className="text-xl font-medium text-ink-900 mb-2">Custom Report Builder</h3>
-           <p className="text-slate-500 mb-6">Design tailored financial reports with custom dimension tagging and multi-period comparatives.</p>
-           <button
-             onClick={() => setNotBuiltMessage('The custom report builder (arbitrary dimension tagging and multi-period comparatives) is not built yet. For now, use the eight Standard Reports, each with real PDF/Excel export.')}
-             className="bg-sidebar-bg text-sidebar-ink px-6 py-2 text-sm font-medium rounded-sm hover:bg-sidebar-bg/90 transition-colors"
-           >
-             Create Custom Report
-           </button>
-        </div>
-      )}
-
-      {activeTab === 'Management report packs' && (
-        <div className="bg-paper-100 border border-ink-900/10 shadow-sm rounded-sm p-8 max-w-4xl mx-auto">
-           <div className="flex justify-between items-center mb-6">
-             <div>
-               <h3 className="text-lg font-medium text-ink-900">Management Packs</h3>
-               <p className="text-sm text-slate-500">Curated collections of reports (Cover page, Executive Summary, P&L, Balance Sheet) exported as a single PDF.</p>
-             </div>
-             <button
-               onClick={() => setNotBuiltMessage('Custom, named report packs are not built yet. The one pack below (P&L + Balance Sheet) works today — open Standard Reports for the full, real set.')}
-               className="bg-sidebar-bg text-sidebar-ink px-4 py-2 text-sm font-medium rounded-sm hover:bg-sidebar-bg/90 transition-colors"
-             >
-               Build New Pack
-             </button>
-           </div>
-
-           <div className="border border-ink-900/10 rounded-sm p-4 bg-paper-50 flex items-center justify-between">
-              <div>
-                <p className="font-semibold text-ink-900">Monthly Board Reporting Pack</p>
-                <p className="text-xs text-slate-500 mt-1">Contains: P&L, Balance Sheet (real data — open each from Standard Reports for the full report and export)</p>
-              </div>
-              <button
-                onClick={() => setActiveTab('Standard reports')}
-                className="text-sm font-medium text-focus-blue-500 border border-focus-blue-500/30 px-3 py-1.5 rounded-sm hover:bg-paper-100 transition-colors"
-              >
-                Open Reports
-              </button>
-           </div>
-        </div>
-      )}
-
-      {activeTab === 'Scheduled/emailed reports' && (
-        <div className="bg-paper-100 border border-ink-900/10 shadow-sm rounded-sm p-8 max-w-4xl mx-auto text-center">
-           <h3 className="text-xl font-medium text-ink-900 mb-2">Scheduled Delivery</h3>
-           <p className="text-slate-500 mb-6">Automate your reporting. Set up standard reports or management packs to be emailed to stakeholders weekly or monthly.</p>
-           <button
-             onClick={() => setNotBuiltMessage('Scheduled email delivery needs a transactional email service (SMTP/SES/Postmark, etc.) wired into the server, which is not configured in this project yet.')}
-             className="bg-sidebar-bg text-sidebar-ink px-6 py-2 text-sm font-medium rounded-sm hover:bg-sidebar-bg/90 transition-colors"
-           >
-             + New Schedule
-           </button>
-        </div>
-      )}
-
-      {notBuiltMessage && (
-        <div className="fixed inset-0 bg-ink-900/30 backdrop-blur-xs z-50 flex items-center justify-center p-4" onClick={() => setNotBuiltMessage(null)}>
-          <div className="bg-paper-100 rounded-sm shadow-2xl border border-ink-900/10 w-full max-w-md p-6" onClick={(e) => e.stopPropagation()}>
-            <div className="flex items-start space-x-3 mb-4">
-              <Info className="w-5 h-5 text-focus-blue-500 shrink-0 mt-0.5" />
-              <p className="text-sm text-ink-900">{notBuiltMessage}</p>
-            </div>
-            <button
-              onClick={() => setNotBuiltMessage(null)}
-              className="w-full bg-sidebar-bg text-sidebar-ink py-2.5 rounded-sm font-medium hover:bg-sidebar-bg/90 transition-colors"
+    <div className="space-y-6 pb-16">
+      <PageHeading
+        tourId="reports-overview"
+        title="Reports"
+        note={<>Financial statements and schedules, each with PDF and CSV export</>}
+        actions={
+          <label className="flex items-center gap-2 text-[13px] text-graphite-600">
+            <span>Show figures in</span>
+            <select
+              value={displayCurrency}
+              onChange={(e) => setDisplayCurrency(e.target.value)}
+              className="h-9 px-2.5 text-[13.5px] border border-field rounded-sm bg-paper-100 text-ink-900"
             >
-              Got it
-            </button>
-          </div>
-        </div>
+              <option value="KES">KES</option>
+              <option value="USD">USD</option>
+              <option value="EUR">EUR</option>
+              <option value="GBP">GBP</option>
+              <option value="UGX">UGX</option>
+              <option value="TZS">TZS</option>
+            </select>
+          </label>
+        }
+      />
+
+      {displayCurrency !== baseCurrency && (
+        <p className="border-b border-feint pb-2.5 text-[13px] text-ledger-red">
+          The books are kept in {baseCurrency}. Figures in these reports are translated to {displayCurrency} at the latest stored rate, not the rate on each transaction’s date.
+        </p>
       )}
+
+      <nav aria-label="Reports" className="grid grid-cols-1 gap-x-12 gap-y-8 lg:grid-cols-2">
+        {CONTENTS.map((group) => (
+          <section key={group.section} aria-labelledby={`contents-${group.section}`}>
+            <h2 id={`contents-${group.section}`} className="ll-printed border-b border-feint-strong pb-2 text-[11.5px] text-graphite-600">
+              {group.section}
+            </h2>
+            <ul>
+              {group.reports.map((report) => (
+                <li key={report.id} className="border-b border-feint">
+                  <button type="button" onClick={() => setActiveReport(report.id)} className="group flex w-full items-start justify-between gap-4 py-3 text-left">
+                    <span className="min-w-0">
+                      <span className="block text-[15px] text-ink-900 group-hover:underline underline-offset-[3px]">{report.name}</span>
+                      <span className="mt-0.5 block text-[13px] leading-snug text-graphite-600">{report.desc}</span>
+                    </span>
+                    <ChevronRight className="mt-1 h-4 w-4 shrink-0 text-graphite-500 group-hover:text-ink-900" aria-hidden="true" />
+                  </button>
+                </li>
+              ))}
+            </ul>
+          </section>
+        ))}
+      </nav>
     </div>
   );
 }

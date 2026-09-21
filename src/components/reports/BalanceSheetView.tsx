@@ -1,50 +1,53 @@
-import React, { useState } from 'react';
-import { formatCurrency } from '../../utils/currency';
+import { useState } from 'react';
 import { format } from 'date-fns';
 import { useQuery } from '@tanstack/react-query';
+import { downloadCsv } from '../../utils/exportCsv';
 import { useAppStore } from '../../store';
 import { FinancialPDFEngine } from '../../utils/pdfExport';
-import { Printer, Download, ArrowLeft } from 'lucide-react';
-import * as XLSX from 'xlsx';
+import { StatementPage, StatementSection, StatementLine, StatementSubtotal, StatementResult, useStatementFigures } from '../ledger/Statement';
+import { Mark } from '../ledger/Mark';
+import { Amount } from '../ledger/Amount';
 
 export function BalanceSheetView({ onBack }: { onBack: () => void }) {
   const { currentOrgId, activeCompany } = useAppStore();
-  const [asOfDate, setAsOfDate] = useState('2026-08-31');
+  const { currency, shown } = useStatementFigures();
+  const [asOfDate, setAsOfDate] = useState(() => format(new Date(), 'yyyy-MM-dd'));
 
-  const { data, isLoading } = useQuery({
+  const report = useQuery({
     queryKey: ['reports_balance_sheet', currentOrgId, asOfDate],
     queryFn: async () => {
-      const res = await fetch(`/api/reports/balance-sheet?asOfDate=${encodeURIComponent(asOfDate)}`, {
-        headers: { 'x-org-id': currentOrgId }
-      });
+      const res = await fetch(`/api/reports/balance-sheet?asOfDate=${encodeURIComponent(asOfDate)}`, { headers: { 'x-org-id': currentOrgId } });
       if (!res.ok) throw new Error('Failed to fetch Balance Sheet');
       return res.json();
-    }
+    },
   });
 
+  const data = report.data;
   const currentAssets = data?.currentAssets || [];
   const nonCurrentAssets = data?.nonCurrentAssets || [];
   const currentLiabilities = data?.currentLiabilities || [];
   const equity = data?.equity || [];
 
-  const totalCurrentAssets = currentAssets.reduce((acc: number, val: any) => acc + val.amountCents, 0);
-  const totalNonCurrentAssets = nonCurrentAssets.reduce((acc: number, val: any) => acc + val.amountCents, 0);
+  const sum = (lines: any[]) => lines.reduce((acc: number, val: any) => acc + val.amountCents, 0);
+  const totalCurrentAssets = sum(currentAssets);
+  const totalNonCurrentAssets = sum(nonCurrentAssets);
   const totalAssets = totalCurrentAssets + totalNonCurrentAssets;
-
-  const totalLiabilities = currentLiabilities.reduce((acc: number, val: any) => acc + val.amountCents, 0);
-  const totalEquity = equity.reduce((acc: number, val: any) => acc + val.amountCents, 0);
+  const totalLiabilities = sum(currentLiabilities);
+  const totalEquity = sum(equity);
   const totalLiabilitiesAndEquity = totalLiabilities + totalEquity;
+  const difference = totalAssets - totalLiabilitiesAndEquity;
+  const asAt = format(new Date(asOfDate), 'd MMMM yyyy');
 
   const handleExportPDF = () => {
     FinancialPDFEngine.exportFinancialStatement(
       {
         title: 'Balance Sheet Statement',
         subtitle: 'Statement of Financial Position',
-        period: `As of ${format(new Date(asOfDate), 'MMMM d, yyyy')}`,
+        period: `As at ${asAt}`,
         companyName: activeCompany?.legalName || activeCompany?.name,
         kraPin: activeCompany?.taxId,
         currency: 'KES',
-        filename: `balance_sheet_${format(new Date(), 'yyyyMMdd')}.pdf`
+        filename: `balance_sheet_${format(new Date(), 'yyyyMMdd')}.pdf`,
       },
       [
         {
@@ -54,8 +57,8 @@ export function BalanceSheetView({ onBack }: { onBack: () => void }) {
             ...currentAssets.map((i: any) => [`  ${i.name}`, FinancialPDFEngine.formatKES(i.amountCents)]),
             ['Total Current Assets', FinancialPDFEngine.formatKES(totalCurrentAssets)],
             ...nonCurrentAssets.map((i: any) => [`  ${i.name}`, FinancialPDFEngine.formatKES(i.amountCents)]),
-            ['TOTAL ASSETS', FinancialPDFEngine.formatKES(totalAssets)]
-          ]
+            ['TOTAL ASSETS', FinancialPDFEngine.formatKES(totalAssets)],
+          ],
         },
         {
           title: '2. LIABILITIES & SHAREHOLDERS EQUITY',
@@ -65,18 +68,14 @@ export function BalanceSheetView({ onBack }: { onBack: () => void }) {
             ['Total Current Liabilities', FinancialPDFEngine.formatKES(totalLiabilities)],
             ...equity.map((i: any) => [`  ${i.name}`, FinancialPDFEngine.formatKES(i.amountCents)]),
             ['Total Equity', FinancialPDFEngine.formatKES(totalEquity)],
-            ['TOTAL LIABILITIES & EQUITY', FinancialPDFEngine.formatKES(totalLiabilitiesAndEquity)]
-          ]
-        }
-      ]
+            ['TOTAL LIABILITIES & EQUITY', FinancialPDFEngine.formatKES(totalLiabilitiesAndEquity)],
+          ],
+        },
+      ],
     );
   };
 
-  const handlePrint = () => {
-    window.print();
-  };
-
-  const handleExportExcel = () => {
+  const handleExportCsv = () => {
     const rows = [
       ['Account Name', 'Amount (KES)'],
       ['CURRENT ASSETS', ''],
@@ -91,130 +90,71 @@ export function BalanceSheetView({ onBack }: { onBack: () => void }) {
       ['EQUITY', ''],
       ...equity.map((i: any) => [i.name, i.amountCents / 100]),
       ['Total Equity', totalEquity / 100],
-      ['TOTAL LIABILITIES & EQUITY', totalLiabilitiesAndEquity / 100]
+      ['TOTAL LIABILITIES & EQUITY', totalLiabilitiesAndEquity / 100],
     ];
-    const ws = XLSX.utils.aoa_to_sheet(rows);
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, 'Balance Sheet');
-    XLSX.writeFile(wb, 'balance_sheet.xlsx');
+    downloadCsv('balance_sheet.csv', rows);
   };
 
-  if (isLoading) return <div className="p-16 text-center text-slate-500">Generating balance sheet...</div>;
-
   return (
-    <div className="bg-paper-100 border border-ink-900/10 shadow-sm rounded-sm">
-      <div className="p-6 border-b border-ink-900/10 flex items-center justify-between bg-paper-50">
-        <div>
-          <button 
-            onClick={onBack}
-            className="text-sm font-medium text-focus-blue-500 hover:text-ink-900 mb-2 inline-flex items-center"
-          >
-            <ArrowLeft className="w-4 h-4 mr-1" /> Back to Reports
-          </button>
-          <h2 className="text-xl font-serif text-ink-900">Balance Sheet</h2>
-          <p className="text-sm text-slate-500">Statement of Financial Position • As of {format(new Date(asOfDate), 'MMMM d, yyyy')}</p>
-        </div>
-        <div className="flex items-center space-x-3">
-          <input 
-            type="date"
-            value={asOfDate}
-            onChange={(e) => setAsOfDate(e.target.value)}
-            className="bg-paper-100 border border-ink-900/20 text-ink-900 text-sm rounded-sm px-3 py-2 focus:ring-1 focus:ring-focus-blue-500 outline-none"
-          />
-          <button onClick={handleExportExcel} className="bg-paper-100 border border-ink-900/20 text-ink-900 px-3 py-2 text-sm font-medium rounded-sm hover:bg-paper-50 transition-colors">
-            Excel
-          </button>
-          <button onClick={handlePrint} className="bg-paper-100 border border-ink-900/20 text-ink-900 px-3 py-2 text-sm font-medium rounded-sm hover:bg-paper-50 transition-colors inline-flex items-center">
-            <Printer className="w-4 h-4 mr-1.5" /> Print
-          </button>
-          <button onClick={handleExportPDF} className="bg-sidebar-bg text-sidebar-ink  px-4 py-2 text-sm font-medium rounded-sm hover:bg-sidebar-bg/90 transition-colors inline-flex items-center">
-            <Download className="w-4 h-4 mr-1.5" /> Export PDF
-          </button>
-        </div>
-      </div>
+    <StatementPage
+      title="Balance sheet"
+      period={`As at ${asAt}`}
+      onBack={onBack}
+      loading={report.isLoading}
+      problem={report.isError ? { what: 'the balance sheet', path: '/api/reports/balance-sheet', onRetry: () => report.refetch() } : null}
+      onCsv={handleExportCsv}
+      onPdf={handleExportPDF}
+      controls={
+        <label>
+          <span className="sr-only">As at</span>
+          <input type="date" value={asOfDate} onChange={(e) => setAsOfDate(e.target.value)} className="h-9 px-2.5 text-[13.5px] border border-field rounded-sm bg-paper-100 text-ink-900" />
+        </label>
+      }
+    >
+      <p className="mb-2 text-[13px]">
+        {Math.round(difference) === 0 ? (
+          <Mark kind="tick" label="Assets equal liabilities and equity." />
+        ) : (
+          <span className="inline-flex flex-wrap items-baseline gap-x-1.5 text-ledger-red">
+            <Mark kind="circled" className="self-center" />
+            <span>Out of balance by</span>
+            <Amount cents={shown(Math.abs(difference))} currency={currency} tone="ink" />
+          </span>
+        )}
+      </p>
 
-      <div className="p-8 max-w-3xl mx-auto">
-        <div className="text-center mb-8">
-          <h3 className="text-lg font-bold text-ink-900 uppercase tracking-widest">Balance Sheet</h3>
-          <p className="text-slate-500 text-sm">Ledgerline Enterprises Ltd • As of {format(new Date(asOfDate), 'MMMM d, yyyy')}</p>
-        </div>
+      <StatementSection title="Current assets">
+        {currentAssets.map((item: any) => (
+          <StatementLine key={item.name} label={item.name} cents={item.amountCents} />
+        ))}
+        <StatementSubtotal label="Total current assets" cents={totalCurrentAssets} />
+      </StatementSection>
 
-        <table className="w-full text-sm">
-          <tbody>
-            {/* ASSETS */}
-            <tr>
-              <td colSpan={2} className="py-3 font-bold text-ink-900 text-base border-b border-ink-900/20">1. ASSETS</td>
-            </tr>
-            <tr>
-              <td colSpan={2} className="pt-3 pb-1 font-semibold text-slate-700 dark:text-slate-300">Current Assets</td>
-            </tr>
-            {currentAssets.map((item: any) => (
-              <tr key={item.name} className="hover:bg-paper-50 transition-colors">
-                <td className="py-2 pl-4 text-slate-700 dark:text-slate-300">{item.name}</td>
-                <td className="py-2 pr-4 text-right tabular-currency text-ink-900 font-medium">{formatCurrency(item.amountCents)}</td>
-              </tr>
-            ))}
-            <tr>
-              <td className="py-2 pl-4 font-semibold text-ink-900 border-t border-ink-900/10">Total Current Assets</td>
-              <td className="py-2 pr-4 text-right tabular-currency font-semibold text-ink-900 border-t border-ink-900/10">{formatCurrency(totalCurrentAssets)}</td>
-            </tr>
+      <StatementSection title="Non-current assets">
+        {nonCurrentAssets.length === 0 ? (
+          <StatementLine label="None recorded" cents={0} muted />
+        ) : (
+          nonCurrentAssets.map((item: any) => <StatementLine key={item.name} label={item.name} cents={item.amountCents} />)
+        )}
+      </StatementSection>
 
-            {/* NON-CURRENT ASSETS */}
-            <tr>
-              <td colSpan={2} className="pt-4 pb-1 font-semibold text-slate-700 dark:text-slate-300">Non-Current Assets</td>
-            </tr>
-            {nonCurrentAssets.map((item: any) => (
-              <tr key={item.name} className="hover:bg-paper-50 transition-colors">
-                <td className="py-2 pl-4 text-slate-700 dark:text-slate-300">{item.name}</td>
-                <td className="py-2 pr-4 text-right tabular-currency text-ink-900 font-medium">{formatCurrency(item.amountCents)}</td>
-              </tr>
-            ))}
-            <tr className="bg-paper-100/50">
-              <td className="py-3 pl-4 font-bold text-ink-900 border-y border-ink-900/10">TOTAL ASSETS</td>
-              <td className="py-3 pr-4 text-right tabular-currency font-bold text-ink-900 border-y border-ink-900/10">{formatCurrency(totalAssets)}</td>
-            </tr>
+      <StatementResult label="Total assets" cents={totalAssets} />
 
-            {/* LIABILITIES */}
-            <tr>
-              <td colSpan={2} className="pt-8 pb-3 font-bold text-ink-900 text-base border-b border-ink-900/20">2. LIABILITIES & EQUITY</td>
-            </tr>
-            <tr>
-              <td colSpan={2} className="pt-3 pb-1 font-semibold text-slate-700 dark:text-slate-300">Current Liabilities</td>
-            </tr>
-            {currentLiabilities.map((item: any) => (
-              <tr key={item.name} className="hover:bg-paper-50 transition-colors">
-                <td className="py-2 pl-4 text-slate-700 dark:text-slate-300">{item.name}</td>
-                <td className="py-2 pr-4 text-right tabular-currency text-ink-900 font-medium">{formatCurrency(item.amountCents)}</td>
-              </tr>
-            ))}
-            <tr>
-              <td className="py-2 pl-4 font-semibold text-ink-900 border-t border-ink-900/10">Total Current Liabilities</td>
-              <td className="py-2 pr-4 text-right tabular-currency font-semibold text-ink-900 border-t border-ink-900/10">{formatCurrency(totalLiabilities)}</td>
-            </tr>
+      <StatementSection title="Current liabilities">
+        {currentLiabilities.map((item: any) => (
+          <StatementLine key={item.name} label={item.name} cents={item.amountCents} />
+        ))}
+        <StatementSubtotal label="Total liabilities" cents={totalLiabilities} />
+      </StatementSection>
 
-            {/* EQUITY */}
-            <tr>
-              <td colSpan={2} className="pt-4 pb-1 font-semibold text-slate-700 dark:text-slate-300">Equity</td>
-            </tr>
-            {equity.map((item: any) => (
-              <tr key={item.name} className="hover:bg-paper-50 transition-colors">
-                <td className="py-2 pl-4 text-slate-700 dark:text-slate-300">{item.name}</td>
-                <td className="py-2 pr-4 text-right tabular-currency text-ink-900 font-medium">{formatCurrency(item.amountCents)}</td>
-              </tr>
-            ))}
-            <tr>
-              <td className="py-2 pl-4 font-semibold text-ink-900 border-t border-ink-900/10">Total Equity</td>
-              <td className="py-2 pr-4 text-right tabular-currency font-semibold text-ink-900 border-t border-ink-900/10">{formatCurrency(totalEquity)}</td>
-            </tr>
+      <StatementSection title="Equity">
+        {equity.map((item: any) => (
+          <StatementLine key={item.name} label={item.name} cents={item.amountCents} />
+        ))}
+        <StatementSubtotal label="Total equity" cents={totalEquity} />
+      </StatementSection>
 
-            {/* TOTAL LIABILITIES & EQUITY */}
-            <tr className="bg-sidebar-bg text-sidebar-ink ">
-              <td className="py-4 pl-4 font-bold rounded-l-sm">TOTAL LIABILITIES & EQUITY</td>
-              <td className="py-4 pr-4 text-right tabular-currency font-bold rounded-r-sm">{formatCurrency(totalLiabilitiesAndEquity)}</td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
-    </div>
+      <StatementResult label="Total liabilities and equity" cents={totalLiabilitiesAndEquity} />
+    </StatementPage>
   );
 }

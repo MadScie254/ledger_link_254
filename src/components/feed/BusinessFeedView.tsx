@@ -1,37 +1,38 @@
 import { useState } from 'react';
 import { useMutation } from '@tanstack/react-query';
+import { format } from 'date-fns';
 import { useAppStore } from '../../store';
-import { Sparkles } from 'lucide-react';
+import { PageHeading, buttonClass } from '../ledger/Page';
 
 const SUGGESTED_QUESTIONS = [
   'How is this business doing this month?',
-  'What do we owe vendors right now?',
-  'Which customers owe us money and how overdue are they?',
+  'What do we owe suppliers right now?',
+  'Which customers owe us money, and how overdue are they?',
 ];
 
 export function BusinessFeedView() {
   const { currentOrgId } = useAppStore();
   const [question, setQuestion] = useState('');
-  const [history, setHistory] = useState<Array<{ question: string; answer: string }>>([]);
+  const [history, setHistory] = useState<Array<{ question: string; answer: string; askedAt: Date }>>([]);
 
   const askMutation = useMutation({
     mutationFn: async (q: string) => {
       const res = await fetch('/api/ai/ask', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'x-org-id': currentOrgId },
-        body: JSON.stringify({ question: q })
+        body: JSON.stringify({ question: q }),
       });
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
-        throw new Error(data.error || 'Failed to get a response');
+        throw new Error(data.error || 'No answer came back. Try the question again.');
       }
       const data = await res.json();
       return data.answer as string;
     },
     onSuccess: (answer, q) => {
-      setHistory(prev => [{ question: q, answer }, ...prev]);
+      setHistory((prev) => [{ question: q, answer, askedAt: new Date() }, ...prev]);
       setQuestion('');
-    }
+    },
   });
 
   const handleAsk = (q?: string) => {
@@ -41,71 +42,72 @@ export function BusinessFeedView() {
   };
 
   return (
-    <div className="max-w-4xl mx-auto space-y-6">
-      <div className="text-center mb-10">
-        <h1 className="text-3xl font-serif text-ink-900 mb-4">AI Business Feed</h1>
-        <p className="text-slate-500">Ask questions about this organization's real financial data — grounded in your actual P&L, receivables, and payables.</p>
-      </div>
+    <div className="max-w-3xl space-y-5 pb-16">
+      <PageHeading
+        title="Business feed"
+        note="Ask about this organization’s books. Gemini writes each answer from the posted P&L, receivables and payables it is given, and it can be wrong. Check a figure against Reports before acting on it."
+      />
 
-      <div className="bg-paper-100 border border-ink-900/10 rounded-sm shadow-sm overflow-hidden mb-4">
-        <div className="p-4 border-b border-ink-900/10 bg-paper-50 flex items-center space-x-3">
-           <div className="w-8 h-8 rounded-full bg-sidebar-bg flex items-center justify-center text-white shrink-0">✨</div>
-           <input
-             type="text"
-             value={question}
-             onChange={(e) => setQuestion(e.target.value)}
-             onKeyDown={(e) => { if (e.key === 'Enter') handleAsk(); }}
-             placeholder="Ask anything (e.g. 'How is this business doing this month?')"
-             className="flex-1 bg-transparent border-none outline-none text-ink-900 placeholder:text-slate-400"
-           />
-           <button
-             onClick={() => handleAsk()}
-             disabled={askMutation.isPending || !question.trim()}
-             className="bg-sidebar-bg text-sidebar-ink px-4 py-2 text-sm font-medium rounded-sm disabled:opacity-50"
-           >
-             {askMutation.isPending ? 'Thinking...' : 'Ask'}
-           </button>
-        </div>
-      </div>
+      <form
+        onSubmit={(e) => {
+          e.preventDefault();
+          handleAsk();
+        }}
+        className="flex flex-col gap-2 sm:flex-row sm:items-end"
+      >
+        <label className="block min-w-0 flex-1">
+          <span className="block text-[13px] font-semibold text-ink-900">Your question</span>
+          <input
+            type="text"
+            value={question}
+            onChange={(e) => setQuestion(e.target.value)}
+            className="mt-1.5 h-10 w-full border px-3 text-[14px]"
+          />
+        </label>
+        <button type="submit" disabled={askMutation.isPending || !question.trim()} className={`${buttonClass.primary} h-10`}>
+          {askMutation.isPending ? 'Writing the answer' : 'Ask'}
+        </button>
+      </form>
 
       {history.length === 0 && (
-        <div className="flex flex-wrap gap-2 justify-center mb-4">
-          {SUGGESTED_QUESTIONS.map(q => (
-            <button
-              key={q}
-              onClick={() => handleAsk(q)}
-              disabled={askMutation.isPending}
-              className="text-xs px-3 py-1.5 bg-paper-100 border border-ink-900/10 rounded-full text-slate-600 hover:border-focus-blue-500/50 hover:text-ink-900 transition-colors disabled:opacity-50"
-            >
-              {q}
-            </button>
-          ))}
+        <div>
+          <p className="ll-printed text-[11px] text-graphite-600">Questions to start with</p>
+          <ul className="mt-2 border-t border-feint-strong">
+            {SUGGESTED_QUESTIONS.map((q) => (
+              <li key={q} className="border-b border-feint">
+                <button
+                  type="button"
+                  onClick={() => handleAsk(q)}
+                  disabled={askMutation.isPending}
+                  className="w-full py-2.5 text-left text-[14px] text-ink-900 hover:text-oxblood disabled:opacity-50"
+                >
+                  {q}
+                </button>
+              </li>
+            ))}
+          </ul>
         </div>
       )}
 
       {askMutation.isError && (
-        <div className="p-4 bg-rust-700/10 border border-rust-700/20 text-rust-700 text-sm rounded-sm">
+        <p role="alert" className="text-[13.5px] text-ledger-red">
           {(askMutation.error as Error).message}
-        </div>
+        </p>
       )}
 
-      <div className="space-y-4">
-        {history.map((item, idx) => (
-          <div key={idx} className="bg-paper-100 border border-ink-900/10 rounded-sm shadow-sm p-6 relative overflow-hidden">
-            <div className="absolute left-0 top-0 bottom-0 w-1 bg-focus-blue-500"></div>
-            <div className="flex items-center space-x-2 mb-3">
-              <Sparkles className="w-4 h-4 text-focus-blue-500" />
-              <p className="text-sm font-semibold text-ink-900">{item.question}</p>
-            </div>
-            <p className="text-sm text-slate-600 leading-relaxed whitespace-pre-wrap">{item.answer}</p>
-          </div>
-        ))}
-        {history.length === 0 && !askMutation.isPending && (
-          <div className="text-center text-slate-400 text-sm py-8">
-            Ask a question above to get a real, data-grounded answer.
-          </div>
-        )}
-      </div>
+      {history.length > 0 && (
+        <ol className="border-t-2 border-ink-900" aria-label="Answers, newest first">
+          {history.map((item, idx) => (
+            <li key={idx} className="border-b border-feint py-4">
+              <div className="flex items-baseline justify-between gap-4">
+                <p className="text-[14.5px] font-semibold text-ink-900">{item.question}</p>
+                <span className="shrink-0 text-[12px] text-graphite-600">{format(item.askedAt, 'HH:mm')}</span>
+              </div>
+              <p className="mt-2 whitespace-pre-wrap text-[14px] leading-relaxed text-ink-900">{item.answer}</p>
+            </li>
+          ))}
+        </ol>
+      )}
     </div>
   );
 }

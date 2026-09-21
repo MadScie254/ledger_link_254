@@ -8,12 +8,24 @@ export interface AccountInput {
   type: 'ASSET' | 'LIABILITY' | 'EQUITY' | 'INCOME' | 'COGS' | 'EXPENSE';
   subtype?: string;
   parentId?: string;
+  currency?: string;
   createdBy?: string;
 }
 
 export class AccountService {
   static async createAccount(input: AccountInput): Promise<string> {
     const supabase = getSupabase();
+    let currency = input.currency?.trim().toUpperCase();
+    if (!currency) {
+      const { data: organization, error: organizationError } = await supabase
+        .from('organizations')
+        .select('base_currency')
+        .eq('id', input.orgId)
+        .single();
+      if (organizationError) throw organizationError;
+      currency = String(organization.base_currency || 'KES').toUpperCase();
+    }
+    if (!/^[A-Z]{3}$/.test(currency)) throw new Error('Account currency must be a three-letter ISO code.');
     
     // Check if code already exists for this org
     const { data: existing, error: searchError } = await supabase
@@ -38,6 +50,7 @@ export class AccountService {
         type: input.type,
         subtype: input.subtype || null,
         parent_id: input.parentId || null,
+        currency,
         is_active: true
       })
       .select('id')
@@ -137,6 +150,7 @@ export class AccountService {
       subtype: row.subtype,
       parentId: row.parent_id,
       isActive: row.is_active,
+      currency: row.currency,
       createdAt: row.created_at,
       balanceCents: balanceByAccountId.get(row.id) || 0
     }));

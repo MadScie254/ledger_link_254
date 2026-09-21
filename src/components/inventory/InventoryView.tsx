@@ -1,40 +1,50 @@
-import React, { useState } from 'react';
-import { formatCurrency, formatCurrencyFromFloat } from '../../utils/currency';
+import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAppStore } from '../../store';
 import { DynamicQuickAddModal } from '../common/DynamicQuickAddModal';
 import { EntityDrillDownModal } from '../common/EntityDrillDownModal';
 import { BulkActionBar } from '../common/BulkActionBar';
+import { Amount } from '../ledger/Amount';
+import { Mark } from '../ledger/Mark';
+import { PageHeading, IndexTabs, SkeletonRows, EmptyNote, LoadProblem, buttonClass } from '../ledger/Page';
 
-const tabs = ['Items', 'Stock adjustments', 'Reorder alerts'];
+type Tab = 'Items' | 'Reorder';
 
 export function InventoryView() {
-  const [activeTab, setActiveTab] = useState('Items');
+  const [activeTab, setActiveTab] = useState<Tab>('Items');
   const [isAddingItem, setIsAddingItem] = useState(false);
   const [selectedItem, setSelectedItem] = useState<any | null>(null);
   const [selectedItemIds, setSelectedItemIds] = useState<string[]>([]);
-  
-  const { currentOrgId } = useAppStore();
+
+  const { currentOrgId, activeCompany } = useAppStore();
+  const baseCurrency = activeCompany?.baseCurrency || 'KES';
   const queryClient = useQueryClient();
 
-  const { data: inventoryData, isLoading } = useQuery({
+  const inventory = useQuery({
     queryKey: ['inventory', currentOrgId],
     queryFn: async () => {
       const res = await fetch('/api/inventory', { headers: { 'x-org-id': currentOrgId } });
       if (!res.ok) throw new Error('Failed to fetch inventory');
       return res.json();
-    }
+    },
   });
 
-  const items = inventoryData?.items || [];
+  // The API names these unitPriceCents and costPriceCents; older rows used priceCents and costCents.
+  const items: any[] = (inventory.data?.items || []).map((item: any) => ({
+    ...item,
+    priceCents: item.unitPriceCents ?? item.priceCents ?? 0,
+    costCents: item.costPriceCents ?? item.costCents ?? 0,
+  }));
+  const isLow = (item: any) => item.quantityOnHand <= item.reorderPoint;
+  const lowItems = items.filter(isLow);
+  const stockValue = items.reduce((sum, item) => sum + (item.costCents || 0) * (item.quantityOnHand || 0), 0);
 
-  // Bulk Delete Items
   const bulkDeleteMutation = useMutation({
     mutationFn: async (ids: string[]) => {
       const res = await fetch('/api/bulk/delete', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'x-org-id': currentOrgId },
-        body: JSON.stringify({ entityType: 'ITEMS', ids })
+        body: JSON.stringify({ entityType: 'ITEMS', ids }),
       });
       if (!res.ok) throw new Error('Failed to delete items');
       return res.json();
@@ -42,178 +52,170 @@ export function InventoryView() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['inventory', currentOrgId] });
       setSelectedItemIds([]);
-    }
+    },
   });
 
-  const handleSelectAll = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.checked) {
-      setSelectedItemIds(items.map((i: any) => i.id));
-    } else {
-      setSelectedItemIds([]);
-    }
-  };
-
-  const handleToggleOne = (id: string, e: React.MouseEvent) => {
-    e.stopPropagation();
-    setSelectedItemIds(prev =>
-      prev.includes(id) ? prev.filter(item => item !== id) : [...prev, id]
-    );
-  };
-
   const isAllSelected = items.length > 0 && selectedItemIds.length === items.length;
+  const toggleOne = (id: string) => setSelectedItemIds((prev) => (prev.includes(id) ? prev.filter((i) => i !== id) : [...prev, id]));
+  const quantity = (item: any) => (
+    <span className="ll-figure text-ink-900">
+      {item.quantityOnHand}
+      <span className="ml-1 text-[12px] text-graphite-600">{item.unitOfMeasure || 'units'}</span>
+    </span>
+  );
 
   return (
-    <div className="max-w-6xl mx-auto pb-16">
-      <div className="flex items-center justify-between mb-2">
-        <h1 className="text-2xl font-serif text-ink-900">Inventory</h1>
-        {activeTab === 'Items' && (
-          <button 
-            onClick={() => setIsAddingItem(true)}
-            className="bg-sidebar-bg text-sidebar-ink  px-4 py-2 text-sm font-medium rounded-sm hover:bg-sidebar-bg/90 transition-colors"
-          >
-            Add Item
+    <div className="space-y-5 pb-16">
+      <PageHeading
+        title="Inventory"
+        note={<>Stock on hand, at cost and at selling price · Figures in {baseCurrency}</>}
+        actions={
+          <button type="button" onClick={() => setIsAddingItem(true)} className={buttonClass.primary}>
+            Add stock item
           </button>
-        )}
-      </div>
-      <div className="ledger-divider mb-6"></div>
+        }
+      />
 
-      <div className="flex space-x-6 border-b border-ink-900/10 mb-6 overflow-x-auto">
-        {tabs.map(tab => (
-          <button
-            key={tab}
-            onClick={() => {
-              setActiveTab(tab);
-              setSelectedItemIds([]);
-            }}
-            className={`pb-3 text-sm font-medium transition-colors border-b-2 whitespace-nowrap ${
-              activeTab === tab 
-                ? 'border-brass-500 text-ink-900' 
-                : 'border-transparent text-slate-500 hover:text-ink-900 hover:border-ink-900/20'
-            }`}
-          >
-            {tab}
-          </button>
-        ))}
-      </div>
+      <IndexTabs
+        label="Inventory"
+        active={activeTab}
+        onChange={(id) => {
+          setActiveTab(id as Tab);
+          setSelectedItemIds([]);
+        }}
+        tabs={[
+          { id: 'Items', name: 'Stock items', count: items.length },
+          { id: 'Reorder', name: 'Below reorder point', count: lowItems.length },
+        ]}
+      />
 
-      {activeTab === 'Items' && (
-        <div className="bg-paper-100 border border-ink-900/10 shadow-sm rounded-sm overflow-hidden">
-          <table className="w-full text-sm text-left">
-            <thead className="bg-paper-100 border-b border-ink-900/10 text-xs uppercase text-slate-500">
-              <tr>
-                <th className="px-4 py-3 w-10 text-center">
-                  <input 
-                    type="checkbox"
-                    checked={isAllSelected}
-                    onChange={handleSelectAll}
-                    className="rounded border-ink-900/20 text-ink-900 focus:ring-focus-blue-500 cursor-pointer"
-                  />
-                </th>
-                <th className="px-4 py-3 font-semibold">Name</th>
-                <th className="px-4 py-3 font-semibold">SKU</th>
-                <th className="px-4 py-3 font-semibold text-right">Price</th>
-                <th className="px-4 py-3 font-semibold text-right">Cost</th>
-                <th className="px-4 py-3 font-semibold text-right">Qty on Hand</th>
-                <th className="px-4 py-3 font-semibold">Status</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-ink-900/5">
-              {isLoading ? (
-                <tr><td colSpan={7} className="px-4 py-8 text-center text-slate-500">Loading inventory...</td></tr>
-              ) : items.length === 0 ? (
-                <tr><td colSpan={7} className="px-4 py-8 text-center text-slate-500">No items found.</td></tr>
-              ) : (
-                items.map((item: any) => {
-                  const isLow = item.quantityOnHand <= item.reorderPoint;
-                  const isChecked = selectedItemIds.includes(item.id);
-
-                  return (
-                    <tr 
-                      key={item.id} 
-                      onClick={() => setSelectedItem(item)}
-                      className={`transition-colors cursor-pointer ${
-                        isChecked 
-                          ? 'bg-focus-blue-500/10 dark:bg-focus-blue-500/20' 
-                          : 'hover:bg-paper-50 dark:hover:bg-ink-900/40'
-                      }`}
-                    >
-                      <td className="px-4 py-3 text-center" onClick={(e) => e.stopPropagation()}>
-                        <input 
-                          type="checkbox"
-                          checked={isChecked}
-                          onChange={(e) => handleToggleOne(item.id, e as any)}
-                          className="rounded border-ink-900/20 text-ink-900 focus:ring-focus-blue-500 cursor-pointer"
-                        />
-                      </td>
-                      <td className="px-4 py-3 font-medium text-ink-900">{item.name}</td>
-                      <td className="px-4 py-3 text-slate-500 font-mono">{item.sku || '-'}</td>
-                      <td className="px-4 py-3 tabular-currency text-right text-ink-900">
-                        {formatCurrency(item.priceCents)}
-                      </td>
-                      <td className="px-4 py-3 tabular-currency text-right text-ink-900">
-                        {formatCurrency(item.costCents)}
-                      </td>
-                      <td className="px-4 py-3 tabular-currency text-right font-medium">
-                        {item.quantityOnHand} {item.unitOfMeasure || 'units'}
-                      </td>
-                      <td className="px-4 py-3">
-                        <span className={`inline-flex items-center px-2 py-1 rounded text-xs font-medium ${
-                          isLow ? 'bg-rust-700/10 text-rust-700' : 'bg-ledger-green-700/10 text-ledger-green-700'
-                        }`}>
-                          {isLow ? 'Low Stock' : 'In Stock'}
-                        </span>
-                      </td>
-                    </tr>
-                  );
-                })
-              )}
-            </tbody>
-          </table>
-        </div>
+      {inventory.isError ? (
+        <LoadProblem what="stock items" path="/api/inventory" onRetry={() => inventory.refetch()} />
+      ) : inventory.isLoading ? (
+        <SkeletonRows label="Loading stock items" />
+      ) : items.length === 0 ? (
+        <EmptyNote
+          action={
+            <button type="button" onClick={() => setIsAddingItem(true)} className={buttonClass.quiet}>
+              Add the first stock item
+            </button>
+          }
+        >
+          No stock items yet. Each item is listed here with its cost, selling price and quantity on hand, flagged when it falls to its reorder point.
+        </EmptyNote>
+      ) : activeTab === 'Items' ? (
+        <>
+          <ul className="sm:hidden" aria-label={`Stock items, figures in ${baseCurrency}`}>
+            {items.map((item) => (
+              <li key={item.id} className="border-b border-feint">
+                <button type="button" onClick={() => setSelectedItem(item)} className="w-full py-3 text-left">
+                  <span className="flex items-baseline justify-between gap-3">
+                    <span className="min-w-0 truncate text-[14.5px] text-ink-900">{item.name}</span>
+                    {quantity(item)}
+                  </span>
+                  <span className="mt-1 flex items-baseline justify-between gap-3 text-[12.5px] text-graphite-600">
+                    <span>{item.sku || 'No SKU'}</span>
+                    <span>
+                      Sells at <Amount cents={item.priceCents || 0} currency={baseCurrency} size="xs" tone="ink" />
+                    </span>
+                  </span>
+                  {isLow(item) && <span className="mt-1.5 block"><Mark kind="query" label={`At or below reorder point of ${item.reorderPoint}`} /></span>}
+                </button>
+              </li>
+            ))}
+          </ul>
+          <div className="hidden sm:block relative overflow-x-auto">
+            <table className="w-full text-[13.5px]">
+              <caption className="sr-only">Stock items, figures in {baseCurrency}</caption>
+              <thead>
+                <tr>
+                  <th scope="col" className="w-8 pr-2 text-left">
+                    <input
+                      type="checkbox"
+                      aria-label="Select all stock items"
+                      checked={isAllSelected}
+                      onChange={(e) => setSelectedItemIds(e.target.checked ? items.map((i) => i.id) : [])}
+                      className="h-4 w-4"
+                    />
+                  </th>
+                  <th scope="col" className="pr-4 text-left">Item</th>
+                  <th scope="col" className="pr-4 text-left">SKU</th>
+                  <th scope="col" className="pr-4 text-right">Cost</th>
+                  <th scope="col" className="pr-4 text-right">Price</th>
+                  <th scope="col" className="pr-4 text-right">On hand</th>
+                  <th scope="col" className="text-left">Standing</th>
+                </tr>
+              </thead>
+              <tbody>
+                {items.map((item) => (
+                  <tr key={item.id} onClick={() => setSelectedItem(item)} className="cursor-pointer">
+                    <td className="w-8 pr-2" onClick={(e) => e.stopPropagation()}>
+                      <input
+                        type="checkbox"
+                        aria-label={`Select ${item.name}`}
+                        checked={selectedItemIds.includes(item.id)}
+                        onChange={() => toggleOne(item.id)}
+                        className="h-4 w-4"
+                      />
+                    </td>
+                    <td className="pr-4">
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setSelectedItem(item);
+                        }}
+                        className="text-left text-ink-900 hover:underline underline-offset-[3px]"
+                      >
+                        {item.name}
+                      </button>
+                    </td>
+                    <td className="pr-4 whitespace-nowrap text-graphite-600">{item.sku || '–'}</td>
+                    <td className="pr-4 text-right whitespace-nowrap"><Amount cents={item.costCents || 0} currency={baseCurrency} /></td>
+                    <td className="pr-4 text-right whitespace-nowrap"><Amount cents={item.priceCents || 0} currency={baseCurrency} /></td>
+                    <td className="pr-4 text-right whitespace-nowrap">{quantity(item)}</td>
+                    <td className="whitespace-nowrap">
+                      {isLow(item) ? <Mark kind="query" label="Reorder" /> : <span className="text-[12px] text-graphite-600">In stock</span>}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+              <tfoot>
+                <tr>
+                  <th scope="row" colSpan={6} className="ll-total py-2 pr-4 text-left font-semibold text-ink-900">
+                    Stock at cost, {items.length} items
+                  </th>
+                  <td className="ll-total py-2 text-left whitespace-nowrap font-semibold">
+                    <Amount cents={stockValue} currency={baseCurrency} tone="ink" />
+                  </td>
+                </tr>
+              </tfoot>
+            </table>
+          </div>
+        </>
+      ) : lowItems.length === 0 ? (
+        <p className="py-6 text-[14px]">
+          <Mark kind="tick" label="Every item is above its reorder point." />
+        </p>
+      ) : (
+        <ul className="border-t border-feint-strong">
+          {lowItems.map((item) => (
+            <li key={item.id} className="border-b border-feint">
+              <button type="button" onClick={() => setSelectedItem(item)} className="flex w-full items-baseline justify-between gap-4 py-3 text-left">
+                <span className="min-w-0">
+                  <span className="block text-[14.5px] text-ink-900">{item.name}</span>
+                  <span className="mt-0.5 block text-[12.5px] text-graphite-600">Reorder at {item.reorderPoint} {item.unitOfMeasure || 'units'}</span>
+                </span>
+                <span className="shrink-0 text-right">
+                  {quantity(item)}
+                  <span className="mt-0.5 block"><Mark kind="query" label="Reorder" /></span>
+                </span>
+              </button>
+            </li>
+          ))}
+        </ul>
       )}
 
-      {activeTab === 'Stock adjustments' && (
-        <div className="bg-paper-100 border border-ink-900/10 shadow-sm rounded-sm p-8 max-w-4xl mx-auto text-center">
-           <h3 className="text-xl font-medium text-ink-900 mb-2">Manual Stock Adjustments</h3>
-           <p className="text-slate-500 mb-6">Record breakages, theft, or physical audit discrepancies directly into the ledger.</p>
-           <button 
-             onClick={() => setIsAddingItem(true)}
-             className="bg-sidebar-bg text-sidebar-ink  px-6 py-2 text-sm font-medium rounded-sm hover:bg-sidebar-bg/90 transition-colors"
-           >
-             + New Adjustment
-           </button>
-        </div>
-      )}
-
-      {activeTab === 'Reorder alerts' && (
-        <div className="bg-paper-100 border border-ink-900/10 shadow-sm rounded-sm p-8 max-w-4xl mx-auto">
-           <h3 className="text-lg font-medium text-ink-900 mb-4">Low Stock Notifications</h3>
-           {items.filter((i: any) => i.quantityOnHand <= i.reorderPoint).length === 0 ? (
-             <div className="p-8 border border-ink-900/10 bg-paper-50 rounded-sm text-center text-slate-500">
-                All inventory levels are healthy.
-             </div>
-           ) : (
-             <div className="space-y-3">
-               {items.filter((i: any) => i.quantityOnHand <= i.reorderPoint).map((item: any) => (
-                 <div key={item.id} className="flex justify-between items-center p-4 border border-rust-700/20 bg-rust-700/5 rounded-sm">
-                   <div>
-                     <p className="font-semibold text-ink-900">{item.name}</p>
-                     <p className="text-sm text-rust-700 mt-1">Current Qty: {item.quantityOnHand} (Reorder at: {item.reorderPoint})</p>
-                   </div>
-                   <button 
-                     onClick={() => setSelectedItem(item)}
-                     className="text-sm font-medium text-ink-900 bg-paper-100 border border-ink-900/20 px-4 py-2 rounded-sm hover:bg-paper-50"
-                   >
-                     View Item 360°
-                   </button>
-                 </div>
-               ))}
-             </div>
-           )}
-        </div>
-      )}
-
-      {/* Bulk Action Contextual Toolbar */}
       {activeTab === 'Items' && (
         <BulkActionBar
           selectedCount={selectedItemIds.length}
@@ -221,7 +223,7 @@ export function InventoryView() {
           entityName="items"
           onClearSelection={() => setSelectedItemIds([])}
           onDelete={() => {
-            if (window.confirm(`Delete ${selectedItemIds.length} inventory item(s)?`)) {
+            if (window.confirm(`Delete ${selectedItemIds.length} stock item(s)? This cannot be undone.`)) {
               bulkDeleteMutation.mutate(selectedItemIds);
             }
           }}
@@ -229,21 +231,9 @@ export function InventoryView() {
         />
       )}
 
-      {/* Dynamic Contextual Add Item Modal */}
-      <DynamicQuickAddModal
-        isOpen={isAddingItem}
-        onClose={() => setIsAddingItem(false)}
-        overrideType="ITEM"
-      />
+      <DynamicQuickAddModal isOpen={isAddingItem} onClose={() => setIsAddingItem(false)} overrideType="ITEM" />
 
-      {/* Comprehensive Entity Drill-Down Overlay */}
-      <EntityDrillDownModal
-        isOpen={!!selectedItem}
-        onClose={() => setSelectedItem(null)}
-        entityType="ITEM"
-        entityId={selectedItem?.id || null}
-        initialData={selectedItem}
-      />
+      <EntityDrillDownModal isOpen={!!selectedItem} onClose={() => setSelectedItem(null)} entityType="ITEM" entityId={selectedItem?.id || null} initialData={selectedItem} />
     </div>
   );
 }

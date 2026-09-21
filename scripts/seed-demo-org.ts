@@ -4,41 +4,37 @@ import { CustomerService } from '../src/server/customers';
 import { VendorService } from '../src/server/vendors';
 import { InvoiceService } from '../src/server/invoices';
 import { BillService } from '../src/server/bills';
-import { LedgerService } from '../src/server/ledger';
 import { AccountService } from '../src/server/accounts';
+import { OrganizationService } from '../src/server/organizations';
 const supabase = getSupabase();
 
-async function delay(ms: number) {
-  return new Promise(resolve => setTimeout(resolve, ms));
-}
+const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 async function seedDemoOrg() {
   console.log('Seeding Demo Organization...');
-  const userId = 'demo-seed-user';
+  const userId = process.env.DEMO_USER_ID?.trim() || '';
+  if (!UUID_PATTERN.test(userId)) {
+    throw new Error('DEMO_USER_ID must be the UUID of an existing Supabase Auth user.');
+  }
 
   // 1. Create Organization
-  const { data: orgData, error: orgError } = await supabase
-    .from('organizations')
-    .insert({
-      name: 'Acme Demo Corp',
-      fiscal_year_start: 'January',
-      base_currency: 'KES',
-      tax_id: 'P012345678Z',
-      is_demo: true
-    })
-    .select('id')
-    .single();
-
-  if (orgError) throw orgError;
-  const orgId = orgData.id;
+  const orgId = await OrganizationService.createOrganization({
+    name: 'Acme Demo Corp',
+    legalName: 'Acme Demo Corp',
+    fiscalYearStart: 'January',
+    baseCurrency: 'KES',
+    country: 'Kenya',
+    taxId: 'P012345678Z',
+    isDemo: true,
+  }, userId);
   console.log(`Created Demo Org ID: ${orgId}`);
 
-  // 1b. Wait a sec for triggers (default accounts)
-  await delay(1000);
   const bankAccount = await AccountService.getAccountByCode(orgId, '1000');
-  const arAccount = await AccountService.getAccountByCode(orgId, '1100');
   const salesAccount = await AccountService.getAccountByCode(orgId, '4000');
   const opAccount = await AccountService.getAccountByCode(orgId, '6000');
+  if (!bankAccount || !salesAccount || !opAccount) {
+    throw new Error('The demo chart of accounts was not initialized.');
+  }
 
   // 2. Customers
   const customers = [
@@ -82,6 +78,7 @@ async function seedDemoOrg() {
       issueDate: invDate.toISOString().substring(0, 10),
       dueDate: dueDate.toISOString().substring(0, 10),
       currency: 'KES',
+      idempotencyKey: crypto.randomUUID(),
       notes: 'Monthly retainer',
       createdBy: userId,
       lines: [
@@ -101,6 +98,7 @@ async function seedDemoOrg() {
       issueDate: invDate.toISOString().substring(0, 10),
       dueDate: dueDate.toISOString().substring(0, 10),
       currency: 'KES',
+      idempotencyKey: crypto.randomUUID(),
       notes: 'System maintenance',
       createdBy: userId,
       lines: [
@@ -127,6 +125,7 @@ async function seedDemoOrg() {
       billDate: billDate.toISOString().substring(0, 10),
       dueDate: dueDate.toISOString().substring(0, 10),
       currency: 'KES',
+      idempotencyKey: crypto.randomUUID(),
       notes: 'Monthly electricity',
       createdBy: userId,
       lines: [
@@ -145,6 +144,7 @@ async function seedDemoOrg() {
       billDate: billDate.toISOString().substring(0, 10),
       dueDate: dueDate.toISOString().substring(0, 10),
       currency: 'KES',
+      idempotencyKey: crypto.randomUUID(),
       notes: 'Fuel',
       createdBy: userId,
       lines: [
@@ -157,8 +157,8 @@ async function seedDemoOrg() {
     });
   }
 
-  // 6. Direct insert fake bank transactions & payments for paid invoices
-  const bankMocks = [];
+  // 6. Seed matching statement lines for invoices paid through the atomic workflow.
+  const bankTransactions = [];
   
   for (const inv of invoiceIds) {
     if (inv.paid) {
@@ -166,46 +166,44 @@ async function seedDemoOrg() {
       payDate.setDate(payDate.getDate() + 10);
       const isoDate = payDate.toISOString();
       
-      // Payment journal entry
-      await LedgerService.postJournalEntry({
-        orgId,
-        entryDate: isoDate.substring(0, 10),
-        memo: `Payment for Invoice ${inv.id}`,
-        sourceType: 'INVOICE',
-        sourceId: inv.id,
+      const payment = await InvoiceService.receivePayment(orgId, inv.id, {
+        amountCents: inv.amount,
+        paymentDate: isoDate.substring(0, 10),
+        depositAccountId: bankAccount.id,
+        idempotencyKey: crypto.randomUUID(),
         createdBy: userId,
-        lines: [
-          { accountId: bankAccount!.id, debit: inv.amount, credit: 0, description: 'Invoice payment received' },
-          { accountId: arAccount!.id, debit: 0, credit: inv.amount, description: 'Invoice payment received' }
-        ]
       });
 
       // Bank transaction
-      bankMocks.push({
+      bankTransactions.push({
         org_id: orgId,
         date: isoDate,
         description: `WIRE TRF ${inv.customer}`,
         amount_cents: inv.amount,
         direction: 'IN',
         status: 'MATCHED',
+        matched_journal_entry_id: payment.journalEntryId,
         ai_category_code: '1100',
         ai_category_name: 'Accounts Receivable'
       });
     }
 
     // Add etims submission
-    await supabase.from('etims_submissions').insert({
-      org_id: orgId,
-      invoice_id: inv.id,
-      status: 'SUCCESS',
-      submitted_at: inv.date.toISOString(),
-      kra_control_code: 'KRA-' + Math.random().toString(36).substring(2, 10).toUpperCase(),
-      qr_code_url: 'https://etims.kra.go.ke/verify'
-    });
+    const { error: etimsError } = await supabase
+      .from('etims_submissions')
+      .update({
+        status: 'SUCCESS',
+        submitted_at: inv.date.toISOString(),
+        kra_control_code: 'KRA-' + Math.random().toString(36).substring(2, 10).toUpperCase(),
+        qr_code_url: 'https://etims.kra.go.ke/verify'
+      })
+      .eq('org_id', orgId)
+      .eq('invoice_id', inv.id);
+    if (etimsError) throw etimsError;
   }
 
-  if (bankMocks.length > 0) {
-    await supabase.from('bank_transactions').insert(bankMocks);
+  if (bankTransactions.length > 0) {
+    await supabase.from('bank_transactions').insert(bankTransactions);
   }
 
   console.log('Invoices, Bills, Ledger, Bank Transactions, and eTIMS seeded.');

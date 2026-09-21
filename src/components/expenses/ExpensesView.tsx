@@ -1,7 +1,4 @@
 import React from 'react';
-import { formatCurrency, formatCurrencyFromFloat } from '../../utils/currency';
-import { Trash, Tag } from 'lucide-react';
-import { ConfirmModal } from '../layout/ConfirmModal';
 import { useState } from 'react';
 import { format } from 'date-fns';
 import { ReceiptScanner } from './ReceiptScanner';
@@ -10,8 +7,13 @@ import { useAppStore } from '../../store';
 import { DynamicQuickAddModal } from '../common/DynamicQuickAddModal';
 import { EntityDrillDownModal } from '../common/EntityDrillDownModal';
 import { BulkActionBar } from '../common/BulkActionBar';
+import { Amount } from '../ledger/Amount';
+import { Mark } from '../ledger/Mark';
+import { PageHeading, IndexTabs, buttonClass } from '../ledger/Page';
+import { Dialog, Field } from '../ledger/Dialog';
+import { SUPPORTED_CURRENCIES } from '../../utils/currency';
 
-const tabs = ['Vendors', 'Bills', 'Expenses', 'Purchase orders', 'Bill payments'];
+const tabs = ['Vendors', 'Bills', 'Expenses', 'Bill payments'];
 
 export function ExpensesView() {
   const [activeTab, setActiveTab] = useState('Bills');
@@ -22,8 +24,13 @@ export function ExpensesView() {
   const [selectedEntity, setSelectedEntity] = useState<{ type: 'VENDOR' | 'BILL'; id: string; data: any } | null>(null);
   const [selectedBillIds, setSelectedBillIds] = useState<string[]>([]);
   const [selectedVendorIds, setSelectedVendorIds] = useState<string[]>([]);
+  const [billIdempotencyKey, setBillIdempotencyKey] = useState(() => crypto.randomUUID());
+  const [batchPaymentAccountId, setBatchPaymentAccountId] = useState('');
   
-  const { currentOrgId } = useAppStore();
+  const { currentOrgId, activeCompany, exchangeRates } = useAppStore();
+  const baseCurrency = activeCompany?.baseCurrency || 'KES';
+  const [billCurrency, setBillCurrency] = useState(baseCurrency);
+  const [billExchangeRate, setBillExchangeRate] = useState('1');
   const queryClient = useQueryClient();
 
   const { data: vendorsData, isLoading: vendorsLoading } = useQuery({
@@ -58,7 +65,7 @@ export function ExpensesView() {
       const res = await fetch('/api/bills', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'x-org-id': currentOrgId },
-        body: JSON.stringify({ orgId: currentOrgId, ...bill })
+        body: JSON.stringify({ ...bill, idempotencyKey: billIdempotencyKey })
       });
       if (!res.ok) {
         const error = await res.json();
@@ -69,9 +76,18 @@ export function ExpensesView() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['bills', currentOrgId] });
       queryClient.invalidateQueries({ queryKey: ['accounts', currentOrgId] });
-      setIsCreatingBill(false);
+      closeBill();
     }
   });
+
+  function closeBill() {
+    setIsCreatingBill(false);
+    setScannedData(null);
+    createBillMutation.reset();
+    setBillIdempotencyKey(crypto.randomUUID());
+    setBillCurrency(baseCurrency);
+    setBillExchangeRate('1');
+  }
 
   // Bulk Delete Bills
   const bulkDeleteBillsMutation = useMutation({
@@ -90,32 +106,34 @@ export function ExpensesView() {
     }
   });
 
-  // Bulk Status Bills — "PAID" records a real cash payment (posts a ledger
-  // entry via /api/bills/batch-pay); other statuses just update the label.
-  const bulkStatusBillsMutation = useMutation({
-    mutationFn: async ({ ids, status }: { ids: string[], status: string }) => {
-      if (status === 'PAID') {
-        const res = await fetch('/api/bills/batch-pay', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', 'x-org-id': currentOrgId },
-          body: JSON.stringify({ billIds: ids })
-        });
-        if (!res.ok) throw new Error('Failed to record bill payments');
-        return res.json();
-      }
-      const res = await fetch('/api/bulk/status-update', {
+  const batchPaymentMutation = useMutation({
+    mutationFn: async ({ targetBills, sourceAccountId }: { targetBills: any[]; sourceAccountId: string }) => {
+      const paymentDate = format(new Date(), 'yyyy-MM-dd');
+      const res = await fetch('/api/bills/batch-pay', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'x-org-id': currentOrgId },
-        body: JSON.stringify({ entityType: 'BILLS', ids, status })
+        body: JSON.stringify({
+          payments: targetBills.map((bill) => ({
+            billId: bill.id,
+            amountCents: bill.amountDueCents,
+            paymentDate,
+            sourceAccountId,
+            idempotencyKey: crypto.randomUUID(),
+          })),
+        })
       });
-      if (!res.ok) throw new Error('Failed to update bills');
-      return res.json();
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(body.error || 'Failed to record bill payments');
+      if (body.failed > 0) throw new Error(`${body.paid} payment(s) posted; ${body.failed} failed. Refresh and review the open bills.`);
+      return body;
     },
     onSuccess: () => {
+      setSelectedBillIds([]);
+    },
+    onSettled: () => {
       queryClient.invalidateQueries({ queryKey: ['bills', currentOrgId] });
       queryClient.invalidateQueries({ queryKey: ['accounts', currentOrgId] });
-      setSelectedBillIds([]);
-    }
+    },
   });
 
   // Bulk Delete Vendors
@@ -138,252 +156,313 @@ export function ExpensesView() {
   const vendors = vendorsData?.vendors || [];
   const bills = billsData?.bills || [];
   const expenseAccounts = accountsData?.accounts?.filter((a: any) => a.type === 'EXPENSE' || a.type === 'COGS') || [];
+  const paymentAccounts = accountsData?.accounts?.filter((a: any) => a.type === 'ASSET' && a.isActive !== false) || [];
 
   const isAllBillsSelected = bills.length > 0 && selectedBillIds.length === bills.length;
   const isAllVendorsSelected = vendors.length > 0 && selectedVendorIds.length === vendors.length;
 
-  return (
-    <div className="max-w-6xl mx-auto pb-16">
-      <div className="flex items-center justify-between mb-2">
-        <h1 className="text-2xl font-serif text-ink-900">Expenses & Bills</h1>
-        <div className="space-x-3">
-          <button 
-            onClick={() => setIsCreatingVendor(true)}
-            className="text-ink-900 bg-paper-100 border border-ink-900/20 px-4 py-2 text-sm font-medium rounded-sm hover:bg-paper-50 transition-colors"
-          >
-            + Add Vendor
-          </button>
-          <button 
-            onClick={() => setIsCreatingBill(true)}
-            className="bg-sidebar-bg text-sidebar-ink  px-4 py-2 text-sm font-medium rounded-sm hover:bg-sidebar-bg/90 transition-colors"
-          >
-            Create Bill
-          </button>
+  const vendorName = (id: string) => vendors.find((v: any) => v.id === id)?.displayName;
+  const openBills = bills.filter((b: any) => Number(b.amountDueCents || 0) > 0 && b.status !== 'VOID');
+  const openBillsTotal = openBills.reduce((sum: number, b: any) => sum + (b.amountDueCents || 0), 0);
+  const scannedVendorId = vendors.find((v: any) => v.displayName === scannedData?.vendor)?.id || '';
+  const scannedVendorUnknown = !!scannedData?.vendor && !scannedVendorId;
+  const billsTotal = bills.reduce((sum: number, b: any) => sum + (b.totalCents || 0), 0);
+  const vendorsTotal = vendors.reduce((sum: number, v: any) => sum + (v.balance || 0), 0);
+  const today = new Date();
+  const billStanding = (bill: any) => {
+    if (bill.status === 'PAID') return <Mark kind="tick" label="Paid" />;
+    if (bill.status === 'OVERDUE' || (bill.dueDate && new Date(bill.dueDate) < today)) return <Mark kind="circled" label="Overdue" />;
+    return <Mark kind="query" label={bill.dueDate ? `Due ${format(new Date(bill.dueDate), 'dd/MM/yyyy')}` : 'To pay'} />;
+  };
+  const skeleton = (label: string) => (
+    <div aria-busy="true" aria-label={label} className="mt-2">
+      {Array.from({ length: 6 }).map((_, i) => (
+        <div key={i} className="h-10 border-b border-feint flex items-center gap-6">
+          <div className="h-3 w-20 bg-paper-200" />
+          <div className="h-3 flex-1 bg-paper-200" />
+          <div className="h-3 w-24 bg-paper-200" />
         </div>
-      </div>
-      <div className="ledger-divider mb-6"></div>
+      ))}
+    </div>
+  );
 
-      {/* Sub-navigation */}
-      <div className="flex space-x-6 border-b border-ink-900/10 mb-6 overflow-x-auto">
-        {tabs.map(tab => (
-          <button
-            key={tab}
-            onClick={() => {
-              setActiveTab(tab);
-              setSelectedBillIds([]);
-              setSelectedVendorIds([]);
-            }}
-            className={`pb-3 text-sm font-medium transition-colors border-b-2 whitespace-nowrap ${
-              activeTab === tab 
-                ? 'border-brass-500 text-ink-900' 
-                : 'border-transparent text-slate-500 hover:text-ink-900 hover:border-ink-900/20'
-            }`}
-          >
-            {tab}
-          </button>
-        ))}
-      </div>
+  return (
+    <div className="pb-16 space-y-5">
+      <PageHeading
+        title="Bills and expenses"
+        note={<>What the business owes its suppliers · Figures in {baseCurrency}</>}
+        actions={
+          <>
+            <button type="button" onClick={() => setIsCreatingVendor(true)} className={buttonClass.secondary}>
+              Add vendor
+            </button>
+            <button type="button" onClick={() => setIsCreatingBill(true)} className={buttonClass.primary}>
+              New bill
+            </button>
+          </>
+        }
+      />
+
+      <IndexTabs
+        label="Bills and expenses"
+        active={activeTab}
+        onChange={(tab) => {
+          setActiveTab(tab);
+          setSelectedBillIds([]);
+          setSelectedVendorIds([]);
+        }}
+        tabs={tabs.map((tab) => ({
+          id: tab,
+          name: tab === 'Expenses' ? 'Receipts' : tab,
+          count: tab === 'Bills' ? bills.length : tab === 'Vendors' ? vendors.length : undefined,
+        }))}
+      />
 
       {activeTab === 'Bills' && (
-        <div className="bg-paper-100 border border-ink-900/10 shadow-sm rounded-sm overflow-hidden">
-          <table className="w-full text-sm text-left">
-            <thead className="bg-paper-100 border-b border-ink-900/10 text-xs uppercase text-slate-500">
-              <tr>
-                <th className="px-4 py-3 w-10 text-center">
-                  <input 
-                    type="checkbox"
-                    checked={isAllBillsSelected}
-                    onChange={(e) => {
-                      if (e.target.checked) setSelectedBillIds(bills.map((b: any) => b.id));
-                      else setSelectedBillIds([]);
-                    }}
-                    className="rounded border-ink-900/20 text-ink-900 focus:ring-focus-blue-500 cursor-pointer"
-                  />
-                </th>
-                <th className="px-4 py-3 font-semibold">Bill No.</th>
-                <th className="px-4 py-3 font-semibold">Vendor</th>
-                <th className="px-4 py-3 font-semibold">Date</th>
-                <th className="px-4 py-3 font-semibold">Due Date</th>
-                <th className="px-4 py-3 font-semibold text-right">Amount</th>
-                <th className="px-4 py-3 font-semibold">Status</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-ink-900/5">
-              {billsLoading ? (
-                <tr><td colSpan={7} className="px-4 py-8 text-center text-slate-500">Loading bills...</td></tr>
-              ) : bills.length === 0 ? (
-                <tr><td colSpan={7} className="px-4 py-8 text-center text-slate-500">No bills found. Create one above.</td></tr>
-              ) : (
-                bills.map((bill: any) => {
-                  const vendor = vendors.find((v: any) => v.id === bill.vendorId);
-                  const isChecked = selectedBillIds.includes(bill.id);
-
-                  return (
-                    <tr 
-                      key={bill.id} 
-                      onClick={() => setSelectedEntity({ type: 'BILL', id: bill.id, data: bill })}
-                      className={`transition-colors cursor-pointer group ${
-                        isChecked ? 'bg-focus-blue-500/10 dark:bg-focus-blue-500/20' : 'hover:bg-paper-50 dark:hover:bg-ink-900/40'
-                      }`}
-                    >
-                      <td className="px-4 py-3 text-center" onClick={(e) => e.stopPropagation()}>
-                        <input 
+        billsLoading ? skeleton('Loading bills') : bills.length === 0 ? (
+          <div className="py-6 max-w-xl text-[14px] text-graphite-600">
+            <p>No bills yet. Each supplier bill is listed here with its due date and standing, the total owed carried to the foot.</p>
+            <button type="button" onClick={() => setIsCreatingBill(true)} className={`${buttonClass.quiet} mt-2`}>Enter the first bill</button>
+          </div>
+        ) : (
+          <>
+            <ul className="sm:hidden" aria-label={`Bills, figures in ${baseCurrency}`}>
+              {bills.map((bill: any) => (
+                <li key={bill.id} className="border-b border-feint py-3">
+                  <div className="flex items-baseline justify-between gap-3">
+                    <button type="button" onClick={() => setSelectedEntity({ type: 'BILL', id: bill.id, data: bill })} className="min-w-0 truncate text-left text-[14.5px] text-ink-900 hover:underline underline-offset-[3px]">
+                      {vendorName(bill.vendorId) || 'Vendor not found'}
+                    </button>
+                    <Amount cents={bill.totalCents || 0} currency={baseCurrency} className="shrink-0" />
+                  </div>
+                  <p className="mt-1 text-[12.5px] text-graphite-600">{bill.billNo} · {format(new Date(bill.billDate), 'dd/MM/yyyy')}</p>
+                  <div className="mt-1.5">{billStanding(bill)}</div>
+                </li>
+              ))}
+              <li className="ll-total mt-px flex items-baseline justify-between gap-3 py-2 text-[13.5px]">
+                <span className="font-semibold text-ink-900">Total of {bills.length} bills</span>
+                <Amount cents={billsTotal} currency={baseCurrency} tone="ink" className="font-semibold" />
+              </li>
+            </ul>
+            <div className="hidden sm:block relative overflow-x-auto">
+              <table className="w-full text-[13.5px]">
+                <caption className="sr-only">Bills, figures in {baseCurrency}</caption>
+                <thead>
+                  <tr>
+                    <th scope="col" className="w-8 pr-2 text-left">
+                      <input
+                        type="checkbox"
+                        aria-label="Select all bills"
+                        checked={isAllBillsSelected}
+                        onChange={(e) => setSelectedBillIds(e.target.checked ? bills.map((b: any) => b.id) : [])}
+                        className="h-4 w-4"
+                      />
+                    </th>
+                    <th scope="col" className="pr-4 text-left">Bill</th>
+                    <th scope="col" className="pr-4 text-left">Vendor</th>
+                    <th scope="col" className="pr-4 text-left">Dated</th>
+                    <th scope="col" className="pr-4 text-left">Standing</th>
+                    <th scope="col" className="text-right">{baseCurrency}</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {bills.map((bill: any) => (
+                    <tr key={bill.id} onClick={() => setSelectedEntity({ type: 'BILL', id: bill.id, data: bill })} className="cursor-pointer">
+                      <td className="w-8 pr-2" onClick={(e) => e.stopPropagation()}>
+                        <input
                           type="checkbox"
-                          checked={isChecked}
-                          onChange={(e) => {
-                            setSelectedBillIds(prev => 
-                              prev.includes(bill.id) ? prev.filter(id => id !== bill.id) : [...prev, bill.id]
-                            );
-                          }}
-                          className="rounded border-ink-900/20 text-ink-900 focus:ring-focus-blue-500 cursor-pointer"
+                          aria-label={`Select bill ${bill.billNo}`}
+                          checked={selectedBillIds.includes(bill.id)}
+                          onChange={() =>
+                            setSelectedBillIds((prev) => (prev.includes(bill.id) ? prev.filter((id) => id !== bill.id) : [...prev, bill.id]))
+                          }
+                          className="h-4 w-4"
                         />
                       </td>
-                      <td className="px-4 py-3 font-medium text-ink-900">{bill.billNo}</td>
-                      <td className="px-4 py-3 text-ink-900">{vendor?.displayName || 'Unknown'}</td>
-                      <td className="px-4 py-3 text-slate-500">{format(new Date(bill.billDate), 'MMM d, yyyy')}</td>
-                      <td className="px-4 py-3 text-slate-500">{format(new Date(bill.dueDate), 'MMM d, yyyy')}</td>
-                      <td className="px-4 py-3 tabular-currency text-right text-ink-900 font-medium">
-                        {formatCurrency(bill.totalCents)}
+                      <td className="pr-4 whitespace-nowrap text-graphite-600">{bill.billNo}</td>
+                      <td className="pr-4">
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setSelectedEntity({ type: 'BILL', id: bill.id, data: bill });
+                          }}
+                          className="text-left text-ink-900 hover:underline underline-offset-[3px]"
+                        >
+                          {vendorName(bill.vendorId) || 'Vendor not found'}
+                        </button>
                       </td>
-                      <td className="px-4 py-3">
-                        <span className={`inline-flex items-center px-2 py-1 rounded text-xs font-medium ${
-                          bill.status === 'PAID' ? 'bg-ledger-green-700/10 text-ledger-green-700' : 'bg-rust-700/10 text-rust-700'
-                        }`}>
-                          {bill.status}
-                        </span>
-                      </td>
+                      <td className="pr-4 whitespace-nowrap text-graphite-600">{format(new Date(bill.billDate), 'dd/MM/yyyy')}</td>
+                      <td className="pr-4 whitespace-nowrap">{billStanding(bill)}</td>
+                      <td className="text-right whitespace-nowrap"><Amount cents={bill.totalCents || 0} currency={baseCurrency} /></td>
                     </tr>
-                  );
-                })
-              )}
-            </tbody>
-          </table>
-        </div>
+                  ))}
+                </tbody>
+                <tfoot>
+                  <tr>
+                    <th scope="row" colSpan={5} className="ll-total py-2 pr-4 text-left font-semibold text-ink-900">Total of {bills.length} bills</th>
+                    <td className="ll-total py-2 text-right whitespace-nowrap"><Amount cents={billsTotal} currency={baseCurrency} tone="ink" className="font-semibold" /></td>
+                  </tr>
+                </tfoot>
+              </table>
+            </div>
+          </>
+        )
       )}
 
       {activeTab === 'Vendors' && (
-        <div className="bg-paper-100 border border-ink-900/10 shadow-sm rounded-sm overflow-hidden">
-          <table className="w-full text-sm text-left">
-            <thead className="bg-paper-100 border-b border-ink-900/10 text-xs uppercase text-slate-500">
-              <tr>
-                <th className="px-4 py-3 w-10 text-center">
-                  <input 
-                    type="checkbox"
-                    checked={isAllVendorsSelected}
-                    onChange={(e) => {
-                      if (e.target.checked) setSelectedVendorIds(vendors.map((v: any) => v.id));
-                      else setSelectedVendorIds([]);
-                    }}
-                    className="rounded border-ink-900/20 text-ink-900 focus:ring-focus-blue-500 cursor-pointer"
-                  />
-                </th>
-                <th className="px-4 py-3 font-semibold">Vendor Name</th>
-                <th className="px-4 py-3 font-semibold">Email</th>
-                <th className="px-4 py-3 font-semibold text-right">Open Balance</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-ink-900/5">
-              {vendorsLoading ? (
-                <tr><td colSpan={4} className="px-4 py-8 text-center text-slate-500">Loading vendors...</td></tr>
-              ) : vendors.length === 0 ? (
-                <tr><td colSpan={4} className="px-4 py-8 text-center text-slate-500">No vendors found.</td></tr>
-              ) : (
-                vendors.map((vendor: any) => {
-                  const isChecked = selectedVendorIds.includes(vendor.id);
-                  return (
-                    <tr 
-                      key={vendor.id} 
-                      onClick={() => setSelectedEntity({ type: 'VENDOR', id: vendor.id, data: vendor })}
-                      className={`transition-colors cursor-pointer ${
-                        isChecked ? 'bg-focus-blue-500/10 dark:bg-focus-blue-500/20' : 'hover:bg-paper-50 dark:hover:bg-ink-900/40'
-                      }`}
-                    >
-                      <td className="px-4 py-3 text-center" onClick={(e) => e.stopPropagation()}>
-                        <input 
+        vendorsLoading ? skeleton('Loading vendors') : vendors.length === 0 ? (
+          <div className="py-6 max-w-xl text-[14px] text-graphite-600">
+            <p>No vendors yet. Suppliers are listed here with their KRA PIN and what the business owes each one.</p>
+            <button type="button" onClick={() => setIsCreatingVendor(true)} className={`${buttonClass.quiet} mt-2`}>Add the first vendor</button>
+          </div>
+        ) : (
+          <>
+            <ul className="sm:hidden" aria-label={`Vendors, figures in ${baseCurrency}`}>
+              {vendors.map((vendor: any) => (
+                <li key={vendor.id} className="border-b border-feint py-3">
+                  <div className="flex items-baseline justify-between gap-3">
+                    <button type="button" onClick={() => setSelectedEntity({ type: 'VENDOR', id: vendor.id, data: vendor })} className="min-w-0 truncate text-left text-[14.5px] text-ink-900 hover:underline underline-offset-[3px]">
+                      {vendor.displayName}
+                    </button>
+                    <Amount cents={vendor.balance || 0} currency={baseCurrency} className="shrink-0" />
+                  </div>
+                  <p className="mt-1 text-[12.5px] text-graphite-600">{[vendor.kraPin && `PIN ${vendor.kraPin}`, vendor.email].filter(Boolean).join(' · ') || 'No PIN or email recorded'}</p>
+                </li>
+              ))}
+              <li className="ll-total mt-px flex items-baseline justify-between gap-3 py-2 text-[13.5px]">
+                <span className="font-semibold text-ink-900">Owed to {vendors.length} vendors</span>
+                <Amount cents={vendorsTotal} currency={baseCurrency} tone="ink" className="font-semibold" />
+              </li>
+            </ul>
+            <div className="hidden sm:block relative overflow-x-auto">
+              <table className="w-full text-[13.5px]">
+                <caption className="sr-only">Vendors and open balances, figures in {baseCurrency}</caption>
+                <thead>
+                  <tr>
+                    <th scope="col" className="w-8 pr-2 text-left">
+                      <input
+                        type="checkbox"
+                        aria-label="Select all vendors"
+                        checked={isAllVendorsSelected}
+                        onChange={(e) => setSelectedVendorIds(e.target.checked ? vendors.map((v: any) => v.id) : [])}
+                        className="h-4 w-4"
+                      />
+                    </th>
+                    <th scope="col" className="pr-4 text-left">Vendor</th>
+                    <th scope="col" className="pr-4 text-left">KRA PIN</th>
+                    <th scope="col" className="pr-4 text-left">Email</th>
+                    <th scope="col" className="text-right">Owed, {baseCurrency}</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {vendors.map((vendor: any) => (
+                    <tr key={vendor.id} onClick={() => setSelectedEntity({ type: 'VENDOR', id: vendor.id, data: vendor })} className="cursor-pointer">
+                      <td className="w-8 pr-2" onClick={(e) => e.stopPropagation()}>
+                        <input
                           type="checkbox"
-                          checked={isChecked}
-                          onChange={(e) => {
-                            setSelectedVendorIds(prev => 
-                              prev.includes(vendor.id) ? prev.filter(id => id !== vendor.id) : [...prev, vendor.id]
-                            );
-                          }}
-                          className="rounded border-ink-900/20 text-ink-900 focus:ring-focus-blue-500 cursor-pointer"
+                          aria-label={`Select ${vendor.displayName}`}
+                          checked={selectedVendorIds.includes(vendor.id)}
+                          onChange={() =>
+                            setSelectedVendorIds((prev) => (prev.includes(vendor.id) ? prev.filter((id) => id !== vendor.id) : [...prev, vendor.id]))
+                          }
+                          className="h-4 w-4"
                         />
                       </td>
-                      <td className="px-4 py-3 font-medium text-ink-900">
-                        <div>{vendor.displayName}</div>
-                        {vendor.kraPin && <div className="text-[10px] text-slate-400 font-mono">PIN: {vendor.kraPin}</div>}
+                      <td className="pr-4">
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setSelectedEntity({ type: 'VENDOR', id: vendor.id, data: vendor });
+                          }}
+                          className="text-left text-ink-900 hover:underline underline-offset-[3px]"
+                        >
+                          {vendor.displayName}
+                        </button>
                       </td>
-                      <td className="px-4 py-3 text-slate-500">{vendor.email || '-'}</td>
-                      <td className="px-4 py-3 tabular-currency text-right text-ink-900">
-                        {formatCurrency(vendor.balance || 0)}
-                      </td>
+                      <td className="pr-4 whitespace-nowrap text-graphite-600">{vendor.kraPin || '–'}</td>
+                      <td className="pr-4 text-graphite-600">{vendor.email || '–'}</td>
+                      <td className="text-right whitespace-nowrap"><Amount cents={vendor.balance || 0} currency={baseCurrency} /></td>
                     </tr>
-                  );
-                })
-              )}
-            </tbody>
-          </table>
-        </div>
+                  ))}
+                </tbody>
+                <tfoot>
+                  <tr>
+                    <th scope="row" colSpan={4} className="ll-total py-2 pr-4 text-left font-semibold text-ink-900">Owed to {vendors.length} vendors</th>
+                    <td className="ll-total py-2 text-right whitespace-nowrap"><Amount cents={vendorsTotal} currency={baseCurrency} tone="ink" className="font-semibold" /></td>
+                  </tr>
+                </tfoot>
+              </table>
+            </div>
+          </>
+        )
       )}
 
       {activeTab === 'Expenses' && (
-        <div className="bg-paper-100 border border-ink-900/10 shadow-sm rounded-sm p-8 max-w-4xl mx-auto text-center">
-           <h3 className="text-xl font-medium text-ink-900 mb-2">Direct Expense Logging</h3>
-           <p className="text-slate-500 mb-6">Quickly log cash or card expenses that don't require an A/P bill.</p>
-           <button 
-             onClick={() => setIsCreatingBill(true)}
-             className="bg-sidebar-bg text-sidebar-ink  px-6 py-2 text-sm font-medium rounded-sm hover:bg-sidebar-bg/90 transition-colors"
-           >
-             + Record Expense
-           </button>
-        </div>
-      )}
-
-      {activeTab === 'Purchase orders' && (
-        <div className="bg-paper-100 border border-ink-900/10 shadow-sm rounded-sm p-8 max-w-4xl mx-auto text-center">
-           <h3 className="text-xl font-medium text-ink-900 mb-2">Purchase Orders</h3>
-           <p className="text-slate-500 mb-6">Issue POs to vendors and convert them into bills upon receipt.</p>
-           <button 
-             onClick={() => setIsCreatingBill(true)}
-             className="bg-sidebar-bg text-sidebar-ink  px-6 py-2 text-sm font-medium rounded-sm hover:bg-sidebar-bg/90 transition-colors"
-           >
-             + Create Purchase Order
-           </button>
+        <div className="max-w-2xl space-y-4">
+          <p className="text-[14px] leading-relaxed text-ink-900">
+            A cash or card purchase is recorded as a bill from the supplier, then marked paid. Take a photo of the receipt and the supplier, amount and date are read from it for you to check.
+          </p>
+          <div className="flex flex-wrap items-center gap-4">
+            <button type="button" onClick={() => setIsScanningReceipt(true)} className={buttonClass.secondary}>
+              Read a receipt
+            </button>
+            <button type="button" onClick={() => setIsCreatingBill(true)} className={buttonClass.quiet}>
+              Enter it by hand
+            </button>
+          </div>
         </div>
       )}
 
       {activeTab === 'Bill payments' && (
-        <div className="bg-paper-100 border border-ink-900/10 shadow-sm rounded-sm p-8 max-w-4xl mx-auto text-center">
-           <h3 className="text-xl font-medium text-ink-900 mb-2">Batch Bill Disbursements</h3>
-           <p className="text-slate-500 mb-6">
-             Records a real cash payment (Debit A/P, Credit Cash) for every currently open bill.
-             This does not move real money — it does not connect to M-Pesa or a bank; use it once
-             you've paid vendors outside the system and need the books to reflect it.
-           </p>
-           <p className="text-sm text-slate-600 mb-6">
-             {bills.filter((b: any) => b.status === 'OPEN' || b.status === 'SENT').length} open bill(s) will be marked paid.
-           </p>
-           <button
-             onClick={() => {
-               const openBillIds = bills.filter((b: any) => b.status === 'OPEN' || b.status === 'SENT').map((b: any) => b.id);
-               if (openBillIds.length === 0) {
-                 alert('No open bills to pay.');
-                 return;
-               }
-               if (confirm(`Record payment for ${openBillIds.length} open bill(s)? This posts real ledger entries.`)) {
-                 bulkStatusBillsMutation.mutate({ ids: openBillIds, status: 'PAID' });
-               }
-             }}
-             disabled={bulkStatusBillsMutation.isPending}
-             className="bg-sidebar-bg text-sidebar-ink  px-6 py-2 text-sm font-medium rounded-sm hover:bg-sidebar-bg/90 transition-colors disabled:opacity-50"
-           >
-             Schedule Batch Run
-           </button>
+        <div className="max-w-2xl space-y-4">
+          <p className="text-[14px] leading-relaxed text-ink-900">
+            Once suppliers have been paid outside Ledger Link, record it here. Each open bill is posted as paid: accounts payable is debited and cash credited.
+          </p>
+          <p className="text-[13px] text-graphite-600">No money moves. Ledger Link is not connected to M-Pesa or a bank.</p>
+          {openBills.length === 0 ? (
+            <p className="text-[14px]">
+              <Mark kind="tick" label="No open bills." />
+            </p>
+          ) : (
+            <>
+              <div className="flex items-baseline justify-between gap-4 border-y border-feint-strong py-2.5 text-[14px]">
+                <span className="text-ink-900">
+                  {openBills.length} open {openBills.length === 1 ? 'bill' : 'bills'}
+                </span>
+                <Amount cents={openBillsTotal} currency={baseCurrency} tone="ink" />
+              </div>
+              <Field label="Pay from" hint={paymentAccounts.length === 0 ? 'Add an active cash or bank asset account before posting payments.' : undefined}>
+                <select value={batchPaymentAccountId} onChange={(event) => setBatchPaymentAccountId(event.target.value)}>
+                  <option value="">Choose an account</option>
+                  {paymentAccounts.map((account: any) => (
+                    <option key={account.id} value={account.id}>{account.code} · {account.name}</option>
+                  ))}
+                </select>
+              </Field>
+              <button
+                type="button"
+                onClick={() => {
+                  if (window.confirm(`Post payment for ${openBills.length} open bill(s)? This writes entries to the ledger.`)) {
+                    batchPaymentMutation.mutate({ targetBills: openBills, sourceAccountId: batchPaymentAccountId });
+                  }
+                }}
+                disabled={batchPaymentMutation.isPending || !batchPaymentAccountId}
+                className={buttonClass.secondary}
+              >
+                {batchPaymentMutation.isPending ? 'Posting' : 'Post these payments'}
+              </button>
+              {batchPaymentMutation.isError && (
+                <p role="alert" className="text-[13px] text-ledger-red">
+                  {(batchPaymentMutation.error as Error).message}
+                </p>
+              )}
+            </>
+          )}
         </div>
       )}
 
-      {/* Bulk Action Contextual Toolbar for Bills */}
       {activeTab === 'Bills' && (
         <BulkActionBar
           selectedCount={selectedBillIds.length}
@@ -395,16 +474,10 @@ export function ExpensesView() {
               bulkDeleteBillsMutation.mutate(selectedBillIds);
             }
           }}
-          statusOptions={[
-            { label: 'Mark Paid', value: 'PAID' },
-            { label: 'Mark Pending', value: 'PENDING' }
-          ]}
-          onStatusUpdate={(status) => bulkStatusBillsMutation.mutate({ ids: selectedBillIds, status })}
-          isLoading={bulkDeleteBillsMutation.isPending || bulkStatusBillsMutation.isPending}
+          isLoading={bulkDeleteBillsMutation.isPending}
         />
       )}
 
-      {/* Bulk Action Contextual Toolbar for Vendors */}
       {activeTab === 'Vendors' && (
         <BulkActionBar
           selectedCount={selectedVendorIds.length}
@@ -420,20 +493,8 @@ export function ExpensesView() {
         />
       )}
 
-      {/* Dynamic Contextual Add Modals */}
-      <DynamicQuickAddModal
-        isOpen={isCreatingVendor}
-        onClose={() => setIsCreatingVendor(false)}
-        overrideType="VENDOR"
-      />
+      <DynamicQuickAddModal isOpen={isCreatingVendor} onClose={() => setIsCreatingVendor(false)} overrideType="VENDOR" />
 
-      <DynamicQuickAddModal
-        isOpen={isCreatingBill}
-        onClose={() => setIsCreatingBill(false)}
-        overrideType="BILL"
-      />
-
-      {/* Comprehensive Entity Drill-Down Overlay */}
       {selectedEntity && (
         <EntityDrillDownModal
           isOpen={!!selectedEntity}
@@ -444,81 +505,128 @@ export function ExpensesView() {
         />
       )}
 
-      {/* Basic Create Bill Modal */}
-      {isCreatingBill && (
-        <div className="fixed inset-0 bg-ink-900/20 backdrop-blur-sm z-50 flex items-center justify-center">
-          <div className="bg-paper-100 rounded-sm shadow-xl border border-ink-900/10 w-full max-w-2xl p-6">
-            <h3 className="text-xl font-serif text-ink-900 mb-4">Record New Bill</h3>
-            {createBillMutation.isError && (
-              <div className="mb-4 p-3 bg-rust-700/10 border border-rust-700/20 text-rust-700 text-sm rounded-sm">
-                {createBillMutation.error.message}
-              </div>
-            )}
-            <form onSubmit={(e) => {
-              e.preventDefault();
-              const fd = new FormData(e.currentTarget);
-              createBillMutation.mutate({
-                vendorId: fd.get('vendorId'),
-                billDate: fd.get('billDate'),
-                dueDate: fd.get('dueDate'),
-                lines: [{
-                  description: fd.get('description'),
-                  accountId: fd.get('accountId'),
-                  amountCents: Math.round(parseFloat(fd.get('amount') as string) * 100)
-                }]
-              });
-            }} className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">Vendor *</label>
-                  <select required name="vendorId" className="w-full bg-paper-100 border border-ink-900/20 text-ink-900 text-sm rounded-sm px-3 py-2 focus:ring-1 focus:ring-focus-blue-500 outline-none">
-                    <option value="">Select a vendor...</option>
-                    {vendors.map((v: any) => (
-                      <option key={v.id} value={v.id}>{v.displayName}</option>
-                    ))}
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">Expense Account *</label>
-                  <select required name="accountId" className="w-full bg-paper-100 border border-ink-900/20 text-ink-900 text-sm rounded-sm px-3 py-2 focus:ring-1 focus:ring-focus-blue-500 outline-none">
-                    <option value="">Select expense category...</option>
-                    {expenseAccounts.map((a: any) => (
-                      <option key={a.id} value={a.id}>{a.code} - {a.name}</option>
-                    ))}
-                  </select>
-                </div>
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">Bill Date *</label>
-                  <input required name="billDate" type="date" defaultValue={scannedData?.date || format(new Date(), 'yyyy-MM-dd')} className="w-full bg-paper-100 border border-ink-900/20 text-ink-900 text-sm rounded-sm px-3 py-2 focus:ring-1 focus:ring-focus-blue-500 outline-none" />
-                </div>
-                <div>
-                  <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">Due Date *</label>
-                  <input required name="dueDate" type="date" defaultValue={format(new Date(Date.now() + 30 * 86400000), 'yyyy-MM-dd')} className="w-full bg-paper-100 border border-ink-900/20 text-ink-900 text-sm rounded-sm px-3 py-2 focus:ring-1 focus:ring-focus-blue-500 outline-none" />
-                </div>
-              </div>
-              <div className="grid grid-cols-4 gap-4 items-end">
-                <div className="col-span-3">
-                  <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">Description</label>
-                  <input name="description" type="text" defaultValue={scannedData?.vendor ? `Receipt from ${scannedData.vendor}` : ''} placeholder="What was this for?" className="w-full bg-paper-100 border border-ink-900/20 text-ink-900 text-sm rounded-sm px-3 py-2 focus:ring-1 focus:ring-focus-blue-500 outline-none" />
-                </div>
-                <div className="col-span-1">
-                  <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">Amount *</label>
-                  <input required name="amount" type="number" step="0.01" min="0.01" defaultValue={scannedData?.amount || ''} placeholder="0.00" className="w-full bg-paper-100 border border-ink-900/20 text-ink-900 text-sm rounded-sm px-3 py-2 focus:ring-1 focus:ring-focus-blue-500 outline-none tabular-currency text-right" />
-                </div>
-              </div>
-
-              <div className="flex justify-end space-x-3 pt-6 border-t border-ink-900/10 mt-6">
-                <button type="button" onClick={() => { setIsCreatingBill(false); setScannedData(null); }} className="px-4 py-2 text-sm font-medium text-slate-500 hover:text-ink-900">Cancel</button>
-                <button type="submit" disabled={createBillMutation.isPending} className="bg-sidebar-bg text-sidebar-ink  px-4 py-2 text-sm font-medium rounded-sm hover:bg-sidebar-bg/90 transition-colors disabled:opacity-50">
-                  {createBillMutation.isPending ? 'Saving...' : 'Save Bill'}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
+      {isScanningReceipt && (
+        <ReceiptScanner
+          onClose={() => setIsScanningReceipt(false)}
+          onScanComplete={(data) => {
+            setScannedData(data);
+            setIsScanningReceipt(false);
+            setIsCreatingBill(true);
+          }}
+        />
       )}
+
+      <Dialog
+        open={isCreatingBill}
+        onClose={closeBill}
+        width="lg"
+        title={scannedData ? 'Check the receipt' : 'New bill'}
+        note={scannedData ? 'Read from the photo. Correct anything misread before saving.' : 'Saving it posts the expense and the amount owed to the supplier.'}
+        footer={
+          <>
+            {createBillMutation.isError && (
+              <p role="alert" className="mr-auto text-[13px] text-ledger-red">
+                {createBillMutation.error.message}
+              </p>
+            )}
+            <button type="button" onClick={closeBill} className={buttonClass.secondary}>
+              Cancel
+            </button>
+            <button type="submit" form="bill-form" disabled={createBillMutation.isPending} className={buttonClass.primary}>
+              {createBillMutation.isPending ? 'Saving' : 'Save bill'}
+            </button>
+          </>
+        }
+      >
+        <form
+          id="bill-form"
+          key={scannedData ? `scan-${scannedData.date}-${scannedData.amount}` : 'manual'}
+          onSubmit={(e) => {
+            e.preventDefault();
+            const fd = new FormData(e.currentTarget);
+            const amountCents = Math.round(parseFloat(fd.get('amount') as string) * 100);
+            const taxRate = Number(fd.get('taxRate')) || 0;
+            const exchangeRate = Number(billExchangeRate);
+            const isForeign = billCurrency !== baseCurrency;
+            const baseAmountCents = isForeign ? Math.round(amountCents / exchangeRate) : amountCents;
+            createBillMutation.mutate({
+              vendorId: fd.get('vendorId'),
+              billDate: fd.get('billDate'),
+              dueDate: fd.get('dueDate'),
+              currency: billCurrency,
+              exchangeRate,
+              lines: [{
+                description: fd.get('description'),
+                accountId: fd.get('accountId'),
+                amountCents: baseAmountCents,
+                foreignAmountCents: isForeign ? amountCents : undefined,
+                taxCents: Math.round(baseAmountCents * taxRate / 100),
+              }],
+            });
+          }}
+          className="grid grid-cols-1 gap-4 sm:grid-cols-2"
+        >
+          <Field label="Supplier" hint={scannedVendorUnknown ? `The receipt names ${scannedData?.vendor}. Add them as a vendor if they are new.` : undefined}>
+            <select required name="vendorId" defaultValue={scannedVendorId}>
+              <option value="">Choose a vendor</option>
+              {vendors.map((v: any) => (
+                <option key={v.id} value={v.id}>{v.displayName}</option>
+              ))}
+            </select>
+          </Field>
+          <Field label="Expense account">
+            <select required name="accountId" defaultValue="">
+              <option value="">Choose an account</option>
+              {expenseAccounts.map((a: any) => (
+                <option key={a.id} value={a.id}>{a.code} · {a.name}</option>
+              ))}
+            </select>
+          </Field>
+          <Field label="Bill date">
+            <input required name="billDate" type="date" defaultValue={scannedData?.date || format(new Date(), 'yyyy-MM-dd')} />
+          </Field>
+          <Field label="Due">
+            <input required name="dueDate" type="date" defaultValue={format(new Date(Date.now() + 30 * 86400000), 'yyyy-MM-dd')} />
+          </Field>
+          <Field label="Currency">
+            <select
+              value={billCurrency}
+              onChange={(event) => {
+                const next = event.target.value;
+                setBillCurrency(next);
+                setBillExchangeRate(next === baseCurrency ? '1' : String(exchangeRates[next] || 1));
+              }}
+            >
+              {SUPPORTED_CURRENCIES.map((currency) => (
+                <option key={currency.code} value={currency.code}>{currency.code} · {currency.name}</option>
+              ))}
+            </select>
+          </Field>
+          {billCurrency !== baseCurrency && (
+            <Field label={`${billCurrency} per 1 ${baseCurrency}`}>
+              <input
+                required
+                type="number"
+                min="0.00000001"
+                step="any"
+                inputMode="decimal"
+                value={billExchangeRate}
+                onChange={(event) => setBillExchangeRate(event.target.value)}
+                className="text-right tabular-currency"
+              />
+            </Field>
+          )}
+          <Field label="Particulars">
+            <input required name="description" type="text" defaultValue={scannedData?.vendor ? `Receipt from ${scannedData.vendor}` : ''} />
+          </Field>
+          <Field label={`Amount (${billCurrency})`}>
+            <input required name="amount" type="number" step="0.01" min="0.01" inputMode="decimal" defaultValue={scannedData?.amount || ''} className="text-right tabular-currency text-ink-blue" />
+          </Field>
+          <Field label="VAT percentage" hint="Enter zero for exempt or non-taxable purchases.">
+            <input required name="taxRate" type="number" step="0.01" min="0" max="100" inputMode="decimal" defaultValue="0" className="text-right tabular-currency" />
+          </Field>
+        </form>
+      </Dialog>
     </div>
   );
 }

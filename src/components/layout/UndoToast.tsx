@@ -1,62 +1,51 @@
 import { useEffect, useState } from 'react';
-import { useAppStore } from '../../store';
-import { RotateCcw, X } from 'lucide-react';
+import { X } from 'lucide-react';
 import { useQueryClient } from '@tanstack/react-query';
+import { useAppStore } from '../../store';
 
 export function UndoToast() {
   const { undoStack, popUndoAction, currentOrgId } = useAppStore();
   const queryClient = useQueryClient();
-  const [isVisible, setIsVisible] = useState(false);
+  const [problem, setProblem] = useState('');
   const action = undoStack[undoStack.length - 1];
 
   useEffect(() => {
-    if (action) {
-      setIsVisible(true);
-      const timer = setTimeout(() => {
-        setIsVisible(false);
-        setTimeout(() => popUndoAction(), 300); // Wait for transition
-      }, 5000); // 5 seconds to undo
-      return () => clearTimeout(timer);
-    } else {
-      setIsVisible(false);
-    }
+    if (!action) return;
+    setProblem('');
+    const timer = setTimeout(() => popUndoAction(), 5000);
+    return () => clearTimeout(timer);
   }, [action, popUndoAction]);
 
   const handleUndo = async () => {
     if (!action) return;
     try {
-      await fetch(action.revertEndpoint, {
+      const res = await fetch(action.revertEndpoint, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-org-id': currentOrgId
-        },
-        body: JSON.stringify(action.data)
+        headers: { 'Content-Type': 'application/json', 'x-org-id': currentOrgId },
+        body: JSON.stringify(action.data),
       });
-      // Invalidate relevant queries
+      if (!res.ok) throw new Error('Undo failed');
       queryClient.invalidateQueries();
-      setIsVisible(false);
-      setTimeout(() => popUndoAction(), 300);
-    } catch (e) {
-      console.error("Undo failed", e);
+      popUndoAction();
+    } catch {
+      setProblem('It could not be undone.');
     }
   };
 
-  if (!action && !isVisible) return null;
+  if (!action) return null;
 
   return (
-    <div className={`fixed bottom-4 right-4 z-50 transition-all duration-300 transform ${isVisible ? 'translate-y-0 opacity-100' : 'translate-y-4 opacity-0'}`}>
-      <div className="bg-sidebar-bg text-sidebar-ink  rounded-md shadow-lg p-4 flex items-center gap-4 border border-ink-900/20">
-        <p className="text-sm">{action?.message || 'Action completed'}</p>
-        <button 
-          onClick={handleUndo}
-          className="flex items-center gap-1 bg-white/10 dark:bg-black/10 hover:bg-white/20 dark:hover:bg-black/20 px-3 py-1.5 rounded-sm text-sm font-medium transition-colors"
-        >
-          <RotateCcw className="h-4 w-4" />
+    <div className="fixed bottom-3 right-3 left-3 z-50 sm:left-auto" role="status">
+      <div className="ll-lift flex items-center gap-4 border border-feint-strong border-t-2 border-t-ink-900 bg-paper-100 px-3.5 py-2.5">
+        <p className="min-w-0 flex-1 text-[13.5px] text-ink-900">
+          {action.message || 'Done.'}
+          {problem && <span className="block text-[12.5px] text-ledger-red">{problem}</span>}
+        </p>
+        <button type="button" onClick={handleUndo} className="text-[13.5px] font-semibold text-oxblood underline underline-offset-[3px]">
           Undo
         </button>
-        <button onClick={() => setIsVisible(false)} className="text-white/60 hover:text-white">
-          <X className="h-4 w-4" />
+        <button type="button" onClick={() => popUndoAction()} aria-label="Dismiss" className="text-graphite-600 hover:text-ink-900">
+          <X className="h-4 w-4" aria-hidden="true" />
         </button>
       </div>
     </div>

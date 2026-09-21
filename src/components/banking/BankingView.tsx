@@ -1,10 +1,13 @@
-import { formatCurrency } from '../../utils/currency';
 import { useState } from 'react';
 import { useRenderTracker } from '../../utils/monitoring';
 import { format } from 'date-fns';
-import { Filter, Search, Download, Sparkles, CheckCircle2, ArrowRight, CheckCheck, RefreshCw } from 'lucide-react';
+import { Filter, Search, Download } from 'lucide-react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAppStore } from '../../store';
+import { Amount } from '../ledger/Amount';
+import { Mark } from '../ledger/Mark';
+import { PageHeading, IndexTabs, PageNote, SkeletonRows, EmptyNote, buttonClass } from '../ledger/Page';
+import { Dialog, Field } from '../ledger/Dialog';
 
 const tabs = ['Bank transactions', 'AI Match Assistant', 'Rules', 'Reconcile', 'Bank connections'];
 
@@ -17,13 +20,14 @@ export function BankingView() {
   const [filterStatus, setFilterStatus] = useState('ALL');
   const [matchingTx, setMatchingTx] = useState<any>(null); // Transaction being matched
   const [selectedCandidate, setSelectedCandidate] = useState<any>(null);
+  const [matchProblem, setMatchProblem] = useState('');
   const [isCreatingRule, setIsCreatingRule] = useState(false);
   const [ruleMatchText, setRuleMatchText] = useState('');
   const [ruleAccountId, setRuleAccountId] = useState('');
   const [isConnecting, setIsConnecting] = useState(false);
   const [connectInstitution, setConnectInstitution] = useState('');
   const [connectEmail, setConnectEmail] = useState('');
-  const { currentOrgId } = useAppStore();
+  const { currentOrgId, activeCompany } = useAppStore();
   const queryClient = useQueryClient();
 
   // Fetch Accounts (to map AI suggestions to real account IDs)
@@ -200,7 +204,10 @@ export function BankingView() {
         },
         body: JSON.stringify(payload)
       });
-      if (!res.ok) throw new Error('Failed to match transaction');
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.error || 'The line could not be matched.');
+      }
       return res.json();
     },
     onSuccess: () => {
@@ -209,7 +216,9 @@ export function BankingView() {
       queryClient.invalidateQueries({ queryKey: ['accounts', currentOrgId] });
       setMatchingTx(null);
       setSelectedCandidate(null);
+      setMatchProblem('');
     },
+    onError: (err: any) => setMatchProblem(err.message),
   });
 
   // Auto-Reconcile All Mutation
@@ -233,18 +242,32 @@ export function BankingView() {
     }
   });
 
+  // Lines matched during this visit get the auditor's tick drawn once, as the
+  // pen makes it; lines already matched on load show it at rest.
+  const [justMatched, setJustMatched] = useState<Set<string>>(() => new Set());
+  const reconcile = (payload: { transactionId: string; targetAccountId?: string; existingJournalEntryId?: string }) => {
+    matchMutation.mutate(payload, {
+      onSuccess: () => setJustMatched((prev) => new Set(prev).add(payload.transactionId)),
+    });
+  };
+
   const handleMatchNew = (tx: any) => {
     const targetAccount = accountsData?.accounts?.find((a: any) => a.code === tx.aiCategoryCode);
     if (!targetAccount) {
-      alert(`Account code ${tx.aiCategoryCode} not found in Chart of Accounts.`);
+      setMatchProblem(`There is no account ${tx.aiCategoryCode} in the chart of accounts. Add it, or match an existing entry.`);
       return;
     }
-    matchMutation.mutate({ transactionId: tx.id, targetAccountId: targetAccount.id });
+    reconcile({ transactionId: tx.id, targetAccountId: targetAccount.id });
   };
 
   const handleAcceptAIMatch = (match: any) => {
-    const targetAccount = accountsData?.accounts?.find((a: any) => a.code === match.suggestedAccountCode) || accountsData?.accounts?.[0];
-    matchMutation.mutate({
+    const targetAccount = accountsData?.accounts?.find((a: any) => a.code === match.suggestedAccountCode);
+    if (!targetAccount) {
+      setMatchProblem(`There is no account ${match.suggestedAccountCode} in the chart of accounts, so ${match.description} was not posted.`);
+      return;
+    }
+    setMatchProblem('');
+    reconcile({
       transactionId: match.transactionId,
       targetAccountId: targetAccount?.id
     });
@@ -270,585 +293,589 @@ export function BankingView() {
     window.URL.revokeObjectURL(url);
   };
 
+  const closeMatch = () => {
+    setMatchingTx(null);
+    setMatchProblem('');
+  };
+  const candidateEntries = matchingTx
+    ? (journalsData?.entries || [])
+        .map((je: any) => ({ je, cents: (je.lines || []).reduce((sum: number, l: any) => sum + Number(l.debit || 0), 0) }))
+        .sort((x: any, y: any) => Math.abs(x.cents - matchingTx.amountCents) - Math.abs(y.cents - matchingTx.amountCents))
+        .slice(0, 8) as { je: any; cents: number }[]
+    : [];
+
   const highConfidenceCount = aiMatches.filter((m: any) => m.confidence >= 85).length;
   const unreviewedCount = rawTx.filter((t: any) => t.status !== 'MATCHED').length;
 
+  const baseCurrency = activeCompany?.baseCurrency || 'KES';
+  const totalOut = filteredTx.filter((t: any) => t.direction === 'OUT').reduce((s: number, t: any) => s + (t.amountCents || 0), 0);
+  const totalIn = filteredTx.filter((t: any) => t.direction === 'IN').reduce((s: number, t: any) => s + (t.amountCents || 0), 0);
+
   return (
-    <div className="max-w-6xl mx-auto space-y-6">
-      <div className="mb-2 flex justify-between items-center">
-        <div>
-          <h1 className="text-2xl font-serif text-ink-900">Banking & Reconciliation</h1>
-          <p className="text-sm text-slate-500">Automated bank feeds, M-Pesa statements, and AI matching assistant</p>
-        </div>
-        <div className="flex items-center space-x-3">
-          <button 
-            onClick={handleExportCSV}
-            className="bg-paper-100 border border-ink-900/20 text-ink-900 px-3 py-2 text-sm font-medium rounded-sm hover:bg-paper-50 transition-colors flex items-center"
-          >
-            <Download className="h-4 w-4 mr-1.5" /> Export CSV
-          </button>
-          <button 
-            onClick={() => syncMutation.mutate()}
-            disabled={syncMutation.isPending}
-            className="bg-sidebar-bg text-sidebar-ink  px-4 py-2 text-sm font-medium rounded-sm hover:bg-sidebar-bg/90 transition-colors flex items-center disabled:opacity-50"
-          >
-            <RefreshCw className={`h-4 w-4 mr-1.5 ${syncMutation.isPending ? 'animate-spin' : ''}`} />
-            {syncMutation.isPending ? 'Syncing...' : 'Sync Feed'}
-          </button>
-        </div>
-      </div>
-      <div className="ledger-divider mb-4"></div>
-
-      {/* AI Assistant Banner */}
-      {unreviewedCount > 0 && (
-        <div className="bg-gradient-to-r from-amber-500/10 via-focus-blue-500/10 to-ledger-green-700/10 border border-amber-500/30 rounded-sm p-4 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
-          <div className="flex items-start space-x-3">
-            <div className="p-2 rounded-sm bg-amber-500 text-white  mt-0.5">
-              <Sparkles className="w-5 h-5" />
-            </div>
-            <div>
-              <div className="flex items-center space-x-2">
-                <h3 className="font-bold text-ink-900 text-sm">AI Transaction Matching Assistant Active</h3>
-                <span className="text-xs px-2 py-0.5 bg-amber-500/20 text-amber-900 dark:text-amber-300 font-bold rounded-full">
-                  {highConfidenceCount} High Confidence Matches
-                </span>
-              </div>
-              <p className="text-xs text-slate-600 mt-1">
-                Analyzed open customer invoices, vendor bills, and payroll entries against live bank lines.
-              </p>
-            </div>
-          </div>
-          <div className="flex items-center space-x-2">
-            <button
-              onClick={() => setActiveTab('AI Match Assistant')}
-              className="px-3 py-1.5 text-xs font-semibold text-focus-blue-500 border border-focus-blue-500/30 rounded-sm hover:bg-paper-100 transition-colors"
-            >
-              Review Matches ({aiMatches.length})
+    <div className="space-y-5">
+      <PageHeading
+        tourId="banking-overview"
+        title="Banking"
+        note={<>Bank and M-Pesa statement lines, matched to the books · Figures in {baseCurrency}</>}
+        actions={
+          <>
+            <button type="button" onClick={handleExportCSV} className={buttonClass.secondary}>
+              <Download className="h-4 w-4" aria-hidden="true" /> Export CSV
             </button>
-            <button
-              onClick={() => autoReconcileMutation.mutate(85)}
-              disabled={autoReconcileMutation.isPending || highConfidenceCount === 0}
-              className="px-4 py-1.5 text-xs font-bold bg-sidebar-bg text-sidebar-ink  rounded-sm hover:bg-sidebar-bg/90 transition-colors flex items-center disabled:opacity-50"
-            >
-              <CheckCheck className="w-4 h-4 mr-1.5" />
-              {autoReconcileMutation.isPending ? 'Reconciling...' : `Auto-Reconcile (${highConfidenceCount})`}
-            </button>
-          </div>
-        </div>
-      )}
-
-      {/* Sub-navigation */}
-      <div className="flex space-x-6 border-b border-ink-900/10 overflow-x-auto">
-        {tabs.map(tab => (
-          <button
-            key={tab}
-            onClick={() => setActiveTab(tab)}
-            className={`pb-3 text-sm font-medium transition-colors border-b-2 whitespace-nowrap flex items-center ${
-              activeTab === tab 
-                ? 'border-brass-500 text-ink-900' 
-                : 'border-transparent text-slate-500 hover:text-ink-900 hover:border-ink-900/20'
-            }`}
-          >
-            {tab === 'AI Match Assistant' && <Sparkles className="w-3.5 h-3.5 mr-1.5 text-amber-500" />}
-            {tab}
-            {tab === 'Bank transactions' && unreviewedCount > 0 && (
-              <span className="ml-2 px-1.5 py-0.2 rounded-full text-[10px] bg-ink-900/10 text-slate-700 font-bold">
-                {unreviewedCount}
-              </span>
+            {highConfidenceCount > 0 && (
+              <button
+                type="button"
+                onClick={() => autoReconcileMutation.mutate(85)}
+                disabled={autoReconcileMutation.isPending}
+                className={buttonClass.primary}
+              >
+                {autoReconcileMutation.isPending ? 'Matching…' : `Accept ${highConfidenceCount} strong ${highConfidenceCount === 1 ? 'match' : 'matches'}`}
+              </button>
             )}
-          </button>
-        ))}
-      </div>
+          </>
+        }
+      />
+
+      <IndexTabs
+        label="Banking"
+        active={activeTab}
+        onChange={setActiveTab}
+        tabs={[
+          { id: 'Bank transactions', name: 'Statement lines', count: rawTx.length },
+          { id: 'AI Match Assistant', name: 'Suggested matches', count: aiMatches.length },
+          { id: 'Rules', name: 'Rules' },
+          { id: 'Reconcile', name: 'Reconcile' },
+          { id: 'Bank connections', name: 'Connection requests' },
+        ]}
+      />
 
       {activeTab === 'Bank transactions' && (
-        <div className="bg-paper-100 border border-ink-900/10 shadow-sm rounded-sm overflow-hidden">
-          {/* Filters Bar */}
-          <div className="p-4 border-b border-ink-900/10 bg-paper-50 flex flex-wrap items-center justify-between gap-3">
-            <div className="flex items-center space-x-3 flex-1 min-w-[240px]">
-              <div className="relative flex-1">
-                <Search className="w-4 h-4 absolute left-3 top-2.5 text-slate-400" />
+        <div className="-mt-1">
+          {unreviewedCount > 0 && (
+            <PageNote>
+              <Mark kind="query" label={`${unreviewedCount} ${unreviewedCount === 1 ? 'line is' : 'lines are'} not matched`} />
+              <span>
+                {aiMatches.length} suggested, {highConfidenceCount} at 85% confidence or more.
+              </span>
+              <button type="button" onClick={() => setActiveTab('AI Match Assistant')} className={buttonClass.quiet}>
+                Review suggestions
+              </button>
+            </PageNote>
+          )}
+
+          <div className="flex flex-wrap items-end gap-3 py-3">
+            <label className="flex-1 min-w-[14rem]">
+              <span className="sr-only">Find a line</span>
+              <span className="relative block">
+                <Search className="w-4 h-4 absolute left-2.5 top-1/2 -translate-y-1/2 text-graphite-500" aria-hidden="true" />
                 <input
-                  type="text"
-                  placeholder="Filter by description, reference, vendor..."
+                  type="search"
+                  placeholder="Find by description or reference"
                   value={filterSearch}
                   onChange={(e) => setFilterSearch(e.target.value)}
-                  className="w-full pl-9 pr-3 py-1.5 text-sm bg-paper-100 border border-ink-900/20 rounded-sm focus:outline-none focus:ring-1 focus:ring-focus-blue-500"
+                  className="w-full h-9 pl-8 pr-3 text-[13.5px] border"
                 />
-              </div>
-              <select
-                value={filterDirection}
-                onChange={(e) => setFilterDirection(e.target.value)}
-                className="bg-paper-100 border border-ink-900/20 text-xs rounded-sm px-2.5 py-2 text-ink-900 outline-none"
-              >
-                <option value="ALL">All Flows</option>
-                <option value="IN">Money In (Credits)</option>
-                <option value="OUT">Money Out (Debits)</option>
+              </span>
+            </label>
+            <label>
+              <span className="sr-only">Direction</span>
+              <select value={filterDirection} onChange={(e) => setFilterDirection(e.target.value)} className="h-9 px-2.5 text-[13.5px] border">
+                <option value="ALL">Money in and out</option>
+                <option value="IN">Money in</option>
+                <option value="OUT">Money out</option>
               </select>
-              <select
-                value={filterStatus}
-                onChange={(e) => setFilterStatus(e.target.value)}
-                className="bg-paper-100 border border-ink-900/20 text-xs rounded-sm px-2.5 py-2 text-ink-900 outline-none"
-              >
-                <option value="ALL">All Statuses</option>
-                <option value="UNMATCHED">Unmatched</option>
+            </label>
+            <label>
+              <span className="sr-only">Matching</span>
+              <select value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)} className="h-9 px-2.5 text-[13.5px] border">
+                <option value="ALL">Matched and not</option>
+                <option value="UNMATCHED">Not matched</option>
                 <option value="MATCHED">Matched</option>
               </select>
-            </div>
-            <div className="text-xs text-slate-500 font-medium">
-              Showing {filteredTx.length} of {rawTx.length} transactions
-            </div>
+            </label>
+            <span className="text-[12.5px] text-graphite-600 pb-2">
+              {filteredTx.length} of {rawTx.length} lines
+            </span>
           </div>
 
-          <table className="w-full text-sm text-left">
-            <thead className="bg-paper-100 border-b border-ink-900/10 text-xs uppercase text-slate-500">
-              <tr>
-                <th className="px-4 py-3 font-semibold">Date</th>
-                <th className="px-4 py-3 font-semibold">Description</th>
-                <th className="px-4 py-3 font-semibold text-right">Spent (KES)</th>
-                <th className="px-4 py-3 font-semibold text-right">Received (KES)</th>
-                <th className="px-4 py-3 font-semibold">AI Match Suggestion</th>
-                <th className="px-4 py-3 font-semibold text-right">Action</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-ink-900/5">
-              {txLoading ? (
-                <tr><td colSpan={6} className="px-4 py-8 text-center text-slate-500">Loading transactions...</td></tr>
-              ) : filteredTx.length === 0 ? (
-                <tr>
-                  <td colSpan={6} className="px-4 py-8 text-center text-slate-500">
-                    No transactions matching criteria.
-                  </td>
-                </tr>
-              ) : (
-                filteredTx.map((tx: any) => {
-                  const match = aiMatchesMap.get(tx.id);
-                  const isMatched = tx.status === 'MATCHED';
-
-                  return (
-                    <tr key={tx.id} className="hover:bg-paper-50 transition-colors group">
-                      <td className="px-4 py-3 tabular-currency text-ink-900 whitespace-nowrap">
-                        {format(new Date(tx.date), 'MMM d, yyyy')}
-                      </td>
-                      <td className="px-4 py-3 font-medium text-ink-900">
-                        <div>{tx.description}</div>
-                        {tx.bankReference && (
-                          <div className="text-[11px] font-mono text-slate-400">Ref: {tx.bankReference}</div>
-                        )}
-                      </td>
-                      <td className="px-4 py-3 tabular-currency text-right text-rust-700 font-medium">
-                        {tx.direction === 'OUT' ? formatCurrency(tx.amountCents) : '-'}
-                      </td>
-                      <td className="px-4 py-3 tabular-currency text-right text-ledger-green-700 font-medium">
-                        {tx.direction === 'IN' ? formatCurrency(tx.amountCents) : '-'}
-                      </td>
-                      <td className="px-4 py-3">
-                        {isMatched ? (
-                          <span className="inline-flex items-center text-xs text-ledger-green-700 font-semibold">
-                            <CheckCircle2 className="w-3.5 h-3.5 mr-1" /> Reconciled
-                          </span>
-                        ) : match ? (
-                          <div className="flex items-center space-x-2">
-                            <span className={`text-[11px] font-bold px-2 py-0.5 rounded-full ${
-                              match.confidence >= 90 
-                                ? 'bg-ledger-green-700/15 text-ledger-green-800 dark:text-ledger-green-300'
-                                : match.confidence >= 75
-                                ? 'bg-amber-500/15 text-amber-800 dark:text-amber-300'
-                                : 'bg-slate-200 text-slate-700'
-                            }`}>
-                              {match.confidence}% Match
-                            </span>
-                            <span className="text-xs text-slate-600 truncate max-w-[180px]">
-                              {match.matchedEntityNumber || match.suggestedAccountName}
-                            </span>
-                          </div>
-                        ) : (
-                          <span className="text-xs text-slate-400">No rule match</span>
-                        )}
-                      </td>
-                      <td className="px-4 py-3 text-right">
-                        {isMatched ? (
-                          <span className="text-xs text-slate-400">Locked</span>
-                        ) : match && match.confidence >= 80 ? (
-                          <button
-                            onClick={() => handleAcceptAIMatch(match)}
-                            disabled={matchMutation.isPending}
-                            className="bg-ledger-green-700 hover:bg-ledger-green-800 text-white  px-3 py-1 text-xs font-semibold rounded-sm transition-colors shadow-sm"
-                          >
-                            Accept Match
+          {txLoading ? (
+            <div aria-busy="true" aria-label="Loading statement lines">
+              {Array.from({ length: 6 }).map((_, i) => (
+                <div key={i} className="h-10 border-b border-feint flex items-center gap-6">
+                  <div className="h-3 w-20 bg-paper-200" />
+                  <div className="h-3 flex-1 bg-paper-200" />
+                  <div className="h-3 w-24 bg-paper-200" />
+                </div>
+              ))}
+            </div>
+          ) : filteredTx.length === 0 ? (
+            <p className="py-8 text-[14px] text-graphite-600">
+              {rawTx.length === 0
+                ? 'No statement lines yet. Lines from bank and M-Pesa statements are listed here to be matched against invoices, bills and payroll.'
+                : 'No lines fit these filters. Clear the search or choose money in and out.'}
+            </p>
+          ) : (
+            <>
+            {/* On a phone each line is a ruled entry: when and how much, what it was, and whether it is matched. */}
+            <ul className="sm:hidden" aria-label={`Statement lines, figures in ${baseCurrency}`}>
+              {filteredTx.map((tx: any) => {
+                const match = aiMatchesMap.get(tx.id);
+                const isMatched = tx.status === 'MATCHED';
+                return (
+                  <li key={tx.id} className="border-b border-feint py-3">
+                    <div className="flex items-baseline justify-between gap-3">
+                      <span className="text-[12.5px] text-graphite-600">{format(new Date(tx.date), 'dd/MM/yyyy')}</span>
+                      <span className="flex items-baseline gap-1.5">
+                        <span className="ll-printed text-[10.5px] text-graphite-600">{tx.direction === 'OUT' ? 'Out' : 'In'}</span>
+                        <Amount cents={tx.amountCents} currency={baseCurrency} size="md" />
+                      </span>
+                    </div>
+                    <p className="mt-1 text-[14px] leading-snug text-ink-900">{tx.description}</p>
+                    <div className="mt-2 flex items-center justify-between gap-3">
+                      {isMatched ? (
+                        <Mark kind="tick" label="Matched" draw={justMatched.has(tx.id)} />
+                      ) : match ? (
+                        <span className="inline-flex min-w-0 items-center gap-1.5 text-[12.5px] text-ink-900">
+                          <Mark kind="query" />
+                          <span className="truncate">{match.matchedEntityNumber || match.suggestedAccountName}</span>
+                          <span className="shrink-0 text-graphite-600">{match.confidence}% likely</span>
+                        </span>
+                      ) : (
+                        <span className="text-[12.5px] text-graphite-600">No suggestion</span>
+                      )}
+                      {!isMatched &&
+                        (match && match.confidence >= 80 ? (
+                          <button type="button" onClick={() => handleAcceptAIMatch(match)} disabled={matchMutation.isPending} className={`${buttonClass.quiet} shrink-0 py-1`}>
+                            Accept match
                           </button>
                         ) : (
-                          <button 
-                            onClick={() => setMatchingTx(tx)}
-                            className="text-xs font-bold text-focus-blue-500 hover:text-ink-900 border border-focus-blue-500/30 hover:border-ink-900/50 px-3 py-1 rounded-sm transition-colors"
-                          >
-                            Review
+                          <button type="button" onClick={() => setMatchingTx(tx)} className={`${buttonClass.quiet} shrink-0 py-1`}>
+                            Match…
                           </button>
-                        )}
-                      </td>
-                    </tr>
-                  );
-                })
-              )}
-            </tbody>
-          </table>
+                        ))}
+                    </div>
+                  </li>
+                );
+              })}
+              <li className="ll-total mt-px flex items-baseline justify-between gap-3 py-2 text-[13.5px]">
+                <span className="font-semibold text-ink-900">Out</span>
+                <Amount cents={totalOut} currency={baseCurrency} tone="ink" className="font-semibold" />
+              </li>
+              <li className="flex items-baseline justify-between gap-3 border-b-[3px] border-double border-ledger-red py-2 text-[13.5px]">
+                <span className="font-semibold text-ink-900">In</span>
+                <Amount cents={totalIn} currency={baseCurrency} tone="ink" className="font-semibold" />
+              </li>
+            </ul>
+            <div className="hidden sm:block relative overflow-x-auto">
+              <table className="w-full text-[13.5px]">
+                <caption className="sr-only">Statement lines, figures in {baseCurrency}</caption>
+                <thead>
+                  <tr>
+                    <th scope="col" className="pr-4 text-left">Date</th>
+                    <th scope="col" className="pr-4 text-left">Particulars</th>
+                    <th scope="col" className="pr-4 text-right">Out, {baseCurrency}</th>
+                    <th scope="col" className="pr-4 text-right">In, {baseCurrency}</th>
+                    <th scope="col" className="pr-4 text-left">Match</th>
+                    <th scope="col" className="text-right"><span className="sr-only">Action</span></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filteredTx.map((tx: any) => {
+                    const match = aiMatchesMap.get(tx.id);
+                    const isMatched = tx.status === 'MATCHED';
+                    return (
+                      <tr key={tx.id}>
+                        <td className="pr-4 whitespace-nowrap text-graphite-600">{format(new Date(tx.date), 'dd/MM/yyyy')}</td>
+                        <td className="pr-4">
+                          <span className="block text-ink-900">{tx.description}</span>
+                          {tx.bankReference && <span className="block text-[12px] text-graphite-500">Ref. {tx.bankReference}</span>}
+                        </td>
+                        <td className="pr-4 text-right whitespace-nowrap">
+                          {tx.direction === 'OUT' ? <Amount cents={tx.amountCents} currency={baseCurrency} /> : <span className="text-graphite-400" aria-label="none">–</span>}
+                        </td>
+                        <td className="pr-4 text-right whitespace-nowrap">
+                          {tx.direction === 'IN' ? <Amount cents={tx.amountCents} currency={baseCurrency} /> : <span className="text-graphite-400" aria-label="none">–</span>}
+                        </td>
+                        <td className="pr-4">
+                          {isMatched ? (
+                            <Mark kind="tick" label="Matched" draw={justMatched.has(tx.id)} />
+                          ) : match ? (
+                            <span className="inline-flex flex-wrap items-center gap-x-2 text-[12px] text-ink-900">
+                              <Mark kind="query" />
+                              <span>{match.matchedEntityNumber || match.suggestedAccountName}</span>
+                              <span className="text-graphite-600">{match.confidence}% likely</span>
+                            </span>
+                          ) : (
+                            <span className="text-[12px] text-graphite-600">No suggestion</span>
+                          )}
+                        </td>
+                        <td className="text-right whitespace-nowrap">
+                          {isMatched ? null : match && match.confidence >= 80 ? (
+                            <button
+                              type="button"
+                              onClick={() => handleAcceptAIMatch(match)}
+                              disabled={matchMutation.isPending}
+                              className={buttonClass.quiet}
+                            >
+                              Accept match
+                            </button>
+                          ) : (
+                            <button type="button" onClick={() => setMatchingTx(tx)} className={buttonClass.quiet}>
+                              Match…
+                            </button>
+                          )}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+                <tfoot>
+                  <tr>
+                    <th scope="row" colSpan={2} className="ll-total py-2 pr-4 text-left font-semibold text-ink-900">
+                      Total of {filteredTx.length} lines shown
+                    </th>
+                    <td className="ll-total py-2 pr-4 text-right whitespace-nowrap">
+                      <Amount cents={totalOut} currency={baseCurrency} tone="ink" className="font-semibold" />
+                    </td>
+                    <td className="ll-total py-2 pr-4 text-right whitespace-nowrap">
+                      <Amount cents={totalIn} currency={baseCurrency} tone="ink" className="font-semibold" />
+                    </td>
+                    <td colSpan={2} className="ll-total py-2" />
+                  </tr>
+                </tfoot>
+              </table>
+            </div>
+            </>
+          )}
         </div>
       )}
 
-      {/* AI Match Assistant Dedicated Tab */}
       {activeTab === 'AI Match Assistant' && (
         <div className="space-y-4">
-          <div className="bg-paper-100 border border-ink-900/10 rounded-sm p-6 shadow-sm">
-            <div className="flex justify-between items-center mb-6">
-              <div>
-                <h3 className="text-lg font-bold text-ink-900 flex items-center">
-                  <Sparkles className="w-5 h-5 mr-2 text-amber-500" />
-                  AI Transaction Matching Queue
-                </h3>
-                <p className="text-sm text-slate-500">
-                  Matches discovered across customer invoices, vendor bills, tax withholdings, and chart of accounts.
-                </p>
-              </div>
-              <button
-                onClick={() => autoReconcileMutation.mutate(85)}
-                disabled={autoReconcileMutation.isPending || highConfidenceCount === 0}
-                className="bg-sidebar-bg text-sidebar-ink  px-4 py-2 text-sm font-semibold rounded-sm hover:bg-sidebar-bg/90 transition-colors flex items-center disabled:opacity-50"
-              >
-                <CheckCheck className="w-4 h-4 mr-2" />
-                Auto-Reconcile All High Confidence ({highConfidenceCount})
-              </button>
-            </div>
-
-            {aiMatchesLoading ? (
-              <div className="py-12 text-center text-slate-500">Scanning ledger and open documents...</div>
-            ) : aiMatches.length === 0 ? (
-              <div className="py-12 text-center text-slate-500">
-                <CheckCircle2 className="w-8 h-8 mx-auto mb-2 text-ledger-green-700" />
-                All pending transactions have been reconciled or have no pending matches.
-              </div>
-            ) : (
-              <div className="space-y-3">
-                {aiMatches.map((candidate: any) => (
-                  <div 
-                    key={candidate.transactionId}
-                    className="border border-ink-900/10 rounded-sm p-4 hover:border-amber-500/50 transition-colors bg-paper-50 flex flex-col md:flex-row items-start md:items-center justify-between gap-4"
-                  >
-                    <div className="space-y-1 flex-1">
-                      <div className="flex items-center space-x-2">
-                        <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${
-                          candidate.confidence >= 90 
-                            ? 'bg-ledger-green-700 text-white ' 
-                            : 'bg-amber-500 text-white '
-                        }`}>
-                          {candidate.confidence}% Confidence
-                        </span>
-                        <span className="text-xs font-mono font-bold text-slate-600 bg-ink-900/5 px-2 py-0.5 rounded">
-                          {candidate.matchedType}
-                        </span>
-                        {candidate.matchedEntityNumber && (
-                          <span className="text-xs font-bold text-focus-blue-500">
-                            {candidate.matchedEntityNumber}
-                          </span>
-                        )}
-                      </div>
-                      <div className="flex items-center space-x-4 pt-1">
-                        <div>
-                          <p className="text-sm font-semibold text-ink-900">{candidate.description}</p>
-                          <p className="text-xs text-slate-500">Bank Flow: {candidate.direction} • {candidate.date}</p>
-                        </div>
-                        <ArrowRight className="w-4 h-4 text-slate-400" />
-                        <div>
-                          <p className="text-sm font-semibold text-ink-900">{candidate.suggestedAccountName}</p>
-                          <p className="text-xs text-slate-500">Ledger Code: {candidate.suggestedAccountCode}</p>
-                        </div>
-                      </div>
-                      <p className="text-xs text-slate-600 italic pt-1">
-                        AI Reasoning: {candidate.matchReason}
-                      </p>
-                    </div>
-
-                    <div className="flex items-center space-x-3 self-end md:self-center">
-                      <div className="text-right">
-                        <p className="text-base font-bold tabular-currency text-ink-900">
-                          {formatCurrency(candidate.amountCents)}
-                        </p>
-                      </div>
-                      <button
-                        onClick={() => handleAcceptAIMatch(candidate)}
-                        disabled={matchMutation.isPending}
-                        className="bg-ledger-green-700 hover:bg-ledger-green-800 text-white  px-4 py-2 text-xs font-bold rounded-sm transition-colors"
-                      >
-                        Accept & Reconcile
-                      </button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+            <p className="max-w-2xl text-[13.5px] text-graphite-600">
+              Unmatched statement lines paired with an open invoice, bill or account, with how likely each pairing is and why. Nothing is posted until you accept it.
+            </p>
           </div>
+
+          {matchProblem && (
+            <p role="alert" className="text-[13.5px] text-ledger-red">
+              {matchProblem}
+            </p>
+          )}
+
+          {aiMatchesLoading ? (
+            <SkeletonRows label="Finding matches" rows={4} />
+          ) : aiMatches.length === 0 ? (
+            <p className="py-4 text-[14px]">
+              <Mark kind="tick" label="Every statement line is matched, or nothing suggests a match." />
+            </p>
+          ) : (
+            <ul className="border-t border-feint-strong">
+              {aiMatches.map((match: any) => {
+                const line = rawTx.find((t: any) => t.id === match.transactionId) || {};
+                const candidate = { ...match, description: line.description ?? match.description, date: line.date ?? match.date, direction: line.direction ?? match.direction, amountCents: line.amountCents ?? match.amountCents ?? 0 };
+                return (
+                <li key={candidate.transactionId} className="grid grid-cols-1 gap-3 border-b border-feint py-3.5 md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_9rem_8rem] md:items-start md:gap-5">
+                  <div className="min-w-0">
+                    <p className="ll-printed text-[10.5px] text-graphite-600">Statement line</p>
+                    <p className="mt-0.5 text-[14px] text-ink-900">{candidate.description}</p>
+                    <p className="mt-0.5 text-[12.5px] text-graphite-600">
+                      {candidate.direction === 'IN' ? 'Money in' : 'Money out'}{candidate.date ? ` · ${format(new Date(candidate.date), 'dd/MM/yyyy')}` : ''}
+                    </p>
+                  </div>
+                  <div className="min-w-0">
+                    <p className="ll-printed text-[10.5px] text-graphite-600">Posts to</p>
+                    <p className="mt-0.5 text-[14px] text-ink-900">
+                      <span className="mr-1.5 ll-figure font-semibold">{candidate.suggestedAccountCode}</span>
+                      {candidate.suggestedAccountName}
+                    </p>
+                    <p className="mt-0.5 text-[12.5px] text-graphite-600">
+                      {candidate.matchedEntityNumber ? `${candidate.matchedEntityNumber} · ` : ''}
+                      {candidate.matchReason}
+                    </p>
+                  </div>
+                  <div className="md:text-right">
+                    <Amount cents={candidate.amountCents} currency={baseCurrency} tone="ink" />
+                    <p className="mt-0.5 text-[12.5px] text-graphite-600">
+                      <span className="ll-figure">{candidate.confidence}%</span> likely
+                    </p>
+                  </div>
+                  <div className="md:text-right">
+                    <button type="button" onClick={() => handleAcceptAIMatch(candidate)} disabled={matchMutation.isPending} className={buttonClass.secondary}>
+                      Accept
+                    </button>
+                  </div>
+                </li>
+                );
+              })}
+            </ul>
+          )}
         </div>
       )}
 
       {activeTab === 'Rules' && (
-        <div className="bg-paper-100 border border-ink-900/10 shadow-sm rounded-sm p-8 max-w-4xl mx-auto">
-           <div className="flex justify-between items-center mb-6">
-             <div>
-               <h3 className="text-lg font-medium text-ink-900">Auto-Categorization Rules</h3>
-               <p className="text-sm text-slate-500">Automatically map recurring bank lines to your ledger accounts.</p>
-             </div>
-             <button onClick={() => setIsCreatingRule(true)} className="bg-sidebar-bg text-sidebar-ink px-4 py-2 text-sm font-medium rounded-sm hover:bg-sidebar-bg/90 transition-colors">
-               Create Rule
-             </button>
-           </div>
+        <div className="max-w-3xl space-y-4">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+            <p className="text-[13.5px] text-graphite-600">A statement line containing the text is suggested for the account. Suggestions still wait for you to accept them.</p>
+            <button type="button" onClick={() => setIsCreatingRule(true)} className={`${buttonClass.secondary} shrink-0`}>
+              Add a rule
+            </button>
+          </div>
 
-           {rulesLoading ? (
-             <div className="p-8 text-center text-slate-500">Loading rules...</div>
-           ) : !rulesData?.rules?.length ? (
-             <div className="p-8 text-center text-slate-500 border border-dashed border-ink-900/10 rounded-sm">
-               No rules yet. Create one to automatically categorize bank lines containing specific text.
-             </div>
-           ) : (
-             <div className="border border-ink-900/10 rounded-sm divide-y divide-ink-900/5">
-               {rulesData.rules.map((rule: any) => (
-                 <div key={rule.id} className="p-4 flex items-center justify-between hover:bg-paper-50 transition-colors">
-                    <div>
-                       <p className="font-semibold text-ink-900">Contains "{rule.matchText}"</p>
-                       <p className="text-sm text-slate-500">Apply to: <span className="font-medium">{rule.targetAccountCode} - {rule.targetAccountName}</span></p>
-                    </div>
-                    <div className="flex items-center space-x-3">
-                      <span className="text-xs text-ledger-green-700 bg-ledger-green-700/10 px-2 py-1 rounded">Active</span>
-                      <button
-                        onClick={() => deleteRuleMutation.mutate(rule.id)}
-                        className="text-xs text-rust-700 hover:underline"
-                      >
-                        Delete
-                      </button>
-                    </div>
-                 </div>
-               ))}
-             </div>
-           )}
-
-           {isCreatingRule && (
-             <div className="fixed inset-0 bg-ink-900/20 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-               <div className="bg-paper-100 rounded-sm shadow-xl border border-ink-900/10 w-full max-w-md p-6">
-                 <h3 className="text-xl font-serif text-ink-900 mb-4">Create Auto-Categorization Rule</h3>
-                 <form onSubmit={(e) => { e.preventDefault(); createRuleMutation.mutate(); }} className="space-y-4">
-                   <div>
-                     <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">Bank line contains *</label>
-                     <input
-                       required
-                       value={ruleMatchText}
-                       onChange={(e) => setRuleMatchText(e.target.value)}
-                       placeholder="e.g., SAFARICOM"
-                       className="w-full bg-paper-100 border border-ink-900/20 text-ink-900 text-sm rounded-sm px-3 py-2 focus:ring-1 focus:ring-focus-blue-500 outline-none"
-                     />
-                   </div>
-                   <div>
-                     <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">Categorize as *</label>
-                     <select
-                       required
-                       value={ruleAccountId}
-                       onChange={(e) => setRuleAccountId(e.target.value)}
-                       className="w-full bg-paper-100 border border-ink-900/20 text-ink-900 text-sm rounded-sm px-3 py-2 focus:ring-1 focus:ring-focus-blue-500 outline-none"
-                     >
-                       <option value="">Select an account...</option>
-                       {(accountsData?.accounts || []).map((a: any) => (
-                         <option key={a.id} value={a.id}>{a.code} - {a.name}</option>
-                       ))}
-                     </select>
-                   </div>
-                   <div className="flex justify-end space-x-3 pt-4 border-t border-ink-900/10">
-                     <button type="button" onClick={() => setIsCreatingRule(false)} className="px-4 py-2 text-sm font-medium text-slate-600 hover:text-ink-900">Cancel</button>
-                     <button type="submit" disabled={createRuleMutation.isPending} className="bg-sidebar-bg text-sidebar-ink px-4 py-2 text-sm font-medium rounded-sm hover:bg-sidebar-bg/90 transition-colors disabled:opacity-50">
-                       {createRuleMutation.isPending ? 'Saving...' : 'Save Rule'}
-                     </button>
-                   </div>
-                 </form>
-               </div>
-             </div>
-           )}
+          {rulesLoading ? (
+            <SkeletonRows label="Loading rules" rows={3} />
+          ) : !rulesData?.rules?.length ? (
+            <EmptyNote>No rules yet. A rule such as lines containing SAFARICOM going to telephone expenses saves matching the same line every month.</EmptyNote>
+          ) : (
+            <ul className="border-t border-feint-strong">
+              {rulesData.rules.map((rule: any) => (
+                <li key={rule.id} className="flex flex-col gap-2 border-b border-feint py-3 sm:flex-row sm:items-baseline sm:justify-between">
+                  <p className="text-[14px] text-ink-900">
+                    Lines containing <span className="ll-figure font-semibold">{rule.matchText}</span>
+                    <span className="text-graphite-600"> go to </span>
+                    <span className="ll-figure font-semibold">{rule.targetAccountCode}</span> {rule.targetAccountName}
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (window.confirm(`Remove the rule for lines containing ${rule.matchText}?`)) deleteRuleMutation.mutate(rule.id);
+                    }}
+                    className={`${buttonClass.quiet} shrink-0 text-ledger-red`}
+                  >
+                    Remove
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
         </div>
       )}
 
       {activeTab === 'Reconcile' && (
-        <div className="bg-paper-100 border border-ink-900/10 shadow-sm rounded-sm p-8 max-w-4xl mx-auto text-center">
-           <h3 className="text-xl font-medium text-ink-900 mb-2">Month-End Bank Reconciliation</h3>
-           <p className="text-slate-500 mb-6">Compares your imported bank feed against the general ledger's Cash account (1000).</p>
-
-           {reconciliationLoading ? (
-             <div className="py-8 text-slate-500">Calculating...</div>
-           ) : (
-             <>
-               <div className="grid grid-cols-2 gap-6 mb-8">
-                 <div className="p-6 border border-ink-900/10 bg-paper-50 rounded-sm">
-                    <p className="text-sm text-slate-500 uppercase tracking-wider mb-2">Statement Balance (Bank Feed)</p>
-                    <p className="text-2xl font-serif text-ink-900 tabular-currency">{formatCurrency(reconciliationData?.statementBalanceCents || 0)}</p>
-                 </div>
-                 <div className="p-6 border border-ink-900/10 bg-paper-50 rounded-sm">
-                    <p className="text-sm text-slate-500 uppercase tracking-wider mb-2">General Ledger Balance</p>
-                    <p className="text-2xl font-serif text-ink-900 tabular-currency">{formatCurrency(reconciliationData?.glBalanceCents || 0)}</p>
-                 </div>
-               </div>
-
-               {reconciliationData?.varianceCents === 0 ? (
-                 <div className="inline-flex items-center space-x-2 text-ledger-green-700 bg-ledger-green-700/10 px-4 py-2 rounded-full mb-6">
-                    <span className="w-2 h-2 rounded-full bg-ledger-green-700"></span>
-                    <span className="font-medium">Balanced. Zero Variance.</span>
-                 </div>
-               ) : (
-                 <div className="inline-flex items-center space-x-2 text-rust-700 bg-rust-700/10 px-4 py-2 rounded-full mb-6">
-                    <span className="w-2 h-2 rounded-full bg-rust-700"></span>
-                    <span className="font-medium">Variance: {formatCurrency(Math.abs(reconciliationData?.varianceCents || 0))} {(reconciliationData?.varianceCents || 0) > 0 ? 'unmatched in bank feed' : 'unmatched in ledger'}</span>
-                 </div>
-               )}
-               <p className="text-xs text-slate-400">Based on {reconciliationData?.transactionCount || 0} imported bank transactions. Unmatched transactions in the "Bank transactions" tab explain most variances.</p>
-             </>
-           )}
+        <div className="max-w-3xl space-y-4">
+          <p className="text-[13.5px] text-graphite-600">The imported statement balance against the cash account (1000) in the ledger.</p>
+          {reconciliationLoading ? (
+            <SkeletonRows label="Working out the balances" rows={3} />
+          ) : (
+            <>
+              <div className="border-t border-feint-strong">
+                <div className="flex items-baseline justify-between gap-4 border-b border-feint py-2.5 text-[14px]">
+                  <span className="text-ink-900">Statement balance</span>
+                  <Amount cents={reconciliationData?.statementBalanceCents || 0} currency={baseCurrency} tone="ink" />
+                </div>
+                <div className="flex items-baseline justify-between gap-4 border-b border-feint py-2.5 text-[14px]">
+                  <span className="text-ink-900">Ledger balance, account 1000</span>
+                  <Amount cents={reconciliationData?.glBalanceCents || 0} currency={baseCurrency} tone="ink" />
+                </div>
+                <div className="ll-total flex items-baseline justify-between gap-4 py-2.5 text-[14px] font-semibold">
+                  <span className={reconciliationData?.varianceCents ? 'text-ledger-red' : 'text-ink-900'}>Difference</span>
+                  <Amount cents={Math.abs(reconciliationData?.varianceCents || 0)} currency={baseCurrency} tone={reconciliationData?.varianceCents ? 'alert' : 'ink'} />
+                </div>
+              </div>
+              {reconciliationData?.varianceCents === 0 ? (
+                <p className="text-[13.5px]"><Mark kind="tick" label="The statement and the ledger agree to the cent." /></p>
+              ) : (
+                <p className="text-[13.5px] text-ink-900">
+                  {(reconciliationData?.varianceCents || 0) > 0 ? 'Lines on the statement are not yet matched in the ledger.' : 'Entries in the ledger are not on the statement.'}{' '}
+                  <button type="button" onClick={() => setActiveTab('Bank transactions')} className={buttonClass.quiet}>
+                    See the unmatched lines
+                  </button>
+                </p>
+              )}
+              <p className="text-[12.5px] text-graphite-600">From {reconciliationData?.transactionCount || 0} imported statement lines.</p>
+            </>
+          )}
         </div>
       )}
 
       {activeTab === 'Bank connections' && (
-        <div className="bg-paper-100 border border-ink-900/10 shadow-sm rounded-sm p-8 max-w-4xl mx-auto">
-           <h3 className="text-lg font-medium text-ink-900 mb-2">Linked Accounts & Gateways</h3>
-           <p className="text-sm text-slate-500 mb-6">
-             Live bank/M-Pesa feeds require connecting a real banking aggregator account — this isn't
-             something that can be switched on from the app. Submitting a request below records your
-             interest; it does not establish a live connection.
-           </p>
-
-           {connectionsLoading ? (
-             <div className="p-8 text-center text-slate-500">Loading...</div>
-           ) : !connectionsData?.requests?.length ? (
-             <div className="p-8 text-center text-slate-500 border border-dashed border-ink-900/10 rounded-sm mb-4">
-               No institutions connected or requested yet.
-             </div>
-           ) : (
-             <div className="space-y-3 mb-4">
-               {connectionsData.requests.map((req: any) => (
-                 <div key={req.id} className="flex items-center justify-between p-4 border border-ink-900/10 rounded-sm bg-paper-50">
-                   <div>
-                     <p className="font-medium text-ink-900">{req.institutionName}</p>
-                     <p className="text-sm text-slate-500">Requested {format(new Date(req.createdAt), 'MMM d, yyyy')}</p>
-                   </div>
-                   <span className="text-xs bg-amber-500/10 text-amber-700 px-2 py-1 rounded font-semibold">{req.status}</span>
-                 </div>
-               ))}
-             </div>
-           )}
-
-           <button
-             onClick={() => setIsConnecting(true)}
-             className="w-full mt-4 py-3 border-2 border-dashed border-ink-900/20 rounded-sm text-ink-900 font-medium hover:border-ink-900/50 transition-colors"
-           >
-             + Request New Financial Institution / Paybill
-           </button>
-
-           {isConnecting && (
-             <div className="fixed inset-0 bg-ink-900/20 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-               <div className="bg-paper-100 rounded-sm shadow-xl border border-ink-900/10 w-full max-w-md p-6 text-left">
-                 <h3 className="text-xl font-serif text-ink-900 mb-4">Request Bank Connection</h3>
-                 <form onSubmit={(e) => { e.preventDefault(); requestConnectionMutation.mutate(); }} className="space-y-4">
-                   <div>
-                     <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">Institution / Paybill Name *</label>
-                     <input
-                       required
-                       value={connectInstitution}
-                       onChange={(e) => setConnectInstitution(e.target.value)}
-                       placeholder="e.g., Equity Bank, M-Pesa Till 555123"
-                       className="w-full bg-paper-100 border border-ink-900/20 text-ink-900 text-sm rounded-sm px-3 py-2 focus:ring-1 focus:ring-focus-blue-500 outline-none"
-                     />
-                   </div>
-                   <div>
-                     <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">Contact Email (optional)</label>
-                     <input
-                       type="email"
-                       value={connectEmail}
-                       onChange={(e) => setConnectEmail(e.target.value)}
-                       className="w-full bg-paper-100 border border-ink-900/20 text-ink-900 text-sm rounded-sm px-3 py-2 focus:ring-1 focus:ring-focus-blue-500 outline-none"
-                     />
-                   </div>
-                   <div className="flex justify-end space-x-3 pt-4 border-t border-ink-900/10">
-                     <button type="button" onClick={() => setIsConnecting(false)} className="px-4 py-2 text-sm font-medium text-slate-600 hover:text-ink-900">Cancel</button>
-                     <button type="submit" disabled={requestConnectionMutation.isPending} className="bg-sidebar-bg text-sidebar-ink px-4 py-2 text-sm font-medium rounded-sm hover:bg-sidebar-bg/90 transition-colors disabled:opacity-50">
-                       {requestConnectionMutation.isPending ? 'Submitting...' : 'Submit Request'}
-                     </button>
-                   </div>
-                 </form>
-               </div>
-             </div>
-           )}
-        </div>
-      )}
-
-      {/* Match Modal */}
-      {matchingTx && (
-        <div className="fixed inset-0 bg-ink-900/20 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-paper-100 rounded-sm shadow-xl border border-ink-900/10 w-full max-w-2xl p-6">
-            <h3 className="text-xl font-serif text-ink-900 mb-4">Reconcile Transaction</h3>
-            
-            <div className="p-4 border border-ink-900/10 bg-paper-50 rounded-sm mb-6 flex justify-between items-center">
-              <div>
-                <p className="font-medium text-ink-900">{matchingTx.description}</p>
-                <p className="text-sm text-slate-500">{format(new Date(matchingTx.date), 'MMM d, yyyy')}</p>
-              </div>
-              <div className="text-right">
-                <p className={`font-medium tabular-currency ${matchingTx.direction === 'IN' ? 'text-ledger-green-700' : 'text-rust-700'}`}>
-                  {matchingTx.direction === 'IN' ? '+' : '-'} {formatCurrency(matchingTx.amountCents)}
-                </p>
-              </div>
-            </div>
-
-            <div className="grid grid-cols-2 gap-6">
-              {/* Option 1: Create New */}
-              <div className="border border-ink-900/10 rounded-sm p-4">
-                <h4 className="font-medium text-ink-900 mb-2">Categorize to Ledger</h4>
-                <p className="text-sm text-slate-500 mb-4">AI suggests categorizing this as <strong>{matchingTx.aiCategoryName}</strong>.</p>
-                <button 
-                  onClick={() => handleMatchNew(matchingTx)}
-                  disabled={matchMutation.isPending}
-                  className="w-full bg-sidebar-bg text-sidebar-ink  px-4 py-2 text-sm font-medium rounded-sm hover:bg-sidebar-bg/90 transition-colors"
-                >
-                  Confirm & Post Entry
-                </button>
-              </div>
-              
-              {/* Option 2: Match Existing */}
-              <div className="border border-ink-900/10 rounded-sm p-4 h-64 overflow-y-auto">
-                <h4 className="font-medium text-ink-900 mb-2">Find Match in Journals</h4>
-                {(!journalsData?.entries || journalsData.entries.length === 0) ? (
-                  <p className="text-sm text-slate-500">No open journal entries found.</p>
-                ) : (
-                  <div className="space-y-2 mt-4">
-                    {journalsData.entries.slice(0, 6).map((je: any) => (
-                      <div 
-                        key={je.id} 
-                        className="p-3 border border-ink-900/10 rounded-sm bg-paper-100 hover:border-focus-blue-500 cursor-pointer flex justify-between items-center"
-                        onClick={() => matchMutation.mutate({ transactionId: matchingTx.id, existingJournalEntryId: je.id })}
-                      >
-                        <div>
-                           <p className="text-xs font-medium text-ink-900">{je.memo || 'Journal Entry'}</p>
-                           <p className="text-xs text-slate-500">{je.entryDate}</p>
-                        </div>
-                        <span className="text-xs text-focus-blue-500 font-medium">Match</span>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-            </div>
-
-            <div className="mt-6 text-right">
-              <button 
-                onClick={() => setMatchingTx(null)}
-                className="text-sm text-slate-500 font-medium hover:text-ink-900"
-              >
-                Cancel
-              </button>
-            </div>
+        <div className="max-w-3xl space-y-4">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+            <p className="text-[13.5px] text-graphite-600">
+              Live bank and M-Pesa feeds need an account with a banking aggregator, which cannot be switched on from inside Ledger Link. A request records which institution you want; it does not connect anything.
+            </p>
+            <button type="button" onClick={() => setIsConnecting(true)} className={`${buttonClass.secondary} shrink-0`}>
+              Request a connection
+            </button>
           </div>
+          {connectionsLoading ? (
+            <SkeletonRows label="Loading requests" rows={2} />
+          ) : !connectionsData?.requests?.length ? (
+            <EmptyNote>No connections requested.</EmptyNote>
+          ) : (
+            <ul className="border-t border-feint-strong">
+              {connectionsData.requests.map((req: any) => (
+                <li key={req.id} className="flex items-baseline justify-between gap-4 border-b border-feint py-3">
+                  <span>
+                    <span className="block text-[14px] text-ink-900">{req.institutionName}</span>
+                    <span className="block text-[12.5px] text-graphite-600">Requested {format(new Date(req.createdAt), 'dd/MM/yyyy')}</span>
+                  </span>
+                  <Mark kind="query" label={req.status ? req.status.charAt(0) + req.status.slice(1).toLowerCase() : 'Requested'} />
+                </li>
+              ))}
+            </ul>
+          )}
         </div>
       )}
+
+      <Dialog
+        open={isCreatingRule}
+        onClose={() => setIsCreatingRule(false)}
+        title="Add a rule"
+        footer={
+          <>
+            {createRuleMutation.isError && (
+              <p role="alert" className="mr-auto text-[13px] text-ledger-red">
+                {(createRuleMutation.error as Error).message}
+              </p>
+            )}
+            <button type="button" onClick={() => setIsCreatingRule(false)} className={buttonClass.secondary}>
+              Cancel
+            </button>
+            <button type="submit" form="rule-form" disabled={createRuleMutation.isPending} className={buttonClass.primary}>
+              {createRuleMutation.isPending ? 'Saving' : 'Save rule'}
+            </button>
+          </>
+        }
+      >
+        <form
+          id="rule-form"
+          onSubmit={(e) => {
+            e.preventDefault();
+            createRuleMutation.mutate();
+          }}
+          className="space-y-4"
+        >
+          <Field label="Statement line contains" hint="Not case sensitive, for example SAFARICOM">
+            <input required value={ruleMatchText} onChange={(e) => setRuleMatchText(e.target.value)} />
+          </Field>
+          <Field label="Suggest the account">
+            <select required value={ruleAccountId} onChange={(e) => setRuleAccountId(e.target.value)}>
+              <option value="">Choose an account</option>
+              {(accountsData?.accounts || []).map((a: any) => (
+                <option key={a.id} value={a.id}>{a.code} · {a.name}</option>
+              ))}
+            </select>
+          </Field>
+        </form>
+      </Dialog>
+
+      <Dialog
+        open={isConnecting}
+        onClose={() => setIsConnecting(false)}
+        title="Request a connection"
+        note="This records the request. It does not connect a bank or M-Pesa account."
+        footer={
+          <>
+            {requestConnectionMutation.isError && (
+              <p role="alert" className="mr-auto text-[13px] text-ledger-red">
+                {(requestConnectionMutation.error as Error).message}
+              </p>
+            )}
+            <button type="button" onClick={() => setIsConnecting(false)} className={buttonClass.secondary}>
+              Cancel
+            </button>
+            <button type="submit" form="connect-form" disabled={requestConnectionMutation.isPending} className={buttonClass.primary}>
+              {requestConnectionMutation.isPending ? 'Sending' : 'Send request'}
+            </button>
+          </>
+        }
+      >
+        <form
+          id="connect-form"
+          onSubmit={(e) => {
+            e.preventDefault();
+            requestConnectionMutation.mutate();
+          }}
+          className="space-y-4"
+        >
+          <Field label="Bank, paybill or till">
+            <input required value={connectInstitution} onChange={(e) => setConnectInstitution(e.target.value)} />
+          </Field>
+          <Field label="Contact email" hint="Optional">
+            <input type="email" value={connectEmail} onChange={(e) => setConnectEmail(e.target.value)} />
+          </Field>
+        </form>
+      </Dialog>
+
+      <Dialog
+        open={!!matchingTx}
+        onClose={closeMatch}
+        width="lg"
+        title="Match this line"
+        footer={
+          <button type="button" onClick={closeMatch} className={buttonClass.secondary}>
+            Cancel
+          </button>
+        }
+      >
+        {matchingTx && (
+          <div className="space-y-5">
+            <div className="flex items-baseline justify-between gap-4 border-b border-feint-strong pb-3">
+              <span className="min-w-0">
+                <span className="block text-[14px] text-ink-900">{matchingTx.description}</span>
+                <span className="block text-[12.5px] text-graphite-600">
+                  {matchingTx.direction === 'IN' ? 'Money in' : 'Money out'} · {format(new Date(matchingTx.date), 'dd/MM/yyyy')}
+                </span>
+              </span>
+              <Amount cents={matchingTx.amountCents} currency={baseCurrency} tone="ink" />
+            </div>
+
+            {matchProblem && (
+              <p role="alert" className="text-[13.5px] text-ledger-red">
+                {matchProblem}
+              </p>
+            )}
+
+            <section aria-labelledby="match-new">
+              <h3 id="match-new" className="text-[14px] font-semibold text-ink-900">Post it to an account</h3>
+              {matchingTx.aiCategoryCode ? (
+                <div className="mt-2 flex flex-wrap items-baseline justify-between gap-3">
+                  <p className="text-[13.5px] text-ink-900">
+                    Suggested: <span className="ll-figure font-semibold">{matchingTx.aiCategoryCode}</span> {matchingTx.aiCategoryName}
+                  </p>
+                  <button type="button" onClick={() => handleMatchNew(matchingTx)} disabled={matchMutation.isPending} className={buttonClass.primary}>
+                    Post to {matchingTx.aiCategoryCode}
+                  </button>
+                </div>
+              ) : (
+                <p className="mt-2 text-[13.5px] text-graphite-600">No account is suggested for this line. Add a rule, or match it to an entry below.</p>
+              )}
+            </section>
+
+            <section aria-labelledby="match-existing">
+              <h3 id="match-existing" className="text-[14px] font-semibold text-ink-900">Or match an entry already posted</h3>
+              <p className="mt-0.5 text-[12.5px] text-graphite-600">Closest amounts first.</p>
+              {candidateEntries.length === 0 ? (
+                <p className="mt-2 text-[13.5px] text-graphite-600">No journal entries yet.</p>
+              ) : (
+                <ul className="mt-2 max-h-64 overflow-y-auto border-t border-feint-strong">
+                  {candidateEntries.map(({ je, cents }) => (
+                    <li key={je.id}>
+                      <button
+                        type="button"
+                        onClick={() => reconcile({ transactionId: matchingTx.id, existingJournalEntryId: je.id })}
+                        disabled={matchMutation.isPending}
+                        className="flex w-full items-baseline justify-between gap-4 border-b border-feint py-2.5 text-left hover:bg-paper-200 disabled:opacity-50"
+                      >
+                        <span className="min-w-0">
+                          <span className="block truncate text-[13.5px] text-ink-900">{je.memo || 'Journal entry'}</span>
+                          <span className="block text-[12px] text-graphite-600">{je.entryDate ? format(new Date(je.entryDate), 'dd/MM/yyyy') : ''}</span>
+                        </span>
+                        <span className="flex shrink-0 items-baseline gap-3">
+                          <Amount cents={cents} currency={baseCurrency} tone="ink" size="sm" />
+                          {cents === matchingTx.amountCents && <Mark kind="tick" label="Same amount" />}
+                        </span>
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </section>
+          </div>
+        )}
+      </Dialog>
     </div>
   );
 }
-

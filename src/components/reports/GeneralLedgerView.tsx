@@ -1,125 +1,117 @@
 import { useState } from 'react';
-import { format } from 'date-fns';
 import { useQuery } from '@tanstack/react-query';
-import { useAppStore } from '../../store';
-import { formatCurrency } from '../../utils/currency';
 import { ArrowLeft, Download } from 'lucide-react';
-import * as XLSX from 'xlsx';
+import { downloadCsv } from '../../utils/exportCsv';
+import { useAppStore } from '../../store';
+import { PageHeading, buttonClass } from '../ledger/Page';
+import { RunningLedger } from '../ledger/RunningLedger';
+import { Mark } from '../ledger/Mark';
 
-export function GeneralLedgerView({ onBack }: { onBack: () => void }) {
-  const { currentOrgId } = useAppStore();
-  const [selectedAccountName, setSelectedAccountName] = useState('');
+export function GeneralLedgerView({ onBack, initialAccountName = '' }: { onBack: () => void; initialAccountName?: string }) {
+  const { currentOrgId, activeCompany } = useAppStore();
+  const currency = activeCompany?.baseCurrency || 'KES';
+  const [selectedAccountName, setSelectedAccountName] = useState(initialAccountName);
 
   const { data: accountsData } = useQuery({
     queryKey: ['accounts', currentOrgId],
     queryFn: async () => {
       const res = await fetch('/api/accounts', { headers: { 'x-org-id': currentOrgId } });
+      if (!res.ok) throw new Error('GET /api/accounts');
       return res.json();
-    }
+    },
   });
-
   const accounts = accountsData?.accounts || [];
+  const selectedAccount = accounts.find((a: any) => a.name === selectedAccountName);
 
-  const { data: linesData, isLoading } = useQuery({
+  const { data: linesData, isLoading, isError, refetch } = useQuery({
     queryKey: ['reports_general_ledger', currentOrgId, selectedAccountName],
     queryFn: async () => {
       const res = await fetch(`/api/reports/ledger?accountName=${encodeURIComponent(selectedAccountName)}`, {
-        headers: { 'x-org-id': currentOrgId }
+        headers: { 'x-org-id': currentOrgId },
       });
-      if (!res.ok) throw new Error('Failed to fetch ledger lines');
+      if (!res.ok) throw new Error(`GET /api/reports/ledger answered ${res.status}`);
       return res.json();
     },
-    enabled: !!selectedAccountName
+    enabled: !!selectedAccountName,
   });
-
   const lines = linesData?.lines || [];
-  const chronological = [...lines].sort((a: any, b: any) => new Date(a.date).getTime() - new Date(b.date).getTime());
-  let runningBalance = 0;
-  const linesWithBalance = chronological.map((line: any) => {
-    runningBalance += (line.debit || 0) - (line.credit || 0);
-    return { ...line, runningBalance };
-  });
 
-  const handleExportExcel = () => {
-    const excelRows = [
-      ['Date', 'Source', 'Memo', 'Debit (KES)', 'Credit (KES)', 'Running Balance (KES)'],
-      ...linesWithBalance.map((l: any) => [
-        l.date, l.sourceType, l.memo || '', (l.debit || 0) / 100, (l.credit || 0) / 100, l.runningBalance / 100
-      ])
-    ];
-    const ws = XLSX.utils.aoa_to_sheet(excelRows);
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, 'General Ledger');
-    XLSX.writeFile(wb, `general_ledger_${selectedAccountName.replace(/\s+/g, '_')}.xlsx`);
+  const handleExportCsv = () => {
+    const chronological = [...lines].sort((a: any, b: any) => new Date(a.date).getTime() - new Date(b.date).getTime());
+    let balance = 0;
+    const rows = chronological.map((l: any) => {
+      balance += Number(l.debit || 0) - Number(l.credit || 0);
+      return [l.date, l.sourceType, l.memo || '', Number(l.debit || 0) / 100, Number(l.credit || 0) / 100, balance / 100];
+    });
+    downloadCsv(
+      `general_ledger_${selectedAccountName.replace(/\s+/g, '_')}.csv`,
+      [[`Date`, 'Source', 'Particulars', `Debit (${currency})`, `Credit (${currency})`, `Balance (${currency})`], ...rows],
+    );
   };
 
+  const accountLabel = selectedAccount ? `${selectedAccount.code} ${selectedAccount.name}` : selectedAccountName;
+
   return (
-    <div className="bg-paper-100 border border-ink-900/10 shadow-sm rounded-sm">
-      <div className="p-6 border-b border-ink-900/10 flex items-center justify-between bg-paper-50">
-        <div>
-          <button onClick={onBack} className="text-sm font-medium text-focus-blue-500 hover:text-ink-900 mb-2 inline-flex items-center">
-            <ArrowLeft className="w-4 h-4 mr-1" /> Back to Reports
-          </button>
-          <h2 className="text-xl font-serif text-ink-900">General Ledger</h2>
-          <p className="text-sm text-slate-500">Every posted transaction for a selected account.</p>
-        </div>
-        {lines.length > 0 && (
-          <button onClick={handleExportExcel} className="bg-sidebar-bg text-sidebar-ink px-4 py-2 text-sm font-medium rounded-sm hover:bg-sidebar-bg/90 transition-colors inline-flex items-center">
-            <Download className="w-4 h-4 mr-1.5" /> Export Excel
-          </button>
-        )}
-      </div>
+    <div className="space-y-5">
+      <button type="button" onClick={onBack} className={buttonClass.quiet}>
+        <ArrowLeft className="w-3.5 h-3.5" aria-hidden="true" /> Reports
+      </button>
 
-      <div className="p-8">
-        <div className="mb-6 max-w-sm">
-          <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">Select Account</label>
-          <select
-            value={selectedAccountName}
-            onChange={(e) => setSelectedAccountName(e.target.value)}
-            className="w-full bg-paper-100 border border-ink-900/20 text-ink-900 text-sm rounded-sm px-3 py-2 focus:ring-1 focus:ring-focus-blue-500 outline-none"
-          >
-            <option value="">Choose an account...</option>
-            {accounts.map((a: any) => (
-              <option key={a.id} value={a.name}>{a.code} - {a.name}</option>
-            ))}
-          </select>
-        </div>
+      <PageHeading
+        title="General ledger"
+        note={<>Every line posted to one account, oldest first · Figures in {currency}</>}
+        actions={
+          lines.length > 0 && (
+            <button type="button" onClick={handleExportCsv} className={buttonClass.secondary}>
+              <Download className="w-4 h-4" aria-hidden="true" /> Export CSV
+            </button>
+          )
+        }
+      />
 
-        {!selectedAccountName ? (
-          <div className="text-center text-slate-500 py-12">Select an account above to view its full transaction history.</div>
-        ) : isLoading ? (
-          <div className="text-center text-slate-500 py-12">Loading ledger lines...</div>
-        ) : lines.length === 0 ? (
-          <div className="text-center text-slate-500 py-12">No transactions posted to this account yet.</div>
-        ) : (
-          <table className="w-full text-sm">
-            <thead className="border-b-2 border-ink-900/20 text-xs uppercase text-slate-600 bg-paper-100">
-              <tr>
-                <th className="py-3 px-4 text-left">Date</th>
-                <th className="py-3 px-4 text-left">Source</th>
-                <th className="py-3 px-4 text-left">Memo</th>
-                <th className="py-3 px-4 text-right">Debit</th>
-                <th className="py-3 px-4 text-right">Credit</th>
-                <th className="py-3 px-4 text-right">Balance</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-ink-900/5">
-              {linesWithBalance.map((line: any) => (
-                <tr key={line.id} className="hover:bg-paper-50 transition-colors">
-                  <td className="py-2.5 px-4 text-slate-600 whitespace-nowrap">{format(new Date(line.date), 'MMM d, yyyy')}</td>
-                  <td className="py-2.5 px-4">
-                    <span className="text-[10px] uppercase font-bold tracking-wider px-1.5 py-0.5 rounded bg-ink-900/5 text-slate-600">{line.sourceType}</span>
-                  </td>
-                  <td className="py-2.5 px-4 text-ink-900">{line.memo || '-'}</td>
-                  <td className="py-2.5 px-4 text-right tabular-currency text-ink-900">{line.debit ? formatCurrency(line.debit) : '-'}</td>
-                  <td className="py-2.5 px-4 text-right tabular-currency text-ink-900">{line.credit ? formatCurrency(line.credit) : '-'}</td>
-                  <td className="py-2.5 px-4 text-right tabular-currency font-medium text-ink-900">{formatCurrency(line.runningBalance)}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        )}
-      </div>
+      <label className="block max-w-sm">
+        <span className="text-[13px] font-semibold text-ink-900">Account</span>
+        <select
+          value={selectedAccountName}
+          onChange={(e) => setSelectedAccountName(e.target.value)}
+          className="mt-1.5 block w-full h-10 px-3 text-[14px] border border-field rounded-sm bg-paper-100 text-ink-900"
+        >
+          <option value="">Choose an account</option>
+          {accounts.map((a: any) => (
+            <option key={a.id} value={a.name}>
+              {a.code} · {a.name}
+            </option>
+          ))}
+        </select>
+      </label>
+
+      {!selectedAccountName ? (
+        <p className="py-6 max-w-xl text-[14px] text-graphite-600">
+          Choose an account to open its ledger. Every line posted to it is listed oldest first, with the balance brought forward at the head of the page and carried forward at its foot as you scroll.
+        </p>
+      ) : isError ? (
+        <p role="alert" className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[13px]">
+          <Mark kind="circled" />
+          <span className="text-ink-900">Could not load this ledger.</span>
+          <span className="text-graphite-600">GET /api/reports/ledger did not complete.</span>
+          <button type="button" onClick={() => refetch()} className={buttonClass.quiet}>Try again</button>
+        </p>
+      ) : isLoading ? (
+        <div aria-busy="true" aria-label="Loading ledger lines" className="border-y border-feint-strong">
+          {Array.from({ length: 8 }).map((_, i) => (
+            <div key={i} className="h-10 border-b border-feint flex items-center gap-6">
+              <div className="h-3 w-20 bg-paper-200" />
+              <div className="h-3 flex-1 bg-paper-200" />
+              <div className="h-3 w-24 bg-paper-200" />
+              <div className="h-3 w-24 bg-paper-200" />
+            </div>
+          ))}
+        </div>
+      ) : lines.length === 0 ? (
+        <p className="py-6 text-[14px] text-graphite-600">Nothing is posted to {accountLabel} yet. Its lines appear here once an entry uses it.</p>
+      ) : (
+        <RunningLedger lines={lines} currency={currency} accountLabel={accountLabel} />
+      )}
     </div>
   );
 }

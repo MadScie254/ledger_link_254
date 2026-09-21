@@ -2,27 +2,10 @@
  * @license
  * SPDX-License-Identifier: Apache-2.0
  */
-import { useEffect } from "react";
+import { lazy, Suspense, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { AppLayout } from "./components/layout/AppLayout";
 import { useAppStore } from "./store";
-import { SalesView } from "./components/sales/SalesView";
-import { BankingView } from "./components/banking/BankingView";
-import { ReportsView } from "./components/reports/ReportsView";
-import { ExpensesView } from "./components/expenses/ExpensesView";
-import { PayrollView } from "./components/payroll/PayrollView";
-import { InventoryView } from "./components/inventory/InventoryView";
-import { TaxView } from "./components/tax/TaxView";
-import { ProjectsView } from "./components/projects/ProjectsView";
-import { CustomerHubView } from "./components/crm/CustomerHubView";
-import { AccountingView } from "./components/accounting/AccountingView";
-import { DashboardView } from "./components/dashboard/DashboardView";
-import { BusinessFeedView } from "./components/feed/BusinessFeedView";
-import { TeamView } from "./components/team/TeamView";
-import { AppsView } from "./components/apps/AppsView";
-import { AuditLogView } from "./components/audit/AuditLogView";
-import { SystemHealthView } from "./components/health/SystemHealthView";
-import { SettingsView } from "./components/settings/SettingsView";
 import { TenantProvider } from "./context/TenantContext";
 import { UndoToast } from "./components/layout/UndoToast";
 import { LockScreen } from "./components/layout/LockScreen";
@@ -30,11 +13,38 @@ import { fetchExchangeRates } from "./utils/currency";
 import { AuthProvider } from "./context/AuthProvider";
 import { useAuth } from "./context/AuthProvider";
 import type { OrganizationData } from "./store";
+import { OnboardingProvider } from "./components/onboarding/OnboardingProvider";
+
+const SalesView = lazy(() => import('./components/sales/SalesView').then((module) => ({ default: module.SalesView })));
+const BankingView = lazy(() => import('./components/banking/BankingView').then((module) => ({ default: module.BankingView })));
+const ReportsView = lazy(() => import('./components/reports/ReportsView').then((module) => ({ default: module.ReportsView })));
+const ExpensesView = lazy(() => import('./components/expenses/ExpensesView').then((module) => ({ default: module.ExpensesView })));
+const PayrollView = lazy(() => import('./components/payroll/PayrollView').then((module) => ({ default: module.PayrollView })));
+const InventoryView = lazy(() => import('./components/inventory/InventoryView').then((module) => ({ default: module.InventoryView })));
+const TaxView = lazy(() => import('./components/tax/TaxView').then((module) => ({ default: module.TaxView })));
+const ProjectsView = lazy(() => import('./components/projects/ProjectsView').then((module) => ({ default: module.ProjectsView })));
+const CustomerHubView = lazy(() => import('./components/crm/CustomerHubView').then((module) => ({ default: module.CustomerHubView })));
+const AccountingView = lazy(() => import('./components/accounting/AccountingView').then((module) => ({ default: module.AccountingView })));
+const DashboardView = lazy(() => import('./components/dashboard/DashboardView').then((module) => ({ default: module.DashboardView })));
+const BusinessFeedView = lazy(() => import('./components/feed/BusinessFeedView').then((module) => ({ default: module.BusinessFeedView })));
+const TeamView = lazy(() => import('./components/team/TeamView').then((module) => ({ default: module.TeamView })));
+const AppsView = lazy(() => import('./components/apps/AppsView').then((module) => ({ default: module.AppsView })));
+const AuditLogView = lazy(() => import('./components/audit/AuditLogView').then((module) => ({ default: module.AuditLogView })));
+const SystemHealthView = lazy(() => import('./components/health/SystemHealthView').then((module) => ({ default: module.SystemHealthView })));
+const SettingsView = lazy(() => import('./components/settings/SettingsView').then((module) => ({ default: module.SettingsView })));
+
+const viewFallback = (
+  <div className="flex min-h-64 items-center justify-center" role="status">
+    <p className="ll-printed text-[12px] text-graphite-600">Opening this ledger</p>
+  </div>
+);
 
 export default function App() {
   return (
     <AuthProvider>
-      <LedgerApp />
+      <OnboardingProvider>
+        <LedgerApp />
+      </OnboardingProvider>
     </AuthProvider>
   );
 }
@@ -163,14 +173,18 @@ function LedgerApp() {
   }
 
   if (organizationsLoading) {
-    return <div className="fixed inset-0 bg-sidebar-bg z-[100] flex items-center justify-center text-sidebar-ink">Loading organizations...</div>;
+    return (
+      <div className="fixed inset-0 z-[100] flex items-center justify-center bg-paper-100 text-ink-900" role="status">
+        <p className="ll-printed text-[12px] text-graphite-600">Opening the books</p>
+      </div>
+    );
   }
 
   if (organizations && organizations.length === 0) {
     return (
       <>
         <TenantProvider>
-          <AppLayout><SettingsView /></AppLayout>
+          <AppLayout><Suspense fallback={viewFallback}><SettingsView /></Suspense></AppLayout>
         </TenantProvider>
         <UndoToast />
       </>
@@ -180,7 +194,7 @@ function LedgerApp() {
   return (
     <>
       <TenantProvider>
-        <AppLayout>{renderContent()}</AppLayout>
+        <AppLayout><Suspense fallback={viewFallback}>{renderContent()}</Suspense></AppLayout>
       </TenantProvider>
       <UndoToast />
     </>

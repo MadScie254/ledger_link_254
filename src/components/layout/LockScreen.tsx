@@ -1,15 +1,19 @@
 import React, { useState } from 'react';
-import { Mail, Lock, CheckCircle2, UserPlus } from 'lucide-react';
 import { useAuth } from '../../context/AuthProvider';
+import { Mark } from '../ledger/Mark';
 
 type Mode = 'signIn' | 'signUp';
 
-const productAreas = [
-  ['01', 'General ledger', 'Posted entries, account balances, and a complete audit history.'],
-  ['02', 'Operations', 'Invoices, bills, banking, payroll, inventory, and projects.'],
-  ['03', 'Reporting', 'Financial statements with export-ready schedules.'],
+const CONTENTS = [
+  ['General ledger', 'Posted entries, account balances and a complete audit history.'],
+  ['Operations', 'Invoices, bills, banking, payroll, inventory and projects.'],
+  ['Reporting', 'Financial statements with export-ready schedules.'],
 ];
 
+const fieldClass =
+  'mt-1.5 block w-full h-11 rounded-sm border border-field bg-paper-100 px-3 text-[15px] text-ink-900 placeholder:text-graphite-500 focus:border-oxblood focus:shadow-[0_0_0_1px_var(--oxblood)] focus:outline-none';
+
+/** The cover of the book, and its first page. */
 export function LockScreen() {
   const { signIn, signUp } = useAuth();
   const [mode, setMode] = useState<Mode>('signIn');
@@ -57,104 +61,98 @@ export function LockScreen() {
     setLoading(false);
   };
 
-  return (
-    <div className="fixed inset-0 z-[100] overflow-y-auto bg-paper-100">
-      <div className="grid min-h-full md:grid-cols-[minmax(360px,46%)_1fr]">
-        <aside className="hidden min-h-screen bg-sidebar-bg px-10 py-9 text-white md:flex md:flex-col md:justify-between lg:px-14 lg:py-11">
-          <div>
-            <div className="flex items-center gap-3">
-              <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-brass-500 font-serif text-xs font-bold text-ink-900">LL</div>
-              <div>
-                <p className="font-serif text-lg font-semibold leading-none">LedgerLink</p>
-                <p className="mt-1 text-[10px] uppercase tracking-[0.12em] text-sidebar-muted">Business accounting</p>
-              </div>
-            </div>
+  const stampedLabel = (compact: boolean) => (
+    <div className={`inline-block border border-[var(--spine-rule)] p-[3px] ${compact ? '' : 'w-full max-w-[20rem]'}`}>
+      <div className={`border border-[var(--spine-rule)] ${compact ? 'px-3 py-2' : 'px-5 py-4'}`}>
+        <p className={`ll-printed tracking-[0.16em] text-sidebar-ink leading-none ${compact ? 'text-[14px]' : 'text-[19px]'}`}>Ledger Link</p>
+        {!compact && <p className="mt-2.5 text-[12.5px] text-sidebar-muted">Books of account for Kenyan business</p>}
+      </div>
+    </div>
+  );
 
-            <div className="mt-24 max-w-md">
-              <p className="text-xs font-semibold uppercase tracking-[0.1em] text-brass-500">One financial record</p>
-              <h1 className="mt-4 font-serif text-[2.65rem] font-medium leading-[1.08] tracking-[-0.035em]">Your books and operations, connected.</h1>
-              <p className="mt-5 max-w-sm text-sm leading-6 text-sidebar-muted">LedgerLink keeps day-to-day financial work tied to the ledger it affects.</p>
-            </div>
+  return (
+    <div className="fixed inset-0 z-[100] overflow-y-auto bg-paper-50">
+      <div className="grid min-h-full grid-cols-1 md:grid-cols-[minmax(22rem,44%)_minmax(0,1fr)]">
+        {/* The cover */}
+        <aside className="ll-cloth hidden md:flex min-h-screen flex-col justify-between px-10 py-10 lg:px-14 lg:py-12 text-sidebar-ink">
+          {stampedLabel(false)}
+
+          <div className="max-w-[26rem]">
+            <h1 className="ll-heading text-[40px] lg:text-[46px] leading-[1.02] text-sidebar-ink">Every invoice, bill and payment, posted to one ledger.</h1>
+            <p className="mt-5 text-[15px] leading-relaxed text-sidebar-muted">
+              Day-to-day financial work stays tied to the ledger it affects.
+            </p>
           </div>
 
-          <div className="max-w-lg border-t border-white/15">
-            {productAreas.map(([number, title, description]) => (
-              <div key={number} className="grid grid-cols-[2rem_1fr] gap-3 border-b border-white/10 py-4">
-                <span className="pt-0.5 font-mono text-[10px] text-brass-500">{number}</span>
-                <div>
-                  <p className="text-xs font-semibold text-white">{title}</p>
-                  <p className="mt-1 text-xs leading-5 text-sidebar-muted">{description}</p>
-                </div>
-              </div>
-            ))}
+          <div className="max-w-[26rem]">
+            <p className="ll-printed text-[11px] text-sidebar-muted pb-2 border-b border-[var(--spine-rule)]">Contents</p>
+            <ul>
+              {CONTENTS.map(([title, description]) => (
+                <li key={title} className="border-b border-[var(--spine-rule)] py-3">
+                  <p className="text-[14px] font-semibold text-sidebar-ink">{title}</p>
+                  <p className="mt-0.5 text-[13px] leading-snug text-sidebar-muted">{description}</p>
+                </li>
+              ))}
+            </ul>
           </div>
         </aside>
 
-        <main className="flex min-h-screen items-center justify-center px-6 py-12 sm:px-10">
-          <div className="w-full max-w-[24rem]">
-            <div className="mb-12 flex items-center gap-2.5 md:hidden">
-              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-brass-500 font-serif text-[10px] font-bold text-ink-900">LL</div>
-              <div>
-                <p className="font-serif text-base font-semibold leading-none text-ink-900">LedgerLink</p>
-                <p className="mt-1 text-[9px] uppercase tracking-[0.1em] text-slate-500">Business accounting</p>
-              </div>
-            </div>
+        {/* The first page */}
+        <main className="flex min-h-screen min-w-0 flex-col">
+          <div className="ll-cloth md:hidden px-5 py-4">{stampedLabel(true)}</div>
 
-            {confirmationSent ? (
-              <div>
-                <CheckCircle2 className="mb-6 h-8 w-8 text-ledger-green-700" />
-                <p className="page-kicker">Account created</p>
-                <h2 className="mt-2 text-3xl tracking-[-0.03em] font-serif font-semibold text-ink-900">Confirm your email</h2>
-                <p className="mt-3 text-sm leading-6 text-slate-500">
-                  We sent a confirmation link to <strong className="text-ink-900">{email}</strong>. Open it to activate your account.
-                </p>
-                <button
-                  onClick={() => {
-                    setConfirmationSent(false);
-                    switchMode('signIn');
-                  }}
-                  className="mt-7 w-full rounded-lg bg-focus-blue-500 py-3 text-sm font-semibold text-white transition-colors hover:brightness-95"
-                >
-                  Return to sign in
-                </button>
-              </div>
-            ) : (
-              <>
-                <p className="page-kicker">{mode === 'signIn' ? 'Sign in' : 'Create an account'}</p>
-                <h2 className="mt-2 text-3xl tracking-[-0.03em] font-serif font-semibold text-ink-900">
-                  {mode === 'signIn' ? 'Access your books' : 'Set up your workspace'}
-                </h2>
-                <p className="mt-2 text-sm text-slate-500">
-                  {mode === 'signIn' ? 'Enter the details associated with your account.' : 'Use your work email to begin.'}
-                </p>
+          <div className="flex flex-1 items-center justify-center px-5 py-10 sm:px-10">
+            <div className="ll-margin w-full max-w-[25rem] pl-6 sm:pl-8">
+              {confirmationSent ? (
+                <div>
+                  <Mark kind="tick" draw className="[&_svg]:h-7 [&_svg]:w-7" />
+                  <h2 className="mt-4 ll-heading text-[30px] leading-tight text-ink-900">Confirm your email</h2>
+                  <p className="mt-3 text-[15px] leading-relaxed text-graphite-600">
+                    Account created. A confirmation link went to <span className="font-semibold text-ink-900">{email}</span>. Open it to activate the account, then sign in.
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setConfirmationSent(false);
+                      switchMode('signIn');
+                    }}
+                    className="mt-7 h-11 w-full rounded-sm bg-oxblood-fill text-[15px] font-semibold text-white hover:bg-[var(--oxblood-fill-hover)]"
+                  >
+                    Return to sign in
+                  </button>
+                </div>
+              ) : (
+                <>
+                  <h2 className="ll-heading text-[32px] leading-tight text-ink-900">
+                    {mode === 'signIn' ? 'Open your books' : 'Start a new book'}
+                  </h2>
+                  <p className="mt-2 text-[15px] text-graphite-600">
+                    {mode === 'signIn' ? 'Sign in with the email and password on your account.' : 'Use your work email. Your organization is set up next.'}
+                  </p>
 
-                {error && (
-                  <div role="alert" className="mt-6 border-l-2 border-rust-700 bg-rust-700/5 px-3 py-2.5 text-sm text-rust-700">
-                    {error}
-                  </div>
-                )}
+                  {error && (
+                    <p role="alert" className="mt-6 flex items-start gap-2 text-[14px] text-ledger-red">
+                      <Mark kind="circled" className="mt-0.5" />
+                      <span>{error}</span>
+                    </p>
+                  )}
 
-                <form onSubmit={handleSubmit} className="mt-8 space-y-5">
-                  <label className="block text-left">
-                    <span className="mb-2 block text-xs font-semibold text-ink-900">Work email</span>
-                    <span className="relative block">
-                      <Mail className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                  <form onSubmit={handleSubmit} className="mt-7 space-y-5" noValidate={false}>
+                    <label className="block">
+                      <span className="text-[13.5px] font-semibold text-ink-900">Work email</span>
                       <input
                         type="email"
                         required
                         autoComplete="email"
                         value={email}
                         onChange={(event) => setEmail(event.target.value)}
-                        placeholder="name@company.com"
-                        className="w-full rounded-lg border border-ink-900/15 bg-paper-100 py-3 pl-10 pr-3 text-sm text-ink-900 outline-none"
+                        placeholder="name@company.co.ke"
+                        className={fieldClass}
                       />
-                    </span>
-                  </label>
+                    </label>
 
-                  <label className="block text-left">
-                    <span className="mb-2 block text-xs font-semibold text-ink-900">Password</span>
-                    <span className="relative block">
-                      <Lock className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                    <label className="block">
+                      <span className="text-[13.5px] font-semibold text-ink-900">Password</span>
                       <input
                         type="password"
                         required
@@ -162,17 +160,14 @@ export function LockScreen() {
                         autoComplete={mode === 'signIn' ? 'current-password' : 'new-password'}
                         value={password}
                         onChange={(event) => setPassword(event.target.value)}
-                        placeholder="Enter your password"
-                        className="w-full rounded-lg border border-ink-900/15 bg-paper-100 py-3 pl-10 pr-3 text-sm text-ink-900 outline-none"
+                        className={fieldClass}
                       />
-                    </span>
-                  </label>
+                      {mode === 'signUp' && <span className="mt-1.5 block text-[12.5px] text-graphite-600">At least 8 characters.</span>}
+                    </label>
 
-                  {mode === 'signUp' && (
-                    <label className="block text-left">
-                      <span className="mb-2 block text-xs font-semibold text-ink-900">Confirm password</span>
-                      <span className="relative block">
-                        <Lock className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                    {mode === 'signUp' && (
+                      <label className="block">
+                        <span className="text-[13.5px] font-semibold text-ink-900">Confirm password</span>
                         <input
                           type="password"
                           required
@@ -180,43 +175,33 @@ export function LockScreen() {
                           autoComplete="new-password"
                           value={confirmPassword}
                           onChange={(event) => setConfirmPassword(event.target.value)}
-                          placeholder="Re-enter your password"
-                          className="w-full rounded-lg border border-ink-900/15 bg-paper-100 py-3 pl-10 pr-3 text-sm text-ink-900 outline-none"
+                          className={fieldClass}
                         />
-                      </span>
-                    </label>
-                  )}
+                      </label>
+                    )}
 
-                  <button
-                    type="submit"
-                    disabled={loading}
-                    className="w-full rounded-lg bg-focus-blue-500 py-3 text-sm font-semibold text-white transition-colors hover:brightness-95 disabled:cursor-wait disabled:opacity-50"
-                  >
-                    {loading
-                      ? (mode === 'signIn' ? 'Signing in…' : 'Creating account…')
-                      : (mode === 'signIn' ? 'Sign in' : 'Create account')}
-                  </button>
-                </form>
+                    <button
+                      type="submit"
+                      disabled={loading}
+                      className="h-11 w-full rounded-sm bg-oxblood-fill text-[15px] font-semibold text-white hover:bg-[var(--oxblood-fill-hover)] disabled:cursor-wait disabled:opacity-60"
+                    >
+                      {loading ? (mode === 'signIn' ? 'Signing in…' : 'Creating account…') : mode === 'signIn' ? 'Sign in' : 'Create account'}
+                    </button>
+                  </form>
 
-                <div className="mt-8 border-t border-ink-900/10 pt-5 text-sm text-slate-500">
-                  {mode === 'signIn' ? (
-                    <>
-                      New to LedgerLink?{' '}
-                      <button onClick={() => switchMode('signUp')} className="font-semibold text-focus-blue-500 hover:underline">
-                        Create an account
-                      </button>
-                    </>
-                  ) : (
-                    <>
-                      Already have an account?{' '}
-                      <button onClick={() => switchMode('signIn')} className="font-semibold text-focus-blue-500 hover:underline">
-                        Sign in
-                      </button>
-                    </>
-                  )}
-                </div>
-              </>
-            )}
+                  <p className="mt-8 border-t border-feint pt-5 text-[14px] text-graphite-600">
+                    {mode === 'signIn' ? 'New to Ledger Link? ' : 'Already have an account? '}
+                    <button
+                      type="button"
+                      onClick={() => switchMode(mode === 'signIn' ? 'signUp' : 'signIn')}
+                      className="font-semibold text-oxblood underline underline-offset-[3px] decoration-[color-mix(in_srgb,currentColor_40%,transparent)] hover:decoration-current"
+                    >
+                      {mode === 'signIn' ? 'Create an account' : 'Sign in'}
+                    </button>
+                  </p>
+                </>
+              )}
+            </div>
           </div>
         </main>
       </div>

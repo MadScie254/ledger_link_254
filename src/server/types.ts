@@ -2,6 +2,10 @@ export interface JournalLineInput {
   accountId: string;
   debit: number;
   credit: number;
+  currency?: string;
+  foreignDebit?: number;
+  foreignCredit?: number;
+  exchangeRate?: number;
   description?: string;
   entityType?: 'CUSTOMER' | 'VENDOR' | 'EMPLOYEE' | 'PROJECT';
   entityId?: string;
@@ -15,6 +19,7 @@ export interface JournalEntryInput {
   sourceId?: string;
   referenceNo?: string;
   createdBy: string;
+  idempotencyKey?: string;
   lines: JournalLineInput[];
 }
 

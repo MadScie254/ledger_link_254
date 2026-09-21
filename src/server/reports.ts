@@ -1,135 +1,169 @@
 import { getSupabase } from './supabase';
+import {
+  aggregateBalanceSheet,
+  aggregateCashFlow,
+  aggregateProfitAndLoss,
+  aggregateTaxRows,
+  normalizeAsOfDate,
+  resolveReportDateRange,
+  type ReportAccount,
+  type ReportAccountType,
+  type ReportLedgerLine,
+} from '../utils/reportCalculations';
+
+const ACCOUNT_TYPES = new Set<ReportAccountType>(['ASSET', 'LIABILITY', 'EQUITY', 'INCOME', 'COGS', 'EXPENSE']);
+const REPORT_PAGE_SIZE = 1_000;
+
+interface QueryPage<T> {
+  data: T[] | null;
+  error: { message: string } | null;
+}
+
+async function fetchAllRows<T>(
+  fetchPage: (from: number, to: number) => PromiseLike<QueryPage<T>>,
+): Promise<T[]> {
+  const rows: T[] = [];
+
+  for (let from = 0; ; from += REPORT_PAGE_SIZE) {
+    const { data, error } = await fetchPage(from, from + REPORT_PAGE_SIZE - 1);
+    if (error) throw error;
+    const page = data || [];
+    rows.push(...page);
+    if (page.length < REPORT_PAGE_SIZE) return rows;
+  }
+}
+
+function asRecord(value: unknown): Record<string, unknown> | null {
+  if (Array.isArray(value)) return asRecord(value[0]);
+  return value !== null && typeof value === 'object' ? value as Record<string, unknown> : null;
+}
+
+function normalizeLedgerLines(rows: unknown[] | null): ReportLedgerLine[] {
+  const normalized: ReportLedgerLine[] = [];
+
+  for (const value of rows || []) {
+    const row = asRecord(value);
+    const accountRow = asRecord(row?.account);
+    const accountType = accountRow?.type;
+    if (!row || !accountRow || typeof accountType !== 'string' || !ACCOUNT_TYPES.has(accountType as ReportAccountType)) {
+      continue;
+    }
+
+    const account: ReportAccount = {
+      code: String(accountRow.code || ''),
+      name: String(accountRow.name || 'Unnamed account'),
+      type: accountType as ReportAccountType,
+      subtype: typeof accountRow.subtype === 'string' ? accountRow.subtype : null,
+    };
+    const journalRow = asRecord(row.journal_entry);
+
+    normalized.push({
+      debit: typeof row.debit === 'number' || typeof row.debit === 'string' ? row.debit : 0,
+      credit: typeof row.credit === 'number' || typeof row.credit === 'string' ? row.credit : 0,
+      account,
+      journalEntry: journalRow && typeof journalRow.id === 'string'
+        ? { id: journalRow.id, sourceType: typeof journalRow.source_type === 'string' ? journalRow.source_type : null }
+        : null,
+    });
+  }
+
+  return normalized;
+}
 
 export class ReportsService {
   static async getProfitAndLoss(orgId: string, dateRange: string) {
     const supabase = getSupabase();
-    
-    // Instead of raw joins in TS, we fetch journal lines joined with accounts
-    // for this org
-    const { data: lines, error } = await supabase
+    const range = resolveReportDateRange(dateRange);
+
+    const lines = await fetchAllRows<unknown>((from, to) => supabase
       .from('journal_lines')
       .select(`
+        id,
         debit,
         credit,
-        account:accounts!inner(name, type, code),
-        journal_entry:journal_entries!inner(org_id)
+        account:accounts!inner(name, type, code, subtype),
+        journal_entry:journal_entries!inner(id, org_id, entry_date)
       `)
-      .eq('journal_entries.org_id', orgId);
-      
-    if (error) throw error;
+      .eq('journal_entries.org_id', orgId)
+      .gte('journal_entries.entry_date', range.start)
+      .lte('journal_entries.entry_date', range.end)
+      .order('id')
+      .range(from, to));
 
-    const incomeMap: Record<string, number> = {};
-    const cogsMap: Record<string, number> = {};
-    const expenseMap: Record<string, number> = {};
-
-    lines.forEach((line: any) => {
-      const accountInfo = line.account;
-      if (!accountInfo) return;
-
-      if (accountInfo.type === 'INCOME') {
-        incomeMap[accountInfo.name] = (incomeMap[accountInfo.name] || 0) + (line.credit || 0) - (line.debit || 0);
-      } else if (accountInfo.type === 'COGS') {
-        cogsMap[accountInfo.name] = (cogsMap[accountInfo.name] || 0) + (line.debit || 0) - (line.credit || 0);
-      } else if (accountInfo.type === 'EXPENSE') {
-        expenseMap[accountInfo.name] = (expenseMap[accountInfo.name] || 0) + (line.debit || 0) - (line.credit || 0);
-      }
-    });
-
-    return {
-      income: Object.entries(incomeMap).map(([name, amountCents]) => ({ name, amountCents })),
-      costOfSales: Object.entries(cogsMap).map(([name, amountCents]) => ({ name, amountCents })),
-      expenses: Object.entries(expenseMap).map(([name, amountCents]) => ({ name, amountCents }))
-    };
+    return aggregateProfitAndLoss(normalizeLedgerLines(lines));
   }
 
   static async getBalanceSheet(orgId: string, asOfDate: string) {
     const supabase = getSupabase();
-    
-    const { data: lines, error } = await supabase
+    const normalizedAsOfDate = normalizeAsOfDate(asOfDate || new Date().toISOString());
+
+    const lines = await fetchAllRows<unknown>((from, to) => supabase
       .from('journal_lines')
       .select(`
+        id,
         debit,
         credit,
-        account:accounts!inner(name, type, code),
-        journal_entry:journal_entries!inner(org_id, entry_date)
+        account:accounts!inner(name, type, code, subtype),
+        journal_entry:journal_entries!inner(id, org_id, entry_date)
       `)
       .eq('journal_entries.org_id', orgId)
-      .lte('journal_entries.entry_date', asOfDate || new Date().toISOString());
+      .lte('journal_entries.entry_date', normalizedAsOfDate)
+      .order('id')
+      .range(from, to));
 
-    if (error) throw error;
-
-    const assetMap: Record<string, number> = {};
-    const liabilityMap: Record<string, number> = {};
-    const equityMap: Record<string, number> = {};
-
-    lines.forEach((line: any) => {
-      const accountInfo = line.account;
-      if (!accountInfo) return;
-
-      if (accountInfo.type === 'ASSET') {
-        assetMap[accountInfo.name] = (assetMap[accountInfo.name] || 0) + (line.debit || 0) - (line.credit || 0);
-      } else if (accountInfo.type === 'LIABILITY') {
-        liabilityMap[accountInfo.name] = (liabilityMap[accountInfo.name] || 0) + (line.credit || 0) - (line.debit || 0);
-      } else if (accountInfo.type === 'EQUITY') {
-        equityMap[accountInfo.name] = (equityMap[accountInfo.name] || 0) + (line.credit || 0) - (line.debit || 0);
-      }
-    });
-
-    return {
-      currentAssets: Object.entries(assetMap).filter(([k]) => !k.includes('Equipment')).map(([name, amountCents]) => ({ name, amountCents })),
-      nonCurrentAssets: Object.entries(assetMap).filter(([k]) => k.includes('Equipment')).map(([name, amountCents]) => ({ name, amountCents })),
-      currentLiabilities: Object.entries(liabilityMap).map(([name, amountCents]) => ({ name, amountCents })),
-      equity: Object.entries(equityMap).map(([name, amountCents]) => ({ name, amountCents }))
-    };
+    return aggregateBalanceSheet(normalizeLedgerLines(lines));
   }
 
   static async getCashFlow(orgId: string, dateRange: string) {
     const supabase = getSupabase();
-    
-    const { data: lines, error } = await supabase
-      .from('journal_lines')
-      .select(`
-        debit,
-        credit,
-        account:accounts!inner(name, type, code),
-        journal_entry:journal_entries!inner(org_id)
-      `)
-      .eq('journal_entries.org_id', orgId);
+    const range = resolveReportDateRange(dateRange);
+    const select = `
+      id,
+      debit,
+      credit,
+      account:accounts!inner(name, type, code, subtype),
+      journal_entry:journal_entries!inner(id, org_id, entry_date, source_type)
+    `;
 
-    if (error) throw error;
+    const [periodLines, openingLines] = await Promise.all([
+      fetchAllRows<unknown>((from, to) => supabase
+        .from('journal_lines')
+        .select(select)
+        .eq('journal_entries.org_id', orgId)
+        .gte('journal_entries.entry_date', range.start)
+        .lte('journal_entries.entry_date', range.end)
+        .order('id')
+        .range(from, to)),
+      fetchAllRows<unknown>((from, to) => supabase
+        .from('journal_lines')
+        .select(select)
+        .eq('journal_entries.org_id', orgId)
+        .lt('journal_entries.entry_date', range.start)
+        .order('id')
+        .range(from, to)),
+    ]);
 
-    let netIncome = 0;
-    lines.forEach((line: any) => {
-      const acc = line.account;
-      if (!acc) return;
-      if (acc.type === 'INCOME') netIncome += (line.credit || 0) - (line.debit || 0);
-      if (acc.type === 'EXPENSE' || acc.type === 'COGS') netIncome -= ((line.debit || 0) - (line.credit || 0));
-    });
-
-    const operating = netIncome !== 0 ? [{ name: 'Net Income from Operations', amountCents: netIncome }] : [];
-
-    return {
-      operating,
-      investing: [],
-      financing: [],
-      beginningCashCents: 0
-    };
+    return aggregateCashFlow(
+      normalizeLedgerLines(periodLines),
+      normalizeLedgerLines(openingLines),
+    );
   }
 
   static async getTrialBalance(orgId: string) {
     const supabase = getSupabase();
     
-    const { data: lines, error } = await supabase
+    const lines = await fetchAllRows<any>((from, to) => supabase
       .from('journal_lines')
       .select(`
+        id,
         debit,
         credit,
         account:accounts!inner(code, name, type),
         journal_entry:journal_entries!inner(org_id)
       `)
-      .eq('journal_entries.org_id', orgId);
-
-    if (error) throw error;
+      .eq('journal_entries.org_id', orgId)
+      .order('id')
+      .range(from, to));
 
     const accountMap: Record<string, any> = {};
 
@@ -148,8 +182,8 @@ export class ReportsService {
         };
       }
       
-      accountMap[code].debitCents += (line.debit || 0);
-      accountMap[code].creditCents += (line.credit || 0);
+      accountMap[code].debitCents += Number(line.debit) || 0;
+      accountMap[code].creditCents += Number(line.credit) || 0;
     });
 
     const rows = Object.values(accountMap).map((row: any) => {
@@ -168,69 +202,69 @@ export class ReportsService {
 
   static async getTaxSummary(orgId: string, period: string) {
     const supabase = getSupabase();
+    const range = resolveReportDateRange(period);
 
-    const { data: org } = await supabase
-      .from('organizations')
-      .select('tax_id')
-      .eq('id', orgId)
-      .maybeSingle();
+    const [orgResult, invoices, bills, etimsSubmissions] = await Promise.all([
+      supabase
+        .from('organizations')
+        .select('tax_id')
+        .eq('id', orgId)
+        .maybeSingle(),
+      fetchAllRows<{ subtotal_cents: number | string | null; tax_cents: number | string | null }>((from, to) => supabase
+        .from('invoices')
+        .select('subtotal_cents, tax_cents')
+        .eq('org_id', orgId)
+        .neq('status', 'VOID')
+        .gte('date', range.start)
+        .lte('date', range.end)
+        .order('id')
+        .range(from, to)),
+      fetchAllRows<{ subtotal_cents: number | string | null; tax_cents: number | string | null }>((from, to) => supabase
+        .from('bills')
+        .select('subtotal_cents, tax_cents')
+        .eq('org_id', orgId)
+        .neq('status', 'VOID')
+        .gte('date', range.start)
+        .lte('date', range.end)
+        .order('id')
+        .range(from, to)),
+      fetchAllRows<{ status: string }>((from, to) => supabase
+        .from('etims_submissions')
+        .select('status, invoice:invoices!inner(org_id, date)')
+        .eq('org_id', orgId)
+        .eq('invoices.org_id', orgId)
+        .gte('invoices.date', range.start)
+        .lte('invoices.date', range.end)
+        .order('id')
+        .range(from, to)),
+    ]);
 
-    const { data: invoices, error: invError } = await supabase
-      .from('invoices')
-      .select('subtotal_cents, tax_cents')
-      .eq('org_id', orgId)
-      .neq('status', 'VOID');
-      
-    if (invError) throw invError;
-    
-    const { data: bills, error: billError } = await supabase
-      .from('bills')
-      .select('subtotal_cents, tax_cents')
-      .eq('org_id', orgId)
-      .neq('status', 'VOID');
-      
-    if (billError) throw billError;
+    if (orgResult.error) throw orgResult.error;
 
-    let outputVat = 0;
-    let standardRatedSales = 0;
-    (invoices || []).forEach((inv: any) => {
-      outputVat += (inv.tax_cents || 0);
-      standardRatedSales += (inv.subtotal_cents || 0);
-    });
-
-    let inputVat = 0;
-    let claimablePurchases = 0;
-    (bills || []).forEach((bill: any) => {
-      inputVat += (bill.tax_cents || 0);
-      claimablePurchases += (bill.subtotal_cents || 0);
-    });
-
-    const { data: etimsSubmissions } = await supabase
-      .from('etims_submissions')
-      .select('status')
-      .eq('org_id', orgId);
-
-    const etimsVerifiedCount = (etimsSubmissions || []).filter((s: any) => s.status === 'VERIFIED').length;
-    const etimsPendingCount = (etimsSubmissions || []).filter((s: any) => s.status !== 'VERIFIED').length;
+    const tax = aggregateTaxRows(invoices, bills);
+    const etimsVerifiedCount = etimsSubmissions.filter((submission) =>
+      submission.status === 'VERIFIED' || submission.status === 'SUCCESS',
+    ).length;
+    const etimsPendingCount = etimsSubmissions.length - etimsVerifiedCount;
 
     return {
-      period: period || new Date().toISOString().substring(0, 7),
-      kraPin: org?.tax_id || null,
+      period,
+      kraPin: orgResult.data?.tax_id || null,
       outputVat: {
-        standardRatedSalesCents: standardRatedSales,
+        standardRatedSalesCents: tax.standardRatedSalesCents,
         vatRatePercent: 16,
-        taxAmountCents: outputVat
+        taxAmountCents: tax.outputVatCents
       },
       inputVat: {
-        claimablePurchasesCents: claimablePurchases,
+        claimablePurchasesCents: tax.claimablePurchasesCents,
         vatRatePercent: 16,
-        taxAmountCents: inputVat
+        taxAmountCents: tax.inputVatCents
       },
       withholdingTaxVat: {
         withholdingRatePercent: 2,
         withheldAmountCents: 0
       },
-      netVatPayableCents: outputVat - inputVat,
+      netVatPayableCents: tax.outputVatCents - tax.inputVatCents,
       etimsVerifiedCount,
       etimsPendingCount
     };
@@ -238,16 +272,17 @@ export class ReportsService {
 
   static async getARAging(orgId: string) {
     const supabase = getSupabase();
-    const { data: invoices, error } = await supabase
+    const invoices = await fetchAllRows<any>((from, to) => supabase
       .from('invoices')
       .select('id, invoice_number, customer_id, due_date, amount_due_cents, status, customers(display_name)')
       .eq('org_id', orgId)
       .neq('status', 'VOID')
       .neq('status', 'PAID')
-      .gt('amount_due_cents', 0);
+      .gt('amount_due_cents', 0)
+      .order('id')
+      .range(from, to));
 
-    if (error) throw error;
-    return this.bucketByDueDate((invoices || []).map((inv: any) => ({
+    return this.bucketByDueDate(invoices.map((inv: any) => ({
       id: inv.id,
       referenceNo: inv.invoice_number,
       partyName: inv.customers?.display_name || 'Unknown Customer',
@@ -258,16 +293,17 @@ export class ReportsService {
 
   static async getAPAging(orgId: string) {
     const supabase = getSupabase();
-    const { data: bills, error } = await supabase
+    const bills = await fetchAllRows<any>((from, to) => supabase
       .from('bills')
       .select('id, bill_number, vendor_id, due_date, amount_due_cents, status, vendors(display_name)')
       .eq('org_id', orgId)
       .neq('status', 'VOID')
       .neq('status', 'PAID')
-      .gt('amount_due_cents', 0);
+      .gt('amount_due_cents', 0)
+      .order('id')
+      .range(from, to));
 
-    if (error) throw error;
-    return this.bucketByDueDate((bills || []).map((bill: any) => ({
+    return this.bucketByDueDate(bills.map((bill: any) => ({
       id: bill.id,
       referenceNo: bill.bill_number,
       partyName: bill.vendors?.display_name || 'Unknown Vendor',
@@ -311,7 +347,7 @@ export class ReportsService {
     if (accountError || !accounts || accounts.length === 0) return [];
     const accountId = accounts[0].id;
 
-    const { data: lines, error: linesError } = await supabase
+    const lines = await fetchAllRows<any>((from, to) => supabase
       .from('journal_lines')
       .select(`
         id,
@@ -321,11 +357,10 @@ export class ReportsService {
       `)
       .eq('account_id', accountId)
       .eq('journal_entries.org_id', orgId)
-      .order('journal_entries(entry_date)', { ascending: false });
+      .order('id')
+      .range(from, to));
 
-    if (linesError) throw linesError;
-
-    return (lines || []).map((line: any) => ({
+    return lines.map((line: any) => ({
       id: line.id,
       date: line.journal_entry.entry_date,
       sourceType: line.journal_entry.source_type,

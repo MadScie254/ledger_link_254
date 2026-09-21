@@ -72,7 +72,7 @@ export const useAppStore = create<AppState>((set) => ({
   setExchangeRates: (rates) => set({ exchangeRates: rates }),
   rateMetadata: { source: 'Open Exchange Rate API (Live Market Feed)', lastUpdated: new Date().toLocaleTimeString() },
   setRateMetadata: (meta) => set({ rateMetadata: meta }),
-  activeView: 'Dashboard',
+  activeView: 'Home / Dashboard',
   setActiveView: (view) => set({ activeView: view }),
   currentOrgId: '',
   setCurrentOrgId: (orgId) => set({ currentOrgId: orgId }),

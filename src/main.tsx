@@ -17,12 +17,21 @@ if (typeof window !== 'undefined') {
   });
 }
 
-const queryClient = new QueryClient();
+const root = createRoot(document.getElementById('root')!);
 
-createRoot(document.getElementById('root')!).render(
-  <StrictMode>
-    <QueryClientProvider client={queryClient}>
-      <App />
-    </QueryClientProvider>
-  </StrictMode>,
-);
+// Development-only design preview of signed-in screens with sample books.
+// Gated on MODE, not DEV: DEV follows NODE_ENV, and a NODE_ENV=development in
+// .env turns DEV true inside `vite build`. MODE is "production" for every build,
+// so this branch and the harness module are removed from the bundle.
+if (import.meta.env.MODE === 'development' && window.location.pathname.startsWith('/__preview')) {
+  void import('./dev/PreviewHarness').then(({ mountPreview }) => mountPreview(root));
+} else {
+  const queryClient = new QueryClient();
+  root.render(
+    <StrictMode>
+      <QueryClientProvider client={queryClient}>
+        <App />
+      </QueryClientProvider>
+    </StrictMode>,
+  );
+}

@@ -2,22 +2,12 @@ import React, { useState, useRef, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useAppStore } from '../../store';
 import { useMonitoringStore } from '../../utils/monitoring';
-import { formatCurrency } from '../../utils/currency';
-import {
-  Bell,
-  CheckCircle2,
-  AlertTriangle,
-  Clock,
-  Activity,
-  FileText,
-  Users,
-  Package,
-  X,
-  ArrowRight,
-  ShieldCheck,
-  Check
-} from 'lucide-react';
-import { motion, AnimatePresence } from 'motion/react';
+import { differenceInCalendarDays, format } from 'date-fns';
+import { statutoryDeadlines, dueIn } from '../../utils/statutory';
+import { Bell, X } from 'lucide-react';
+import { Mark } from '../ledger/Mark';
+import { Amount } from '../ledger/Amount';
+import { buttonClass } from '../ledger/Page';
 
 export interface AppNotification {
   id: string;
@@ -86,112 +76,97 @@ export function NotificationDropdown() {
     }
   });
 
-  // Construct Dynamic Notification List
+  // Built only from what the books say; nothing here is scheduled or promised.
   const notifications: AppNotification[] = [];
+  const dayMonthYear = (d?: string) => (d ? format(new Date(d), 'dd/MM/yyyy') : '');
 
-  // 1. Overdue & Unpaid Invoices
+  // 1. Invoices past their due date, then one line for the rest still open.
   const invoices = invoicesData?.invoices || [];
   const now = new Date();
+  const unpaid = invoices.filter((inv: any) => inv.status !== 'PAID' && inv.status !== 'VOID' && inv.status !== 'DRAFT');
+  const overdue = unpaid.filter((inv: any) => inv.dueDate && new Date(inv.dueDate) < now);
+  const awaiting = unpaid.filter((inv: any) => !overdue.includes(inv));
 
-  invoices.forEach((inv: any) => {
-    const isDue = new Date(inv.dueDate) < now;
-    if (inv.status !== 'PAID' && isDue) {
-      notifications.push({
-        id: `inv-overdue-${inv.id}`,
-        category: 'invoice',
-        title: `Overdue Invoice: ${inv.invoiceNo || 'INV-Draft'}`,
-        description: `Payment was due on ${inv.dueDate ? new Date(inv.dueDate).toLocaleDateString() : 'N/A'}. Total outstanding: ${formatCurrency(inv.totalCents || 0)}`,
-        timestamp: 'Requires follow-up',
-        severity: 'urgent',
-        targetView: 'Sales',
-        actionLabel: 'View Invoices',
-        amountCents: inv.totalCents
-      });
-    } else if (inv.status === 'SENT') {
-      notifications.push({
-        id: `inv-sent-${inv.id}`,
-        category: 'invoice',
-        title: `Pending Settlement: ${inv.invoiceNo}`,
-        description: `Awaiting customer payment confirmation of ${formatCurrency(inv.totalCents || 0)}.`,
-        timestamp: 'Open invoice',
-        severity: 'warning',
-        targetView: 'Sales',
-        actionLabel: 'Check Status',
-        amountCents: inv.totalCents
-      });
-    }
+  overdue.forEach((inv: any) => {
+    notifications.push({
+      id: `inv-overdue-${inv.id}`,
+      category: 'invoice',
+      title: `${inv.invoiceNo || 'An invoice'} is overdue`,
+      description: `Was due on ${dayMonthYear(inv.dueDate)}.`,
+      timestamp: `${Math.max(1, differenceInCalendarDays(now, new Date(inv.dueDate)))} days late`,
+      severity: 'urgent',
+      targetView: 'Sales',
+      actionLabel: 'Open Sales',
+      amountCents: inv.amountDueCents ?? inv.totalCents,
+    });
   });
 
-  // 2. Pending Payroll Tasks
+  if (awaiting.length > 0) {
+    const total = awaiting.reduce((sum: number, inv: any) => sum + (inv.amountDueCents ?? inv.totalCents ?? 0), 0);
+    notifications.push({
+      id: `inv-awaiting-${awaiting.length}-${total}`,
+      category: 'invoice',
+      title: `${awaiting.length} ${awaiting.length === 1 ? 'invoice is' : 'invoices are'} awaiting payment`,
+      description: 'Not yet due.',
+      timestamp: 'Open',
+      severity: 'info',
+      targetView: 'Sales',
+      actionLabel: 'Open Sales',
+      amountCents: total,
+    });
+  }
+
+  // 2. Statutory deadlines, for organizations with staff on the payroll.
   const employees = employeesData?.employees || [];
   if (employees.length > 0) {
-    const totalPayrollCents = employees.reduce((sum: number, e: any) => sum + (e.baseSalaryCents || 0), 0);
-    notifications.push({
-      id: 'payroll-monthly-run',
-      category: 'payroll',
-      title: 'Upcoming Payroll Run',
-      description: `${employees.length} employees scheduled for monthly salary disbursement (~${formatCurrency(totalPayrollCents)}).`,
-      timestamp: 'Due end of month',
-      severity: 'warning',
-      targetView: 'Payroll',
-      actionLabel: 'Run Payroll'
-    });
-
-    notifications.push({
-      id: 'statutory-filing-due',
-      category: 'payroll',
-      title: 'Statutory Returns (PAYE & SHIF/NSSF)',
-      description: 'Monthly statutory tax filings and remittances to KRA are due before the 9th.',
-      timestamp: 'Compliance task',
-      severity: 'info',
-      targetView: 'Payroll',
-      actionLabel: 'View Filings'
-    });
+    statutoryDeadlines()
+      .filter((d) => d.id !== 'vat')
+      .forEach((d) => {
+        notifications.push({
+          id: `statutory-${d.id}-${format(d.due, 'yyyyMMdd')}`,
+          category: 'payroll',
+          title: `${d.label} due ${format(d.due, 'EEE d MMM')}`,
+          description: d.rule,
+          timestamp: dueIn(d.due),
+          severity: differenceInCalendarDays(d.due, now) <= 3 ? 'urgent' : 'warning',
+          targetView: 'Payroll',
+          actionLabel: 'Open Payroll',
+        });
+      });
   }
 
-  // 3. System Health Telemetry
-  const slowCalls = apiMetrics.filter(m => m.duration > 250);
+  // 3. Slow responses measured in this browser.
+  const slowCalls = apiMetrics.filter((m) => m.duration > 250);
   if (slowCalls.length > 0) {
     notifications.push({
-      id: 'system-latency-alert',
+      id: `system-slow-${slowCalls.length}`,
       category: 'system',
-      title: 'Elevated API Response Latency',
-      description: `${slowCalls.length} request(s) exceeded 250ms latency (peak ${Math.round(slowCalls[0].duration)}ms on ${slowCalls[0].url}).`,
-      timestamp: 'Telemetry alert',
+      title: `${slowCalls.length} slow ${slowCalls.length === 1 ? 'response' : 'responses'} this session`,
+      description: `Slowest took ${Math.round(Math.max(...slowCalls.map((m) => m.duration)))} ms.`,
+      timestamp: 'This browser',
       severity: 'warning',
       targetView: 'System Health',
-      actionLabel: 'View Metrics'
-    });
-  } else {
-    notifications.push({
-      id: 'system-healthy',
-      category: 'system',
-      title: 'All Systems Operational',
-      description: 'Zero database latency anomalies. Multi-tenant isolation and API routes active.',
-      timestamp: 'Real-time telemetry',
-      severity: 'success',
-      targetView: 'System Health',
-      actionLabel: 'Health Dashboard'
+      actionLabel: 'Open System health',
     });
   }
 
-  // 4. Low Inventory Stock
+  // 4. Stock at or below its reorder point.
   const items = inventoryData?.items || [];
-  const lowStockItems = items.filter((i: any) => i.quantityOnHand <= i.reorderPoint);
-  if (lowStockItems.length > 0) {
-    lowStockItems.slice(0, 3).forEach((item: any) => {
+  items
+    .filter((i: any) => i.quantityOnHand <= i.reorderPoint)
+    .slice(0, 3)
+    .forEach((item: any) => {
       notifications.push({
         id: `inventory-low-${item.id}`,
         category: 'inventory',
-        title: `Low Stock: ${item.name}`,
-        description: `Only ${item.quantityOnHand} ${item.unitOfMeasure || 'units'} remaining (Reorder trigger: ${item.reorderPoint}).`,
-        timestamp: 'Inventory alert',
+        title: `${item.name} needs reordering`,
+        description: `${item.quantityOnHand} ${item.unitOfMeasure || 'units'} on hand; reorder at ${item.reorderPoint}.`,
+        timestamp: 'Reorder point',
         severity: 'urgent',
         targetView: 'Inventory',
-        actionLabel: 'Restock Item'
+        actionLabel: 'Open Inventory',
       });
     });
-  }
 
   // Filter and filter by dismissed
   const visibleNotifications = notifications.filter(n => !dismissedIds.includes(n.id));
@@ -221,215 +196,128 @@ export function NotificationDropdown() {
     setDismissedIds(prev => [...prev, id]);
   };
 
-  const getSeverityStyle = (severity: AppNotification['severity']) => {
-    switch (severity) {
-      case 'urgent':
-        return {
-          icon: <AlertTriangle className="h-4 w-4 text-rust-700 shrink-0" />,
-          badgeBg: 'bg-rust-700/10 text-rust-700 border-rust-700/20',
-          dot: 'bg-rust-700'
-        };
-      case 'warning':
-        return {
-          icon: <Clock className="h-4 w-4 text-brass-600 shrink-0" />,
-          badgeBg: 'bg-brass-500/10 text-brass-700 border-brass-500/20',
-          dot: 'bg-brass-500'
-        };
-      case 'info':
-        return {
-          icon: <Activity className="h-4 w-4 text-focus-blue-500 shrink-0" />,
-          badgeBg: 'bg-focus-blue-500/10 text-focus-blue-600 border-focus-blue-500/20',
-          dot: 'bg-focus-blue-500'
-        };
-      case 'success':
-        return {
-          icon: <CheckCircle2 className="h-4 w-4 text-ledger-green-700 shrink-0" />,
-          badgeBg: 'bg-ledger-green-700/10 text-ledger-green-700 border-ledger-green-700/20',
-          dot: 'bg-ledger-green-700'
-        };
-    }
-  };
+  const markFor = (severity: AppNotification['severity']) =>
+    severity === 'urgent' ? <Mark kind="circled" /> : severity === 'success' ? <Mark kind="tick" /> : <Mark kind="query" />;
 
-  const getCategoryIcon = (cat: AppNotification['category']) => {
-    switch (cat) {
-      case 'invoice':
-        return <FileText className="h-3.5 w-3.5 mr-1" />;
-      case 'payroll':
-        return <Users className="h-3.5 w-3.5 mr-1" />;
-      case 'system':
-        return <Activity className="h-3.5 w-3.5 mr-1" />;
-      case 'inventory':
-        return <Package className="h-3.5 w-3.5 mr-1" />;
-    }
-  };
 
   return (
     <div className="relative" ref={dropdownRef}>
-      {/* Bell Button with badge */}
       <button
         type="button"
         id="notification-bell-btn"
-        aria-label="Open notifications"
+        aria-label={unreadCount > 0 ? `Notifications, ${unreadCount} new` : 'Notifications'}
+        aria-expanded={isOpen}
         onClick={() => setIsOpen(!isOpen)}
-        className="p-2 text-slate-500 hover:text-ink-900 rounded-md hover:bg-paper-100 dark:hover:bg-ink-900/30 relative transition-colors focus:outline-none focus:ring-1 focus:ring-focus-blue-500"
+        className="relative p-2 text-graphite-600 hover:text-ink-900"
       >
-        <Bell className="h-5 w-5" />
-        {unreadCount > 0 ? (
-          <span className="absolute top-1 right-1 flex items-center justify-center min-w-[18px] h-[18px] px-1 text-[10px] font-bold text-white bg-rust-700 rounded-full ring-2 ring-paper-50 animate-pulse">
+        <Bell className="h-5 w-5" aria-hidden="true" />
+        {unreadCount > 0 && (
+          <span className="absolute top-0.5 right-0.5 flex h-[17px] min-w-[17px] items-center justify-center border border-ink-900 bg-paper-100 px-1 text-[10.5px] font-semibold tabular-nums text-ink-900" aria-hidden="true">
             {unreadCount > 9 ? '9+' : unreadCount}
           </span>
-        ) : (
-          <span className="absolute top-1.5 right-1.5 h-2 w-2 rounded-full bg-ledger-green-700 ring-2 ring-paper-50" />
         )}
       </button>
 
-      {/* Notification Dropdown Panel */}
-      <AnimatePresence>
-        {isOpen && (
-          <motion.div
-            initial={{ opacity: 0, y: 8, scale: 0.98 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: 8, scale: 0.98 }}
-            transition={{ duration: 0.15 }}
-            className="absolute right-0 mt-2 w-96 sm:w-[420px] bg-paper-100 border border-ink-900/10 shadow-2xl rounded-sm z-50 overflow-hidden"
-          >
-            {/* Header */}
-            <div className="px-4 py-3 border-b border-ink-900/10 bg-paper-50  flex items-center justify-between">
-              <div className="flex items-center space-x-2">
-                <span className="font-serif font-semibold text-ink-900 text-sm">Notifications & Alerts</span>
-                {unreadCount > 0 && (
-                  <span className="text-xs px-2 py-0.5 rounded-full bg-rust-700/10 text-rust-700 font-semibold">
-                    {unreadCount} new
-                  </span>
-                )}
-              </div>
-              <div className="flex items-center space-x-2">
-                {unreadCount > 0 && (
-                  <button
-                    onClick={handleMarkAllRead}
-                    className="text-xs text-slate-500 hover:text-ink-900 flex items-center transition-colors"
-                  >
-                    <Check className="h-3.5 w-3.5 mr-1" /> Mark all read
-                  </button>
-                )}
-                <button
-                  onClick={() => setIsOpen(false)}
-                  className="text-slate-400 hover:text-ink-900 p-1"
-                >
-                  <X className="h-4 w-4" />
+      {isOpen && (
+        <div className="ll-lift fixed inset-x-3 top-14 z-50 border border-feint-strong border-t-2 border-t-ink-900 bg-paper-100 sm:absolute sm:inset-x-auto sm:right-0 sm:top-auto sm:mt-2 sm:w-[420px]" role="dialog" aria-label="Notifications">
+          <div className="flex items-center justify-between gap-3 border-b border-feint px-4 py-2.5">
+            <p className="text-[14px] font-semibold text-ink-900">
+              Needs attention
+              {unreadCount > 0 && <span className="ml-2 font-normal text-graphite-600">{unreadCount} new</span>}
+            </p>
+            <div className="flex items-center gap-3">
+              {unreadCount > 0 && (
+                <button type="button" onClick={handleMarkAllRead} className={buttonClass.quiet}>
+                  Mark all read
                 </button>
-              </div>
-            </div>
-
-            {/* Filter Tabs */}
-            <div className="flex items-center space-x-1 px-3 py-2 bg-paper-100/50  border-b border-ink-900/5 overflow-x-auto text-xs">
-              {[
-                { id: 'ALL', label: 'All' },
-                { id: 'INVOICE', label: 'Invoices' },
-                { id: 'PAYROLL', label: 'Payroll' },
-                { id: 'SYSTEM', label: 'Health' },
-                { id: 'INVENTORY', label: 'Stock' }
-              ].map(tab => (
-                <button
-                  key={tab.id}
-                  onClick={() => setActiveFilter(tab.id as any)}
-                  className={`px-2.5 py-1 rounded-sm font-medium transition-colors whitespace-nowrap ${
-                    activeFilter === tab.id
-                      ? 'bg-paper-100 text-ink-900 shadow-xs'
-                      : 'text-slate-500 hover:text-ink-900'
-                  }`}
-                >
-                  {tab.label}
-                </button>
-              ))}
-            </div>
-
-            {/* Notification List */}
-            <div className="max-h-[380px] overflow-y-auto divide-y divide-ink-900/5">
-              {filteredNotifications.length === 0 ? (
-                <div className="p-8 text-center text-slate-500 text-sm">
-                  <ShieldCheck className="h-8 w-8 text-slate-400 mx-auto mb-2" />
-                  <p className="font-medium text-ink-900">All caught up!</p>
-                  <p className="text-xs mt-1">No alerts under the selected category.</p>
-                </div>
-              ) : (
-                filteredNotifications.map((item) => {
-                  const style = getSeverityStyle(item.severity);
-                  const isRead = readIds.includes(item.id);
-
-                  return (
-                    <div
-                      key={item.id}
-                      onClick={() => handleNavigate(item.targetView, item.id)}
-                      className={`p-3.5 hover:bg-paper-50 dark:hover:bg-ink-900/30 transition-colors cursor-pointer relative group ${
-                        !isRead && item.severity !== 'success' ? 'bg-focus-blue-500/5' : ''
-                      }`}
-                    >
-                      <div className="flex items-start justify-between gap-2">
-                        <div className="flex items-start space-x-2.5 flex-1 min-w-0">
-                          <div className="mt-0.5">{style.icon}</div>
-                          <div className="flex-1 min-w-0">
-                            <div className="flex items-center space-x-2 mb-1">
-                              <span className={`inline-flex items-center text-[10px] uppercase tracking-wider font-semibold px-1.5 py-0.5 rounded border ${style.badgeBg}`}>
-                                {getCategoryIcon(item.category)}
-                                {item.category}
-                              </span>
-                              <span className="text-[11px] text-slate-400">{item.timestamp}</span>
-                            </div>
-                            <h4 className="text-xs font-semibold text-ink-900 leading-snug">
-                              {item.title}
-                            </h4>
-                            <p className="text-xs text-slate-500 mt-1 line-clamp-2 leading-relaxed">
-                              {item.description}
-                            </p>
-                          </div>
-                        </div>
-
-                        {/* Dismiss button */}
-                        <button
-                          onClick={(e) => handleDismiss(item.id, e)}
-                          title="Dismiss notification"
-                          className="opacity-0 group-hover:opacity-100 p-1 text-slate-400 hover:text-rust-700 transition-opacity"
-                        >
-                          <X className="h-3.5 w-3.5" />
-                        </button>
-                      </div>
-
-                      {/* Action Pill */}
-                      <div className="mt-2.5 flex items-center justify-between text-xs pt-2 border-t border-ink-900/5">
-                        <span className="text-[11px] text-slate-400 font-mono">
-                          Target: {item.targetView}
-                        </span>
-                        <span className="inline-flex items-center font-medium text-focus-blue-500 hover:text-focus-blue-600 transition-colors">
-                          {item.actionLabel}
-                          <ArrowRight className="h-3 w-3 ml-1" />
-                        </span>
-                      </div>
-                    </div>
-                  );
-                })
               )}
-            </div>
-
-            {/* Footer */}
-            <div className="p-2.5 bg-paper-50  border-t border-ink-900/10 flex items-center justify-between text-xs">
-              <div className="flex items-center text-slate-500">
-                <span className="h-2 w-2 rounded-full bg-ledger-green-700 mr-2"></span>
-                <span>System Monitoring Live</span>
-              </div>
-              <button
-                onClick={() => {
-                  setActiveView('System Health');
-                  setIsOpen(false);
-                }}
-                className="text-focus-blue-500 hover:underline font-medium"
-              >
-                Telemetry Dashboard →
+              <button type="button" onClick={() => setIsOpen(false)} aria-label="Close" className="p-1 text-graphite-600 hover:text-ink-900">
+                <X className="h-4 w-4" aria-hidden="true" />
               </button>
             </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+          </div>
+
+          <div className="flex gap-4 overflow-x-auto border-b border-feint px-4 text-[12.5px]" role="tablist" aria-label="Filter notifications">
+            {[
+              { id: 'ALL', label: 'All' },
+              { id: 'INVOICE', label: 'Sales' },
+              { id: 'PAYROLL', label: 'Payroll' },
+              { id: 'SYSTEM', label: 'System' },
+              { id: 'INVENTORY', label: 'Stock' },
+            ].map((tab) => (
+              <button
+                key={tab.id}
+                type="button"
+                role="tab"
+                aria-selected={activeFilter === tab.id}
+                onClick={() => setActiveFilter(tab.id as any)}
+                className={`-mb-px whitespace-nowrap border-b-2 py-2 ${activeFilter === tab.id ? 'border-oxblood font-semibold text-ink-900' : 'border-transparent text-graphite-600 hover:text-ink-900'}`}
+              >
+                {tab.label}
+              </button>
+            ))}
+          </div>
+
+          <ul className="max-h-[380px] overflow-y-auto">
+            {filteredNotifications.length === 0 ? (
+              <li className="px-4 py-8 text-center">
+                <p className="text-[14px] text-ink-900">
+                  <Mark kind="tick" label="Nothing needs your attention." />
+                </p>
+              </li>
+            ) : (
+              filteredNotifications.map((item) => {
+                const isRead = readIds.includes(item.id);
+                return (
+                  <li key={item.id} className="group relative border-b border-feint">
+                    <button type="button" onClick={() => handleNavigate(item.targetView, item.id)} className="flex w-full items-start gap-2.5 px-4 py-3 pr-10 text-left hover:bg-paper-200">
+                      <span className="mt-0.5">{markFor(item.severity)}</span>
+                      <span className="min-w-0 flex-1">
+                        <span className="flex items-baseline justify-between gap-3">
+                          <span className={`text-[13.5px] leading-snug text-ink-900 ${isRead ? '' : 'font-semibold'}`}>
+                            {item.title}
+                            {!isRead && <span className="sr-only"> (new)</span>}
+                          </span>
+                          <span className="shrink-0 text-[11.5px] text-graphite-600">{item.timestamp}</span>
+                        </span>
+                        <span className="mt-0.5 flex items-baseline justify-between gap-3 text-[12.5px] leading-relaxed text-graphite-600">
+                          <span className="line-clamp-2">{item.description}</span>
+                          {item.amountCents !== undefined && <Amount cents={item.amountCents} size="sm" tone="ink" className="shrink-0" />}
+                        </span>
+                        <span className="mt-1.5 block text-[12.5px] text-oxblood underline underline-offset-[3px]">
+                          {item.actionLabel}
+                        </span>
+                      </span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={(e) => handleDismiss(item.id, e)}
+                      aria-label={`Dismiss ${item.title}`}
+                      className="absolute right-2 top-2.5 p-1 text-graphite-600 opacity-100 hover:text-ink-900 sm:opacity-0 sm:group-hover:opacity-100 sm:focus:opacity-100"
+                    >
+                      <X className="h-3.5 w-3.5" aria-hidden="true" />
+                    </button>
+                  </li>
+                );
+              })
+            )}
+          </ul>
+
+          <div className="flex items-center justify-between gap-3 px-4 py-2 text-[12px] text-graphite-600">
+            <span>Checked when this panel opens</span>
+            <button
+              type="button"
+              onClick={() => {
+                setActiveView('System Health');
+                setIsOpen(false);
+              }}
+              className={buttonClass.quiet}
+            >
+              System health
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -1,7 +1,13 @@
 import { getSupabase } from './supabase';
-import { LedgerService } from './ledger';
-import { AccountService } from './accounts';
 import { EtimsService } from './etims';
+
+export interface InvoiceLineInput {
+  description: string;
+  accountId: string;
+  amountCents: number;
+  foreignAmountCents?: number;
+  taxCents?: number;
+}
 
 export interface InvoiceInput {
   orgId: string;
@@ -11,15 +17,105 @@ export interface InvoiceInput {
   dueDate: string;
   currency?: string;
   exchangeRate?: number;
-  foreignAmountCents?: number;
   notes?: string;
-  lines: {
-    description: string;
-    accountId: string;
-    amountCents: number;
-    foreignAmountCents?: number;
-  }[];
+  lines: InvoiceLineInput[];
+  idempotencyKey: string;
   createdBy: string;
+}
+
+export interface InvoicePaymentInput {
+  amountCents: number;
+  paymentDate: string;
+  depositAccountId: string;
+  idempotencyKey: string;
+  createdBy: string;
+}
+
+function mapInvoiceLine(row: any) {
+  return {
+    id: row.id,
+    invoiceId: row.invoice_id,
+    description: row.description,
+    accountId: row.account_id,
+    amountCents: Number(row.amount_cents) || 0,
+    foreignAmountCents: row.foreign_amount_cents == null ? null : Number(row.foreign_amount_cents),
+    taxCents: Number(row.tax_cents) || 0,
+    foreignTaxCents: Number(row.foreign_tax_cents) || 0,
+    createdAt: row.created_at,
+  };
+}
+
+function mapInvoicePayment(row: any) {
+  return {
+    id: row.id,
+    invoiceId: row.invoice_id,
+    amountCents: Number(row.amount_cents) || 0,
+    currency: row.currency,
+    foreignAmountCents: Number(row.foreign_amount_cents) || 0,
+    exchangeRate: Number(row.exchange_rate) || 1,
+    paymentDate: row.payment_date,
+    accountId: row.account_id,
+    journalEntryId: row.journal_entry_id,
+    createdAt: row.created_at,
+  };
+}
+
+function mapInvoice(row: any) {
+  return {
+    id: row.id,
+    orgId: row.org_id,
+    invoiceNumber: row.invoice_number,
+    invoiceNo: row.invoice_number,
+    customerId: row.customer_id,
+    date: row.date,
+    issueDate: row.date,
+    dueDate: row.due_date,
+    subtotalCents: Number(row.subtotal_cents) || 0,
+    taxCents: Number(row.tax_cents) || 0,
+    totalCents: Number(row.total_cents) || 0,
+    amountDueCents: Number(row.amount_due_cents) || 0,
+    status: row.status,
+    currency: row.currency,
+    exchangeRate: row.exchange_rate == null ? null : Number(row.exchange_rate),
+    foreignAmountCents: row.foreign_amount_cents == null ? null : Number(row.foreign_amount_cents),
+    notes: row.notes,
+    createdBy: row.created_by,
+    createdAt: row.created_at,
+    lines: (row.invoice_lines || []).map(mapInvoiceLine),
+    payments: (row.invoice_payments || []).map(mapInvoicePayment),
+  };
+}
+
+async function assertInvoiceRelations(orgId: string, customerId: string, lines: InvoiceLineInput[]) {
+  const supabase = getSupabase();
+  const accountIds = [...new Set(lines.map((line) => line.accountId))];
+  const [{ data: customer, error: customerError }, { data: accounts, error: accountsError }] = await Promise.all([
+    supabase.from('customers').select('id').eq('org_id', orgId).eq('id', customerId).maybeSingle(),
+    supabase.from('accounts').select('id, is_active').eq('org_id', orgId).in('id', accountIds),
+  ]);
+
+  if (customerError) throw customerError;
+  if (!customer) throw new Error('The selected customer does not belong to this organization.');
+  if (accountsError) throw accountsError;
+
+  const activeAccountIds = new Set((accounts || []).filter((account: any) => account.is_active !== false).map((account: any) => account.id));
+  const missingAccount = accountIds.find((accountId) => !activeAccountIds.has(accountId));
+  if (missingAccount) throw new Error('One or more invoice accounts do not belong to this organization or are inactive.');
+}
+
+async function assertDepositAccount(orgId: string, accountId: string) {
+  const supabase = getSupabase();
+  const { data, error } = await supabase
+    .from('accounts')
+    .select('id, type, is_active')
+    .eq('org_id', orgId)
+    .eq('id', accountId)
+    .maybeSingle();
+
+  if (error) throw error;
+  if (!data || data.is_active === false || data.type !== 'ASSET') {
+    throw new Error('The deposit account must be an active asset account in this organization.');
+  }
 }
 
 export class InvoiceService {
@@ -27,231 +123,123 @@ export class InvoiceService {
     const supabase = getSupabase();
     const { data, error } = await supabase
       .from('invoices')
-      .select('*')
+      .select('*, invoice_lines(*), invoice_payments(*)')
       .eq('org_id', orgId)
       .order('created_at', { ascending: false });
-      
+
     if (error) throw error;
-    
-    return (data || []).map(row => ({
-      id: row.id,
-      orgId: row.org_id,
-      invoiceNumber: row.invoice_number,
-      invoiceNo: row.invoice_number,
-      customerId: row.customer_id,
-      date: row.date,
-      issueDate: row.date,
-      dueDate: row.due_date,
-      subtotalCents: row.subtotal_cents,
-      taxCents: row.tax_cents,
-      totalCents: row.total_cents,
-      amountDueCents: row.amount_due_cents,
-      status: row.status,
-      currency: row.currency,
-      exchangeRate: row.exchange_rate,
-      foreignAmountCents: row.foreign_amount_cents,
-      notes: row.notes,
-      createdBy: row.created_by,
-      createdAt: row.created_at
-    }));
+    return (data || []).map(mapInvoice);
   }
 
-  static async createInvoice(input: InvoiceInput) {
-    const supabase = getSupabase();
-    const currency = (input.currency || 'KES').toUpperCase();
+  static async createInvoice(input: InvoiceInput): Promise<string> {
+    await assertInvoiceRelations(input.orgId, input.customerId, input.lines);
+
+    const currency = (input.currency || 'KES').trim().toUpperCase();
     const exchangeRate = input.exchangeRate && input.exchangeRate > 0 ? input.exchangeRate : 1;
-    
-    // 1. Find Accounts Receivable account (Code 1100)
-    const arAccount = await AccountService.getAccountByCode(input.orgId, '1100');
-    if (!arAccount) {
-      throw new Error('A/R account (1100) not found. Please seed the chart of accounts.');
-    }
+    const lines = input.lines.map((line) => ({
+      description: line.description.trim(),
+      accountId: line.accountId,
+      amountCents: Math.trunc(line.amountCents),
+      foreignAmountCents: line.foreignAmountCents == null ? null : Math.trunc(line.foreignAmountCents),
+      taxCents: Math.trunc(line.taxCents || 0),
+    }));
 
-    // 2. Calculate Total in foreign and base currency
-    let totalCents = 0;
-    let totalForeignCents = 0;
-    for (const line of input.lines) {
-      const lineForeign = line.foreignAmountCents || line.amountCents;
-      totalForeignCents += lineForeign;
-      totalCents += line.amountCents;
-    }
+    const supabase = getSupabase();
+    const { data, error } = await supabase.rpc('create_invoice_with_journal', {
+      p_org_id: input.orgId,
+      p_customer_id: input.customerId,
+      p_issue_date: input.issueDate,
+      p_due_date: input.dueDate,
+      p_currency: currency,
+      p_exchange_rate: exchangeRate,
+      p_notes: input.notes?.trim() || null,
+      p_created_by: input.createdBy,
+      p_idempotency_key: input.idempotencyKey,
+      p_lines: lines,
+    });
 
-    if (totalCents === 0 && totalForeignCents > 0) {
-      totalCents = Math.round(totalForeignCents / exchangeRate);
-    }
+    if (error) throw error;
+    if (typeof data !== 'string') throw new Error('Invoice creation did not return an invoice ID.');
 
-    // 3. Prepare Ledger Lines (Base currency equivalent posted to ledger core)
-    const journalLines = [
-      {
-        accountId: arAccount.id,
-        debit: totalCents,
-        credit: 0,
-        description: currency !== 'KES' ? `Invoice A/R (${currency} ${(totalForeignCents / 100).toFixed(2)} @ ${exchangeRate})` : undefined,
-        entityType: 'CUSTOMER' as const,
-        entityId: input.customerId,
-      }
-    ];
-
-    for (const line of input.lines) {
-      const lineAmountCents = line.amountCents || Math.round((line.foreignAmountCents || 0) / exchangeRate);
-      journalLines.push({
-        accountId: line.accountId,
-        debit: 0,
-        credit: lineAmountCents,
-        description: line.description,
-        entityType: 'CUSTOMER' as const,
-        entityId: input.customerId,
-      });
-    }
-
-    const { data: counterData, error: counterError } = await supabase.rpc('increment_and_get', { p_org_id: input.orgId, p_doc_type: 'INV' });
-    if (counterError) throw counterError;
-    const invoiceNo = `INV-${new Date(input.issueDate).getFullYear()}-${String(counterData).padStart(4, '0')}`;
-
-    // 4. Save Invoice Record first to get the ID
-    const { data: invoice, error: invoiceError } = await supabase
-      .from('invoices')
-      .insert({
-        org_id: input.orgId,
-        invoice_number: invoiceNo,
-        customer_id: input.customerId,
-        date: input.issueDate,
-        due_date: input.dueDate,
-        subtotal_cents: totalCents,
-        tax_cents: 0,
-        total_cents: totalCents,
-        amount_due_cents: totalCents,
-        status: 'SENT',
-        currency: currency,
-        notes: input.notes || null,
-        created_by: input.createdBy || null
-      })
-      .select('id')
-      .single();
-
-    if (invoiceError) throw invoiceError;
-    const invoiceRefId = invoice.id;
-
-    // 5. Post to Ledger Core (This asserts double-entry integrity)
+    // eTIMS remains a separately queued integration; failure must not unwind a
+    // successfully committed financial transaction.
     try {
-      await LedgerService.postJournalEntry({
-        orgId: input.orgId,
-        entryDate: input.issueDate,
-        memo: `Invoice ${invoiceNo}${currency !== 'KES' ? ` [${currency}]` : ''}`,
-        sourceType: 'INVOICE',
-        sourceId: invoiceRefId,
-        referenceNo: invoiceNo,
-        createdBy: input.createdBy,
-        lines: journalLines
-      });
-    } catch (error) {
-      const { error: cleanupError } = await supabase
+      await EtimsService.submitInvoice(input.orgId, data, { currency, exchangeRate, lines });
+    } catch (err) {
+      console.warn('eTIMS submission could not be queued:', err);
+    }
+
+    return data;
+  }
+
+  static async receivePayment(orgId: string, invoiceId: string, input: InvoicePaymentInput) {
+    const supabase = getSupabase();
+    const [invoiceResult] = await Promise.all([
+      supabase
         .from('invoices')
-        .delete()
-        .eq('id', invoiceRefId)
-        .eq('org_id', input.orgId);
+        .select('id, status, amount_due_cents')
+        .eq('org_id', orgId)
+        .eq('id', invoiceId)
+        .maybeSingle(),
+      assertDepositAccount(orgId, input.depositAccountId),
+    ]);
 
-      if (cleanupError) {
-        console.error('Failed to remove invoice after ledger posting failed:', cleanupError);
-      }
-      throw error;
-    }
+    if (invoiceResult.error) throw invoiceResult.error;
+    const invoice = invoiceResult.data;
+    if (!invoice) throw new Error('Invoice not found in this organization.');
+    if (invoice.status === 'VOID') throw new Error('A void invoice cannot receive a payment.');
+    if (input.amountCents > Number(invoice.amount_due_cents)) throw new Error('Payment cannot exceed the invoice amount due.');
 
-    // 6. Submit to KRA eTIMS (Mock)
-    let etimsData = null;
-    try {
-      etimsData = await EtimsService.submitInvoice(input.orgId, invoiceRefId, {
-        invoiceNo,
-        totalCents,
-        lines: input.lines
-      });
-    } catch (err: any) {
-      console.warn('eTIMS Submission Failed (Continuing with Invoice creation):', err.message);
-    }
+    const { data, error } = await supabase.rpc('receive_invoice_payment', {
+      p_org_id: orgId,
+      p_invoice_id: invoiceId,
+      p_amount_cents: Math.trunc(input.amountCents),
+      p_payment_date: input.paymentDate,
+      p_deposit_account_id: input.depositAccountId,
+      p_idempotency_key: input.idempotencyKey,
+      p_created_by: input.createdBy,
+    });
 
-    // If eTIMS succeeded, we could update the invoice record here with etims status, 
-    // but the original code was keeping this simple. Let's just return.
-
-    return invoiceRefId;
+    if (error) throw error;
+    return data as {
+      paymentId: string;
+      journalEntryId: string;
+      amountDueCents: number;
+      status: string;
+    };
   }
 
   static async voidInvoice(orgId: string, invoiceId: string, voidedBy: string) {
     const supabase = getSupabase();
-    
-    // Get invoice to void
-    const { data: invoice, error: invoiceError } = await supabase
-      .from('invoices')
-      .select('*')
-      .eq('id', invoiceId)
-      .eq('org_id', orgId)
-      .single();
-      
-    if (invoiceError || !invoice) {
-      throw new Error('Invoice not found or already voided');
-    }
-    
-    if (invoice.status === 'VOID') {
-      return; // Already voided
-    }
-
-    // Reverse the journal entries FIRST. Only flip the invoice's status once
-    // the reversing entry has actually posted, so a failed reversal never
-    // leaves the invoice marked VOID with the original ledger entry still live.
-    const journalEntries = await LedgerService.getJournalEntries(orgId);
-    const originalEntry = journalEntries.find(je => je.sourceType === 'INVOICE' && je.sourceId === invoiceId);
-
-    if (originalEntry) {
-      const reversingLines = originalEntry.lines.map(line => ({
-        accountId: line.accountId,
-        debit: line.credit,
-        credit: line.debit,
-        description: `VOID: ${line.description || ''}`,
-        entityType: line.entityType,
-        entityId: line.entityId
-      }));
-
-      await LedgerService.postJournalEntry({
-        orgId: orgId,
-        entryDate: new Date().toISOString().split('T')[0],
-        memo: `Void Invoice ${invoice.invoice_number}`,
-        sourceType: 'INVOICE',
-        sourceId: invoiceId, // Reference the same invoice ID
-        referenceNo: `VOID-${invoice.invoice_number}`,
-        createdBy: voidedBy,
-        lines: reversingLines
-      });
-    }
-
-    // Update invoice status only after the reversal succeeded (or there was
-    // no original entry to reverse).
-    const { error: updateError } = await supabase
-      .from('invoices')
-      .update({ status: 'VOID' })
-      .eq('id', invoiceId);
-
-    if (updateError) throw updateError;
+    const { error } = await supabase.rpc('void_invoice_with_reversal', {
+      p_org_id: orgId,
+      p_invoice_id: invoiceId,
+      p_void_date: new Date().toISOString().slice(0, 10),
+      p_created_by: voidedBy,
+    });
+    if (error) throw error;
   }
 
-  static async updateInvoice(orgId: string, id: string, input: any) {
+  static async updateInvoice(orgId: string, id: string, input: { dueDate?: string; notes?: string; status?: never }) {
     const supabase = getSupabase();
-
-    if (input.status !== undefined) {
+    if ((input as any).status !== undefined) {
       throw new Error('Invoice status must be changed through a dedicated payment or void workflow.');
     }
-    
-    // Only allow metadata updates
-    const updateData: any = {};
+
+    const updateData: Record<string, unknown> = {};
     if (input.dueDate !== undefined) updateData.due_date = input.dueDate;
-    if (input.notes !== undefined) updateData.notes = input.notes;
-    
+    if (input.notes !== undefined) updateData.notes = input.notes.trim() || null;
+
     if (Object.keys(updateData).length > 0) {
-      const { error } = await supabase
+      const { data, error } = await supabase
         .from('invoices')
         .update(updateData)
         .eq('id', id)
-        .eq('org_id', orgId);
-        
+        .eq('org_id', orgId)
+        .select('id')
+        .maybeSingle();
       if (error) throw error;
+      if (!data) throw new Error('Invoice not found in this organization.');
     }
   }
 }

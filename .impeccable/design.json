@@ -1,0 +1,165 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-09-17T00:00:00Z",
+  "title": "Design System: Ledger Link",
+  "extensions": {
+    "colorMeta": {
+      "paper-ground": { "role": "neutral", "displayName": "Ledger Paper", "canonical": "#FBFCFD", "dark": "#0F131B", "cssVar": "--paper-ground" },
+      "paper-sheet": { "role": "neutral", "displayName": "Clean Sheet", "canonical": "#FFFFFF", "dark": "#151A24", "cssVar": "--paper-sheet" },
+      "paper-tab": { "role": "neutral", "displayName": "Index Card", "canonical": "#EEF2F7", "dark": "#1C2230", "cssVar": "--paper-tab" },
+      "feint": { "role": "neutral", "displayName": "Feint Ruling", "canonical": "#D5E0EE", "dark": "#253043", "cssVar": "--feint" },
+      "feint-strong": { "role": "neutral", "displayName": "Strong Ruling", "canonical": "#A9BEDA", "dark": "#34435C", "cssVar": "--feint-strong" },
+      "ink": { "role": "neutral", "displayName": "Printer's Ink", "canonical": "#1A1D24", "dark": "#E6E9EF", "cssVar": "--ink", "tonalRamp": ["#1A1D24", "#343A46", "#4B5361", "#5F6776", "#8C93A0", "#A9BEDA", "#D5E0EE", "#EEF2F7"] },
+      "graphite-700": { "role": "neutral", "displayName": "Graphite 700", "canonical": "#343A46", "dark": "#CDD2DB", "cssVar": "--graphite-700" },
+      "graphite-600": { "role": "neutral", "displayName": "Graphite 600", "canonical": "#4B5361", "dark": "#B3BAC6", "cssVar": "--graphite-600" },
+      "graphite-500": { "role": "neutral", "displayName": "Graphite 500", "canonical": "#5F6776", "dark": "#9AA2B0", "cssVar": "--graphite-500" },
+      "graphite-400": { "role": "neutral", "displayName": "Graphite 400", "canonical": "#8C93A0", "dark": "#6E7686", "cssVar": "--graphite-400" },
+      "field": { "role": "neutral", "displayName": "Field Stroke", "canonical": "#7F899B", "dark": "#5E6A80", "cssVar": "--field" },
+      "ink-blue": { "role": "secondary", "displayName": "Ballpoint Blue", "canonical": "#1C3F94", "dark": "#A9BEFF", "cssVar": "--ink-blue", "tonalRamp": ["#0B1A40", "#132A66", "#1C3F94", "#3A5DB3", "#6380CC", "#8FA6E0", "#BFCDF0", "#E6ECFA"] },
+      "ledger-red": { "role": "tertiary", "displayName": "Stationery Red", "canonical": "#B3202F", "dark": "#FF8C8F", "cssVar": "--red", "tonalRamp": ["#420A10", "#6E121C", "#B3202F", "#CF4553", "#E0727C", "#EDA2A8", "#F6CDD0", "#FBECEC"] },
+      "auditor-green": { "role": "tertiary", "displayName": "Auditor's Green", "canonical": "#1E6B45", "dark": "#6FCF9B", "cssVar": "--green", "tonalRamp": ["#0A2618", "#134430", "#1E6B45", "#358A61", "#5FAA83", "#8FC7A8", "#C0E1CE", "#E7F2EC"] },
+      "oxblood": { "role": "primary", "displayName": "Bookcloth Oxblood", "canonical": "#5A1A1F", "dark": "#E9A7AB", "darkFill": "#8E2F37", "cssVar": "--oxblood", "tonalRamp": ["#2B1014", "#45121A", "#5A1A1F", "#6B2228", "#8E2F37", "#C77A80", "#E9A7AB", "#F6ECEC"] },
+      "oxblood-deep": { "role": "primary", "displayName": "Pressed Oxblood", "canonical": "#45121A", "dark": "#A23842", "cssVar": "--oxblood-fill-hover" },
+      "spine-raised": { "role": "primary", "displayName": "Raised Cloth", "canonical": "#6B2228", "dark": "#3A161B", "cssVar": "--spine-raised" },
+      "spine-ink": { "role": "neutral", "displayName": "Spine Ink", "canonical": "#F6EDEA", "dark": "#F3E6E4", "cssVar": "--spine-ink" },
+      "spine-muted": { "role": "neutral", "displayName": "Spine Muted", "canonical": "#D9B8B4", "dark": "#C9A3A1", "cssVar": "--spine-muted" }
+    },
+    "typographyMeta": {
+      "display": { "displayName": "Page Heading", "purpose": "Page headings, mixed case at width 78, ruled 2px in ink beneath. 28px mobile, 34px from 640px." },
+      "headline": { "displayName": "Dialog Title", "purpose": "Titles of lifted sheets, width 78." },
+      "title": { "displayName": "Section Title", "purpose": "Section headings inside a page, ruled strong feint beneath, width 78." },
+      "figure-lead": { "displayName": "Position Figure", "purpose": "Headline money figures on Home, 21px / 26px / 32px, tabular at width 100." },
+      "body": { "displayName": "Book Body", "purpose": "Rows, notes, buttons and fields at width 100 with tabular lining figures." },
+      "label": { "displayName": "Printed Caps", "purpose": "Column heads, position labels, spine groups and tags; uppercase at width 72, 0.06em." }
+    },
+    "shadows": [
+      { "name": "lifted-sheet", "value": "0 18px 40px -16px rgb(12 16 24 / 0.32), 0 3px 8px rgb(12 16 24 / 0.08)", "darkValue": "0 18px 40px -16px rgb(0 0 0 / 0.6), 0 3px 8px rgb(0 0 0 / 0.3)", "purpose": "Dialogs, command palette, menus, undo toast, bulk action bar and the mobile spine. Nothing on the page casts a shadow." },
+      { "name": "field-focus-stroke", "value": "0 0 0 1px var(--oxblood)", "purpose": "Thickens a focused field border; not elevation." },
+      { "name": "modal-backdrop", "value": "rgb(0 0 0 / 0.45)", "purpose": "Backdrop behind modal sheets and the mobile spine. No blur." }
+    ],
+    "motion": [
+      { "name": "pen-stroke", "value": "140ms cubic-bezier(0.16, 1, 0.3, 1)", "purpose": "A tick drawn once on match, reconcile or payment (stroke-dashoffset 1 to 0). The only authored motion; collapses to 0.01ms under prefers-reduced-motion." }
+    ],
+    "breakpoints": [
+      { "name": "sm", "value": "640px" },
+      { "name": "md", "value": "768px" },
+      { "name": "lg", "value": "1024px" },
+      { "name": "xl", "value": "1280px" }
+    ]
+  },
+  "components": [
+    {
+      "name": "Primary Button",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "The one filled action in a page heading or dialog footer.",
+      "html": "<button class=\"ds-btn-primary\">Post an entry</button>",
+      "css": ".ds-btn-primary { display: inline-flex; align-items: center; justify-content: center; gap: 6px; height: 36px; padding: 0 14px; border: 0; border-radius: 3px; background: var(--oxblood-fill, #5A1A1F); color: #FFFFFF; font-family: Archivo, ui-sans-serif, system-ui, sans-serif; font-size: 13.5px; font-weight: 600; cursor: pointer; } .ds-btn-primary:hover { background: var(--oxblood-fill-hover, #45121A); } .ds-btn-primary:focus-visible { outline: 2px solid var(--oxblood, #5A1A1F); outline-offset: 2px; } .ds-btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }"
+    },
+    {
+      "name": "Secondary Button",
+      "kind": "button",
+      "refersTo": "button-secondary",
+      "description": "Every other button action: Export, Print, Cancel.",
+      "html": "<button class=\"ds-btn-secondary\">Print</button>",
+      "css": ".ds-btn-secondary { display: inline-flex; align-items: center; justify-content: center; gap: 6px; height: 36px; padding: 0 12px; border: 1px solid var(--field, #7F899B); border-radius: 3px; background: var(--paper-sheet, #FFFFFF); color: var(--ink, #1A1D24); font-family: Archivo, ui-sans-serif, system-ui, sans-serif; font-size: 13.5px; cursor: pointer; } .ds-btn-secondary:hover { border-color: var(--ink, #1A1D24); } .ds-btn-secondary:focus-visible { outline: 2px solid var(--oxblood, #5A1A1F); outline-offset: 2px; }"
+    },
+    {
+      "name": "Quiet Action",
+      "kind": "button",
+      "refersTo": "button-quiet",
+      "description": "A text action inside a row or a sentence.",
+      "html": "<button class=\"ds-btn-quiet\">All journal entries</button>",
+      "css": ".ds-btn-quiet { display: inline-flex; align-items: center; gap: 4px; padding: 0; border: 0; background: none; color: var(--oxblood, #5A1A1F); font-family: Archivo, ui-sans-serif, system-ui, sans-serif; font-size: 13px; text-decoration: underline; text-underline-offset: 3px; text-decoration-color: color-mix(in srgb, currentColor 40%, transparent); cursor: pointer; } .ds-btn-quiet:hover { text-decoration-color: currentColor; } .ds-btn-quiet:focus-visible { outline: 2px solid var(--oxblood, #5A1A1F); outline-offset: 2px; }"
+    },
+    {
+      "name": "Field",
+      "kind": "input",
+      "refersTo": "input-field",
+      "description": "Labelled field; amount inputs are right-aligned tabular figures in ballpoint blue.",
+      "html": "<label class=\"ds-field\"><span class=\"ds-field-label\">Amount received</span><input class=\"ds-field-input ds-field-amount\" value=\"46,500.00\" /><span class=\"ds-field-hint\">In KES, as it appears on the statement</span></label>",
+      "css": ".ds-field { display: block; font-family: Archivo, ui-sans-serif, system-ui, sans-serif; } .ds-field-label { display: block; font-size: 13px; font-weight: 600; color: var(--ink, #1A1D24); } .ds-field-input { display: block; box-sizing: border-box; width: 100%; height: 40px; margin-top: 6px; padding: 0 12px; border: 1px solid var(--field, #7F899B); border-radius: 3px; background: var(--paper-sheet, #FFFFFF); color: var(--ink, #1A1D24); font: inherit; font-size: 14px; font-variant-numeric: tabular-nums lining-nums; } .ds-field-input:focus { border-color: var(--oxblood, #5A1A1F); box-shadow: 0 0 0 1px var(--oxblood, #5A1A1F); outline: none; } .ds-field-amount { text-align: right; color: var(--ink-blue, #1C3F94); } .ds-field-hint { display: block; margin-top: 4px; font-size: 12.5px; color: var(--graphite-600, #4B5361); }"
+    },
+    {
+      "name": "Spine Navigation",
+      "kind": "nav",
+      "refersTo": "nav-item",
+      "description": "Oxblood bookcloth spine with printed group names and the open section as a paper thumb-index tab.",
+      "html": "<nav class=\"ds-spine\"><div class=\"ds-spine-label\"><span class=\"ds-spine-label-inner\"><span class=\"ds-spine-word\">Ledger Link</span><span class=\"ds-spine-org\">Riverside Hardware Ltd</span></span></div><p class=\"ds-spine-group\">Money</p><button class=\"ds-spine-item ds-spine-item-active\" aria-current=\"page\">Home</button><button class=\"ds-spine-item\">Banking</button><button class=\"ds-spine-item\">Sales</button></nav>",
+      "css": ".ds-spine { width: 232px; padding: 20px 0 16px; background: var(--spine, #5A1A1F); color: var(--spine-ink, #F6EDEA); font-family: Archivo, ui-sans-serif, system-ui, sans-serif; } .ds-spine-label { margin: 0 16px 16px; padding: 3px; border: 1px solid var(--spine-rule, rgb(246 237 234 / 0.14)); } .ds-spine-label-inner { display: block; padding: 10px 12px; border: 1px solid var(--spine-rule, rgb(246 237 234 / 0.14)); } .ds-spine-word { display: block; font-size: 15px; font-weight: 650; font-stretch: 72%; letter-spacing: 0.14em; text-transform: uppercase; line-height: 1; } .ds-spine-org { display: block; margin-top: 8px; font-size: 12px; color: var(--spine-muted, #D9B8B4); } .ds-spine-group { margin: 12px 0 0; padding: 0 16px 6px; font-size: 10.5px; font-weight: 650; font-stretch: 72%; letter-spacing: 0.06em; text-transform: uppercase; color: var(--spine-muted, #D9B8B4); } .ds-spine-item { display: flex; align-items: center; width: 100%; height: 36px; padding: 0 12px 0 16px; border: 0; background: none; color: var(--spine-ink, #F6EDEA); font: inherit; font-size: 13.5px; text-align: left; cursor: pointer; } .ds-spine-item:hover { background: var(--spine-raised, #6B2228); } .ds-spine-item:focus-visible { outline: 2px solid var(--spine-ink, #F6EDEA); outline-offset: -2px; } .ds-spine-item-active, .ds-spine-item-active:hover { width: calc(100% + 1px); background: var(--paper-ground, #FBFCFD); color: var(--ink, #1A1D24); font-weight: 600; }"
+    },
+    {
+      "name": "Index Tabs",
+      "kind": "nav",
+      "refersTo": "index-tab-active",
+      "description": "Printed tabs on a strong feint rule; the selected tab takes an oxblood underline.",
+      "html": "<div class=\"ds-tabs\" role=\"tablist\"><button class=\"ds-tab\" role=\"tab\" aria-selected=\"true\">Invoices <span class=\"ds-tab-count\">(12)</span></button><button class=\"ds-tab\" role=\"tab\" aria-selected=\"false\">Recurring</button><button class=\"ds-tab\" role=\"tab\" aria-selected=\"false\">Customers</button></div>",
+      "css": ".ds-tabs { display: flex; gap: 24px; border-bottom: 1px solid var(--feint-strong, #A9BEDA); font-family: Archivo, ui-sans-serif, system-ui, sans-serif; } .ds-tab { margin-bottom: -1px; padding: 12px 0 8px; border: 0; border-bottom: 2px solid transparent; background: none; color: var(--graphite-600, #4B5361); font: inherit; font-size: 14px; cursor: pointer; } .ds-tab:hover { color: var(--ink, #1A1D24); } .ds-tab[aria-selected=\"true\"] { border-bottom-color: var(--oxblood, #5A1A1F); color: var(--ink, #1A1D24); font-weight: 600; } .ds-tab:focus-visible { outline: 2px solid var(--oxblood, #5A1A1F); outline-offset: 2px; } .ds-tab-count { margin-left: 6px; font-weight: 400; color: var(--graphite-500, #5F6776); }"
+    },
+    {
+      "name": "Amount",
+      "kind": "custom",
+      "refersTo": "figure",
+      "description": "A figure as written in the book: shillings, a red hairline, cents; brackets for negatives, en dash for nil.",
+      "html": "<span class=\"ds-amount\">1,931,250<span class=\"ds-amount-rule\"></span>00</span> <span class=\"ds-amount ds-amount-loss\">(420,000<span class=\"ds-amount-rule\"></span>00)</span> <span class=\"ds-amount ds-amount-nil\">&#8211;</span>",
+      "css": ".ds-amount { display: inline-flex; align-items: baseline; white-space: nowrap; line-height: 1; font-family: Archivo, ui-sans-serif, system-ui, sans-serif; font-size: 15px; font-variant-numeric: tabular-nums lining-nums; color: var(--ink-blue, #1C3F94); } .ds-amount-rule { align-self: stretch; width: 1px; margin: 0 0.16em 0 0.14em; background: var(--red, #B3202F); opacity: 0.8; } .ds-amount-loss { color: var(--red, #B3202F); } .ds-amount-nil { color: var(--graphite-500, #5F6776); }"
+    },
+    {
+      "name": "Ruled Total",
+      "kind": "custom",
+      "refersTo": "figure",
+      "description": "Ledger rows on feint rules closing on a red single rule above and double rule below.",
+      "html": "<div class=\"ds-ledger\"><div class=\"ds-ledger-row\"><span>Gross profit</span><span class=\"ds-ledger-fig\">930,000<i></i>00</span></div><div class=\"ds-ledger-row\"><span>Operating expenses</span><span class=\"ds-ledger-fig\">(646,500<i></i>00)</span></div><div class=\"ds-ledger-row ds-ledger-total\"><span>Net profit</span><span class=\"ds-ledger-fig\">283,500<i></i>00</span></div></div>",
+      "css": ".ds-ledger { width: 360px; font-family: Archivo, ui-sans-serif, system-ui, sans-serif; font-size: 13.5px; color: var(--ink, #1A1D24); font-variant-numeric: tabular-nums lining-nums; } .ds-ledger-row { display: flex; align-items: baseline; justify-content: space-between; gap: 16px; padding: 8px 0; border-bottom: 1px solid var(--feint, #D5E0EE); } .ds-ledger-fig { display: inline-flex; align-items: baseline; } .ds-ledger-fig i { align-self: stretch; width: 1px; margin: 0 0.16em 0 0.14em; background: var(--red, #B3202F); opacity: 0.8; } .ds-ledger-total { margin-top: 1px; font-weight: 600; border-top: 1px solid var(--red, #B3202F); border-bottom: 3px double var(--red, #B3202F); }"
+    },
+    {
+      "name": "Auditor's Marks",
+      "kind": "chip",
+      "refersTo": "figure",
+      "description": "Tick, query and circled marks drawn as pen strokes, always with their word; the tick draws once in 140ms.",
+      "html": "<span class=\"ds-mark ds-mark-tick\"><svg viewBox=\"0 0 16 16\" width=\"16\" height=\"16\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path class=\"ds-pen\" pathLength=\"1\" d=\"M2.2 8.8 L6 12.6 L13.8 3.4\"/></svg>Matched</span> <span class=\"ds-mark ds-mark-query\"><svg viewBox=\"0 0 16 16\" width=\"16\" height=\"16\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M5.3 5.4 C5.3 3.6 6.6 2.6 8.1 2.6 C9.7 2.6 10.9 3.7 10.9 5.1 C10.9 6.4 10 7 9.1 7.6 C8.4 8.1 8 8.6 8 9.6 L8 10.2\"/><circle cx=\"8\" cy=\"13.2\" r=\"0.6\" fill=\"currentColor\" stroke=\"none\"/></svg>Awaiting payment</span> <span class=\"ds-mark ds-mark-circled\"><svg viewBox=\"0 0 16 16\" width=\"16\" height=\"16\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M13.4 5.2 C12.3 2.9 9.9 1.9 7.4 2.3 C4.3 2.8 2.2 5.5 2.6 8.6 C3 11.6 5.8 13.8 8.8 13.4 C11.8 13 13.9 10.3 13.5 7.3\"/></svg>Overdue</span>",
+      "css": ".ds-mark { display: inline-flex; align-items: center; gap: 6px; font-family: Archivo, ui-sans-serif, system-ui, sans-serif; font-size: 12px; } .ds-mark-tick { color: var(--green, #1E6B45); } .ds-mark-query { color: var(--graphite-600, #4B5361); } .ds-mark-circled { color: var(--red, #B3202F); } .ds-pen { stroke-dasharray: 1; stroke-dashoffset: 1; animation: ds-pen 140ms cubic-bezier(0.16, 1, 0.3, 1) forwards; } @keyframes ds-pen { to { stroke-dashoffset: 0; } } @media (prefers-reduced-motion: reduce) { .ds-pen { animation-duration: 0.01ms; } }"
+    }
+  ],
+  "narrative": {
+    "northStar": "The Counter Book",
+    "overview": "Ledger Link is the hardcover counter book every Kenyan duka already keeps, rendered in a browser: bright ledger paper with feint blue ruling, a stationery-red margin, figures written in ballpoint blue, and an oxblood bookcloth spine carrying the section index. The database does the adding up; the interface only has to read like a book an auditor would sign. Dark mode is the carbon sheet: the same page as a pale impression on near-black.\n\nThe page is dense and ruled, not boxed. Sections are separated by printed rules (a heavy 2px ink rule under a page heading, feint 1px rules between rows), never by floating cards on grey. Every figure sits in fixed digit positions, split into shillings and cents by a thin red rule, so columns of money align down the page on a phone in shop daylight and on a desk monitor through a long reconciliation session. Selection and opening are instant; the only authored motion is the pen stroke of an auditor's tick.\n\nThe build refuses the category default of fintech dashboards: KPI tiles on grey, area charts, a blue brand accent, frosted glass and soft card shadows. Blue here is ink on the page, not a brand.",
+    "keyCharacteristics": [
+      "One typeface, Archivo, at three widths: printed caps (72), condensed headings (78), body and figures (100).",
+      "Palette law: every hue has exactly one job, and no role borrows another's colour.",
+      "Ruled paper, square sheets, 2–3px controls; shadows only on sheets lifted over the page.",
+      "Figures as Shs|Cts with brackets for negatives and an en dash for nil.",
+      "Pinned brought-forward and carried-forward balances on long ledgers."
+    ],
+    "rules": [
+      { "name": "The Palette Law Rule", "body": "Blue is for figures, red for rules and trouble, green for ticks, graphite for queries, oxblood for the binding. No element picks a colour for emphasis or decoration; if a role is not on that list, it is ink or graphite.", "section": "colors" },
+      { "name": "The Ballpoint Rule", "body": "A figure written into the book is blue; a figure the book prints about itself (a total, a result, a figure carried from elsewhere) is ink. Nothing that is not a money figure is ever blue.", "section": "colors" },
+      { "name": "The Red Ink Rule", "body": "Red is never a fill for decoration and never a warning tone. It rules totals and margins, divides Shs from Cts, and marks losses and errors.", "section": "colors" },
+      { "name": "The Three Widths Rule", "body": "Width 72 is always uppercase and always a printed label; width 78 is always a mixed-case heading; width 100 is everything read or added up. Headings are never set in caps, so a longer Swahili heading still fits on a phone.", "section": "typography" },
+      { "name": "The Fixed Digit Rule", "body": "Tabular, lining figures are on at the body, on every table and on every figure. A column of money never shifts a digit.", "section": "typography" },
+      { "name": "The Ruled Not Boxed Rule", "body": "Group content with rules and whitespace. A bordered container is for a sheet (dialog, menu, palette), not for a section of the page.", "section": "layout" },
+      { "name": "The Lifted Sheet Rule", "body": "A shadow means \"this sheet is above the page and will go away\". Nothing that lives on the page casts one.", "section": "elevation" },
+      { "name": "The Cut Card Rule", "body": "No radius above 3px anywhere.", "section": "shapes" }
+    ],
+    "dos": [
+      "**Do** write money through the Amount figure: Shs|Cts with the red hairline, brackets for negatives, an en dash for nil, currency in the column head.",
+      "**Do** keep one filled oxblood primary per page heading or dialog; every other action is secondary or quiet.",
+      "**Do** close totals on a 1px red rule above and a 3px double red rule below.",
+      "**Do** separate sections with rules: 2px ink under a page heading, 1px strong feint under a section title, 1px feint between rows.",
+      "**Do** set printed labels and column heads in Archivo width 72 caps at 0.06em, headings at width 78 in mixed case, and everything else at width 100 with tabular figures.",
+      "**Do** pair every tick, query or circled mark with its word.",
+      "**Do** label anything specified but unbuilt as \"Not built\" and never render it as a working control.",
+      "**Do** state statutory dates by their rule (PAYE, NSSF and SHIF by the 9th; the Housing Levy by the ninth working day; VAT by the 20th; moved off weekends) from the one shared deadline source."
+    ],
+    "donts": [
+      "**Don't** use ballpoint blue for links, buttons, focus, chart fills or anything that is not a money figure.",
+      "**Don't** use red as a warning, notice or emphasis colour; it is for total rules, the Shs|Cts divider, losses and errors.",
+      "**Don't** put KPI figures in floating cards on grey, add area charts, or give the brand a blue accent.",
+      "**Don't** cast a shadow from anything that lives on the page, or use backdrop blur.",
+      "**Don't** round anything beyond 3px or make pills.",
+      "**Don't** animate opening, selection, hover or tabs; the pen tick is the only motion.",
+      "**Don't** set a heading in all caps or place a printed-caps eyebrow above a heading.",
+      "**Don't** repeat the currency code on every figure."
+    ]
+  }
+}

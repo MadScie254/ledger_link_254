@@ -1,33 +1,35 @@
-import React, { useState } from 'react';
-import { formatCurrency } from '../../utils/currency';
-import { format } from 'date-fns';
+import { useState } from 'react';
+import { format, subMonths } from 'date-fns';
 import { useQuery } from '@tanstack/react-query';
+import { downloadCsv } from '../../utils/exportCsv';
 import { useAppStore } from '../../store';
 import { FinancialPDFEngine } from '../../utils/pdfExport';
-import { Printer, Download, ArrowLeft, ShieldCheck } from 'lucide-react';
-import * as XLSX from 'xlsx';
+import { StatementPage, StatementSection, StatementLine, StatementSubtotal, StatementResult } from '../ledger/Statement';
+import { Mark } from '../ledger/Mark';
 
 export function TaxSummaryView({ onBack }: { onBack: () => void }) {
   const { currentOrgId, activeCompany } = useAppStore();
-  const [period, setPeriod] = useState('August 2026');
+  const [period, setPeriod] = useState(() => format(new Date(), 'MMMM yyyy'));
+  const taxPeriods = Array.from({ length: 12 }, (_, index) => format(subMonths(new Date(), index), 'MMMM yyyy'));
 
-  const { data, isLoading } = useQuery({
+  const report = useQuery({
     queryKey: ['reports_tax_summary', currentOrgId, period],
     queryFn: async () => {
-      const res = await fetch(`/api/reports/tax-summary?period=${encodeURIComponent(period)}`, {
-        headers: { 'x-org-id': currentOrgId }
-      });
+      const res = await fetch(`/api/reports/tax-summary?period=${encodeURIComponent(period)}`, { headers: { 'x-org-id': currentOrgId } });
       if (!res.ok) throw new Error('Failed to fetch Tax Summary');
       return res.json();
-    }
+    },
   });
 
+  const data = report.data;
   const outputVat = data?.outputVat || { standardRatedSalesCents: 0, vatRatePercent: 16, taxAmountCents: 0 };
   const inputVat = data?.inputVat || { claimablePurchasesCents: 0, vatRatePercent: 16, taxAmountCents: 0 };
   const withholdingTaxVat = data?.withholdingTaxVat || { withholdingRatePercent: 2, withheldAmountCents: 0 };
-  const netVatPayableCents = data?.netVatPayableCents ?? (outputVat.taxAmountCents - inputVat.taxAmountCents - withholdingTaxVat.withheldAmountCents);
+  const netVatPayableCents = data?.netVatPayableCents ?? outputVat.taxAmountCents - inputVat.taxAmountCents - withholdingTaxVat.withheldAmountCents;
   const etimsVerifiedCount = data?.etimsVerifiedCount ?? 0;
   const etimsPendingCount = data?.etimsPendingCount ?? 0;
+  const kraPin = data?.kraPin || activeCompany?.taxId;
+  const totalDeductions = inputVat.taxAmountCents + withholdingTaxVat.withheldAmountCents;
 
   const handleExportPDF = () => {
     FinancialPDFEngine.exportFinancialStatement(
@@ -36,9 +38,9 @@ export function TaxSummaryView({ onBack }: { onBack: () => void }) {
         subtitle: 'Kenya Revenue Authority Value Added Tax Return Schedule',
         period,
         companyName: activeCompany?.legalName || activeCompany?.name,
-        kraPin: data?.kraPin || activeCompany?.taxId || 'Not set',
+        kraPin: kraPin || 'Not set',
         currency: 'KES',
-        filename: `kra_vat_summary_${format(new Date(), 'yyyyMMdd')}.pdf`
+        filename: `kra_vat_summary_${format(new Date(), 'yyyyMMdd')}.pdf`,
       },
       [
         {
@@ -48,14 +50,9 @@ export function TaxSummaryView({ onBack }: { onBack: () => void }) {
             ['Standard Rated Supplies (16%)', FinancialPDFEngine.formatKES(outputVat.standardRatedSalesCents), '16%', FinancialPDFEngine.formatKES(outputVat.taxAmountCents)],
             ['Zero Rated Supplies (0%)', FinancialPDFEngine.formatKES(0), '0%', FinancialPDFEngine.formatKES(0)],
             ['Exempt Supplies', FinancialPDFEngine.formatKES(0), '0%', FinancialPDFEngine.formatKES(0)],
-            ['TOTAL OUTPUT TAX (A)', '', '', FinancialPDFEngine.formatKES(outputVat.taxAmountCents)]
+            ['TOTAL OUTPUT TAX (A)', '', '', FinancialPDFEngine.formatKES(outputVat.taxAmountCents)],
           ],
-          columnStyles: {
-            0: { cellWidth: 'auto' },
-            1: { halign: 'right' },
-            2: { halign: 'center' },
-            3: { halign: 'right', fontStyle: 'bold' }
-          }
+          columnStyles: { 0: { cellWidth: 'auto' }, 1: { halign: 'right' }, 2: { halign: 'center' }, 3: { halign: 'right', fontStyle: 'bold' } },
         },
         {
           title: '2. INPUT TAX (Purchases & Expenses)',
@@ -63,158 +60,80 @@ export function TaxSummaryView({ onBack }: { onBack: () => void }) {
           rows: [
             ['Standard Rated Local Purchases', FinancialPDFEngine.formatKES(inputVat.claimablePurchasesCents), '16%', FinancialPDFEngine.formatKES(inputVat.taxAmountCents)],
             ['Withholding VAT Deductions (2%)', '', '2%', FinancialPDFEngine.formatKES(withholdingTaxVat.withheldAmountCents)],
-            ['TOTAL INPUT TAX & DEDUCTIONS (B)', '', '', FinancialPDFEngine.formatKES(inputVat.taxAmountCents + withholdingTaxVat.withheldAmountCents)]
+            ['TOTAL INPUT TAX & DEDUCTIONS (B)', '', '', FinancialPDFEngine.formatKES(totalDeductions)],
           ],
-          columnStyles: {
-            0: { cellWidth: 'auto' },
-            1: { halign: 'right' },
-            2: { halign: 'center' },
-            3: { halign: 'right', fontStyle: 'bold' }
-          }
+          columnStyles: { 0: { cellWidth: 'auto' }, 1: { halign: 'right' }, 2: { halign: 'center' }, 3: { halign: 'right', fontStyle: 'bold' } },
         },
         {
           title: '3. NET TAX PAYABLE / (REFUND CLAIM)',
           headers: ['Calculation Line', 'Amount (KES)'],
           rows: [
             ['Total Output Tax (A)', FinancialPDFEngine.formatKES(outputVat.taxAmountCents)],
-            ['Less: Total Deductible Input Tax (B)', `(${FinancialPDFEngine.formatKES(inputVat.taxAmountCents + withholdingTaxVat.withheldAmountCents)})`],
-            ['NET VAT PAYABLE TO KRA', FinancialPDFEngine.formatKES(netVatPayableCents)]
-          ]
-        }
-      ]
+            ['Less: Total Deductible Input Tax (B)', `(${FinancialPDFEngine.formatKES(totalDeductions)})`],
+            ['NET VAT PAYABLE TO KRA', FinancialPDFEngine.formatKES(netVatPayableCents)],
+          ],
+        },
+      ],
     );
   };
 
-  const handlePrint = () => {
-    window.print();
-  };
-
-  const handleExportExcel = () => {
+  const handleExportCsv = () => {
     const excelRows = [
       ['Tax Section', 'Base Amount (KES)', 'Tax Rate', 'Tax Amount (KES)'],
       ['Standard Rated Sales (Output VAT)', outputVat.standardRatedSalesCents / 100, '16%', outputVat.taxAmountCents / 100],
       ['Standard Rated Purchases (Input VAT)', inputVat.claimablePurchasesCents / 100, '16%', inputVat.taxAmountCents / 100],
       ['Withholding VAT (WHVAT 2%)', '', '2%', withholdingTaxVat.withheldAmountCents / 100],
-      ['NET VAT PAYABLE TO KRA', '', '', netVatPayableCents / 100]
+      ['NET VAT PAYABLE TO KRA', '', '', netVatPayableCents / 100],
     ];
-    const ws = XLSX.utils.aoa_to_sheet(excelRows);
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, 'KRA VAT Summary');
-    XLSX.writeFile(wb, 'kra_vat_summary.xlsx');
+    downloadCsv('kra_vat_summary.csv', excelRows);
   };
 
-  if (isLoading) return <div className="p-16 text-center text-slate-500">Generating tax summary...</div>;
-
   return (
-    <div className="bg-paper-100 border border-ink-900/10 shadow-sm rounded-sm">
-      <div className="p-6 border-b border-ink-900/10 flex items-center justify-between bg-paper-50">
-        <div>
-          <button 
-            onClick={onBack}
-            className="text-sm font-medium text-focus-blue-500 hover:text-ink-900 mb-2 inline-flex items-center"
-          >
-            <ArrowLeft className="w-4 h-4 mr-1" /> Back to Reports
-          </button>
-          <h2 className="text-xl font-serif text-ink-900">Tax Summary (KRA VAT & eTIMS)</h2>
-          <p className="text-sm text-slate-500">Official VAT Return & Electronic Tax Invoice Schedule • {period}</p>
-        </div>
-        <div className="flex items-center space-x-3">
-          <select 
-            value={period}
-            onChange={(e) => setPeriod(e.target.value)}
-            className="bg-paper-100 border border-ink-900/20 text-ink-900 text-sm rounded-sm px-3 py-2 focus:ring-1 focus:ring-focus-blue-500 outline-none"
-          >
-            <option>August 2026</option>
-            <option>July 2026</option>
-            <option>June 2026</option>
-            <option>Q2 2026</option>
-            <option>Q1 2026</option>
+    <StatementPage
+      title="VAT and eTIMS summary"
+      period={`${period}${kraPin ? ` · KRA PIN ${kraPin}` : ''}`}
+      onBack={onBack}
+      loading={report.isLoading}
+      problem={report.isError ? { what: 'the tax summary', path: '/api/reports/tax-summary', onRetry: () => report.refetch() } : null}
+      onCsv={handleExportCsv}
+      onPdf={handleExportPDF}
+      controls={
+        <label>
+          <span className="sr-only">Period</span>
+          <select value={period} onChange={(e) => setPeriod(e.target.value)} className="h-9 px-2.5 text-[13.5px] border border-field rounded-sm bg-paper-100 text-ink-900">
+            {taxPeriods.map((option) => <option key={option}>{option}</option>)}
           </select>
-          <button onClick={handleExportExcel} className="bg-paper-100 border border-ink-900/20 text-ink-900 px-3 py-2 text-sm font-medium rounded-sm hover:bg-paper-50 transition-colors">
-            Excel
-          </button>
-          <button onClick={handlePrint} className="bg-paper-100 border border-ink-900/20 text-ink-900 px-3 py-2 text-sm font-medium rounded-sm hover:bg-paper-50 transition-colors inline-flex items-center">
-            <Printer className="w-4 h-4 mr-1.5" /> Print
-          </button>
-          <button onClick={handleExportPDF} className="bg-sidebar-bg text-sidebar-ink  px-4 py-2 text-sm font-medium rounded-sm hover:bg-sidebar-bg/90 transition-colors inline-flex items-center">
-            <Download className="w-4 h-4 mr-1.5" /> Export PDF
-          </button>
-        </div>
-      </div>
+        </label>
+      }
+    >
+      <p className="mb-3 flex flex-wrap items-center gap-x-4 gap-y-1 border-b border-feint pb-3 text-[13px] text-ink-900">
+        {etimsVerifiedCount === 0 && etimsPendingCount === 0 ? (
+          <Mark kind="query" label="No eTIMS submissions yet. Submitting needs your own OSCU or VSCU device registration with KRA." />
+        ) : (
+          <>
+            <Mark kind="tick" label={`${etimsVerifiedCount} invoices signed by eTIMS`} />
+            {etimsPendingCount > 0 && <Mark kind="query" label={`${etimsPendingCount} queued`} />}
+          </>
+        )}
+        {!kraPin && <Mark kind="circled" label="No KRA PIN recorded in Settings" />}
+      </p>
 
-      <div className="p-8 max-w-3xl mx-auto space-y-6">
-        <div className={`p-4 rounded-sm border flex items-center justify-between ${etimsVerifiedCount > 0 && etimsPendingCount === 0 ? 'bg-ledger-green-700/10 border-ledger-green-700/20' : 'bg-brass-500/10 border-brass-500/20'}`}>
-          <div className="flex items-center space-x-3">
-            <ShieldCheck className={`w-6 h-6 ${etimsVerifiedCount > 0 && etimsPendingCount === 0 ? 'text-ledger-green-700' : 'text-brass-600'}`} />
-            <div>
-              <p className="font-bold text-ink-900">
-                {etimsPendingCount === 0 && etimsVerifiedCount === 0
-                  ? 'KRA eTIMS: Not Configured'
-                  : `KRA eTIMS: ${etimsVerifiedCount} verified, ${etimsPendingCount} pending`}
-              </p>
-              <p className="text-xs text-slate-500">
-                {etimsPendingCount === 0 && etimsVerifiedCount === 0
-                  ? 'Connect your KRA Type C API credentials under Tax & Compliance to start submitting invoices electronically.'
-                  : 'Based on real eTIMS submission records for this organization.'}
-              </p>
-            </div>
-          </div>
-          <span className="text-xs font-mono font-bold px-2 py-1 bg-paper-100 rounded text-slate-700 border border-ink-900/10">
-            PIN: {data?.kraPin || activeCompany?.taxId || 'Not set'}
-          </span>
-        </div>
+      <StatementSection title="Output tax on sales">
+        <StatementLine label="Standard-rated sales" cents={outputVat.standardRatedSalesCents} muted />
+        <StatementSubtotal label="Output VAT at 16%" cents={outputVat.taxAmountCents} />
+      </StatementSection>
 
-        <div className="border border-ink-900/10 rounded-sm overflow-hidden divide-y divide-ink-900/10">
-          {/* Output VAT */}
-          <div className="p-4 bg-paper-50">
-            <h4 className="font-bold text-ink-900 text-sm mb-3">1. Output Tax (Sales & Supplies)</h4>
-            <div className="space-y-2 text-sm">
-              <div className="flex justify-between">
-                <span className="text-slate-600">Standard Rated Sales (16%)</span>
-                <span className="tabular-currency text-ink-900">{formatCurrency(outputVat.standardRatedSalesCents)}</span>
-              </div>
-              <div className="flex justify-between font-semibold border-t border-ink-900/5 pt-2">
-                <span className="text-ink-900">Total Output VAT (16%)</span>
-                <span className="tabular-currency text-ink-900">{formatCurrency(outputVat.taxAmountCents)}</span>
-              </div>
-            </div>
-          </div>
+      <StatementSection title="Input tax on purchases">
+        <StatementLine label="Claimable local purchases" cents={inputVat.claimablePurchasesCents} muted />
+        <StatementLine label="Input VAT at 16%" cents={inputVat.taxAmountCents} />
+        <StatementLine label="Withholding VAT credit at 2%" cents={withholdingTaxVat.withheldAmountCents} />
+        <StatementSubtotal label="Total deductions" cents={totalDeductions} />
+      </StatementSection>
 
-          {/* Input VAT */}
-          <div className="p-4 bg-paper-50">
-            <h4 className="font-bold text-ink-900 text-sm mb-3">2. Deductible Input Tax (Purchases)</h4>
-            <div className="space-y-2 text-sm">
-              <div className="flex justify-between">
-                <span className="text-slate-600">Claimable Local Purchases (16%)</span>
-                <span className="tabular-currency text-ink-900">{formatCurrency(inputVat.claimablePurchasesCents)}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-slate-600">Input Tax Claimed (16%)</span>
-                <span className="tabular-currency text-ink-900">{formatCurrency(inputVat.taxAmountCents)}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-slate-600">Withholding VAT Credit (2%)</span>
-                <span className="tabular-currency text-ink-900">{formatCurrency(withholdingTaxVat.withheldAmountCents)}</span>
-              </div>
-              <div className="flex justify-between font-semibold border-t border-ink-900/5 pt-2">
-                <span className="text-ink-900">Total Input Deductions</span>
-                <span className="tabular-currency text-ink-900">{formatCurrency(inputVat.taxAmountCents + withholdingTaxVat.withheldAmountCents)}</span>
-              </div>
-            </div>
-          </div>
-
-          {/* Final Net Tax */}
-          <div className="p-5 bg-sidebar-bg text-sidebar-ink  flex justify-between items-center">
-            <div>
-              <p className="text-xs uppercase tracking-widest text-slate-300">Net Tax Payable to KRA</p>
-              <p className="text-xs text-slate-400 mt-0.5">Due by 20th of the following month</p>
-            </div>
-            <p className="text-2xl font-serif font-bold tabular-currency text-ledger-green-400">
-              {formatCurrency(netVatPayableCents)}
-            </p>
-          </div>
-        </div>
-      </div>
-    </div>
+      <StatementResult label={netVatPayableCents < 0 ? 'VAT to claim back from KRA' : 'Net VAT due to KRA'} cents={netVatPayableCents} />
+      <p className="mt-2 text-[12.5px] text-graphite-600">
+        Due by the 20th of the following month. When the 20th falls on a weekend it is due the next working day.
+      </p>
+    </StatementPage>
   );
 }

@@ -14,9 +14,12 @@ export type Variables = {
 const writeRoles = new Set<OrganizationRole>(['owner', 'admin']);
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
-function isOrganizationCollectionRequest(c: Context) {
+function isUserScopedRequest(c: Context) {
   const path = new URL(c.req.url).pathname;
-  return path === '/api/organizations' && (c.req.method === 'GET' || c.req.method === 'POST');
+  return (
+    (path === '/api/organizations' && (c.req.method === 'GET' || c.req.method === 'POST')) ||
+    (path === '/api/onboarding' && (c.req.method === 'GET' || c.req.method === 'PATCH'))
+  );
 }
 
 /**
@@ -43,9 +46,9 @@ export async function requireAuthenticationAndOrganization(c: Context<{ Variable
 
   c.set('userId', user.id);
 
-  // Users can list their organizations or create their first one without an
-  // existing organization selection.
-  if (isOrganizationCollectionRequest(c)) {
+  // Personal onboarding and organization collection requests are authenticated
+  // but do not require an existing organization selection.
+  if (isUserScopedRequest(c)) {
     return next();
   }
 
