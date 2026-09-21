@@ -10,7 +10,7 @@ import {
   type ReactNode,
 } from 'react';
 import { createPortal } from 'react-dom';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useQuery } from '@tanstack/react-query';
 import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
 import {
   ArrowLeft,
@@ -149,11 +149,12 @@ export const useOnboarding = () => useContext(OnboardingContext);
 
 export function OnboardingProvider({ children }: { children: ReactNode }) {
   const { session } = useAuth();
-  const queryClient = useQueryClient();
   const setActiveView = useAppStore((state) => state.setActiveView);
   const [state, setState] = useState<OnboardingState | null>(null);
   const [language, setLanguage] = useState<Language>('en');
   const [persistenceProblem, setPersistenceProblem] = useState('');
+  const [appReady, setAppReady] = useState(false);
+  const persistQueue = useRef<Promise<void>>(Promise.resolve());
 
   const query = useQuery({
     queryKey: ['onboarding', session?.user.id],
@@ -169,44 +170,64 @@ export function OnboardingProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     if (query.data) setState(query.data);
-    if (!session) setState(null);
+    if (!session) {
+      setState(null);
+      setAppReady(false);
+    }
   }, [query.data, session]);
 
-  const mutation = useMutation({
-    mutationFn: async (next: OnboardingState) => {
-      const response = await fetch('/api/onboarding', {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(next),
-        keepalive: true,
+  useEffect(() => {
+    if (!session) return;
+    const root = document.getElementById('root');
+    if (!root) return;
+    const check = () => setAppReady(Boolean(document.querySelector('[data-tour="app-location"]')));
+    check();
+    const observer = new MutationObserver(check);
+    observer.observe(root, { childList: true, subtree: true });
+    return () => observer.disconnect();
+  }, [session]);
+
+  const persist = useCallback((next: OnboardingState) => {
+    // Serialize writes so a fast sequence of Next actions can never let an
+    // older request arrive last and move persisted progress backwards.
+    persistQueue.current = persistQueue.current
+      .catch(() => undefined)
+      .then(async () => {
+        const response = await fetch('/api/onboarding', {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(next),
+          keepalive: true,
+        });
+        if (!response.ok) throw new Error('Progress could not be saved.');
+        setPersistenceProblem('');
+      })
+      .catch(() => {
+        setPersistenceProblem('Progress is not saved yet. Check the connection before closing this page.');
       });
-      if (!response.ok) throw new Error('Progress could not be saved.');
-      return response.json() as Promise<OnboardingState>;
-    },
-    onSuccess: (saved) => {
-      setPersistenceProblem('');
-      queryClient.setQueryData(['onboarding', session?.user.id], saved);
-    },
-    onError: () => setPersistenceProblem('Progress is not saved yet. Check the connection before closing this page.'),
-  });
+  }, []);
 
   const update = useCallback((status: OnboardingStatus, step: number) => {
     const next = { status, step } satisfies OnboardingState;
     setState(next);
-    mutation.mutate(next);
-  }, [mutation]);
+    persist(next);
+  }, [persist]);
 
   const restartTutorial = useCallback(() => {
     setActiveView('Home / Dashboard');
     update('IN_PROGRESS', 0);
   }, [setActiveView, update]);
 
+  const handleStep = useCallback((step: number) => update('IN_PROGRESS', step), [update]);
+  const handleSkip = useCallback(() => update('SKIPPED', state?.step || 0), [state?.step, update]);
+  const handleComplete = useCallback(() => update('COMPLETED', TOUR_STEPS.length - 1), [update]);
+
   const value = useMemo(() => ({ restartTutorial, isReady: Boolean(state) }), [restartTutorial, state]);
 
   return (
     <OnboardingContext.Provider value={value}>
       {children}
-      {state?.status === 'NOT_ASKED' && (
+      {appReady && state?.status === 'NOT_ASKED' && (
         <WelcomeDialog
           language={language}
           onLanguageChange={setLanguage}
@@ -214,14 +235,14 @@ export function OnboardingProvider({ children }: { children: ReactNode }) {
           onSkip={() => update('SKIPPED', 0)}
         />
       )}
-      {state?.status === 'IN_PROGRESS' && (
+      {appReady && state?.status === 'IN_PROGRESS' && (
         <ProductTour
           step={Math.min(state.step, TOUR_STEPS.length - 1)}
           language={language}
           onLanguageChange={setLanguage}
-          onStep={(step) => update('IN_PROGRESS', step)}
-          onSkip={() => update('SKIPPED', state.step)}
-          onComplete={() => update('COMPLETED', TOUR_STEPS.length - 1)}
+          onStep={handleStep}
+          onSkip={handleSkip}
+          onComplete={handleComplete}
           persistenceProblem={persistenceProblem}
         />
       )}
@@ -321,9 +342,22 @@ function ProductTour({
   }, [current.view, setActiveView]);
 
   useEffect(() => {
+    const appRoot = document.getElementById('root');
+    const returnFocus = document.activeElement as HTMLElement | null;
+    const alreadyInert = appRoot?.hasAttribute('inert') || false;
+    appRoot?.setAttribute('inert', '');
+    return () => {
+      if (!alreadyInert) appRoot?.removeAttribute('inert');
+      if (returnFocus?.isConnected) returnFocus.focus();
+    };
+  }, []);
+
+  useEffect(() => {
     let observer: ResizeObserver | undefined;
     let timer = 0;
     let stopped = false;
+    let trackedElement: HTMLElement | null = null;
+    let remeasure: (() => void) | null = null;
     const started = Date.now();
     setTargetRect(null);
     setIsLocating(Boolean(current.target));
@@ -349,13 +383,17 @@ function ProductTour({
       if (stopped) return;
       const element = document.querySelector<HTMLElement>(current.target!);
       if (element && element.getClientRects().length > 0) {
+        trackedElement = element;
         element.scrollIntoView({ behavior: reducedMotion ? 'auto' : 'smooth', block: 'center', inline: 'nearest' });
         window.setTimeout(() => measure(element), reducedMotion ? 0 : 280);
         observer = new ResizeObserver(() => measure(element));
         observer.observe(element);
+        remeasure = () => measure(element);
+        window.addEventListener('resize', remeasure);
+        window.addEventListener('scroll', remeasure, true);
         return;
       }
-      if (Date.now() - started >= 5000) {
+      if (Date.now() - started >= 12000) {
         // Role-based and conditional UI may remove a target. Continue instead
         // of leaving the person with an empty spotlight.
         if (step < TOUR_STEPS.length - 1) onStep(step + 1);
@@ -369,6 +407,10 @@ function ProductTour({
       stopped = true;
       window.clearTimeout(timer);
       observer?.disconnect();
+      if (remeasure && trackedElement) {
+        window.removeEventListener('resize', remeasure);
+        window.removeEventListener('scroll', remeasure, true);
+      }
     };
   }, [current.target, onStep, reducedMotion, step]);
 
@@ -390,7 +432,7 @@ function ProductTour({
         setConfirmSkip(true);
         return;
       }
-      if (!confirmSkip && (event.key === 'ArrowRight' || (event.key === 'Enter' && !card.contains(event.target as Node)))) {
+      if (!confirmSkip && (event.key === 'ArrowRight' || event.key === 'Enter')) {
         event.preventDefault();
         goNext();
         return;
@@ -428,7 +470,7 @@ function ProductTour({
   return createPortal(
     <div className="fixed inset-0 z-[90]" aria-live="polite">
       <div className="absolute inset-0" aria-hidden="true" />
-      {targetRect && !isMobile && (
+      {targetRect && (
         <motion.div
           className="pointer-events-none fixed border-2 border-[var(--oxblood)]"
           initial={false}
@@ -437,7 +479,7 @@ function ProductTour({
           style={{ boxShadow: '0 0 0 9999px rgb(0 0 0 / 0.62), 0 0 22px color-mix(in srgb, var(--oxblood) 70%, transparent)' }}
         />
       )}
-      {(!targetRect || isMobile) && <div className="pointer-events-none fixed inset-0 bg-black/60" aria-hidden="true" />}
+      {!targetRect && <div className="pointer-events-none fixed inset-0 bg-black/60" aria-hidden="true" />}
 
       <AnimatePresence mode="wait">
         <motion.div
