@@ -674,24 +674,26 @@ export function DashboardView() {
         </section>
       )}
 
-      {/* Analysis columns */}
-      {metrics.isError ? (
-        <Problem error={metrics.error} onRetry={() => metrics.refetch()} what="the figures for this page" />
-      ) : metrics.isLoading ? (
-        <div data-tour="dashboard-summary" className="grid grid-cols-2 lg:grid-cols-4 border-b border-feint-strong" aria-busy="true" aria-label="Loading figures">
-          {[0, 1, 2, 3].map((i) => (
-            <div key={i} className={`py-4 px-4 space-y-3 ${i > 0 ? 'lg:border-l border-feint-strong' : ''}`}>
-              <div className="h-3 w-16 bg-paper-200" />
-              <div className="h-8 w-40 max-w-full bg-paper-200" />
-              <div className="h-3 w-28 bg-paper-200" />
-            </div>
-          ))}
-        </div>
-      ) : columns.length > 0 ? (
-        <section data-tour="dashboard-summary" aria-label="Position" className={`grid grid-cols-2 ${wideColumns === 4 ? 'lg:grid-cols-4' : wideColumns === 3 ? 'lg:grid-cols-3' : ''} border-b border-feint-strong`}>
-          {columns.map(renderColumn)}
-        </section>
-      ) : null}
+      {/* Analysis columns. The tour anchors to the wrapper so it exists whether the figures load, fail or are empty. */}
+      <div data-tour="dashboard-summary">
+        {metrics.isError ? (
+          <Problem error={metrics.error} onRetry={() => metrics.refetch()} what="the figures for this page" />
+        ) : metrics.isLoading ? (
+          <div className="grid grid-cols-2 lg:grid-cols-4 border-b border-feint-strong" aria-busy="true" aria-label="Loading figures">
+            {[0, 1, 2, 3].map((i) => (
+              <div key={i} className={`py-4 px-4 space-y-3 ${i > 0 ? 'lg:border-l border-feint-strong' : ''}`}>
+                <div className="h-3 w-16 bg-paper-200" />
+                <div className="h-8 w-40 max-w-full bg-paper-200" />
+                <div className="h-3 w-28 bg-paper-200" />
+              </div>
+            ))}
+          </div>
+        ) : columns.length > 0 ? (
+          <section aria-label="Position" className={`grid grid-cols-2 ${wideColumns === 4 ? 'lg:grid-cols-4' : wideColumns === 3 ? 'lg:grid-cols-3' : ''} border-b border-feint-strong`}>
+            {columns.map(renderColumn)}
+          </section>
+        ) : null}
+      </div>
 
       {/* Queries and entries */}
       <div className="mt-8 grid grid-cols-1 gap-10 lg:grid-cols-[minmax(0,19rem)_minmax(0,1fr)] lg:gap-8">

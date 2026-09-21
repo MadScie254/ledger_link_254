@@ -58,6 +58,7 @@ export function TaxView() {
   return (
     <div className="space-y-5 pb-16">
       <PageHeading
+        tourId="tax-overview"
         title="Tax"
         note={<>VAT position, eTIMS invoices and the filing calendar{kraPin ? ` · KRA PIN ${kraPin}` : ''}</>}
         actions={

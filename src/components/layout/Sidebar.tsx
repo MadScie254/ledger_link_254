@@ -80,7 +80,7 @@ export function Sidebar() {
         </div>
       </div>
 
-      <nav aria-label="Sections" className="flex-1 overflow-y-auto pb-4">
+      <nav data-tour="sidebar-index" aria-label="Sections" className="flex-1 overflow-y-auto pb-4">
         {INDEX.map((group) => (
           <section key={group.label} className="mt-3 first:mt-1">
             <h2 className="px-4 pb-1.5 ll-printed text-[10.5px] text-sidebar-muted">{group.label}</h2>

@@ -113,6 +113,7 @@ export function AuditLogView() {
   return (
     <div className="space-y-5 pb-16">
       <PageHeading
+        tourId="audit-overview"
         title="Audit log"
         note="Every change to accounts, entries and the team, in the order it happened. Entries cannot be edited or removed."
         actions={

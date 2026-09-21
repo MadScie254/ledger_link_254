@@ -20,6 +20,7 @@ export function AppsView() {
   return (
     <div className="max-w-4xl space-y-5 pb-16">
       <PageHeading
+        tourId="apps-overview"
         title="Integrations"
         note="Only the KRA eTIMS queue exists in Ledger Link today. The other connections are planned and not built, so none of them can be switched on."
       />

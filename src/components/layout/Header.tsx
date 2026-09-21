@@ -142,6 +142,7 @@ export function Header() {
 
         <button
           type="button"
+          data-tour="header-search"
           onClick={() => setCommandPaletteOpen(true)}
           className="ml-auto hidden md:flex w-64 lg:w-80 items-center gap-2 h-8 px-2.5 border border-field rounded-sm bg-paper-100 text-[12.5px] text-graphite-500 hover:border-ink-900 hover:text-ink-900"
         >
@@ -153,6 +154,7 @@ export function Header() {
         <div className="ml-auto md:ml-2 flex items-center gap-1">
           <button
             type="button"
+            data-tour="header-search"
             onClick={() => setCommandPaletteOpen(true)}
             className="md:hidden p-2 text-graphite-600 hover:text-ink-900"
             aria-label="Find a record or report"

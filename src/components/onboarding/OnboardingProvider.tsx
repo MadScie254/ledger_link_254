@@ -10,22 +10,36 @@ import {
   type ReactNode,
 } from 'react';
 import { createPortal } from 'react-dom';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
 import {
   ArrowLeft,
   ArrowRight,
+  Bell,
   BookOpen,
+  Boxes,
   ChartNoAxesCombined,
   Check,
   CircleCheckBig,
+  Contact,
   FilePlus2,
+  FolderKanban,
   Landmark,
   LayoutDashboard,
+  LifeBuoy,
   LoaderCircle,
+  MessageSquareText,
+  PanelLeft,
+  Percent,
+  Plug,
+  ReceiptText,
+  Scale,
+  ScrollText,
+  Search,
   Settings2,
   SkipForward,
   Users,
+  Wallet,
   type LucideIcon,
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthProvider';
@@ -33,100 +47,40 @@ import { useAppStore } from '../../store';
 import type { OnboardingState, OnboardingStatus } from '../../server/onboarding';
 import { Dialog } from '../ledger/Dialog';
 import { buttonClass } from '../ledger/Page';
+import { CHAPTERS, TOUR_STEPS, type Language, type TourIcon } from './tourSteps';
 
-type Language = 'en' | 'sw';
-type Copy = Record<Language, string>;
-
-interface TourStep {
-  title: Copy;
-  body: Copy;
-  view?: string;
-  target?: string;
-  icon: LucideIcon;
-}
-
-const TOUR_STEPS: TourStep[] = [
-  {
-    title: { en: 'Welcome to your books', sw: 'Karibu kwenye vitabu vyako' },
-    body: {
-      en: 'Ledger Link keeps sales, bills, payments, and reports together for your business.',
-      sw: 'Ledger Link huweka mauzo, bili, malipo na ripoti za biashara yako mahali pamoja.',
-    },
-    view: 'Home / Dashboard',
-    target: '[data-tour="app-location"]',
-    icon: BookOpen,
-  },
-  {
-    title: { en: 'Start with the day’s position', sw: 'Anza na hali ya biashara leo' },
-    body: {
-      en: 'These figures show the cash you have, money customers owe, bills to pay, and the result for the period.',
-      sw: 'Takwimu hizi zinaonyesha fedha ulizo nazo, madeni ya wateja, bili za kulipa na matokeo ya kipindi.',
-    },
-    view: 'Home / Dashboard',
-    target: '[data-tour="dashboard-summary"]',
-    icon: LayoutDashboard,
-  },
-  {
-    title: { en: 'Record a sale with an invoice', sw: 'Rekodi mauzo kwa ankara' },
-    body: {
-      en: 'Create an invoice when a customer owes the business. Ledger Link records the sale in the books for you.',
-      sw: 'Tengeneza ankara mteja anapodaiwa na biashara. Ledger Link hurekodi mauzo kwenye vitabu kwa niaba yako.',
-    },
-    view: 'Sales',
-    target: '[data-tour="new-invoice"]',
-    icon: FilePlus2,
-  },
-  {
-    title: { en: 'Match money to the right record', sw: 'Linganisha fedha na rekodi sahihi' },
-    body: {
-      en: 'Banking brings in bank and M-Pesa lines. Matching a line to an invoice or bill explains what the money was for.',
-      sw: 'Banking huleta miamala ya benki na M-Pesa. Kulinganisha muamala na ankara au bili huonyesha fedha ilikuwa ya nini.',
-    },
-    view: 'Banking',
-    target: '[data-tour="banking-overview"]',
-    icon: Landmark,
-  },
-  {
-    title: { en: 'See the bigger picture', sw: 'Ona picha kamili ya biashara' },
-    body: {
-      en: 'Reports turn your records into clear statements about profit, cash, what the business owns, and what it owes.',
-      sw: 'Ripoti hubadilisha rekodi zako kuwa taarifa wazi za faida, fedha, mali ya biashara na madeni yake.',
-    },
-    view: 'Reports',
-    target: '[data-tour="reports-overview"]',
-    icon: ChartNoAxesCombined,
-  },
-  {
-    title: { en: 'Work with your team', sw: 'Fanya kazi na timu yako' },
-    body: {
-      en: 'Owners and admins can invite another person and choose what they may change in these books.',
-      sw: 'Wamiliki na wasimamizi wanaweza kualika mtu mwingine na kuchagua anachoweza kubadilisha kwenye vitabu hivi.',
-    },
-    view: 'Team',
-    target: '[data-tour="team-overview"]',
-    icon: Users,
-  },
-  {
-    title: { en: 'Help is always here', sw: 'Msaada unapatikana hapa kila wakati' },
-    body: {
-      en: 'Open Settings whenever you want to run this tutorial again. Restarting it never changes your business data.',
-      sw: 'Fungua Settings wakati wowote unapotaka kuanza mafunzo haya tena. Kuanzisha upya hakubadilishi data ya biashara yako.',
-    },
-    view: 'Settings',
-    target: '[data-tour="restart-tutorial"]',
-    icon: Settings2,
-  },
-  {
-    title: { en: 'The books are ready', sw: 'Vitabu viko tayari' },
-    body: {
-      en: 'Begin with a sale, a bill, or a bank line. Ledger Link will keep the reports connected to every record.',
-      sw: 'Anza na mauzo, bili au muamala wa benki. Ledger Link itaunganisha kila rekodi na ripoti zako.',
-    },
-    icon: CircleCheckBig,
-  },
-];
+const ICONS: Record<TourIcon, LucideIcon> = {
+  book: BookOpen,
+  sidebar: PanelLeft,
+  search: Search,
+  bell: Bell,
+  dashboard: LayoutDashboard,
+  bank: Landmark,
+  invoice: FilePlus2,
+  customers: Contact,
+  bills: ReceiptText,
+  accounting: Scale,
+  reports: ChartNoAxesCombined,
+  tax: Percent,
+  payroll: Wallet,
+  inventory: Boxes,
+  projects: FolderKanban,
+  feed: MessageSquareText,
+  team: Users,
+  plug: Plug,
+  audit: ScrollText,
+  settings: Settings2,
+  help: LifeBuoy,
+  done: CircleCheckBig,
+};
 
 const FOCUSABLE = 'button:not([disabled]), a[href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
+
+/** After this long without finding a step's target, show the explanation without a spotlight. */
+const MISSING_AFTER_MS = 6000;
+const FALLBACK_CARD_HEIGHT = 420;
+/** Below this, a phone sheet is too short to read, so it may overlap the target instead. */
+const MIN_SHEET_HEIGHT = 260;
 
 interface Rect {
   top: number;
@@ -147,8 +101,21 @@ const OnboardingContext = createContext<OnboardingContextValue>({
 
 export const useOnboarding = () => useContext(OnboardingContext);
 
+/**
+ * Several elements can share one anchor (the phone tab bar and the desktop
+ * sidebar are both "sidebar-index"). Take the first one that is on screen.
+ */
+function findVisible(selector: string): HTMLElement | null {
+  for (const element of document.querySelectorAll<HTMLElement>(selector)) {
+    const box = element.getBoundingClientRect();
+    if (box.width > 0 && box.height > 0) return element;
+  }
+  return null;
+}
+
 export function OnboardingProvider({ children }: { children: ReactNode }) {
   const { session } = useAuth();
+  const queryClient = useQueryClient();
   const setActiveView = useAppStore((state) => state.setActiveView);
   const activeCompany = useAppStore((state) => state.activeCompany);
   const [state, setState] = useState<OnboardingState | null>(null);
@@ -156,9 +123,10 @@ export function OnboardingProvider({ children }: { children: ReactNode }) {
   const [persistenceProblem, setPersistenceProblem] = useState('');
   const [appReady, setAppReady] = useState(false);
   const persistQueue = useRef<Promise<void>>(Promise.resolve());
+  const userId = session?.user.id;
 
   const query = useQuery({
-    queryKey: ['onboarding', session?.user.id],
+    queryKey: ['onboarding', userId],
     enabled: Boolean(session),
     queryFn: async () => {
       const response = await fetch('/api/onboarding');
@@ -211,8 +179,12 @@ export function OnboardingProvider({ children }: { children: ReactNode }) {
   const update = useCallback((status: OnboardingStatus, step: number) => {
     const next = { status, step } satisfies OnboardingState;
     setState(next);
+    // The sync effect above re-copies query.data whenever the auth session object
+    // changes (token refresh, tab refocus). Keep the cache current so that copy
+    // can never roll a finished or in-progress tour back to NOT_ASKED.
+    queryClient.setQueryData(['onboarding', userId], next);
     persist(next);
-  }, [persist]);
+  }, [persist, queryClient, userId]);
 
   const restartTutorial = useCallback(() => {
     setActiveView('Home / Dashboard');
@@ -275,8 +247,8 @@ function WelcomeDialog({
       onClose={onSkip}
       title={language === 'en' ? 'Welcome to Ledger Link' : 'Karibu Ledger Link'}
       note={language === 'en'
-        ? 'Is this your first time here? We’ll walk through everything in about 3 minutes.'
-        : 'Je, hii ni mara yako ya kwanza hapa? Tutakuonyesha kila kitu kwa takribani dakika 3.'}
+        ? 'Is this your first time here? We’ll walk through every page in about 6 minutes, in plain words.'
+        : 'Je, hii ni mara yako ya kwanza hapa? Tutapitia kila ukurasa kwa takribani dakika 6, kwa maneno rahisi.'}
       width="sm"
       showCloseButton={false}
       footer={(
@@ -300,8 +272,8 @@ function WelcomeDialog({
       </div>
       <p className="mt-4 text-[13.5px] leading-relaxed text-graphite-600">
         {language === 'en'
-          ? 'The tour uses your real screens but will not create, edit, or remove any records.'
-          : 'Mafunzo yatatumia kurasa zako halisi bila kuunda, kubadilisha au kufuta rekodi yoyote.'}
+          ? 'No accounting experience needed. The tour uses your real screens but will not create, edit, or remove any records. You can stop at any point and continue later.'
+          : 'Huhitaji uzoefu wa uhasibu. Mafunzo yatatumia kurasa zako halisi bila kuunda, kubadilisha au kufuta rekodi yoyote. Unaweza kuacha wakati wowote na kuendelea baadaye.'}
       </p>
     </Dialog>
   );
@@ -328,11 +300,17 @@ function ProductTour({
   const setActiveView = useAppStore((state) => state.setActiveView);
   const reducedMotion = useReducedMotion();
   const titleId = useId();
-  const cardRef = useRef<HTMLDivElement>(null);
+  // Held in state, not a ref: the card is swapped out by AnimatePresence, and the
+  // effects below must re-run when the new card element mounts.
+  const [card, setCard] = useState<HTMLDivElement | null>(null);
   const [targetRect, setTargetRect] = useState<Rect | null>(null);
   const [isLocating, setIsLocating] = useState(Boolean(current.target));
+  const [missing, setMissing] = useState(false);
   const [confirmSkip, setConfirmSkip] = useState(false);
   const [isMobile, setIsMobile] = useState(() => window.innerWidth < 640);
+  const [naturalHeight, setNaturalHeight] = useState(0);
+  const StepIcon = ICONS[current.icon];
+  const en = language === 'en';
 
   const goNext = useCallback(() => {
     setConfirmSkip(false);
@@ -360,15 +338,18 @@ function ProductTour({
     };
   }, []);
 
+  // Find the step's target on whichever page it opens. A target that never
+  // appears (a failed load, a hidden section) must not cost the person the
+  // explanation, so the step is shown without a spotlight instead of skipped.
   useEffect(() => {
     let observer: ResizeObserver | undefined;
     let timer = 0;
     let settleTimer = 0;
     let stopped = false;
-    let trackedElement: HTMLElement | null = null;
-    let remeasure: (() => void) | null = null;
+    let stopTracking: (() => void) | undefined;
     const started = Date.now();
     setTargetRect(null);
+    setMissing(false);
     setIsLocating(Boolean(current.target));
 
     if (!current.target) {
@@ -385,30 +366,43 @@ function ProductTour({
         width: Math.min(window.innerWidth - 8, rect.width + padding * 2),
         height: Math.min(window.innerHeight - 8, rect.height + padding * 2),
       });
+      setMissing(false);
       setIsLocating(false);
+    };
+
+    const track = (element: HTMLElement) => {
+      // On a phone the card is a sheet over the lower part of the screen, so
+      // bring the target to the top, just under the sticky header.
+      const phone = window.innerWidth < 640;
+      if (phone) element.style.scrollMarginTop = '72px';
+      element.scrollIntoView({ behavior: reducedMotion ? 'auto' : 'smooth', block: phone ? 'start' : 'center', inline: 'nearest' });
+      settleTimer = window.setTimeout(() => measure(element), reducedMotion ? 0 : 280);
+      observer = new ResizeObserver(() => measure(element));
+      observer.observe(element);
+      const remeasure = () => measure(element);
+      window.addEventListener('resize', remeasure);
+      window.addEventListener('scroll', remeasure, true);
+      stopTracking = () => {
+        window.removeEventListener('resize', remeasure);
+        window.removeEventListener('scroll', remeasure, true);
+        if (phone) element.style.scrollMarginTop = '';
+      };
     };
 
     const locate = () => {
       if (stopped) return;
-      const element = document.querySelector<HTMLElement>(current.target!);
-      if (element && element.getClientRects().length > 0) {
-        trackedElement = element;
-        element.scrollIntoView({ behavior: reducedMotion ? 'auto' : 'smooth', block: 'center', inline: 'nearest' });
-        settleTimer = window.setTimeout(() => measure(element), reducedMotion ? 0 : 280);
-        observer = new ResizeObserver(() => measure(element));
-        observer.observe(element);
-        remeasure = () => measure(element);
-        window.addEventListener('resize', remeasure);
-        window.addEventListener('scroll', remeasure, true);
+      const element = findVisible(current.target!);
+      if (element) {
+        track(element);
         return;
       }
-      if (Date.now() - started >= 12000) {
-        // Role-based and conditional UI may remove a target. Continue instead
-        // of leaving the person with an empty spotlight.
-        if (step < TOUR_STEPS.length - 1) onStep(step + 1);
-        return;
+      const waited = Date.now() - started;
+      if (waited >= MISSING_AFTER_MS) {
+        setMissing(true);
+        setIsLocating(false);
       }
-      timer = window.setTimeout(locate, 100);
+      // Keep looking: a slow page may still arrive, and the spotlight then snaps to it.
+      timer = window.setTimeout(locate, waited >= MISSING_AFTER_MS ? 400 : 100);
     };
     timer = window.setTimeout(locate, 60);
 
@@ -417,12 +411,9 @@ function ProductTour({
       window.clearTimeout(timer);
       window.clearTimeout(settleTimer);
       observer?.disconnect();
-      if (remeasure && trackedElement) {
-        window.removeEventListener('resize', remeasure);
-        window.removeEventListener('scroll', remeasure, true);
-      }
+      stopTracking?.();
     };
-  }, [current.target, onStep, reducedMotion, step]);
+  }, [current.target, reducedMotion, step]);
 
   useEffect(() => {
     const onResize = () => setIsMobile(window.innerWidth < 640);
@@ -430,27 +421,47 @@ function ProductTour({
     return () => window.removeEventListener('resize', onResize);
   }, []);
 
+  // Place the card by the height its content wants, not the height it is
+  // currently squeezed to, so a tall card can choose the side with room for it.
   useEffect(() => {
-    const card = cardRef.current;
     if (!card) return;
-    const first = card.querySelector<HTMLElement>(FOCUSABLE);
+    const measure = () => setNaturalHeight(Array.from(card.children).reduce((total, child) => total + (child as HTMLElement).scrollHeight, 0) + 2);
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(card);
+    return () => observer.disconnect();
+  }, [card, step, confirmSkip, isLocating, missing, language]);
+
+  useEffect(() => {
+    if (!card) return;
+    // Land on Next, so Enter does what it says.
+    const first = card.querySelector<HTMLElement>('[data-tour-primary]') || card.querySelector<HTMLElement>(FOCUSABLE);
     (first || card).focus();
+  }, [card, step, confirmSkip, isLocating]);
+
+  useEffect(() => {
+    if (!card) return;
 
     const onKeyDown = (event: KeyboardEvent) => {
+      if (event.defaultPrevented || event.altKey || event.ctrlKey || event.metaKey) return;
       if (event.key === 'Escape') {
         event.preventDefault();
-        setConfirmSkip(true);
+        setConfirmSkip((open) => !open);
         return;
       }
-      if (!confirmSkip && (event.key === 'ArrowRight' || event.key === 'Enter')) {
-        event.preventDefault();
-        goNext();
-        return;
-      }
-      if (!confirmSkip && event.key === 'ArrowLeft') {
-        event.preventDefault();
-        goBack();
-        return;
+      // Enter belongs to a focused button. Only treat it as Next from the card itself.
+      const onControl = event.target instanceof Element && event.target.closest('button, a, input, select, textarea, [role="button"]');
+      if (!confirmSkip && !event.repeat) {
+        if (event.key === 'ArrowRight' || (event.key === 'Enter' && !onControl)) {
+          event.preventDefault();
+          goNext();
+          return;
+        }
+        if (event.key === 'ArrowLeft') {
+          event.preventDefault();
+          goBack();
+          return;
+        }
       }
       if (event.key !== 'Tab') return;
       const focusables = Array.from(card.querySelectorAll<HTMLElement>(FOCUSABLE)).filter((element) => element.offsetParent !== null);
@@ -472,10 +483,23 @@ function ProductTour({
 
     document.addEventListener('keydown', onKeyDown);
     return () => document.removeEventListener('keydown', onKeyDown);
-  }, [confirmSkip, goBack, goNext, step]);
+  }, [card, confirmSkip, goBack, goNext, step]);
 
-  const position = getCardPosition(targetRect, isMobile);
-  const StepIcon = current.icon;
+  // A phone sheet sits at the bottom unless the target lives down there (the tab bar).
+  const sheetAtTop = isMobile && targetRect !== null && targetRect.top > window.innerHeight / 2;
+  const placement = getCardPlacement(targetRect, naturalHeight || FALLBACK_CARD_HEIGHT);
+  // A tall target (the Home figures) would run under a full-height sheet, so
+  // the sheet takes only the room left below it and scrolls inside.
+  const roomBelowTarget = targetRect ? window.innerHeight - (targetRect.top + targetRect.height) - 8 : Infinity;
+  const sheetStyle = isMobile && !sheetAtTop && roomBelowTarget >= MIN_SHEET_HEIGHT && roomBelowTarget < window.innerHeight * 0.62
+    ? { maxHeight: roomBelowTarget }
+    : undefined;
+  const chapterName = CHAPTERS[current.chapter][language];
+  const stepLabel = en ? `Step ${step + 1} of ${TOUR_STEPS.length}` : `Hatua ${step + 1} kati ya ${TOUR_STEPS.length}`;
+
+  const cardClass = isMobile
+    ? `fixed inset-x-0 z-[92] flex max-h-[62vh] w-full flex-col overflow-hidden border border-feint-strong bg-paper-100 ll-lift focus:outline-none ${sheetAtTop ? 'top-0 border-t-0' : 'bottom-0 border-b-0'} border-x-0`
+    : 'fixed z-[92] flex max-h-[calc(100vh-2rem)] w-[min(23rem,calc(100vw-2rem))] flex-col overflow-hidden border border-feint-strong bg-paper-100 ll-lift focus:outline-none';
 
   return createPortal(
     <div className="fixed inset-0 z-[90]" aria-live="polite">
@@ -494,7 +518,7 @@ function ProductTour({
       <AnimatePresence mode="wait">
         <motion.div
           key={`${step}-${confirmSkip ? 'confirm' : 'step'}`}
-          ref={cardRef}
+          ref={setCard}
           role="dialog"
           aria-modal="true"
           aria-labelledby={titleId}
@@ -503,84 +527,119 @@ function ProductTour({
           animate={{ opacity: 1, scale: 1 }}
           exit={reducedMotion ? undefined : { opacity: 0, scale: 0.97 }}
           transition={{ duration: reducedMotion ? 0 : 0.22, ease: 'easeOut' }}
-          className={`fixed z-[92] overflow-y-auto border border-feint-strong bg-paper-100 ll-lift focus:outline-none ${isMobile ? 'inset-x-0 bottom-0 max-h-[85vh] w-full border-x-0 border-b-0 p-5 pb-[calc(1.25rem+env(safe-area-inset-bottom))]' : 'max-h-[calc(100vh-2rem)] w-[min(23rem,calc(100vw-2rem))] p-5'}`}
-          style={isMobile ? undefined : position}
+          className={cardClass}
+          style={isMobile ? sheetStyle : placement}
         >
           {confirmSkip ? (
-            <>
+            <div className="p-5">
               <div className="border border-feint-strong bg-paper-200 p-2.5 text-oxblood w-fit" aria-hidden="true">
                 <SkipForward className="h-5 w-5" />
               </div>
               <h2 id={titleId} className="ll-heading mt-4 text-[21px] text-ink-900">
-                {language === 'en' ? 'Skip the rest of the tour?' : 'Uruke mafunzo yaliyobaki?'}
+                {en ? 'Skip the rest of the tour?' : 'Uruke mafunzo yaliyobaki?'}
               </h2>
               <p className="mt-2 text-[13.5px] leading-relaxed text-graphite-600">
-                {language === 'en'
+                {en
                   ? 'Progress will be saved as skipped. You can start again from Settings at any time.'
                   : 'Hali itahifadhiwa kuwa umeruka. Unaweza kuanza tena kupitia Settings wakati wowote.'}
               </p>
               <div className="mt-5 flex justify-end gap-2 border-t border-feint pt-3">
-                <button type="button" onClick={() => setConfirmSkip(false)} className={buttonClass.secondary}>
-                  {language === 'en' ? 'Continue tour' : 'Endelea na mafunzo'}
+                <button type="button" data-tour-primary onClick={() => setConfirmSkip(false)} className={buttonClass.secondary}>
+                  {en ? 'Continue tour' : 'Endelea na mafunzo'}
                 </button>
                 <button type="button" onClick={onSkip} className={buttonClass.primary}>
-                  {language === 'en' ? 'Skip tour' : 'Ruka mafunzo'}
+                  {en ? 'Skip tour' : 'Ruka mafunzo'}
                 </button>
               </div>
-            </>
+            </div>
           ) : isLocating ? (
-            <div className="flex min-h-32 items-center gap-3" role="status">
+            <div className="flex min-h-32 items-center gap-3 p-5" role="status">
               <LoaderCircle className="h-5 w-5 animate-spin text-oxblood" aria-hidden="true" />
-              <p className="text-[13.5px] text-graphite-600">
-                {language === 'en' ? 'Opening the next page…' : 'Inafungua ukurasa unaofuata…'}
+              <p id={titleId} className="text-[13.5px] text-graphite-600">
+                {en ? 'Opening the next page…' : 'Inafungua ukurasa unaofuata…'}
               </p>
             </div>
           ) : (
             <>
-              <div className="flex items-start justify-between gap-4">
-                <div className="border border-feint-strong bg-paper-200 p-2.5 text-oxblood" aria-hidden="true">
-                  <StepIcon className="h-5 w-5" />
+              <div className="min-h-0 flex-1 overflow-y-auto px-5 pb-3 pt-5">
+                <div className="flex items-start justify-between gap-4">
+                  <div className="border border-feint-strong bg-paper-200 p-2.5 text-oxblood" aria-hidden="true">
+                    <StepIcon className="h-5 w-5" />
+                  </div>
+                  <LanguageSwitch language={language} onChange={onLanguageChange} />
                 </div>
-                <LanguageSwitch language={language} onChange={onLanguageChange} />
-              </div>
-              <h2 id={titleId} className="ll-heading mt-4 text-[21px] leading-tight text-ink-900">{current.title[language]}</h2>
-              <p className="mt-2 text-[13.5px] leading-relaxed text-graphite-600">{current.body[language]}</p>
+                <p className="ll-printed mt-4 text-[10.5px] text-graphite-600">{chapterName}</p>
+                <h2 id={titleId} className="ll-heading mt-1 text-[21px] leading-tight text-ink-900">{current.title[language]}</h2>
+                <p className="mt-2 text-[13.5px] leading-relaxed text-graphite-600">{current.body[language]}</p>
 
-              <div className="mt-5" aria-label={`${language === 'en' ? 'Step' : 'Hatua'} ${step + 1} ${language === 'en' ? 'of' : 'kati ya'} ${TOUR_STEPS.length}`}>
-                <div className="flex items-center justify-between gap-3">
-                  <span className="ll-printed text-[10.5px] text-graphite-600">
-                    {language === 'en' ? `Step ${step + 1} of ${TOUR_STEPS.length}` : `Hatua ${step + 1} kati ya ${TOUR_STEPS.length}`}
-                  </span>
-                  <span className="text-[11.5px] text-graphite-500">{Math.round(((step + 1) / TOUR_STEPS.length) * 100)}%</span>
-                </div>
-                <div className="mt-1.5 h-1 bg-paper-200">
-                  <motion.div
-                    className="h-full bg-oxblood-fill"
-                    initial={false}
-                    animate={{ width: `${((step + 1) / TOUR_STEPS.length) * 100}%` }}
-                    transition={{ duration: reducedMotion ? 0 : 0.22 }}
-                  />
-                </div>
-              </div>
-
-              {persistenceProblem && <p role="alert" className="mt-3 text-[12px] text-ledger-red">{persistenceProblem}</p>}
-
-              <div className="mt-4 flex flex-wrap items-center gap-2 border-t border-feint pt-3">
-                <button type="button" onClick={() => setConfirmSkip(true)} className={`${buttonClass.quiet} mr-auto`}>
-                  {language === 'en' ? 'Skip tour' : 'Ruka mafunzo'}
-                </button>
-                {step > 0 && (
-                  <button type="button" onClick={goBack} className={buttonClass.secondary}>
-                    <ArrowLeft className="h-4 w-4" aria-hidden="true" /> {language === 'en' ? 'Back' : 'Rudi'}
-                  </button>
+                {current.path && (
+                  <p className="mt-3 flex flex-wrap items-baseline gap-x-2 text-[13px] text-ink-900">
+                    <span className="ll-printed text-[10.5px] text-graphite-600">{en ? 'Find it in' : 'Ipo wapi'}</span>
+                    <span className="font-semibold">{current.path}</span>
+                  </p>
                 )}
-                <button type="button" onClick={goNext} className={buttonClass.primary}>
-                  {step === TOUR_STEPS.length - 1 ? (
-                    <><Check className="h-4 w-4" aria-hidden="true" /> {language === 'en' ? 'Get started' : 'Anza kutumia'}</>
-                  ) : (
-                    <>{language === 'en' ? 'Next' : 'Endelea'} <ArrowRight className="h-4 w-4" aria-hidden="true" /></>
+
+                {missing && (
+                  <p role="status" className="mt-3 border border-feint-strong bg-paper-200 px-3 py-2 text-[12.5px] leading-snug text-ink-900">
+                    {en
+                      ? 'This part is not on screen right now, so it is not highlighted. The description above still applies.'
+                      : 'Sehemu hii haionekani kwenye skrini kwa sasa, kwa hiyo haijaangaziwa. Maelezo yaliyo juu bado yanatumika.'}
+                  </p>
+                )}
+
+                {current.points && (
+                  <dl className="mt-3 border-t border-feint-strong">
+                    {current.points.map((point) => {
+                      const numbered = /^\d+$/.test(point.term.en);
+                      return (
+                        <div
+                          key={point.term.en}
+                          className={`border-b border-feint py-2 ${numbered ? 'grid grid-cols-[1.5rem_minmax(0,1fr)] gap-x-2' : ''}`}
+                        >
+                          <dt className="text-[13px] font-semibold text-ink-900">{point.term[language]}</dt>
+                          <dd className={`text-[13px] leading-snug text-graphite-600 ${numbered ? '' : 'mt-0.5'}`}>{point.text[language]}</dd>
+                        </div>
+                      );
+                    })}
+                  </dl>
+                )}
+              </div>
+
+              <div className="shrink-0 border-t border-feint bg-paper-100 px-5 pb-[calc(1rem+env(safe-area-inset-bottom))] pt-3">
+                <div aria-label={stepLabel}>
+                  <div className="flex items-center justify-between gap-3">
+                    <span className="ll-printed text-[10.5px] text-graphite-600">{stepLabel}</span>
+                    <span className="text-[11.5px] text-graphite-500">{Math.round(((step + 1) / TOUR_STEPS.length) * 100)}%</span>
+                  </div>
+                  <div className="mt-1.5 h-1 bg-paper-200">
+                    <motion.div
+                      className="h-full bg-oxblood-fill"
+                      initial={false}
+                      animate={{ width: `${((step + 1) / TOUR_STEPS.length) * 100}%` }}
+                      transition={{ duration: reducedMotion ? 0 : 0.22 }}
+                    />
+                  </div>
+                </div>
+
+                {persistenceProblem && <p role="alert" className="mt-3 text-[12px] text-ledger-red">{persistenceProblem}</p>}
+
+                <div className="mt-3 flex flex-wrap items-center gap-2">
+                  <button type="button" onClick={() => setConfirmSkip(true)} className={`${buttonClass.quiet} mr-auto`}>
+                    {en ? 'Skip tour' : 'Ruka mafunzo'}
+                  </button>
+                  {step > 0 && (
+                    <button type="button" onClick={goBack} className={buttonClass.secondary}>
+                      <ArrowLeft className="h-4 w-4" aria-hidden="true" /> {en ? 'Back' : 'Rudi'}
+                    </button>
                   )}
-                </button>
+                  <button type="button" data-tour-primary onClick={goNext} className={buttonClass.primary}>
+                    {step === TOUR_STEPS.length - 1 ? (
+                      <><Check className="h-4 w-4" aria-hidden="true" /> {en ? 'Get started' : 'Anza kutumia'}</>
+                    ) : (
+                      <>{en ? 'Next' : 'Endelea'} <ArrowRight className="h-4 w-4" aria-hidden="true" /></>
+                    )}
+                  </button>
+                </div>
               </div>
             </>
           )}
@@ -609,33 +668,46 @@ function LanguageSwitch({ language, onChange }: { language: Language; onChange: 
   );
 }
 
-function getCardPosition(rect: Rect | null, isMobile: boolean): { top: number; left: number } | undefined {
-  if (isMobile) return undefined;
+interface Placement {
+  top: number;
+  left: number;
+  maxHeight: number;
+}
+
+/**
+ * Put the card where it never covers what it is describing. Try beside the
+ * target, then below, then above, and take the first side with room for the
+ * whole card. If none has, use the roomiest side and let the text scroll inside
+ * the card (the buttons stay pinned). Only a target that fills the screen gets
+ * a centred card over it.
+ */
+function getCardPlacement(rect: Rect | null, naturalHeight: number): Placement {
   const margin = 16;
   const gap = 16;
+  const minUseful = 220;
   const width = Math.min(368, window.innerWidth - margin * 2);
-  const estimatedHeight = 390;
+  const viewportRoom = window.innerHeight - margin * 2;
+  const natural = Math.min(naturalHeight, viewportRoom);
+  const centred = (): Placement => ({
+    top: Math.max(margin, (window.innerHeight - natural) / 2),
+    left: Math.max(margin, (window.innerWidth - width) / 2),
+    maxHeight: viewportRoom,
+  });
+  if (!rect) return centred();
 
-  if (!rect) {
-    return {
-      top: Math.max(margin, (window.innerHeight - estimatedHeight) / 2),
-      left: Math.max(margin, (window.innerWidth - width) / 2),
-    };
-  }
+  const clampX = (x: number) => Math.min(Math.max(x, margin), window.innerWidth - width - margin);
+  const clampY = (y: number, height: number) => Math.min(Math.max(y, margin), window.innerHeight - margin - height);
+  const options = [
+    { fits: rect.left + rect.width + gap + width <= window.innerWidth - margin, room: viewportRoom, at: (h: number) => ({ top: clampY(rect.top, h), left: rect.left + rect.width + gap }) },
+    { fits: rect.left - gap - width >= margin, room: viewportRoom, at: (h: number) => ({ top: clampY(rect.top, h), left: rect.left - gap - width }) },
+    { fits: true, room: window.innerHeight - margin - (rect.top + rect.height + gap), at: () => ({ top: rect.top + rect.height + gap, left: clampX(rect.left) }) },
+    { fits: true, room: rect.top - gap - margin, at: (h: number) => ({ top: rect.top - gap - h, left: clampX(rect.left) }) },
+  ].filter((option) => option.fits);
 
-  const right = rect.left + rect.width + gap;
-  const left = rect.left - width - gap;
-  const below = rect.top + rect.height + gap;
-  const above = rect.top - estimatedHeight - gap;
-  let top = Math.min(Math.max(rect.top, margin), window.innerHeight - estimatedHeight - margin);
-  let horizontal = right;
+  const best = options.find((option) => option.room >= natural)
+    || options.filter((option) => option.room >= minUseful).sort((a, b) => b.room - a.room)[0];
+  if (!best) return centred();
 
-  if (right + width > window.innerWidth - margin && left >= margin) horizontal = left;
-  else if (right + width > window.innerWidth - margin) {
-    horizontal = Math.min(Math.max(rect.left, margin), window.innerWidth - width - margin);
-    if (below + estimatedHeight <= window.innerHeight - margin) top = below;
-    else if (above >= margin) top = above;
-  }
-
-  return { top: Math.max(margin, top), left: Math.max(margin, horizontal) };
+  const height = Math.min(natural, best.room);
+  return { ...best.at(height), maxHeight: height };
 }

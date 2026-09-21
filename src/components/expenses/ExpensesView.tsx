@@ -189,6 +189,7 @@ export function ExpensesView() {
   return (
     <div className="pb-16 space-y-5">
       <PageHeading
+        tourId="bills-overview"
         title="Bills and expenses"
         note={<>What the business owes its suppliers · Figures in {baseCurrency}</>}
         actions={
