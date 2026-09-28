@@ -3,6 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 import { lazy, Suspense, useEffect, useState } from "react";
+import { AnimatePresence } from "motion/react";
 import { useQuery } from "@tanstack/react-query";
 import { AppLayout } from "./components/layout/AppLayout";
 import { useAppStore } from "./store";
@@ -199,10 +200,15 @@ function LedgerApp() {
   };
 
   if (!session || isLocked) {
-    if (showLanding) {
-      return <LandingPage onSignIn={() => enterAuth('signIn')} onSignUp={() => enterAuth('signUp')} />;
-    }
-    return <LockScreen initialMode={authMode} onBack={() => setShowLanding(true)} />;
+    return (
+      <AnimatePresence mode="wait" initial={false}>
+        {showLanding ? (
+          <LandingPage key="landing" onSignIn={() => enterAuth('signIn')} onSignUp={() => enterAuth('signUp')} />
+        ) : (
+          <LockScreen key="lock" initialMode={authMode} onBack={() => setShowLanding(true)} />
+        )}
+      </AnimatePresence>
+    );
   }
 
   if (organizationsLoading) {

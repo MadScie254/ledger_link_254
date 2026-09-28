@@ -1,0 +1,14 @@
+{
+  "detector": {
+    "ignoreRules": [],
+    "ignoreFiles": [],
+    "ignoreValues": [
+      {
+        "rule": "design-system-font",
+        "value": "ibm plex serif",
+        "createdAt": "2026-09-28T11:21:06.752Z",
+        "reason": "user asked to implement the moodboard direction extending the type system with a serif cover heading; DESIGN.md will be updated to document it"
+      }
+    ]
+  }
+}

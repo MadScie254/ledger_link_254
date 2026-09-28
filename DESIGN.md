@@ -132,14 +132,14 @@ components:
 
 Ledger Link is the hardcover counter book every Kenyan duka already keeps, rendered in a browser: bright ledger paper with feint blue ruling, a stationery-red margin, figures written in ballpoint blue, and an oxblood bookcloth spine carrying the section index. The database does the adding up; the interface only has to read like a book an auditor would sign. Dark mode is the carbon sheet: the same page as a pale impression on near-black.
 
-The page is dense and ruled, not boxed. Sections are separated by printed rules (a heavy 2px ink rule under a page heading, feint 1px rules between rows), never by floating cards on grey. Every figure sits in fixed digit positions, split into shillings and cents by a thin red rule, so columns of money align down the page on a phone in shop daylight and on a desk monitor through a long reconciliation session. Selection and opening are instant; the only authored motion is the pen stroke of an auditor's tick.
+The page is dense and ruled, not boxed. Sections are separated by printed rules (a heavy 2px ink rule under a page heading, feint 1px rules between rows), never by floating cards on grey. Every figure sits in fixed digit positions, split into shillings and cents by a thin red rule, so columns of money align down the page on a phone in shop daylight and on a desk monitor through a long reconciliation session. Selection and opening are instant; the pen stroke of an auditor's tick and the stamp of a posted record are the only two authored motions inside the working app. The page background carries a barely-there fibre grain, never a card, a dialog, or anywhere text sits directly on it.
 
-The build refuses the category default of fintech dashboards: KPI tiles on grey, area charts, a blue brand accent, frosted glass and soft card shadows. Blue here is ink on the page, not a brand.
+The build refuses the category default of fintech dashboards: KPI tiles on grey, area charts, a blue brand accent, frosted glass and soft card shadows. Blue here is ink on the page, not a brand. The book carries one mark of its own rather than a borrowed icon: an open ledger, two facing pages and the spine between them, beside the wordmark wherever it appears.
 
 **Key Characteristics:**
-- One typeface, Archivo, at three widths: printed caps (72), condensed headings (78), body and figures (100).
-- Palette law: every hue has exactly one job, and no role borrows another's colour.
-- Ruled paper, square sheets, 2–3px controls; shadows only on sheets lifted over the page.
+- Archivo, at three widths, for everything except the one cover heading each screen leads with: printed caps (72), condensed headings (78), body and figures (100). The cover heading is IBM Plex Serif.
+- Palette law: every hue has exactly one job, and no role borrows another's colour. A company may choose its own accent (oxblood, forest, navy, plum or slate) in place of the default; the meaning-carrying colours never move.
+- Ruled paper, square sheets, 2–3px controls; shadows only on sheets lifted over the page; a faint fibre grain on the page background only.
 - Figures as Shs|Cts with brackets for negatives and an en dash for nil.
 - Pinned brought-forward and carried-forward balances on long ledgers.
 
@@ -179,14 +179,16 @@ A paper-and-stationery palette: near-white paper, pencil greys, and four inks th
 
 ## Typography
 
+**Cover Font:** IBM Plex Serif, weight 500, italic 500 (with Georgia, Times New Roman fallback). One heading per screen, nowhere else.
 **Display Font:** Archivo at width 78 (with ui-sans-serif, system-ui, Segoe UI, Roboto fallback)
 **Body Font:** Archivo at width 100 with tabular, lining figures
 **Label/Mono Font:** Archivo at width 72, uppercase
 
-**Character:** A single grotesque stretched three ways, the way a stationer's printed headings, a clerk's column heads and the written entries share one book. Archivo is loaded as one variable file from Google Fonts (`wdth 62..125`, `wght 100..900`); self-hosting is deferred. Every font slot, including serif and mono, resolves to Archivo.
+**Character:** A single grotesque stretched three ways, the way a stationer's printed headings, a clerk's column heads and the written entries share one book. Archivo is loaded as one variable file from Google Fonts (`wdth 62..125`, `wght 100..900`); self-hosting is deferred. Body, labels and tabular figures all resolve to Archivo. One second voice was added deliberately: IBM Plex Serif carries the single cover heading each screen leads with (`.ll-cover`), giving that one heading the authority of a title stamped on the cover, while everything smaller stays Archivo's condensed voice.
 
 ### Hierarchy
-- **Display** (650, 28px mobile / 34px from 640px, line-height 0.98, width 78, -0.01em): the page heading, mixed case, ruled heavy beneath. On Home it is the weekday and date.
+- **Cover** (IBM Plex Serif 500, 28px mobile / 34px from 640px, line-height 0.98, -0.005em): PageHeading's page title, the Dashboard's weekday and date, the two lock-screen covers, and the landing page's headings. The one heading per screen that gets the serif; every other heading below stays Display.
+- **Display** (650, 28px mobile / 34px from 640px, line-height 0.98, width 78, -0.01em): every other page heading, mixed case, ruled heavy beneath.
 - **Headline** (650, 22px, tight, width 78): dialog titles.
 - **Title** (650, 17px, width 78): section headings inside a page, ruled with strong feint beneath.
 - **Figure Lead** (400, 21px / 26px / 32px across breakpoints, line-height 1, width 100, tabular): the position figures across the top of Home. Statement results step down to 20–22px.
@@ -194,7 +196,7 @@ A paper-and-stationery palette: near-white paper, pencil greys, and four inks th
 - **Label** (650, 11px, 0.06em, uppercase, width 72): table column heads, position labels (CASH, OWED TO YOU), spine group names at 10.5px, the SPECIMEN tag, page number. The wordmark on the spine is the same printed caps at 15px with 0.14em tracking.
 
 ### Named Rules
-**The Three Widths Rule.** Width 72 is always uppercase and always a printed label; width 78 is always a mixed-case heading; width 100 is everything read or added up. Headings are never set in caps, so a longer Swahili heading still fits on a phone.
+**The Three Widths Rule.** Width 72 is always uppercase and always a printed label; width 78 is always a mixed-case heading; width 100 is everything read or added up. Headings are never set in caps, so a longer Swahili heading still fits on a phone. The one exception: a Cover heading is IBM Plex Serif, not an Archivo width, and there is never more than one per screen.
 
 **The Fixed Digit Rule.** Tabular, lining figures are on at the body, on every table and on every figure. A column of money never shifts a digit.
 
@@ -261,7 +263,10 @@ Plain printed controls with one vocabulary across every page.
 A figure as written into a counter book. Shillings grouped en-KE, a 1px red hairline at 80% strength, then two-digit cents. Negatives are wrapped in brackets; nil prints an en dash in graphite 500. The currency is never repeated on the figure; the column head or label carries it, and the accessible name speaks it ("KES 1,931,250.00", "KES nil"). Tones: figure (ballpoint blue, default), ink (printed figures and totals), result (ink, red when negative), alert (red whatever the sign). Sizes run 11 / 13 / 15 / 20–22 / 21–32px. Amounts show the cents they arrive in; conversion happens once at statement level and is announced.
 
 ### Marks
-The auditor's margin marks, drawn as 16px pen strokes with a 2px round-capped line: tick (green, agreed), query (graphite "?", needs attention), circled (red, exception). A mark always has its word beside it or in its row. When a line is freshly matched, reconciled or paid, the stroke draws once over 140ms (`cubic-bezier(0.16, 1, 0.3, 1)`); under reduced motion it appears already drawn. This is the only authored motion in the system.
+The auditor's margin marks, drawn as 16px pen strokes with a 2px round-capped line: tick (green, agreed), query (graphite "?", needs attention), circled (red, exception). A mark always has its word beside it or in its row. When a line is freshly matched, reconciled or paid, the stroke draws once over 140ms (`cubic-bezier(0.16, 1, 0.3, 1)`); under reduced motion it appears already drawn.
+
+### Posted Stamp
+A record being posted (a manual journal entry today; the pattern is meant to extend to invoices, bills and payroll runs) shows one stamp, once, over the form it was entered on: a bordered oxblood check mark and the word "Posted", scaled in from 1.5x and settling to rest over 220ms (`cubic-bezier(0.2, 0.8, 0.2, 1)`), never looping. Under reduced motion it appears already settled. This and the pen tick above are deliberately the only two authored motions inside the working app.
 
 ### Totals and Statements
 Ledger rows put the label left and the figure right on a feint rule. A subtotal takes a 1px ink rule above; a total or result takes the red single-over-double rule. Statement pages print the organization, period and "Figures in KES" under the heading, with Print and Excel as secondary and Export PDF as the one primary.
@@ -285,7 +290,7 @@ Every table in the app shell or a lifted sheet follows one rule set: separated b
 - **Do** set printed labels and column heads in Archivo width 72 caps at 0.06em, headings at width 78 in mixed case, and everything else at width 100 with tabular figures.
 - **Do** pair every tick, query or circled mark with its word.
 - **Do** label anything specified but unbuilt as "Not built" and never render it as a working control.
-- **Do** state statutory dates by their rule (PAYE, NSSF and SHIF by the 9th; the Housing Levy by the ninth working day; VAT by the 20th; moved off weekends) from the one shared deadline source.
+- **Do** state statutory dates by their rule (PAYE, NSSF and SHA by the 9th; the Housing Levy by the ninth working day; VAT by the 20th; moved off weekends) from the one shared deadline source.
 
 ### Don't:
 - **Don't** use ballpoint blue for links, buttons, focus, chart fills or anything that is not a money figure.
@@ -293,6 +298,6 @@ Every table in the app shell or a lifted sheet follows one rule set: separated b
 - **Don't** put KPI figures in floating cards on grey, add area charts, or give the brand a blue accent.
 - **Don't** cast a shadow from anything that lives on the page, or use backdrop blur.
 - **Don't** round anything beyond 3px or make pills.
-- **Don't** animate opening, selection, hover or tabs; the pen tick is the only motion.
+- **Don't** animate opening, selection, hover or tabs; the pen tick and the posted stamp are the only two motions inside the working app. (The landing page, a Persuade surface outside the app shell, additionally slides between itself and the sign-in screen; that transition never appears once someone is signed in.)
 - **Don't** set a heading in all caps or place a printed-caps eyebrow above a heading.
 - **Don't** repeat the currency code on every figure.

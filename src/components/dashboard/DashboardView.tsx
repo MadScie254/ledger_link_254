@@ -611,7 +611,7 @@ export function DashboardView() {
       {/* Today's page */}
       <header className="flex flex-col gap-4 border-b-2 border-ink-900 pb-3 sm:flex-row sm:items-end sm:justify-between">
         <div className="min-w-0">
-          <h1 className="ll-heading text-[30px] sm:text-[38px] leading-[0.95] text-ink-900">
+          <h1 className="ll-cover text-[30px] sm:text-[38px] leading-[0.95] text-ink-900">
             {format(today, 'EEEE d MMMM')}
           </h1>
           <p className="mt-2 text-[13px] text-graphite-600">

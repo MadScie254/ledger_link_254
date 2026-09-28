@@ -3,6 +3,7 @@ import { X } from 'lucide-react';
 import { useAppStore } from '../../store';
 import { useAuth } from '../../context/AuthProvider';
 import { CompanyMark } from '../ledger/CompanyMark';
+import { BrandMark } from '../ledger/BrandMark';
 import { reorderByBusinessType } from '../../utils/businessTypes';
 
 /**
@@ -74,7 +75,10 @@ export function Sidebar() {
             aria-label={`Ledger Link, book of ${activeCompany?.name || 'no organization'}. Open organization settings`}
           >
             <span className="block border border-[var(--spine-rule)] px-3 py-2.5 group-hover:bg-sidebar-surface">
-              <span className="block ll-printed text-[15px] tracking-[0.14em] text-sidebar-ink leading-none">Ledger Link</span>
+              <span className="flex items-center gap-1.5">
+                <BrandMark className="h-4 w-4 shrink-0" />
+                <span className="ll-printed text-[15px] tracking-[0.14em] text-sidebar-ink leading-none">Ledger Link</span>
+              </span>
               <span className="mt-2 flex items-center gap-2">
                 <CompanyMark name={activeCompany?.name} size="sm" />
                 <span className="min-w-0 flex-1 truncate text-[12px] leading-snug text-sidebar-muted">

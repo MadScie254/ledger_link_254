@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { motion, useReducedMotion } from 'motion/react';
 import {
   ArrowRight,
   BarChart3,
@@ -15,6 +16,7 @@ import {
   Wallet,
   X,
 } from 'lucide-react';
+import { BrandMark } from '../components/ledger/BrandMark';
 
 /**
  * Ledger Link's public face: what the product does, how it works, and how to
@@ -88,6 +90,7 @@ interface LandingPageProps {
 export function LandingPage({ onSignIn, onSignUp }: LandingPageProps) {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [openFaq, setOpenFaq] = useState<number | null>(0);
+  const reducedMotion = useReducedMotion();
 
   const scrollTo = (id: string) => {
     setIsMenuOpen(false);
@@ -95,13 +98,19 @@ export function LandingPage({ onSignIn, onSignUp }: LandingPageProps) {
   };
 
   return (
-    <div className="min-h-screen bg-paper-50 text-ink-900">
+    <motion.div
+      className="min-h-screen ll-grain-bg text-ink-900"
+      initial={reducedMotion ? false : { opacity: 0, x: -28 }}
+      animate={{ opacity: 1, x: 0 }}
+      exit={reducedMotion ? undefined : { opacity: 0, x: 28 }}
+      transition={{ duration: reducedMotion ? 0 : 0.32, ease: [0.2, 0.8, 0.2, 1] }}
+    >
       <header className="sticky top-0 z-40 border-b border-feint-strong bg-paper-50/95 backdrop-blur-sm">
         <div className="mx-auto flex h-16 max-w-6xl items-center justify-between px-5 sm:px-8">
           <div className="flex items-center gap-2">
             <span className="border border-ink-900 p-[3px]" aria-hidden="true">
               <span className="flex h-6 w-6 items-center justify-center border border-ink-900">
-                <BookOpen className="h-3.5 w-3.5 text-oxblood" />
+                <BrandMark className="h-3.5 w-3.5 text-oxblood" />
               </span>
             </span>
             <span className="ll-printed text-[14px] tracking-[0.14em] text-ink-900">Ledger Link</span>
@@ -155,7 +164,7 @@ export function LandingPage({ onSignIn, onSignUp }: LandingPageProps) {
         <div className="grid grid-cols-1 gap-12 lg:grid-cols-[minmax(0,1fr)_minmax(0,26rem)] lg:items-center lg:gap-10">
           <div>
             <p className="ll-printed text-[11px] text-oxblood">Double-entry bookkeeping for Kenyan businesses</p>
-            <h1 className="ll-heading mt-4 text-[38px] leading-[1.04] text-ink-900 sm:text-[52px]">
+            <h1 className="ll-cover mt-4 text-[38px] leading-[1.04] text-ink-900 sm:text-[52px]">
               Every invoice, bill and payment, posted to one ledger.
             </h1>
             <p className="mt-5 max-w-xl text-[16px] leading-relaxed text-graphite-600 sm:text-[17px]">
@@ -298,7 +307,7 @@ export function LandingPage({ onSignIn, onSignUp }: LandingPageProps) {
       {/* Final CTA */}
       <section className="border-t border-feint-strong bg-paper-100">
         <div className="mx-auto max-w-4xl px-5 py-16 text-center sm:px-8 sm:py-24">
-          <h2 className="ll-heading text-[32px] leading-tight text-ink-900 sm:text-[40px]">Open the books, in a few minutes.</h2>
+          <h2 className="ll-cover text-[32px] leading-tight text-ink-900 sm:text-[40px]">Open the books, in a few minutes.</h2>
           <p className="mx-auto mt-4 max-w-lg text-[15px] leading-relaxed text-graphite-600">
             No card required to start. Choose what kind of business this is, and the books are ready.
           </p>
@@ -312,14 +321,14 @@ export function LandingPage({ onSignIn, onSignUp }: LandingPageProps) {
         <div className="mx-auto flex max-w-6xl flex-col gap-4 px-5 py-8 sm:flex-row sm:items-center sm:justify-between sm:px-8">
           <div className="flex items-center gap-2">
             <span className="flex h-6 w-6 items-center justify-center border border-feint-strong" aria-hidden="true">
-              <BookOpen className="h-3.5 w-3.5 text-oxblood" />
+              <BrandMark className="h-3.5 w-3.5 text-oxblood" />
             </span>
             <span className="ll-printed text-[12px] tracking-[0.14em] text-graphite-600">Ledger Link</span>
           </div>
           <p className="text-[12.5px] text-graphite-500">Double-entry bookkeeping for Kenyan businesses. Built in Nairobi.</p>
         </div>
       </footer>
-    </div>
+    </motion.div>
   );
 }
 
@@ -327,7 +336,7 @@ function SectionHeading({ eyebrow, title, note }: { eyebrow: string; title: stri
   return (
     <div className="max-w-2xl">
       <p className="ll-printed text-[11px] text-oxblood">{eyebrow}</p>
-      <h2 className="ll-heading mt-3 text-[28px] leading-tight text-ink-900 sm:text-[34px]">{title}</h2>
+      <h2 className="ll-cover mt-3 text-[28px] leading-tight text-ink-900 sm:text-[34px]">{title}</h2>
       {note && <p className="mt-3 text-[14.5px] leading-relaxed text-graphite-600">{note}</p>}
     </div>
   );

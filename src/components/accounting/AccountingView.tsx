@@ -11,6 +11,7 @@ import { Amount } from '../ledger/Amount';
 import { Mark } from '../ledger/Mark';
 import { Dialog, Field } from '../ledger/Dialog';
 import { PageHeading, IndexTabs, buttonClass } from '../ledger/Page';
+import { PostedStamp } from '../ledger/PostedStamp';
 import Papa from 'papaparse';
 
 const tabs = ['Chart of Accounts', 'Journal Entries', 'Budgets', 'Settings'];
@@ -27,6 +28,7 @@ export function AccountingView() {
 
   // JE State
   const [isAddingJE, setIsAddingJE] = useState(false);
+  const [justPostedJE, setJustPostedJE] = useState(false);
   const [jeLines, setJeLines] = useState([{ accountId: '', debit: 0, credit: 0 }, { accountId: '', debit: 0, credit: 0 }]);
   const [jeMemo, setJeMemo] = useState('');
   const [jeDate, setJeDate] = useState(format(new Date(), 'yyyy-MM-dd'));
@@ -143,7 +145,11 @@ export function AccountingView() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['journal-entries', currentOrgId] });
-      closeJE();
+      setJustPostedJE(true);
+      window.setTimeout(() => {
+        setJustPostedJE(false);
+        closeJE();
+      }, 520);
     }
   });
 
@@ -449,7 +455,9 @@ export function AccountingView() {
           </>
         }
       >
-        <form id="je-form" onSubmit={handlePostJE} className="space-y-5">
+        <div className="relative">
+          {justPostedJE && <PostedStamp />}
+          <form id="je-form" onSubmit={handlePostJE} className="space-y-5">
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-[12rem_minmax(0,1fr)]">
             <Field label="Date">
               <input required type="date" value={jeDate} onChange={(e) => setJeDate(e.target.value)} />
@@ -550,7 +558,8 @@ export function AccountingView() {
               )}
             </p>
           </div>
-        </form>
+          </form>
+        </div>
       </Dialog>
 
       <DynamicQuickAddModal isOpen={isAddingAccount} onClose={() => setIsAddingAccount(false)} overrideType="ACCOUNT" />

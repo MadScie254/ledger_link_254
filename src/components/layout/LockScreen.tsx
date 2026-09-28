@@ -1,7 +1,9 @@
 import React, { useState } from 'react';
 import { ArrowLeft } from 'lucide-react';
+import { motion, useReducedMotion } from 'motion/react';
 import { useAuth } from '../../context/AuthProvider';
 import { Mark } from '../ledger/Mark';
+import { BrandMark } from '../ledger/BrandMark';
 
 type Mode = 'signIn' | 'signUp';
 
@@ -17,6 +19,7 @@ const fieldClass =
 /** The cover of the book, and its first page. */
 export function LockScreen({ initialMode = 'signIn', onBack }: { initialMode?: Mode; onBack?: () => void } = {}) {
   const { signIn, signUp } = useAuth();
+  const reducedMotion = useReducedMotion();
   const [mode, setMode] = useState<Mode>(initialMode);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -65,21 +68,30 @@ export function LockScreen({ initialMode = 'signIn', onBack }: { initialMode?: M
   const stampedLabel = (compact: boolean) => (
     <div className={`inline-block border border-[var(--spine-rule)] p-[3px] ${compact ? '' : 'w-full max-w-[20rem]'}`}>
       <div className={`border border-[var(--spine-rule)] ${compact ? 'px-3 py-2' : 'px-5 py-4'}`}>
-        <p className={`ll-printed tracking-[0.16em] text-sidebar-ink leading-none ${compact ? 'text-[14px]' : 'text-[19px]'}`}>Ledger Link</p>
+        <span className="flex items-center gap-2">
+          <BrandMark className={compact ? 'h-3.5 w-3.5 shrink-0' : 'h-5 w-5 shrink-0'} />
+          <p className={`ll-printed tracking-[0.16em] text-sidebar-ink leading-none ${compact ? 'text-[14px]' : 'text-[19px]'}`}>Ledger Link</p>
+        </span>
         {!compact && <p className="mt-2.5 text-[12.5px] text-sidebar-muted">Books of account for Kenyan business</p>}
       </div>
     </div>
   );
 
   return (
-    <div className="fixed inset-0 z-[100] overflow-y-auto bg-paper-50">
+    <motion.div
+      className="fixed inset-0 z-[100] overflow-y-auto ll-grain-bg"
+      initial={reducedMotion ? false : { opacity: 0, x: 28 }}
+      animate={{ opacity: 1, x: 0 }}
+      exit={reducedMotion ? undefined : { opacity: 0, x: -28 }}
+      transition={{ duration: reducedMotion ? 0 : 0.32, ease: [0.2, 0.8, 0.2, 1] }}
+    >
       <div className="grid min-h-full grid-cols-1 md:grid-cols-[minmax(22rem,44%)_minmax(0,1fr)]">
         {/* The cover */}
         <aside className="ll-cloth hidden md:flex min-h-screen flex-col justify-between px-10 py-10 lg:px-14 lg:py-12 text-sidebar-ink">
           {stampedLabel(false)}
 
           <div className="max-w-[26rem]">
-            <h1 className="ll-heading text-[40px] lg:text-[46px] leading-[1.02] text-sidebar-ink">Every invoice, bill and payment, posted to one ledger.</h1>
+            <h1 className="ll-cover text-[40px] lg:text-[46px] leading-[1.02] text-sidebar-ink">Every invoice, bill and payment, posted to one ledger.</h1>
             <p className="mt-5 text-[15px] leading-relaxed text-sidebar-muted">
               Day-to-day financial work stays tied to the ledger it affects.
             </p>
@@ -140,7 +152,7 @@ export function LockScreen({ initialMode = 'signIn', onBack }: { initialMode?: M
                 </div>
               ) : (
                 <>
-                  <h2 className="ll-heading text-[32px] leading-tight text-ink-900">
+                  <h2 className="ll-cover text-[32px] leading-tight text-ink-900">
                     {mode === 'signIn' ? 'Open your books' : 'Start a new book'}
                   </h2>
                   <p className="mt-2 text-[15px] text-graphite-600">
@@ -222,6 +234,6 @@ export function LockScreen({ initialMode = 'signIn', onBack }: { initialMode?: M
           </div>
         </main>
       </div>
-    </div>
+    </motion.div>
   );
 }
