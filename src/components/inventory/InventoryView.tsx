@@ -7,6 +7,7 @@ import { BulkActionBar } from '../common/BulkActionBar';
 import { Amount } from '../ledger/Amount';
 import { Mark } from '../ledger/Mark';
 import { PageHeading, IndexTabs, SkeletonRows, EmptyNote, LoadProblem, buttonClass } from '../ledger/Page';
+import { useConfirm } from '../../hooks/useConfirm';
 
 type Tab = 'Items' | 'Reorder';
 
@@ -19,6 +20,7 @@ export function InventoryView() {
   const { currentOrgId, activeCompany } = useAppStore();
   const baseCurrency = activeCompany?.baseCurrency || 'KES';
   const queryClient = useQueryClient();
+  const { confirm, confirmDialog } = useConfirm();
 
   const inventory = useQuery({
     queryKey: ['inventory', currentOrgId],
@@ -224,9 +226,10 @@ export function InventoryView() {
           entityName="items"
           onClearSelection={() => setSelectedItemIds([])}
           onDelete={() => {
-            if (window.confirm(`Delete ${selectedItemIds.length} stock item(s)? This cannot be undone.`)) {
-              bulkDeleteMutation.mutate(selectedItemIds);
-            }
+            confirm(
+              { title: 'Delete stock items', message: `Delete ${selectedItemIds.length} stock item(s)? This cannot be undone.`, confirmText: 'Delete', isDestructive: true },
+              () => bulkDeleteMutation.mutate(selectedItemIds)
+            );
           }}
           isLoading={bulkDeleteMutation.isPending}
         />
@@ -235,6 +238,8 @@ export function InventoryView() {
       <DynamicQuickAddModal isOpen={isAddingItem} onClose={() => setIsAddingItem(false)} overrideType="ITEM" />
 
       <EntityDrillDownModal isOpen={!!selectedItem} onClose={() => setSelectedItem(null)} entityType="ITEM" entityId={selectedItem?.id || null} initialData={selectedItem} />
+
+      {confirmDialog}
     </div>
   );
 }

@@ -3,6 +3,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useAppStore } from '../../store';
 import { Dialog, Field } from '../ledger/Dialog';
 import { PageHeading, SkeletonRows, EmptyNote, LoadProblem, buttonClass } from '../ledger/Page';
+import { useConfirm } from '../../hooks/useConfirm';
 
 type AssignableRole = 'admin' | 'member' | 'accountant';
 type Role = 'owner' | AssignableRole;
@@ -31,6 +32,7 @@ export function TeamView() {
   const [inviteRole, setInviteRole] = useState<AssignableRole>('member');
   const [formError, setFormError] = useState('');
   const [rowError, setRowError] = useState('');
+  const { confirm, confirmDialog } = useConfirm();
 
   const team = useQuery({
     queryKey: ['team', currentOrgId],
@@ -134,11 +136,17 @@ export function TeamView() {
       <button
         type="button"
         onClick={() => {
-          if (window.confirm(`Remove ${m.email} from this organization? They lose access to its books straight away.`)) {
-            removeMutation.mutate(m.id);
-          }
+          confirm(
+            {
+              title: 'Remove team member',
+              message: `Remove ${m.email} from this organization? They lose access to its books straight away.`,
+              confirmText: 'Remove',
+              isDestructive: true,
+            },
+            () => removeMutation.mutate(m.id)
+          );
         }}
-        className={`${buttonClass.quiet} text-ledger-red`}
+        className={buttonClass.quiet}
       >
         Remove
       </button>
@@ -237,6 +245,8 @@ export function TeamView() {
           </Field>
         </form>
       </Dialog>
+
+      {confirmDialog}
     </div>
   );
 }

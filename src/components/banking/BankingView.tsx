@@ -7,6 +7,7 @@ import { useAppStore } from '../../store';
 import { Amount } from '../ledger/Amount';
 import { Mark } from '../ledger/Mark';
 import { PageHeading, IndexTabs, PageNote, SkeletonRows, EmptyNote, buttonClass } from '../ledger/Page';
+import { useConfirm } from '../../hooks/useConfirm';
 import { Dialog, Field } from '../ledger/Dialog';
 
 const tabs = ['Bank transactions', 'AI Match Assistant', 'Rules', 'Reconcile', 'Bank connections'];
@@ -29,6 +30,7 @@ export function BankingView() {
   const [connectEmail, setConnectEmail] = useState('');
   const { currentOrgId, activeCompany } = useAppStore();
   const queryClient = useQueryClient();
+  const { confirm, confirmDialog } = useConfirm();
 
   // Fetch Accounts (to map AI suggestions to real account IDs)
   const { data: accountsData } = useQuery({
@@ -639,9 +641,17 @@ export function BankingView() {
                   <button
                     type="button"
                     onClick={() => {
-                      if (window.confirm(`Remove the rule for lines containing ${rule.matchText}?`)) deleteRuleMutation.mutate(rule.id);
+                      confirm(
+                        {
+                          title: 'Remove rule',
+                          message: `Remove the rule for lines containing ${rule.matchText}?`,
+                          confirmText: 'Remove',
+                          isDestructive: true,
+                        },
+                        () => deleteRuleMutation.mutate(rule.id)
+                      );
                     }}
-                    className={`${buttonClass.quiet} shrink-0 text-ledger-red`}
+                    className={`${buttonClass.quiet} shrink-0`}
                   >
                     Remove
                   </button>
@@ -876,6 +886,8 @@ export function BankingView() {
           </div>
         )}
       </Dialog>
+
+      {confirmDialog}
     </div>
   );
 }

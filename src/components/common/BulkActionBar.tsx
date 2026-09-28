@@ -66,7 +66,7 @@ export function BulkActionBar({
         )}
 
         {onDelete && (
-          <button type="button" onClick={onDelete} disabled={isLoading} className="h-8 px-2.5 text-[13px] font-semibold text-ledger-red border border-ledger-red hover:bg-ledger-red hover:text-white disabled:opacity-50">
+          <button type="button" onClick={onDelete} disabled={isLoading} className="h-8 px-2.5 text-[13px] font-semibold text-ink-900 border border-ink-900 hover:bg-ink-900 hover:text-white disabled:opacity-50">
             Delete
           </button>
         )}

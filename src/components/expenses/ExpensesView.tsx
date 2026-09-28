@@ -13,6 +13,7 @@ import { PageHeading, IndexTabs, buttonClass } from '../ledger/Page';
 import { Dialog, Field } from '../ledger/Dialog';
 import { SUPPORTED_CURRENCIES } from '../../utils/currency';
 import { PostedStamp } from '../ledger/PostedStamp';
+import { useConfirm } from '../../hooks/useConfirm';
 
 const tabs = ['Vendors', 'Bills', 'Expenses', 'Bill payments'];
 
@@ -28,7 +29,8 @@ export function ExpensesView() {
   const [billIdempotencyKey, setBillIdempotencyKey] = useState(() => crypto.randomUUID());
   const [batchPaymentAccountId, setBatchPaymentAccountId] = useState('');
   const [justPostedBill, setJustPostedBill] = useState(false);
-  
+  const { confirm, confirmDialog } = useConfirm();
+
   const { currentOrgId, activeCompany, exchangeRates } = useAppStore();
   const baseCurrency = activeCompany?.baseCurrency || 'KES';
   const [billCurrency, setBillCurrency] = useState(baseCurrency);
@@ -451,9 +453,14 @@ export function ExpensesView() {
               <button
                 type="button"
                 onClick={() => {
-                  if (window.confirm(`Post payment for ${openBills.length} open bill(s)? This writes entries to the ledger.`)) {
-                    batchPaymentMutation.mutate({ targetBills: openBills, sourceAccountId: batchPaymentAccountId });
-                  }
+                  confirm(
+                    {
+                      title: 'Post payments',
+                      message: `Post payment for ${openBills.length} open bill(s)? This writes entries to the ledger.`,
+                      confirmText: 'Post',
+                    },
+                    () => batchPaymentMutation.mutate({ targetBills: openBills, sourceAccountId: batchPaymentAccountId })
+                  );
                 }}
                 disabled={batchPaymentMutation.isPending || !batchPaymentAccountId}
                 className={buttonClass.secondary}
@@ -477,9 +484,10 @@ export function ExpensesView() {
           entityName="bills"
           onClearSelection={() => setSelectedBillIds([])}
           onDelete={() => {
-            if (window.confirm(`Delete ${selectedBillIds.length} bill(s)?`)) {
-              bulkDeleteBillsMutation.mutate(selectedBillIds);
-            }
+            confirm(
+              { title: 'Delete bills', message: `Delete ${selectedBillIds.length} bill(s)?`, confirmText: 'Delete', isDestructive: true },
+              () => bulkDeleteBillsMutation.mutate(selectedBillIds)
+            );
           }}
           isLoading={bulkDeleteBillsMutation.isPending}
         />
@@ -492,9 +500,10 @@ export function ExpensesView() {
           entityName="vendors"
           onClearSelection={() => setSelectedVendorIds([])}
           onDelete={() => {
-            if (window.confirm(`Delete ${selectedVendorIds.length} vendor(s)?`)) {
-              bulkDeleteVendorsMutation.mutate(selectedVendorIds);
-            }
+            confirm(
+              { title: 'Delete vendors', message: `Delete ${selectedVendorIds.length} vendor(s)?`, confirmText: 'Delete', isDestructive: true },
+              () => bulkDeleteVendorsMutation.mutate(selectedVendorIds)
+            );
           }}
           isLoading={bulkDeleteVendorsMutation.isPending}
         />
@@ -637,6 +646,8 @@ export function ExpensesView() {
           </form>
         </div>
       </Dialog>
+
+      {confirmDialog}
     </div>
   );
 }

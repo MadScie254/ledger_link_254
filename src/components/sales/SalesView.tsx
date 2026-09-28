@@ -3,7 +3,6 @@ import { useRenderTracker } from '../../utils/monitoring';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { format } from 'date-fns';
 import { Download } from 'lucide-react';
-import { ConfirmModal } from '../layout/ConfirmModal';
 import { InvoiceBuilder } from './InvoiceBuilder';
 import { EntityDrillDownModal } from '../common/EntityDrillDownModal';
 import { BulkActionBar } from '../common/BulkActionBar';
@@ -12,6 +11,7 @@ import { Amount } from '../ledger/Amount';
 import { Dialog, Field } from '../ledger/Dialog';
 import { Mark } from '../ledger/Mark';
 import { PageHeading, PageNote, buttonClass } from '../ledger/Page';
+import { useConfirm } from '../../hooks/useConfirm';
 
 export function SalesView() {
   useRenderTracker("SalesView");
@@ -25,6 +25,7 @@ export function SalesView() {
   const [depositAccountId, setDepositAccountId] = useState('');
   const [paymentIdempotencyKey, setPaymentIdempotencyKey] = useState('');
   const [paymentProblem, setPaymentProblem] = useState('');
+  const { confirm, confirmDialog } = useConfirm();
 
   const queryClient = useQueryClient();
 
@@ -385,9 +386,10 @@ export function SalesView() {
         entityName="invoices"
         onClearSelection={() => setSelectedIds([])}
         onDelete={() => {
-          if (window.confirm(`Delete ${selectedIds.length} invoice(s)?`)) {
-            bulkDeleteMutation.mutate(selectedIds);
-          }
+          confirm(
+            { title: 'Delete invoices', message: `Delete ${selectedIds.length} invoice(s)?`, confirmText: 'Delete', isDestructive: true },
+            () => bulkDeleteMutation.mutate(selectedIds)
+          );
         }}
         onExport={handleExportCSV}
         isLoading={bulkDeleteMutation.isPending}
@@ -453,6 +455,8 @@ export function SalesView() {
         entityId={selectedInvoice?.id || null}
         initialData={selectedInvoice}
       />
+
+      {confirmDialog}
     </div>
   );
 }

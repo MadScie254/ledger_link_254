@@ -6,6 +6,7 @@ import { EntityDrillDownModal } from '../common/EntityDrillDownModal';
 import { BulkActionBar } from '../common/BulkActionBar';
 import { Amount } from '../ledger/Amount';
 import { PageHeading, IndexTabs, PageNote, SkeletonRows, EmptyNote, LoadProblem, buttonClass } from '../ledger/Page';
+import { useConfirm } from '../../hooks/useConfirm';
 
 type Tab = 'Customers' | 'Balances';
 
@@ -18,6 +19,7 @@ export function CustomerHubView() {
   const { currentOrgId, activeCompany } = useAppStore();
   const baseCurrency = activeCompany?.baseCurrency || 'KES';
   const queryClient = useQueryClient();
+  const { confirm, confirmDialog } = useConfirm();
 
   const customersQuery = useQuery({
     queryKey: ['customers', currentOrgId],
@@ -254,9 +256,10 @@ export function CustomerHubView() {
         entityName="customers"
         onClearSelection={() => setSelectedCustomerIds([])}
         onDelete={() => {
-          if (window.confirm(`Delete ${selectedCustomerIds.length} customer(s)? This cannot be undone.`)) {
-            bulkDeleteMutation.mutate(selectedCustomerIds);
-          }
+          confirm(
+            { title: 'Delete customers', message: `Delete ${selectedCustomerIds.length} customer(s)? This cannot be undone.`, confirmText: 'Delete', isDestructive: true },
+            () => bulkDeleteMutation.mutate(selectedCustomerIds)
+          );
         }}
         statusOptions={[
           { label: 'Mark active', value: 'ACTIVE' },
@@ -275,6 +278,8 @@ export function CustomerHubView() {
         entityId={selectedCustomer?.id || null}
         initialData={selectedCustomer}
       />
+
+      {confirmDialog}
     </div>
   );
 }

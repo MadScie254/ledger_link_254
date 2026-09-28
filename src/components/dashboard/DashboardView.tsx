@@ -793,7 +793,7 @@ export function DashboardView() {
                 <tbody>
                   {recentEntries.map((entry: any) => (
                     <tr key={entry.id}>
-                      <td className="pr-3 text-graphite-600 whitespace-nowrap">{entry.entryDate ? format(new Date(entry.entryDate), 'dd/MM') : '–'}</td>
+                      <td className="pr-3 text-graphite-600 whitespace-nowrap">{entry.entryDate ? format(new Date(entry.entryDate), 'dd/MM/yyyy') : '–'}</td>
                       <td className="hidden sm:table-cell pr-3 text-graphite-600 whitespace-nowrap">{entry.referenceNo || '–'}</td>
                       <td className="pr-3 min-w-0">
                         <button type="button" onClick={() => setActiveView('Accounting')} className="text-left text-ink-900 hover:underline underline-offset-[3px]">

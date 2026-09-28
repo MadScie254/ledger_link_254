@@ -4,6 +4,7 @@ import { useAppStore } from '../../store';
 import { Amount } from '../ledger/Amount';
 import { Dialog, Field } from '../ledger/Dialog';
 import { SkeletonRows, EmptyNote, LoadProblem, buttonClass } from '../ledger/Page';
+import { useConfirm } from '../../hooks/useConfirm';
 
 interface Budget {
   id: string;
@@ -27,6 +28,7 @@ export function BudgetPlanner() {
   const [newBudget, setNewBudget] = useState({ categoryId: '', amount: '', period: 'MONTHLY' as Budget['period'] });
   const [formError, setFormError] = useState('');
   const [rowError, setRowError] = useState('');
+  const { confirm, confirmDialog } = useConfirm();
 
   const budgetsQuery = useQuery({
     queryKey: ['budgets', currentOrgId],
@@ -133,9 +135,17 @@ export function BudgetPlanner() {
       <button
         type="button"
         onClick={() => {
-          if (window.confirm(`Remove the budget for ${b.categoryName}? Postings to the account are not affected.`)) deleteMutation.mutate(b.id);
+          confirm(
+            {
+              title: 'Remove budget',
+              message: `Remove the budget for ${b.categoryName}? Postings to the account are not affected.`,
+              confirmText: 'Remove',
+              isDestructive: true,
+            },
+            () => deleteMutation.mutate(b.id)
+          );
         }}
-        className={`${buttonClass.quiet} text-ledger-red`}
+        className={buttonClass.quiet}
       >
         Remove
       </button>
@@ -299,6 +309,8 @@ export function BudgetPlanner() {
           </Field>
         </form>
       </Dialog>
+
+      {confirmDialog}
     </div>
   );
 }
