@@ -9,6 +9,7 @@ import { Dialog, Field } from '../ledger/Dialog';
 import { PageHeading, IndexTabs, EmptyNote, buttonClass } from '../ledger/Page';
 import { BookOpen } from 'lucide-react';
 import { useOnboarding } from '../onboarding/OnboardingProvider';
+import { BUSINESS_TYPES, type BusinessType } from '../../utils/businessTypes';
 
 type Tab = 'companies' | 'currencies' | 'accounting' | 'security';
 
@@ -428,6 +429,7 @@ function CompanyModal({ initialData, onClose, onSuccess }: { initialData: Organi
   const [taxId, setTaxId] = useState(initialData?.taxId || '');
   const [fiscalYearStart, setFiscalYearStart] = useState(initialData?.fiscalYearStart || 'January');
   const [industry, setIndustry] = useState(initialData?.industry || '');
+  const [businessType, setBusinessType] = useState<BusinessType | ''>(initialData?.businessType || '');
   const [address, setAddress] = useState(initialData?.address || '');
   const [city, setCity] = useState(initialData?.city || 'Nairobi');
   const [phone, setPhone] = useState(initialData?.phone || '');
@@ -440,7 +442,7 @@ function CompanyModal({ initialData, onClose, onSuccess }: { initialData: Organi
     setIsSubmitting(true);
     setError(null);
     try {
-      const payload = { name, legalName: legalName || name, baseCurrency, country, taxId, fiscalYearStart, industry, address, city, phone, email };
+      const payload = { name, legalName: legalName || name, baseCurrency, country, taxId, fiscalYearStart, industry, businessType: businessType || null, address, city, phone, email };
       const res = await fetch(initialData ? `/api/organizations/${initialData.id}` : '/api/organizations', {
         method: initialData ? 'PUT' : 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -510,6 +512,15 @@ function CompanyModal({ initialData, onClose, onSuccess }: { initialData: Organi
         </Field>
         <Field label="Industry">
           <input type="text" value={industry} onChange={(e) => setIndustry(e.target.value)} />
+        </Field>
+        <Field label="Business type" hint="Adds a few accounts for this kind of work and tailors the tour. Change it anytime.">
+          <select value={businessType} onChange={(e) => setBusinessType(e.target.value as BusinessType | '')}>
+            <option value="">Not set</option>
+            {BUSINESS_TYPES.filter((type) => type.id !== 'general').map((type) => (
+              <option key={type.id} value={type.id}>{type.label}</option>
+            ))}
+            <option value="general">Something else</option>
+          </select>
         </Field>
         <Field label="Town or city">
           <input type="text" value={city} onChange={(e) => setCity(e.target.value)} />

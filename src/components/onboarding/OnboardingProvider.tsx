@@ -48,6 +48,8 @@ import type { OnboardingState, OnboardingStatus } from '../../server/onboarding'
 import { Dialog } from '../ledger/Dialog';
 import { buttonClass } from '../ledger/Page';
 import { CHAPTERS, TOUR_STEPS, type Language, type TourIcon } from './tourSteps';
+import { BusinessTypePrompt } from './BusinessTypePrompt';
+import { shouldSkipTourStep, type BusinessType } from '../../utils/businessTypes';
 
 const ICONS: Record<TourIcon, LucideIcon> = {
   book: BookOpen,
@@ -199,6 +201,10 @@ export function OnboardingProvider({ children }: { children: ReactNode }) {
   // setup page. Keep NOT_ASKED intact until real app screens and their tour
   // targets exist; starting sooner would create a tour of missing elements.
   const canTour = appReady && Boolean(activeCompany);
+  // Asked once, before the welcome dialog: what a business type changes
+  // (seeded accounts, which tour steps apply) should already be true by the
+  // time anyone sees the tour.
+  const needsBusinessType = canTour && !activeCompany?.businessType;
   const value = useMemo(
     () => ({ restartTutorial, isReady: Boolean(state) && Boolean(activeCompany) }),
     [activeCompany, restartTutorial, state],
@@ -207,7 +213,8 @@ export function OnboardingProvider({ children }: { children: ReactNode }) {
   return (
     <OnboardingContext.Provider value={value}>
       {children}
-      {canTour && state?.status === 'NOT_ASKED' && (
+      {needsBusinessType && <BusinessTypePrompt />}
+      {canTour && !needsBusinessType && state?.status === 'NOT_ASKED' && (
         <WelcomeDialog
           language={language}
           onLanguageChange={setLanguage}
@@ -215,7 +222,7 @@ export function OnboardingProvider({ children }: { children: ReactNode }) {
           onSkip={() => update('SKIPPED', 0)}
         />
       )}
-      {canTour && state?.status === 'IN_PROGRESS' && (
+      {canTour && !needsBusinessType && state?.status === 'IN_PROGRESS' && (
         <ProductTour
           step={Math.min(state.step, TOUR_STEPS.length - 1)}
           language={language}
@@ -224,6 +231,7 @@ export function OnboardingProvider({ children }: { children: ReactNode }) {
           onSkip={handleSkip}
           onComplete={handleComplete}
           persistenceProblem={persistenceProblem}
+          businessType={activeCompany?.businessType || null}
         />
       )}
     </OnboardingContext.Provider>
@@ -287,6 +295,7 @@ function ProductTour({
   onSkip,
   onComplete,
   persistenceProblem,
+  businessType,
 }: {
   step: number;
   language: Language;
@@ -295,6 +304,7 @@ function ProductTour({
   onSkip: () => void;
   onComplete: () => void;
   persistenceProblem: string;
+  businessType: BusinessType | null;
 }) {
   const current = TOUR_STEPS[step];
   const setActiveView = useAppStore((state) => state.setActiveView);
@@ -323,9 +333,16 @@ function ProductTour({
     if (step > 0) onStep(step - 1);
   }, [onStep, step]);
 
+  // A business type can rule a step out before it ever renders (Inventory for
+  // a consultancy, Projects for a shop). Advance past it without a flash of
+  // its page; the effect below runs after this one and never fires for it.
   useEffect(() => {
-    if (current.view) setActiveView(current.view);
-  }, [current.view, setActiveView]);
+    if (shouldSkipTourStep(current.id, businessType)) goNext();
+  }, [current.id, businessType, goNext]);
+
+  useEffect(() => {
+    if (current.view && !shouldSkipTourStep(current.id, businessType)) setActiveView(current.view);
+  }, [current.id, current.view, businessType, setActiveView]);
 
   useEffect(() => {
     const appRoot = document.getElementById('root');

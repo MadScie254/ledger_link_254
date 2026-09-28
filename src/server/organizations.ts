@@ -1,5 +1,6 @@
 import { getSupabase } from './supabase';
 import { AccountService } from './accounts';
+import { extraAccountsFor, type BusinessType } from '../utils/businessTypes';
 
 export interface Organization {
   id: string;
@@ -10,6 +11,7 @@ export interface Organization {
   taxId?: string;
   fiscalYearStart?: string;
   industry?: string;
+  businessType?: BusinessType | null;
   address?: string;
   city?: string;
   phone?: string;
@@ -52,6 +54,7 @@ export class OrganizationService {
       taxId: d.tax_id,
       fiscalYearStart: d.fiscal_year_start,
       industry: d.industry,
+      businessType: d.business_type,
       address: d.address,
       city: d.city,
       phone: d.phone,
@@ -86,6 +89,7 @@ export class OrganizationService {
       taxId: data.tax_id,
       fiscalYearStart: data.fiscal_year_start,
       industry: data.industry,
+      businessType: data.business_type,
       address: data.address,
       city: data.city,
       phone: data.phone,
@@ -111,6 +115,7 @@ export class OrganizationService {
         tax_id: data.taxId || '',
         fiscal_year_start: data.fiscalYearStart || 'January',
         industry: data.industry || 'General Business',
+        business_type: data.businessType || null,
         address: data.address || '',
         city: data.city || '',
         phone: data.phone || '',
@@ -138,8 +143,8 @@ export class OrganizationService {
       }
     }
 
-    // Initialize Standard Chart of Accounts
-    await this.seedDefaultAccounts(orgId);
+    // Initialize Standard Chart of Accounts, plus this type's own if chosen at creation.
+    await this.seedDefaultAccounts(orgId, data.businessType || null);
 
     return orgId;
   }
@@ -154,6 +159,7 @@ export class OrganizationService {
     if (data.taxId !== undefined) updateData.tax_id = data.taxId;
     if (data.fiscalYearStart !== undefined) updateData.fiscal_year_start = data.fiscalYearStart;
     if (data.industry !== undefined) updateData.industry = data.industry;
+    if (data.businessType !== undefined) updateData.business_type = data.businessType;
     if (data.address !== undefined) updateData.address = data.address;
     if (data.city !== undefined) updateData.city = data.city;
     if (data.phone !== undefined) updateData.phone = data.phone;
@@ -165,12 +171,17 @@ export class OrganizationService {
         .from('organizations')
         .update(updateData)
         .eq('id', orgId);
-        
+
       if (error) throw error;
     }
+
+    // Choosing (or changing) a business type adds its accounts; it never
+    // removes what the org already has, and seedDefaultAccounts already
+    // skips codes that exist, so calling it again on every change is safe.
+    if (data.businessType) await this.seedDefaultAccounts(orgId, data.businessType);
   }
 
-  static async seedDefaultAccounts(orgId: string): Promise<void> {
+  static async seedDefaultAccounts(orgId: string, businessType: BusinessType | null = null): Promise<void> {
     const supabase = getSupabase();
     const { data: organization, error } = await supabase
       .from('organizations')
@@ -213,7 +224,7 @@ export class OrganizationService {
       { code: '8100', name: 'Realized FX Gain / Loss', type: 'INCOME' as const },
     ];
 
-    for (const acc of standardAccounts) {
+    for (const acc of [...standardAccounts, ...extraAccountsFor(businessType)]) {
       if (existingCodes.has(acc.code)) continue;
       const currency = acc.code === '1010' ? 'USD' : acc.code === '1020' ? 'EUR' : baseCurrency;
       await AccountService.createAccount({ ...acc, orgId, currency });

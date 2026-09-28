@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import type { BusinessType } from './utils/businessTypes';
 
 const THEME_STORAGE_KEY = 'll-theme';
 
@@ -26,6 +27,7 @@ export interface OrganizationData {
   taxId?: string;
   fiscalYearStart?: string;
   industry?: string;
+  businessType?: BusinessType | null;
   address?: string;
   city?: string;
   phone?: string;

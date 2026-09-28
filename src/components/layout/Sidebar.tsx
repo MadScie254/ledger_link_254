@@ -1,7 +1,9 @@
+import { useMemo } from 'react';
 import { X } from 'lucide-react';
 import { useAppStore } from '../../store';
 import { useAuth } from '../../context/AuthProvider';
 import { CompanyMark } from '../ledger/CompanyMark';
+import { reorderByBusinessType } from '../../utils/businessTypes';
 
 /**
  * The spine of the book. Sections read as a printed thumb index: plain words,
@@ -49,6 +51,13 @@ export function Sidebar() {
   const { activeView, setActiveView, activeCompany, isMobileSidebarOpen, setMobileSidebarOpen } = useAppStore();
   const { user, signOut } = useAuth();
 
+  // Every section stays; only the Books group's order responds to the
+  // business type, so the pages that matter most for this kind of work lead.
+  const groups = useMemo(
+    () => INDEX.map((group) => (group.label === 'Books' ? { ...group, items: reorderByBusinessType(group.items, activeCompany?.businessType) } : group)),
+    [activeCompany?.businessType],
+  );
+
   const handleNavigate = (view: string) => {
     setActiveView(view);
     setMobileSidebarOpen(false);
@@ -86,7 +95,7 @@ export function Sidebar() {
       </div>
 
       <nav data-tour="sidebar-index" aria-label="Sections" className="flex-1 overflow-y-auto pb-4">
-        {INDEX.map((group) => (
+        {groups.map((group) => (
           <section key={group.label} className="mt-3 first:mt-1">
             <h2 className="px-4 pb-1.5 ll-printed text-[10.5px] text-sidebar-muted">{group.label}</h2>
             <ul>
