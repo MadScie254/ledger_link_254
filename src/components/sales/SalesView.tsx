@@ -12,6 +12,7 @@ import { Dialog, Field } from '../ledger/Dialog';
 import { Mark } from '../ledger/Mark';
 import { PageHeading, PageNote, buttonClass } from '../ledger/Page';
 import { useConfirm } from '../../hooks/useConfirm';
+import { downloadCsv } from '../../utils/exportCsv';
 
 export function SalesView() {
   useRenderTracker("SalesView");
@@ -121,22 +122,15 @@ export function SalesView() {
       ? invoicesData.invoices.filter((inv: any) => selectedIds.includes(inv.id))
       : invoicesData.invoices;
 
-    const headers = ['Date', 'Invoice No', 'Customer ID', 'Status', 'Total'];
+    const headers = ['Date', 'Invoice No', 'Customer', 'Status', 'Total'];
     const rows = targetInvoices.map((inv: any) => [
       format(new Date(inv.issueDate), 'yyyy-MM-dd'),
       inv.invoiceNo,
-      inv.customerId,
+      customerName(inv.customerId) || inv.customerId,
       inv.status,
-      (inv.totalCents / 100).toFixed(2)
+      (inv.totalCents / 100).toFixed(2),
     ]);
-    const csvContent = [headers.join(','), ...rows.map((r: any) => r.join(','))].join('\n');
-    const blob = new Blob([csvContent], { type: 'text/csv' });
-    const url = window.URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = 'invoices.csv';
-    a.click();
-    window.URL.revokeObjectURL(url);
+    downloadCsv('invoices.csv', [headers, ...rows]);
   };
 
   if (isBuilding) return <InvoiceBuilder onDone={() => setIsBuilding(false)} />;

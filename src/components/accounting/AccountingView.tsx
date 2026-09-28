@@ -521,7 +521,7 @@ export function AccountingView() {
                     </td>
                     <td>
                       {jeLines.length > 2 && (
-                        <button type="button" onClick={() => setJeLines(jeLines.filter((_, i) => i !== index))} aria-label={`Remove line ${index + 1}`} className="p-1 text-graphite-600 hover:text-ledger-red">
+                        <button type="button" onClick={() => setJeLines(jeLines.filter((_, i) => i !== index))} aria-label={`Remove line ${index + 1}`} className="p-1 text-graphite-600 hover:text-oxblood">
                           <X className="h-4 w-4" aria-hidden="true" />
                         </button>
                       )}

@@ -9,6 +9,8 @@ import { AppLayout } from "./components/layout/AppLayout";
 import { useAppStore } from "./store";
 import { TenantProvider } from "./context/TenantContext";
 import { UndoToast } from "./components/layout/UndoToast";
+import { ErrorBoundary } from "./components/layout/ErrorBoundary";
+import { OfflineBanner } from "./components/layout/OfflineBanner";
 import { LockScreen } from "./components/layout/LockScreen";
 import { fetchExchangeRates } from "./utils/currency";
 import { AuthProvider } from "./context/AuthProvider";
@@ -224,9 +226,14 @@ function LedgerApp() {
     return (
       <>
         <TenantProvider>
-          <AppLayout><Suspense fallback={viewFallback}>{emptyOrganizationView}</Suspense></AppLayout>
+          <AppLayout>
+            <ErrorBoundary key={activeView}>
+              <Suspense fallback={viewFallback}>{emptyOrganizationView}</Suspense>
+            </ErrorBoundary>
+          </AppLayout>
         </TenantProvider>
         <UndoToast />
+        <OfflineBanner />
       </>
     );
   }
@@ -234,9 +241,14 @@ function LedgerApp() {
   return (
     <>
       <TenantProvider>
-        <AppLayout><Suspense fallback={viewFallback}>{renderContent()}</Suspense></AppLayout>
+        <AppLayout>
+          <ErrorBoundary key={activeView}>
+            <Suspense fallback={viewFallback}>{renderContent()}</Suspense>
+          </ErrorBoundary>
+        </AppLayout>
       </TenantProvider>
       <UndoToast />
+      <OfflineBanner />
     </>
   );
 }

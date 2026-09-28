@@ -244,14 +244,14 @@ export function InvoiceBuilder({ onDone }: { onDone: () => void }) {
                         />
                       </label>
                       {lines.length > 1 && (
-                        <button type="button" onClick={() => removeLine(l.key)} aria-label={`Remove line ${i + 1}`} className="mb-2 p-1 text-graphite-600 hover:text-ledger-red sm:hidden">
+                        <button type="button" onClick={() => removeLine(l.key)} aria-label={`Remove line ${i + 1}`} className="mb-2 p-1 text-graphite-600 hover:text-oxblood sm:hidden">
                           <X className="h-4 w-4" aria-hidden="true" />
                         </button>
                       )}
                     </div>
                     <div className="hidden sm:block">
                       {lines.length > 1 && (
-                        <button type="button" onClick={() => removeLine(l.key)} aria-label={`Remove line ${i + 1}`} className="p-1 text-graphite-600 hover:text-ledger-red">
+                        <button type="button" onClick={() => removeLine(l.key)} aria-label={`Remove line ${i + 1}`} className="p-1 text-graphite-600 hover:text-oxblood">
                           <X className="h-4 w-4" aria-hidden="true" />
                         </button>
                       )}

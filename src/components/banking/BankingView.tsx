@@ -8,6 +8,7 @@ import { Amount } from '../ledger/Amount';
 import { Mark } from '../ledger/Mark';
 import { PageHeading, IndexTabs, PageNote, SkeletonRows, EmptyNote, buttonClass } from '../ledger/Page';
 import { useConfirm } from '../../hooks/useConfirm';
+import { downloadCsv } from '../../utils/exportCsv';
 import { Dialog, Field } from '../ledger/Dialog';
 
 const tabs = ['Bank transactions', 'AI Match Assistant', 'Rules', 'Reconcile', 'Bank connections'];
@@ -280,19 +281,12 @@ export function BankingView() {
     const headers = ['Date', 'Description', 'Direction', 'Amount', 'Status'];
     const rows = rawTx.map((tx: any) => [
       format(new Date(tx.date), 'yyyy-MM-dd'),
-      `"${tx.description.replace(/"/g, '""')}"`,
+      tx.description || '',
       tx.direction,
       (tx.amountCents / 100).toFixed(2),
-      tx.status
+      tx.status,
     ]);
-    const csvContent = [headers.join(','), ...rows.map((r: any) => r.join(','))].join('\n');
-    const blob = new Blob([csvContent], { type: 'text/csv' });
-    const url = window.URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = 'transactions.csv';
-    a.click();
-    window.URL.revokeObjectURL(url);
+    downloadCsv('transactions.csv', [headers, ...rows]);
   };
 
   const closeMatch = () => {
