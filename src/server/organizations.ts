@@ -198,7 +198,7 @@ export class OrganizationService {
       { code: '2100', name: 'Output VAT Payable', type: 'LIABILITY' as const },
       { code: '2110', name: 'PAYE Payable', type: 'LIABILITY' as const },
       { code: '2120', name: 'NSSF Payable', type: 'LIABILITY' as const },
-      { code: '2130', name: 'SHIF Payable', type: 'LIABILITY' as const },
+      { code: '2130', name: 'SHA Payable', type: 'LIABILITY' as const },
       { code: '2140', name: 'Affordable Housing Levy Payable', type: 'LIABILITY' as const },
       { code: '3000', name: "Owner's Equity / Share Capital", type: 'EQUITY' as const },
       { code: '3100', name: 'Retained Earnings', type: 'EQUITY' as const },

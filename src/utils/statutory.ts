@@ -4,7 +4,7 @@ import { differenceInCalendarDays } from 'date-fns';
  * Kenyan statutory deadlines for the month in hand, in one place so Home and
  * Tax can never disagree.
  *
- * PAYE, NSSF and SHIF are due by the 9th, VAT by the 20th, and the Housing Levy
+ * PAYE, NSSF and SHA are due by the 9th, VAT by the 20th, and the Housing Levy
  * by the ninth working day. A date that lands on a weekend moves to the next
  * working day (product owner's rule, 17 September 2026). Public holidays are
  * not yet in the calendar, which the Housing Levy rule line says.
@@ -59,14 +59,14 @@ export function statutoryDeadlines(today: Date = new Date()): StatutoryDeadline[
   const levy = differenceInCalendarDays(levyThisMonth, start) >= 0 ? levyThisMonth : ninthWorkingDay(y, m + 1);
 
   return [
-    monthly('paye', 'PAYE, NSSF and SHIF returns', 9, 'Payroll'),
+    monthly('paye', 'PAYE, NSSF and SHA returns', 9, 'Payroll'),
     { id: 'levy' as const, label: 'Housing Levy', rule: '9th working day, before public holidays', due: levy, view: 'Payroll' },
     monthly('vat', 'VAT return', 20, 'Tax'),
   ].sort((a, b) => a.due.getTime() - b.due.getTime());
 }
 
 /**
- * When the payroll returns for one pay period fall due: PAYE, NSSF and SHIF by
+ * When the payroll returns for one pay period fall due: PAYE, NSSF and SHA by
  * the 9th of the following month, the Housing Levy by that month's ninth
  * working day, each moved off a weekend as above.
  */

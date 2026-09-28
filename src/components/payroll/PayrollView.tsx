@@ -17,13 +17,13 @@ import {
   type PayslipBreakdown,
 } from '../../utils/kenyaPayroll';
 
-const tabs = ['Employees', 'Run payroll', 'Payslips', 'Statutory filings (PAYE/NSSF/SHIF)'];
+const tabs = ['Employees', 'Run payroll', 'Payslips', 'Statutory filings (PAYE/NSSF/SHA)'];
 
-type ReturnKey = 'PAYE' | 'NSSF' | 'SHIF' | 'AHL';
+type ReturnKey = 'PAYE' | 'NSSF' | 'SHA' | 'AHL';
 const STATUTORY_RETURNS: { key: ReturnKey; name: string; authority: string; field: 'payeCents' | 'nssfCents' | 'shifCents' | 'ahlCents' }[] = [
   { key: 'PAYE', name: 'PAYE', authority: 'Kenya Revenue Authority', field: 'payeCents' },
   { key: 'NSSF', name: 'NSSF', authority: 'National Social Security Fund', field: 'nssfCents' },
-  { key: 'SHIF', name: 'SHIF', authority: 'Social Health Authority', field: 'shifCents' },
+  { key: 'SHA', name: 'SHA', authority: 'Social Health Authority', field: 'shifCents' },
   { key: 'AHL', name: 'Housing Levy', authority: 'Kenya Revenue Authority', field: 'ahlCents' },
 ];
 
@@ -111,7 +111,7 @@ export function PayrollView() {
     const columnMap = {
       PAYE: (p: any) => ({ Employee: p.employeeName, 'Gross Pay': p.grossCents / 100, 'PAYE Deducted': p.payeCents / 100 }),
       NSSF: (p: any) => ({ Employee: p.employeeName, 'Pensionable Pay': p.grossCents / 100, 'NSSF Deducted': p.nssfCents / 100 }),
-      SHIF: (p: any) => ({ Employee: p.employeeName, 'Gross Pay': p.grossCents / 100, 'SHIF Deducted': p.shifCents / 100 }),
+      SHA: (p: any) => ({ Employee: p.employeeName, 'Gross Pay': p.grossCents / 100, 'SHA Deducted': p.shifCents / 100 }),
       AHL: (p: any) => ({ Employee: p.employeeName, 'Gross Pay': p.grossCents / 100, 'Housing Levy Deducted': p.ahlCents / 100 }),
     };
     const csv = Papa.unparse(payslips.map(columnMap[type]));
@@ -157,11 +157,11 @@ export function PayrollView() {
       gross: t.gross + p.grossCents,
       paye: t.paye + p.payeCents,
       nssf: t.nssf + p.nssfCents,
-      shif: t.shif + p.shifCents,
+      sha: t.sha + p.shifCents,
       ahl: t.ahl + p.ahlCents,
       net: t.net + p.netCents,
     }),
-    { gross: 0, paye: 0, nssf: 0, shif: 0, ahl: 0, net: 0 },
+    { gross: 0, paye: 0, nssf: 0, sha: 0, ahl: 0, net: 0 },
   );
   const salaryTotal = employees.reduce((sum: number, e: any) => sum + (e.baseSalaryCents || 0), 0);
 
@@ -193,7 +193,7 @@ export function PayrollView() {
         onChange={setActiveTab}
         tabs={tabs.map((tab) => ({
           id: tab,
-          name: tab === 'Run payroll' ? 'Pay run' : tab === 'Statutory filings (PAYE/NSSF/SHIF)' ? 'Statutory returns' : tab,
+          name: tab === 'Run payroll' ? 'Pay run' : tab === 'Statutory filings (PAYE/NSSF/SHA)' ? 'Statutory returns' : tab,
           count: tab === 'Employees' ? employees.length : undefined,
         }))}
       />
@@ -345,7 +345,7 @@ export function PayrollView() {
                   <tr>
                     <th scope="col" className="pr-4 text-right">PAYE</th>
                     <th scope="col" className="pr-4 text-right">NSSF</th>
-                    <th scope="col" className="pr-4 text-right">SHIF</th>
+                    <th scope="col" className="pr-4 text-right">SHA</th>
                     <th scope="col" className="pr-4 text-right">Housing Levy</th>
                   </tr>
                 </thead>
@@ -368,7 +368,7 @@ export function PayrollView() {
                     <td className="ll-total py-2 pr-4 text-right whitespace-nowrap"><Amount cents={runTotals.gross} currency={baseCurrency} tone="ink" className="font-semibold" /></td>
                     <td className="ll-total py-2 pr-4 text-right whitespace-nowrap"><Amount cents={runTotals.paye} currency={baseCurrency} tone="ink" className="font-semibold" /></td>
                     <td className="ll-total py-2 pr-4 text-right whitespace-nowrap"><Amount cents={runTotals.nssf} currency={baseCurrency} tone="ink" className="font-semibold" /></td>
-                    <td className="ll-total py-2 pr-4 text-right whitespace-nowrap"><Amount cents={runTotals.shif} currency={baseCurrency} tone="ink" className="font-semibold" /></td>
+                    <td className="ll-total py-2 pr-4 text-right whitespace-nowrap"><Amount cents={runTotals.sha} currency={baseCurrency} tone="ink" className="font-semibold" /></td>
                     <td className="ll-total py-2 pr-4 text-right whitespace-nowrap"><Amount cents={runTotals.ahl} currency={baseCurrency} tone="ink" className="font-semibold" /></td>
                     <td className="ll-total py-2 text-right whitespace-nowrap"><Amount cents={runTotals.net} currency={baseCurrency} tone="ink" className="font-semibold" /></td>
                   </tr>
@@ -379,7 +379,7 @@ export function PayrollView() {
         </div>
       )}
 
-      {(activeTab === 'Payslips' || activeTab === 'Statutory filings (PAYE/NSSF/SHIF)') &&
+      {(activeTab === 'Payslips' || activeTab === 'Statutory filings (PAYE/NSSF/SHA)') &&
         (runsLoading ? (
           <SkeletonRows label="Loading pay runs" rows={4} />
         ) : runs.length === 0 ? (
@@ -390,7 +390,7 @@ export function PayrollView() {
               </button>
             }
           >
-            No pay run has been posted yet. Payslips and the PAYE, NSSF, SHIF and Housing Levy figures for filing come from a posted run.
+            No pay run has been posted yet. Payslips and the PAYE, NSSF, SHA and Housing Levy figures for filing come from a posted run.
           </EmptyNote>
         ) : (
           <div className="space-y-4">
@@ -421,7 +421,7 @@ export function PayrollView() {
                     <tr>
                       <th scope="col" className="pr-4 text-right">PAYE</th>
                       <th scope="col" className="pr-4 text-right">NSSF</th>
-                      <th scope="col" className="pr-4 text-right">SHIF</th>
+                      <th scope="col" className="pr-4 text-right">SHA</th>
                       <th scope="col" className="pr-4 text-right">Housing Levy</th>
                     </tr>
                   </thead>

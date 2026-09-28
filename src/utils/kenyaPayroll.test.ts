@@ -79,7 +79,7 @@ test('applies the upper 32.5% and 35% PAYE bands', () => {
   assert.equal(payslip.payeCents, KES(292_740.35));
 });
 
-test('applies the SHIF minimum and floors PAYE at zero', () => {
+test('applies the SHA minimum and floors PAYE at zero', () => {
   const payslip = calculatePayslip(KES(10_000), SEPTEMBER_2026);
   assert.equal(payslip.shifCents, KES(300));
   assert.equal(payslip.nssfCents, KES(600));

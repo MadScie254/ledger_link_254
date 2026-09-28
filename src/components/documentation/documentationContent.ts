@@ -351,7 +351,7 @@ export const documentationSections: DocumentationSection[] = [
     summary: 'Run operational modules with the accounting and statutory checks they require.',
     audience: 'Owner, admin, accountant',
     minutes: 22,
-    keywords: ['payroll', 'PAYE', 'NSSF', 'SHIF', 'housing levy', 'inventory', 'project', 'time', 'tax', 'VAT', 'eTIMS'],
+    keywords: ['payroll', 'PAYE', 'NSSF', 'SHA', 'housing levy', 'inventory', 'project', 'time', 'tax', 'VAT', 'eTIMS'],
     blocks: [
       {
         type: 'steps',
@@ -359,7 +359,7 @@ export const documentationSections: DocumentationSection[] = [
         steps: [
           { title: 'Maintain employees', detail: 'Open Payroll → Employees. Add identity, salary, currency, KRA PIN, NSSF details, department, and status. Confirm active employees only.' },
           { title: 'Choose period and pay date', detail: 'Open Pay run. The pay date selects the coded statutory rate table, so use the actual payroll date.' },
-          { title: 'Review the preview', detail: 'Check gross pay, PAYE, NSSF, SHIF, Housing Levy, and net pay per employee and in total.' },
+          { title: 'Review the preview', detail: 'Check gross pay, PAYE, NSSF, SHA, Housing Levy, and net pay per employee and in total.' },
           { title: 'Post once', detail: 'Post this pay run only after approval. The atomic workflow creates the run, payslips, and balanced journal together.' },
           { title: 'Export statutory schedules', detail: 'Use Payslips and Statutory returns to review and export CSV schedules. Verify them against current legal requirements before filing.' },
         ],

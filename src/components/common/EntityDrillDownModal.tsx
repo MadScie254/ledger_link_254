@@ -299,7 +299,7 @@ export function EntityDrillDownModal({ isOpen, onClose, entityType, entityId, in
             <Section title="Statutory numbers">
               <Line label="KRA PIN" value={data.kraPin} figure />
               <Line label="NSSF number" value={data.nssfNumber} figure />
-              <Line label="SHIF number" value={data.shifNumber} figure />
+              <Line label="SHA number" value={data.shifNumber} figure />
               <Line label="Bank" value={data.bankName} />
             </Section>
           </>

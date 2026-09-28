@@ -313,7 +313,7 @@ export const TOUR_STEPS: TourStep[] = [
     points: [
       point('Employees', 'Add each person with their KRA PIN and salary.', 'Employees', 'Ongeza kila mtu na KRA PIN na mshahara wake.'),
       point('Run payroll', 'Preview the month, then post the pay run to the books. Each person gets a payslip.', 'Run payroll', 'Angalia hesabu ya mwezi, kisha weka malipo kwenye vitabu. Kila mtu anapata payslip.'),
-      point('The four deductions', 'PAYE is income tax. NSSF is pension. SHIF is health cover. The Housing Levy funds affordable housing.', 'Makato manne', 'PAYE ni kodi ya mapato. NSSF ni pensheni. SHIF ni bima ya afya. Housing Levy ni ushuru wa nyumba za bei nafuu.'),
+      point('The four deductions', 'PAYE is income tax. NSSF is pension. SHA is health cover. The Housing Levy funds affordable housing.', 'Makato manne', 'PAYE ni kodi ya mapato. NSSF ni pensheni. SHA ni bima ya afya. Housing Levy ni ushuru wa nyumba za bei nafuu.'),
       point('Statutory filings', 'Shows what each agency is owed and by when.', 'Statutory filings', 'Inaonyesha kila shirika linadai kiasi gani na kufikia lini.'),
     ],
   },

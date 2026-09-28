@@ -1280,7 +1280,7 @@ export function DynamicQuickAddModal({
                     </div>
                     <div>
                       <label htmlFor="qa-shifNumber-55" className="block text-[13px] font-semibold text-ink-900 mb-1.5">
-                        SHIF number
+                        SHA number
                       </label>
                       <input
                         id="qa-shifNumber-55" name="shifNumber"
