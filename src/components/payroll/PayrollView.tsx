@@ -9,6 +9,7 @@ import { Amount } from '../ledger/Amount';
 import { Mark } from '../ledger/Mark';
 import { PageHeading, IndexTabs, PageNote, SkeletonRows, EmptyNote, buttonClass } from '../ledger/Page';
 import { payrollReturnsDue } from '../../utils/statutory';
+import { calculatePayslip, findRateTable, STATUTORY_RATE_TABLES, type StatutoryRateTable } from '../../utils/kenyaPayroll';
 
 const tabs = ['Employees', 'Run payroll', 'Payslips', 'Statutory filings (PAYE/NSSF/SHIF)'];
 
@@ -19,38 +20,6 @@ const STATUTORY_RETURNS: { key: ReturnKey; name: string; authority: string; fiel
   { key: 'SHIF', name: 'SHIF', authority: 'Social Health Authority', field: 'shifCents' },
   { key: 'AHL', name: 'Housing Levy', authority: 'Kenya Revenue Authority', field: 'ahlCents' },
 ];
-
-// Mirrors src/server/payroll.ts calculatePayslip — Kenyan statutory bands
-// (Finance Act 2023 / NSSF Act / SHIF Act, 2024/2025 rates). Duplicated here
-// purely for an instant client-side preview; the server recomputes and is
-// the source of truth when a payroll run is actually processed.
-function calculatePayslipPreview(grossCents: number) {
-  const gross = grossCents / 100;
-  const bands = [
-    { upTo: 24000, rate: 0.10 },
-    { upTo: 32333, rate: 0.25 },
-    { upTo: 500000, rate: 0.30 },
-    { upTo: 800000, rate: 0.325 },
-    { upTo: Infinity, rate: 0.35 }
-  ];
-  let remaining = gross;
-  let lowerBound = 0;
-  let taxBeforeRelief = 0;
-  for (const band of bands) {
-    if (remaining <= 0) break;
-    const bandWidth = band.upTo - lowerBound;
-    const taxableInBand = Math.min(remaining, bandWidth);
-    taxBeforeRelief += taxableInBand * band.rate;
-    remaining -= taxableInBand;
-    lowerBound = band.upTo;
-  }
-  const paye = Math.max(taxBeforeRelief - 2400, 0);
-  const nssf = Math.min(gross, 36000) * 0.06;
-  const shif = Math.max(gross * 0.0275, 300);
-  const ahl = gross * 0.015;
-  const net = gross - paye - nssf - shif - ahl;
-  return { gross, paye, nssf, shif, ahl, net };
-}
 
 export function PayrollView() {
   const [activeTab, setActiveTab] = useState('Employees');
@@ -152,19 +121,40 @@ export function PayrollView() {
   };
 
   const baseCurrency = activeCompany?.baseCurrency || 'KES';
-  const toCents = (kes: number) => Math.round((kes || 0) * 100);
-  const runRows = activeEmployees.map((emp: any) => ({ emp, p: calculatePayslipPreview(emp.baseSalaryCents || 0) }));
+  // The preview uses the same calculation and rate tables the server posts with.
+  const runRates = findRateTable(payDate);
+  const runRows = runRates
+    ? activeEmployees.map((emp: any) => ({ emp, p: calculatePayslip(emp.baseSalaryCents || 0, payDate) }))
+    : [];
   const runTotals = runRows.reduce(
     (t: any, { p }: any) => ({
-      gross: t.gross + toCents(p.gross),
-      paye: t.paye + toCents(p.paye),
-      nssf: t.nssf + toCents(p.nssf),
-      shif: t.shif + toCents(p.shif),
-      ahl: t.ahl + toCents(p.ahl),
-      net: t.net + toCents(p.net),
+      gross: t.gross + p.grossCents,
+      paye: t.paye + p.payeCents,
+      nssf: t.nssf + p.nssfCents,
+      shif: t.shif + p.shifCents,
+      ahl: t.ahl + p.ahlCents,
+      net: t.net + p.netCents,
     }),
     { gross: 0, paye: 0, nssf: 0, shif: 0, ahl: 0, net: 0 },
   );
+  const kes = (cents: number) => `KES ${(cents / 100).toLocaleString('en-KE')}`;
+  const pct = (rate: number) => `${+(rate * 100).toFixed(2)}%`;
+  const ratesSummary = (rates: StatutoryRateTable) =>
+    `NSSF ${pct(rates.nssf.rate)} of pay up to ${kes(rates.nssf.upperEarningsLimitCents)} (lower limit ${kes(rates.nssf.lowerEarningsLimitCents)}), SHIF ${pct(rates.shif.rate)} with a ${kes(rates.shif.minimumCents)} minimum, Housing Levy ${pct(rates.housingLevyRate)}, and PAYE on pay after all three`;
+  const fromDate = (rates: StatutoryRateTable) => format(parse(rates.effectiveFrom, 'yyyy-MM-dd', new Date()), 'd MMM yyyy');
+
+  // Posted payslips are never recomputed. This only checks whether they agree
+  // with the rates coded for their pay date, since runs posted before those
+  // rates were coded used a KES 36,000 NSSF ceiling and charged PAYE on gross.
+  const selectedRunPayDate: string = selectedRun?.payDate ? String(selectedRun.payDate).slice(0, 10) : '';
+  const selectedRunRates = selectedRunPayDate ? findRateTable(selectedRunPayDate) : null;
+  const payslipsOffRates = selectedRunRates
+    ? payslips.filter((p: any) => {
+        const expected = calculatePayslip(p.grossCents || 0, selectedRunPayDate);
+        return expected.payeCents !== p.payeCents || expected.nssfCents !== p.nssfCents
+          || expected.shifCents !== p.shifCents || expected.ahlCents !== p.ahlCents;
+      }).length
+    : 0;
   const salaryTotal = employees.reduce((sum: number, e: any) => sum + (e.baseSalaryCents || 0), 0);
 
   return (
@@ -308,9 +298,15 @@ export function PayrollView() {
 
           <PageNote>
             This is a preview. The server computes PAYE, NSSF, SHIF and the Housing Levy again when the run is posted, and those figures are the ones that post.
+            {runRates && <> Both use the rates in force on the pay date, coded from {fromDate(runRates)}: {ratesSummary(runRates)}.</>}
           </PageNote>
 
-          {runRows.length === 0 ? (
+          {!runRates ? (
+            <p role="alert" className="flex items-start gap-2 py-6 text-[14px] text-ledger-red">
+              <Mark kind="circled" className="mt-0.5" />
+              <span>No statutory rates are coded for pay date {payDate || '(blank)'}. Rates are coded for pay dates from {fromDate(STATUTORY_RATE_TABLES[0])}. Choose a later pay date.</span>
+            </p>
+          ) : runRows.length === 0 ? (
             <p className="py-6 text-[14px] text-graphite-600">No active employees. Add or reactivate employees to prepare a pay run.</p>
           ) : (
             <div className="relative overflow-x-auto">
@@ -334,12 +330,12 @@ export function PayrollView() {
                   {runRows.map(({ emp, p }: any) => (
                     <tr key={emp.id}>
                       <td className="pr-4 text-ink-900">{emp.firstName} {emp.lastName}</td>
-                      <td className="pr-4 text-right whitespace-nowrap"><Amount cents={toCents(p.gross)} currency={baseCurrency} /></td>
-                      <td className="pr-4 text-right whitespace-nowrap"><Amount cents={toCents(p.paye)} currency={baseCurrency} /></td>
-                      <td className="pr-4 text-right whitespace-nowrap"><Amount cents={toCents(p.nssf)} currency={baseCurrency} /></td>
-                      <td className="pr-4 text-right whitespace-nowrap"><Amount cents={toCents(p.shif)} currency={baseCurrency} /></td>
-                      <td className="pr-4 text-right whitespace-nowrap"><Amount cents={toCents(p.ahl)} currency={baseCurrency} /></td>
-                      <td className="text-right whitespace-nowrap"><Amount cents={toCents(p.net)} currency={baseCurrency} tone="ink" className="font-semibold" /></td>
+                      <td className="pr-4 text-right whitespace-nowrap"><Amount cents={p.grossCents} currency={baseCurrency} /></td>
+                      <td className="pr-4 text-right whitespace-nowrap"><Amount cents={p.payeCents} currency={baseCurrency} /></td>
+                      <td className="pr-4 text-right whitespace-nowrap"><Amount cents={p.nssfCents} currency={baseCurrency} /></td>
+                      <td className="pr-4 text-right whitespace-nowrap"><Amount cents={p.shifCents} currency={baseCurrency} /></td>
+                      <td className="pr-4 text-right whitespace-nowrap"><Amount cents={p.ahlCents} currency={baseCurrency} /></td>
+                      <td className="text-right whitespace-nowrap"><Amount cents={p.netCents} currency={baseCurrency} tone="ink" className="font-semibold" /></td>
                     </tr>
                   ))}
                 </tbody>
@@ -436,7 +432,13 @@ export function PayrollView() {
                   What {selectedRun?.period} owes each authority, with a CSV for the return. Filing itself is done on iTax, the NSSF portal and the SHA portal.
                 </p>
                 <p className="mb-3 text-[13px] text-ink-900">
-                  <Mark kind="query" label="The deductions use rates coded for 2024. Check them against current KRA, NSSF and SHA rates before filing." />
+                  {!selectedRunRates ? (
+                    <Mark kind="query" label={`No statutory rates are coded for this run's pay date, so its deductions cannot be checked. Check them against KRA, NSSF and SHA rates before filing.`} />
+                  ) : payslipsOffRates > 0 ? (
+                    <Mark kind="query" label={`${payslipsOffRates} of ${payslips.length} payslips differ from the rates in force on the pay date (${ratesSummary(selectedRunRates)}). This run was posted before those rates were coded and its figures are not changed. Correct the difference on the return or in a later run.`} />
+                  ) : (
+                    <Mark kind="tick" label={`Deductions agree with the rates in force on the pay date, coded from ${fromDate(selectedRunRates)}: ${ratesSummary(selectedRunRates)}. Rates were last checked against KRA, NSSF and SHA notices on 17 September 2026.`} />
+                  )}
                 </p>
                 <ul className="border-t border-feint-strong">
                   {STATUTORY_RETURNS.map((r) => {

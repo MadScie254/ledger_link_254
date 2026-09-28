@@ -9,7 +9,8 @@
     "preview": "vite preview",
     "deploy": "vite build && wrangler deploy",
     "clean": "rm -rf dist",
-    "lint": "tsc --noEmit"
+    "lint": "tsc --noEmit",
+    "test": "node --test \"src/**/*.test.ts\""
   },
   "dependencies": {
     "@google/genai": "^2.19.0",

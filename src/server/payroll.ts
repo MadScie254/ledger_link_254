@@ -1,70 +1,11 @@
 import { getSupabase } from './supabase';
 import { LedgerService } from './ledger';
 import { AccountService } from './accounts';
+import { calculatePayslip } from '../utils/kenyaPayroll';
 
-export interface PayslipBreakdown {
-  grossCents: number;
-  payeCents: number;
-  nssfCents: number;
-  shifCents: number;
-  ahlCents: number;
-  netCents: number;
-}
-
-/**
- * Kenyan statutory payroll deductions, per the Finance Act 2023 / NSSF Act
- * (2013, amended 2023) / SHIF Act 2023 rates in effect for 2024/2025.
- * Bands can change by legislation — verify against current KRA/NSSF/SHA
- * guidance before relying on this for a real filing.
- */
-export function calculatePayslip(grossCents: number): PayslipBreakdown {
-  const gross = grossCents / 100;
-
-  // PAYE — graduated monthly bands (KES), then KES 2,400/month personal relief.
-  const bands = [
-    { upTo: 24000, rate: 0.10 },
-    { upTo: 32333, rate: 0.25 },
-    { upTo: 500000, rate: 0.30 },
-    { upTo: 800000, rate: 0.325 },
-    { upTo: Infinity, rate: 0.35 }
-  ];
-  let remaining = gross;
-  let lowerBound = 0;
-  let taxBeforeRelief = 0;
-  for (const band of bands) {
-    if (remaining <= 0) break;
-    const bandWidth = band.upTo - lowerBound;
-    const taxableInBand = Math.min(remaining, bandWidth);
-    taxBeforeRelief += taxableInBand * band.rate;
-    remaining -= taxableInBand;
-    lowerBound = band.upTo;
-  }
-  const PERSONAL_RELIEF = 2400;
-  const paye = Math.max(taxBeforeRelief - PERSONAL_RELIEF, 0);
-
-  // NSSF — 6% employee contribution, Tier I + Tier II, capped at the
-  // upper earnings limit (KES 36,000/month as of Feb 2025).
-  const NSSF_UEL = 36000;
-  const nssf = Math.min(gross, NSSF_UEL) * 0.06;
-
-  // SHIF (replaced NHIF in Oct 2024) — 2.75% of gross, minimum KES 300.
-  const shif = Math.max(gross * 0.0275, 300);
-
-  // Affordable Housing Levy — 1.5% of gross (employee portion).
-  const ahl = gross * 0.015;
-
-  const totalDeductions = paye + nssf + shif + ahl;
-  const net = gross - totalDeductions;
-
-  return {
-    grossCents: Math.round(gross * 100),
-    payeCents: Math.round(paye * 100),
-    nssfCents: Math.round(nssf * 100),
-    shifCents: Math.round(shif * 100),
-    ahlCents: Math.round(ahl * 100),
-    netCents: Math.round(net * 100)
-  };
-}
+// Statutory rates and the calculation live in src/utils/kenyaPayroll.ts, shared
+// with the Payroll screen preview so the two cannot drift apart.
+export { calculatePayslip, type PayslipBreakdown } from '../utils/kenyaPayroll';
 
 export class PayrollService {
   static async getEmployees(orgId: string) {
@@ -185,7 +126,9 @@ export class PayrollService {
 
     const breakdowns = employees.map((emp: any) => ({
       employeeId: emp.id,
-      ...calculatePayslip(emp.base_salary || 0)
+      // Rates are those in force on the pay date. Posted runs keep the figures
+      // stored when they were posted; nothing here recomputes them.
+      ...calculatePayslip(emp.base_salary || 0, payDate)
     }));
 
     const totals = breakdowns.reduce((acc, b) => ({
