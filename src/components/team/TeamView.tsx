@@ -4,18 +4,22 @@ import { useAppStore } from '../../store';
 import { Dialog, Field } from '../ledger/Dialog';
 import { PageHeading, SkeletonRows, EmptyNote, LoadProblem, buttonClass } from '../ledger/Page';
 
+type AssignableRole = 'admin' | 'member' | 'accountant';
+type Role = 'owner' | AssignableRole;
+
 interface TeamMember {
   id: string;
   userId: string;
   email: string;
-  role: 'owner' | 'admin' | 'member';
+  role: Role;
   status: string;
   isYou: boolean;
 }
 
-const ROLE_NOTE: Record<TeamMember['role'], string> = {
+const ROLE_NOTE: Record<Role, string> = {
   owner: 'Holds the organization and posts to the books',
   admin: 'Posts to the books, invites members, changes roles and settings',
+  accountant: 'Posts to the books, like an admin, but cannot change settings, roles or the team. Can belong to other organizations too',
   member: 'Can read the books; posting needs an owner or admin',
 };
 
@@ -24,7 +28,7 @@ export function TeamView() {
   const queryClient = useQueryClient();
   const [isInviteOpen, setIsInviteOpen] = useState(false);
   const [inviteEmail, setInviteEmail] = useState('');
-  const [inviteRole, setInviteRole] = useState<'admin' | 'member'>('member');
+  const [inviteRole, setInviteRole] = useState<AssignableRole>('member');
   const [formError, setFormError] = useState('');
   const [rowError, setRowError] = useState('');
 
@@ -58,7 +62,7 @@ export function TeamView() {
   });
 
   const roleMutation = useMutation({
-    mutationFn: async ({ id, role }: { id: string; role: 'admin' | 'member' }) => {
+    mutationFn: async ({ id, role }: { id: string; role: AssignableRole }) => {
       const res = await fetch(`/api/team/${id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json', 'x-org-id': currentOrgId },
@@ -101,25 +105,32 @@ export function TeamView() {
   }
 
   const members: TeamMember[] = team.data?.members || [];
+  // Only an owner or admin can invite, change a role, or remove someone;
+  // an accountant posts to the books but does not administer the
+  // organization, same restriction a plain member already has.
+  const myRole = members.find((m) => m.isYou)?.role;
+  const canManageTeam = myRole === 'owner' || myRole === 'admin';
 
-  const roleControl = (m: TeamMember) =>
-    m.role === 'owner' ? (
-      <span className="text-[13.5px] font-semibold text-ink-900">Owner</span>
-    ) : (
+  const roleControl = (m: TeamMember) => {
+    if (m.role === 'owner') return <span className="text-[13.5px] font-semibold text-ink-900">Owner</span>;
+    if (!canManageTeam) return <span className="text-[13.5px] text-ink-900">{ROLE_LABEL[m.role]}</span>;
+    return (
       <select
         aria-label={`Role for ${m.email}`}
         value={m.role}
-        onChange={(e) => roleMutation.mutate({ id: m.id, role: e.target.value as 'admin' | 'member' })}
+        onChange={(e) => roleMutation.mutate({ id: m.id, role: e.target.value as AssignableRole })}
         disabled={roleMutation.isPending || m.isYou}
         className="h-8 border px-2 text-[13px]"
       >
         <option value="admin">Admin</option>
+        <option value="accountant">Accountant</option>
         <option value="member">Member</option>
       </select>
     );
+  };
 
   const removeControl = (m: TeamMember) =>
-    m.role !== 'owner' && !m.isYou ? (
+    canManageTeam && m.role !== 'owner' && !m.isYou ? (
       <button
         type="button"
         onClick={() => {
@@ -148,9 +159,11 @@ export function TeamView() {
           </>
         }
         actions={
-          <button type="button" onClick={() => setIsInviteOpen(true)} className={buttonClass.primary}>
-            Invite a member
-          </button>
+          canManageTeam ? (
+            <button type="button" onClick={() => setIsInviteOpen(true)} className={buttonClass.primary}>
+              Invite a member
+            </button>
+          ) : undefined
         }
       />
 
@@ -191,7 +204,7 @@ export function TeamView() {
         open={isInviteOpen}
         onClose={closeInvite}
         title="Invite a member"
-        note="A new address receives an email invitation. Someone who already uses Ledger Link is added straight away."
+        note="A new address receives an email invitation. Someone who already uses Ledger Link, including for another organization, is added straight away."
         footer={
           <>
             <button type="button" onClick={closeInvite} className={buttonClass.secondary}>
@@ -216,8 +229,9 @@ export function TeamView() {
             <input type="email" required autoComplete="off" value={inviteEmail} onChange={(e) => setInviteEmail(e.target.value)} />
           </Field>
           <Field label="Role" hint={ROLE_NOTE[inviteRole]}>
-            <select value={inviteRole} onChange={(e) => setInviteRole(e.target.value as 'admin' | 'member')}>
+            <select value={inviteRole} onChange={(e) => setInviteRole(e.target.value as AssignableRole)}>
               <option value="member">Member</option>
+              <option value="accountant">Accountant</option>
               <option value="admin">Admin</option>
             </select>
           </Field>
@@ -226,3 +240,10 @@ export function TeamView() {
     </div>
   );
 }
+
+const ROLE_LABEL: Record<Role, string> = {
+  owner: 'Owner',
+  admin: 'Admin',
+  accountant: 'Accountant',
+  member: 'Member',
+};

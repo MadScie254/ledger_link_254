@@ -2,10 +2,13 @@ import { getSupabase } from './supabase';
 import { AuditService } from './audit';
 import type { OrganizationRole } from '../../worker/auth';
 
+const ASSIGNABLE_ROLES = new Set(['admin', 'member', 'accountant']);
+type AssignableRole = 'admin' | 'member' | 'accountant';
+
 export interface TeamMemberInput {
   orgId: string;
   email: string;
-  role: 'admin' | 'member';
+  role: AssignableRole;
   invitedBy?: string;
 }
 
@@ -62,8 +65,8 @@ export class TeamService {
     if (!email || !email.includes('@')) {
       throw new Error('A valid email address is required.');
     }
-    if (input.role !== 'admin' && input.role !== 'member') {
-      throw new Error('Role must be either admin or member.');
+    if (!ASSIGNABLE_ROLES.has(input.role)) {
+      throw new Error('Role must be admin, member or accountant.');
     }
 
     // Try to find an existing Supabase Auth user with this email first —
@@ -119,10 +122,10 @@ export class TeamService {
     return newMembership.id;
   }
 
-  static async updateMemberRole(orgId: string, membershipId: string, role: 'admin' | 'member', updatedBy?: string): Promise<void> {
+  static async updateMemberRole(orgId: string, membershipId: string, role: AssignableRole, updatedBy?: string): Promise<void> {
     const supabase = getSupabase();
-    if (role !== 'admin' && role !== 'member') {
-      throw new Error('Role must be either admin or member.');
+    if (!ASSIGNABLE_ROLES.has(role)) {
+      throw new Error('Role must be admin, member or accountant.');
     }
 
     const { data: membership, error: fetchError } = await supabase

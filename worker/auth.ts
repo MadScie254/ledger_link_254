@@ -2,8 +2,9 @@ import type { Context, Next } from 'hono';
 import { getSupabase } from '../src/server/supabase';
 
 // Must match the public.membership_role Postgres enum exactly
-// (supabase/migrations/20260829221831_001_core_tables.sql).
-export type OrganizationRole = 'owner' | 'admin' | 'member';
+// (supabase/migrations/20260829221831_001_core_tables.sql, extended by
+// 20260928150000_add_accountant_membership_role.sql).
+export type OrganizationRole = 'owner' | 'admin' | 'member' | 'accountant';
 
 export type Variables = {
   userId: string;
@@ -11,7 +12,11 @@ export type Variables = {
   orgRole: OrganizationRole;
 };
 
-const writeRoles = new Set<OrganizationRole>(['owner', 'admin']);
+// An accountant posts to the books like an admin, but never administers the
+// organization: requireOrganizationAdministrator below stays owner/admin
+// only, so team management and organization settings are unaffected.
+const writeRoles = new Set<OrganizationRole>(['owner', 'admin', 'accountant']);
+const ALL_ROLES: readonly OrganizationRole[] = ['owner', 'admin', 'member', 'accountant'];
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 function isUserScopedRequest(c: Context) {
@@ -73,7 +78,7 @@ export async function requireAuthenticationAndOrganization(c: Context<{ Variable
   }
 
   const role = membership?.role?.toLowerCase() as OrganizationRole | undefined;
-  if (!role || !['owner', 'admin', 'member'].includes(role)) {
+  if (!role || !ALL_ROLES.includes(role)) {
     return c.json({ error: 'You do not have access to this organization.' }, 403);
   }
 

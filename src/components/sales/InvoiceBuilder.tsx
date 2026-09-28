@@ -8,6 +8,7 @@ import { DynamicQuickAddModal } from '../common/DynamicQuickAddModal';
 import { Amount } from '../ledger/Amount';
 import { Field } from '../ledger/Dialog';
 import { PageHeading, EmptyNote, buttonClass } from '../ledger/Page';
+import { PostedStamp } from '../ledger/PostedStamp';
 
 interface Line {
   key: number;
@@ -41,6 +42,7 @@ export function InvoiceBuilder({ onDone }: { onDone: () => void }) {
   const [isAddingCustomer, setIsAddingCustomer] = useState(false);
   const [problem, setProblem] = useState('');
   const [isPosting, setIsPosting] = useState(false);
+  const [justPosted, setJustPosted] = useState(false);
   const [idempotencyKey] = useState(() => crypto.randomUUID());
 
   const customersQuery = useQuery({
@@ -122,16 +124,20 @@ export function InvoiceBuilder({ onDone }: { onDone: () => void }) {
         throw new Error(err.error || 'The invoice could not be posted.');
       }
       queryClient.invalidateQueries({ queryKey: ['invoices'] });
-      onDone();
+      setJustPosted(true);
+      window.setTimeout(() => {
+        setJustPosted(false);
+        onDone();
+      }, 520);
     } catch (err: any) {
       setProblem(err.message);
-    } finally {
       setIsPosting(false);
     }
   };
 
   return (
-    <div className="max-w-4xl space-y-5 pb-16">
+    <div className="relative max-w-4xl space-y-5 pb-16">
+      {justPosted && <PostedStamp label="Invoice posted" />}
       <div>
         <button type="button" onClick={onDone} className={buttonClass.quiet}>
           Sales

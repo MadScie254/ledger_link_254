@@ -12,6 +12,7 @@ import { Mark } from '../ledger/Mark';
 import { PageHeading, IndexTabs, buttonClass } from '../ledger/Page';
 import { Dialog, Field } from '../ledger/Dialog';
 import { SUPPORTED_CURRENCIES } from '../../utils/currency';
+import { PostedStamp } from '../ledger/PostedStamp';
 
 const tabs = ['Vendors', 'Bills', 'Expenses', 'Bill payments'];
 
@@ -26,6 +27,7 @@ export function ExpensesView() {
   const [selectedVendorIds, setSelectedVendorIds] = useState<string[]>([]);
   const [billIdempotencyKey, setBillIdempotencyKey] = useState(() => crypto.randomUUID());
   const [batchPaymentAccountId, setBatchPaymentAccountId] = useState('');
+  const [justPostedBill, setJustPostedBill] = useState(false);
   
   const { currentOrgId, activeCompany, exchangeRates } = useAppStore();
   const baseCurrency = activeCompany?.baseCurrency || 'KES';
@@ -76,7 +78,11 @@ export function ExpensesView() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['bills', currentOrgId] });
       queryClient.invalidateQueries({ queryKey: ['accounts', currentOrgId] });
-      closeBill();
+      setJustPostedBill(true);
+      window.setTimeout(() => {
+        setJustPostedBill(false);
+        closeBill();
+      }, 520);
     }
   });
 
@@ -539,7 +545,9 @@ export function ExpensesView() {
           </>
         }
       >
-        <form
+        <div className="relative">
+          {justPostedBill && <PostedStamp label="Bill posted" />}
+          <form
           id="bill-form"
           key={scannedData ? `scan-${scannedData.date}-${scannedData.amount}` : 'manual'}
           onSubmit={(e) => {
@@ -626,7 +634,8 @@ export function ExpensesView() {
           <Field label="VAT percentage" hint="Enter zero for exempt or non-taxable purchases.">
             <input required name="taxRate" type="number" step="0.01" min="0" max="100" inputMode="decimal" defaultValue="0" className="text-right tabular-currency" />
           </Field>
-        </form>
+          </form>
+        </div>
       </Dialog>
     </div>
   );

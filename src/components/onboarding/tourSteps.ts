@@ -383,6 +383,7 @@ export const TOUR_STEPS: TourStep[] = [
     points: [
       point('Owner', 'Holds the organization and posts to the books.', 'Owner', 'Anamiliki shirika na anaweka rekodi kwenye vitabu.'),
       point('Admin', 'Posts to the books, invites members and changes settings.', 'Admin', 'Anaweka rekodi kwenye vitabu, anaalika wanachama na kubadilisha mipangilio.'),
+      point('Accountant', 'Posts to the books like an admin, but cannot change settings, roles or the team. Can serve other companies too.', 'Accountant', 'Anaweka rekodi kama msimamizi, lakini hawezi kubadilisha mipangilio, majukumu au timu. Anaweza kuhudumia makampuni mengine pia.'),
       point('Member', 'Can read the books. Posting needs an owner or an admin.', 'Member', 'Anaweza kusoma vitabu. Kuweka rekodi kunahitaji mmiliki au msimamizi.'),
     ],
   },

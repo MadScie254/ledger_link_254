@@ -50,7 +50,7 @@ Success is a Kenyan bookkeeper using a feature for a full working day without su
 
 **Authentication:** email and password only. Magic links are out and must not be reintroduced.
 
-**Built today:** accounts, journals, invoices, recurring invoices, bills, vendors, customers, banking with AI match suggestions and rules, payroll runs and payslips, inventory, projects and time entries, budgets, team roles (owner, admin, member), audit log, reports, multi-org switching, demo tenant.
+**Built today:** accounts, journals, invoices, recurring invoices, bills, vendors, customers, banking with AI match suggestions and rules, payroll runs and payslips, inventory, projects and time entries, budgets, team roles (owner, admin, accountant, member), audit log, reports, multi-org switching, demo tenant, onboarding tour and business-type customization, a public landing page, an accent color per organization. An accountant serves several client organizations from one login: the same membership and company-switcher mechanism as any other role, granted a role that posts to the books without administering the organization.
 
 **Specified but not built:** Daraja polling and live M-Pesa sync (3.3), CSV/OFX bank import with saved mappings (3.3), statutory rate tables with effective-from dates and atomic payroll journal batches (3.4), estimates and purchase orders (3.5), WhatsApp invoicing (3.6), mobile bottom navigation (3.7), ledger book view (3.8), react-hook-form and zod forms (3.9), keyboard leader sequences (4), onboarding wizard (3.2). The interface must never present these as working.
 
