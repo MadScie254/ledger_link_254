@@ -2,7 +2,7 @@
  * @license
  * SPDX-License-Identifier: Apache-2.0
  */
-import { lazy, Suspense, useEffect } from "react";
+import { lazy, Suspense, useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { AppLayout } from "./components/layout/AppLayout";
 import { useAppStore } from "./store";
@@ -14,6 +14,27 @@ import { AuthProvider } from "./context/AuthProvider";
 import { useAuth } from "./context/AuthProvider";
 import type { OrganizationData } from "./store";
 import { OnboardingProvider } from "./components/onboarding/OnboardingProvider";
+import { LandingPage } from "./marketing/LandingPage";
+
+/** A tab that has already gone past the landing page (signed in, or clicked
+ * through) never sees it again this tab, including after a later sign-out:
+ * re-entering credentials is the expected next step there, not the pitch. A
+ * new tab, or one that never left the landing page, starts on it. */
+const VISITED_AUTH_KEY = 'll-visited-auth';
+function hasVisitedAuth(): boolean {
+  try {
+    return sessionStorage.getItem(VISITED_AUTH_KEY) === '1';
+  } catch {
+    return false;
+  }
+}
+function markVisitedAuth() {
+  try {
+    sessionStorage.setItem(VISITED_AUTH_KEY, '1');
+  } catch {
+    // Private mode or blocked storage: the landing page just shows again next reload, which is harmless.
+  }
+}
 
 const SalesView = lazy(() => import('./components/sales/SalesView').then((module) => ({ default: module.SalesView })));
 const BankingView = lazy(() => import('./components/banking/BankingView').then((module) => ({ default: module.BankingView })));
@@ -52,6 +73,13 @@ export default function App() {
 
 function LedgerApp() {
   const { session, signOut } = useAuth();
+  const [showLanding, setShowLanding] = useState(() => !hasVisitedAuth());
+  const [authMode, setAuthMode] = useState<'signIn' | 'signUp'>('signIn');
+  const enterAuth = (mode: 'signIn' | 'signUp') => {
+    markVisitedAuth();
+    setAuthMode(mode);
+    setShowLanding(false);
+  };
   const {
     activeView,
     setActiveView,
@@ -171,7 +199,10 @@ function LedgerApp() {
   };
 
   if (!session || isLocked) {
-    return <LockScreen />;
+    if (showLanding) {
+      return <LandingPage onSignIn={() => enterAuth('signIn')} onSignUp={() => enterAuth('signUp')} />;
+    }
+    return <LockScreen initialMode={authMode} onBack={() => setShowLanding(true)} />;
   }
 
   if (organizationsLoading) {

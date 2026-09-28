@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { ArrowLeft } from 'lucide-react';
 import { useAuth } from '../../context/AuthProvider';
 import { Mark } from '../ledger/Mark';
 
@@ -14,9 +15,9 @@ const fieldClass =
   'mt-1.5 block w-full h-11 rounded-sm border border-field bg-paper-100 px-3 text-[15px] text-ink-900 placeholder:text-graphite-500 focus:border-oxblood focus:shadow-[0_0_0_1px_var(--oxblood)] focus:outline-none';
 
 /** The cover of the book, and its first page. */
-export function LockScreen() {
+export function LockScreen({ initialMode = 'signIn', onBack }: { initialMode?: Mode; onBack?: () => void } = {}) {
   const { signIn, signUp } = useAuth();
-  const [mode, setMode] = useState<Mode>('signIn');
+  const [mode, setMode] = useState<Mode>(initialMode);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -99,7 +100,23 @@ export function LockScreen() {
 
         {/* The first page */}
         <main className="flex min-h-screen min-w-0 flex-col">
-          <div className="ll-cloth md:hidden px-5 py-4">{stampedLabel(true)}</div>
+          <div className="ll-cloth flex items-center justify-between px-5 py-4 md:hidden">
+            {stampedLabel(true)}
+            {onBack && (
+              <button type="button" onClick={onBack} className="p-1.5 text-sidebar-muted hover:text-sidebar-ink" aria-label="Back">
+                <ArrowLeft className="h-5 w-5" />
+              </button>
+            )}
+          </div>
+          {onBack && (
+            <button
+              type="button"
+              onClick={onBack}
+              className="hidden items-center gap-1.5 px-8 pt-6 text-[13px] text-graphite-600 hover:text-ink-900 md:flex"
+            >
+              <ArrowLeft className="h-4 w-4" aria-hidden="true" /> Back
+            </button>
+          )}
 
           <div className="flex flex-1 items-center justify-center px-5 py-10 sm:px-10">
             <div className="ll-margin w-full max-w-[25rem] pl-6 sm:pl-8">
