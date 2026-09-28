@@ -1,5 +1,4 @@
 import { getSupabase } from './supabase';
-import { AccountService } from './accounts';
 import { extraAccountsFor, type BusinessType } from '../utils/businessTypes';
 import { DEFAULT_THEME_ACCENT, type ThemeAccent } from '../utils/themeAccents';
 
@@ -230,11 +229,25 @@ export class OrganizationService {
       { code: '8100', name: 'Realized FX Gain / Loss', type: 'INCOME' as const },
     ];
 
-    for (const acc of [...standardAccounts, ...extraAccountsFor(businessType)]) {
-      if (existingCodes.has(acc.code)) continue;
-      const currency = acc.code === '1010' ? 'USD' : acc.code === '1020' ? 'EUR' : baseCurrency;
-      await AccountService.createAccount({ ...acc, orgId, currency });
-      existingCodes.add(acc.code);
-    }
+    // One bulk insert, not one round trip per account: two dozen-plus
+    // individual creates (each already an existence-check plus an insert)
+    // pushed a single organization signup past the Worker's subrequest
+    // limit and failed outright.
+    const newAccounts = [...standardAccounts, ...extraAccountsFor(businessType)].filter(
+      (acc) => !existingCodes.has(acc.code)
+    );
+    if (newAccounts.length === 0) return;
+
+    const { error: insertError } = await supabase.from('accounts').insert(
+      newAccounts.map((acc) => ({
+        org_id: orgId,
+        code: acc.code,
+        name: acc.name,
+        type: acc.type,
+        currency: acc.code === '1010' ? 'USD' : acc.code === '1020' ? 'EUR' : baseCurrency,
+        is_active: true,
+      }))
+    );
+    if (insertError) throw insertError;
   }
 }

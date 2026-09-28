@@ -10,6 +10,8 @@ interface AuthContextType {
   signIn: (email: string, password: string) => Promise<{ error: any }>;
   signUp: (email: string, password: string) => Promise<{ error: any; needsEmailConfirmation: boolean }>;
   resendConfirmation: (email: string) => Promise<{ error: any }>;
+  justConfirmedEmail: boolean;
+  dismissEmailConfirmed: () => void;
 }
 
 export const AuthContext = createContext<AuthContextType>({
@@ -18,39 +20,55 @@ export const AuthContext = createContext<AuthContextType>({
   signOut: async () => {},
   signIn: async () => ({ error: null }),
   signUp: async () => ({ error: null, needsEmailConfirmation: false }),
-  resendConfirmation: async () => ({ error: null })
+  resendConfirmation: async () => ({ error: null }),
+  justConfirmedEmail: false,
+  dismissEmailConfirmed: () => {}
 });
 
 export const useAuth = () => useContext(AuthContext);
+
+// Read once, at module load, before Supabase's own client has a chance to
+// process and strip this hash: the one moment it is safe to tell a
+// confirmation-link visit apart from an ordinary sign-in.
+let cameFromEmailConfirmation =
+  typeof window !== 'undefined' && new URLSearchParams(window.location.hash.slice(1)).get('type') === 'signup';
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
+  const [justConfirmedEmail, setJustConfirmedEmail] = useState(false);
   const { setLocked } = useAppStore();
+
+  const noteSession = (session: Session | null) => {
+    setSession(session);
+    setUser(session?.user ?? null);
+    setLocked(!session);
+    if (session?.access_token) {
+      localStorage.setItem('supabase-auth-token', session.access_token);
+    } else {
+      localStorage.removeItem('supabase-auth-token');
+    }
+    // A confirmation link's tokens arrive in the URL hash, which Supabase
+    // reads once on load. They are only useful for that one read: leaving
+    // them visible afterwards is a bare access token sitting in the address
+    // bar for no reason, so this is the point to both acknowledge the
+    // confirmation and remove them.
+    if (session && cameFromEmailConfirmation) {
+      cameFromEmailConfirmation = false;
+      setJustConfirmedEmail(true);
+      window.history.replaceState(null, '', window.location.pathname + window.location.search);
+    }
+  };
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session);
-      setUser(session?.user ?? null);
-      setLocked(!session);
-      if (session?.access_token) {
-        localStorage.setItem('supabase-auth-token', session.access_token);
-      } else {
-        localStorage.removeItem('supabase-auth-token');
-      }
+      noteSession(session);
       setLoading(false);
     });
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      setSession(session);
-      setUser(session?.user ?? null);
-      setLocked(!session);
-      if (session?.access_token) {
-        localStorage.setItem('supabase-auth-token', session.access_token);
-      } else {
-        localStorage.removeItem('supabase-auth-token');
-      }
+      noteSession(session);
     });
 
     return () => subscription.unsubscribe();
@@ -108,8 +126,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     );
   }
 
+  const dismissEmailConfirmed = () => setJustConfirmedEmail(false);
+
   return (
-    <AuthContext.Provider value={{ session, user, signOut, signIn, signUp, resendConfirmation }}>
+    <AuthContext.Provider value={{ session, user, signOut, signIn, signUp, resendConfirmation, justConfirmedEmail, dismissEmailConfirmed }}>
       {children}
     </AuthContext.Provider>
   );

@@ -17,6 +17,7 @@ import { useAuth } from "./context/AuthProvider";
 import type { OrganizationData } from "./store";
 import { OnboardingProvider } from "./components/onboarding/OnboardingProvider";
 import { LandingPage } from "./marketing/LandingPage";
+import { Mark } from "./components/ledger/Mark";
 
 /** A tab that has already gone past the landing page (signed in, or clicked
  * through) never sees it again this tab, including after a later sign-out:
@@ -63,6 +64,26 @@ const viewFallback = (
   </div>
 );
 
+/** Shown once, straight after a confirmation link signs someone in, before the app itself appears. */
+function EmailConfirmedScreen({ onDone }: { onDone: () => void }) {
+  useEffect(() => {
+    const timer = setTimeout(onDone, 1800);
+    return () => clearTimeout(timer);
+  }, [onDone]);
+
+  return (
+    <div
+      role="status"
+      onClick={onDone}
+      className="fixed inset-0 z-[100] flex cursor-pointer flex-col items-center justify-center gap-3 bg-paper-100 text-center"
+    >
+      <Mark kind="tick" draw className="[&_svg]:h-8 [&_svg]:w-8" />
+      <p className="ll-heading text-[22px] text-ink-900">Email confirmed</p>
+      <p className="max-w-xs text-[13.5px] text-graphite-600">Signed in. Opening the books.</p>
+    </div>
+  );
+}
+
 export default function App() {
   return (
     <AuthProvider>
@@ -74,7 +95,7 @@ export default function App() {
 }
 
 function LedgerApp() {
-  const { session, signOut } = useAuth();
+  const { session, signOut, justConfirmedEmail, dismissEmailConfirmed } = useAuth();
   const [showLanding, setShowLanding] = useState(() => !hasVisitedAuth());
   const [authMode, setAuthMode] = useState<'signIn' | 'signUp'>('signIn');
   const enterAuth = (mode: 'signIn' | 'signUp') => {
@@ -199,6 +220,10 @@ function LedgerApp() {
     // Default catch-all
     return <DashboardView />;
   };
+
+  if (session && justConfirmedEmail) {
+    return <EmailConfirmedScreen onDone={dismissEmailConfirmed} />;
+  }
 
   if (!session || isLocked) {
     // Plain conditional, not AnimatePresence: wrapping this swap in
