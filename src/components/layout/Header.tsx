@@ -5,6 +5,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { NotificationDropdown } from './NotificationDropdown';
 import { DynamicQuickAddModal, getContextualEntityType } from '../common/DynamicQuickAddModal';
 import { EntityType } from '../../hooks/useEntityForm';
+import { CompanyMark } from '../ledger/CompanyMark';
 
 /** The plain name each view goes by in the drill path. */
 const SECTION_NAMES: Record<string, string> = {
@@ -90,8 +91,9 @@ export function Header() {
               onClick={() => setIsCompanyMenuOpen(!isCompanyMenuOpen)}
               aria-expanded={isCompanyMenuOpen}
               aria-haspopup="menu"
-              className="flex min-w-0 items-center gap-1 px-1.5 py-1 -ml-1.5 text-graphite-600 hover:text-ink-900 hover:bg-paper-200 rounded-sm"
+              className="flex min-w-0 items-center gap-1.5 px-1.5 py-1 -ml-1.5 text-graphite-600 hover:text-ink-900 hover:bg-paper-200 rounded-sm"
             >
+              <CompanyMark name={activeCompany?.name} size="sm" />
               <span className="truncate max-w-[6.5rem] sm:max-w-[14rem]">{activeCompany?.name || 'No organization'}</span>
               <ChevronDown className="w-3.5 h-3.5 shrink-0" aria-hidden="true" />
             </button>
@@ -109,9 +111,10 @@ export function Header() {
                           role="menuitemradio"
                           aria-checked={isSelected}
                           onClick={() => handleSelectCompany(org)}
-                          className="w-full text-left px-3.5 py-2 flex items-center justify-between gap-3 hover:bg-paper-200"
+                          className="w-full text-left px-3.5 py-2 flex items-center gap-2.5 hover:bg-paper-200"
                         >
-                          <span className="min-w-0">
+                          <CompanyMark name={org.name} size="sm" />
+                          <span className="min-w-0 flex-1">
                             <span className={`block truncate text-[13px] ${isSelected ? 'font-semibold text-ink-900' : 'text-ink-900'}`}>{org.name}</span>
                             <span className="block text-[11.5px] text-graphite-500">{org.country} · {org.baseCurrency}</span>
                           </span>

@@ -66,7 +66,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   const signUp = async (email: string, password: string) => {
-    const { data, error } = await supabase.auth.signUp({ email, password });
+    const { data, error } = await supabase.auth.signUp({
+      email,
+      password,
+      // The confirmation email always lands back on whichever origin the
+      // person signed up from: localhost while testing, the deployed site
+      // once published. No manual switch to maintain between the two.
+      // Supabase only honours this if that origin is also on the project's
+      // Auth > URL Configuration > Redirect URLs allow-list; otherwise it
+      // silently falls back to the configured Site URL.
+      options: { emailRedirectTo: window.location.origin },
+    });
     // If email confirmation is required by the Supabase project's auth
     // settings, signUp succeeds but returns no session until the user
     // clicks the confirmation link.

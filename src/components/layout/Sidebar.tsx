@@ -1,6 +1,7 @@
 import { X } from 'lucide-react';
 import { useAppStore } from '../../store';
 import { useAuth } from '../../context/AuthProvider';
+import { CompanyMark } from '../ledger/CompanyMark';
 
 /**
  * The spine of the book. Sections read as a printed thumb index: plain words,
@@ -65,8 +66,11 @@ export function Sidebar() {
           >
             <span className="block border border-[var(--spine-rule)] px-3 py-2.5 group-hover:bg-sidebar-surface">
               <span className="block ll-printed text-[15px] tracking-[0.14em] text-sidebar-ink leading-none">Ledger Link</span>
-              <span className="mt-2 block text-[12px] leading-snug text-sidebar-muted truncate">
-                {activeCompany?.name || 'No organization'}
+              <span className="mt-2 flex items-center gap-2">
+                <CompanyMark name={activeCompany?.name} size="sm" />
+                <span className="min-w-0 flex-1 truncate text-[12px] leading-snug text-sidebar-muted">
+                  {activeCompany?.name || 'No organization'}
+                </span>
               </span>
             </span>
           </button>
