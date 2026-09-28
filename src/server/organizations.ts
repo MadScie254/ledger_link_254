@@ -1,6 +1,7 @@
 import { getSupabase } from './supabase';
 import { AccountService } from './accounts';
 import { extraAccountsFor, type BusinessType } from '../utils/businessTypes';
+import { DEFAULT_THEME_ACCENT, type ThemeAccent } from '../utils/themeAccents';
 
 export interface Organization {
   id: string;
@@ -12,6 +13,7 @@ export interface Organization {
   fiscalYearStart?: string;
   industry?: string;
   businessType?: BusinessType | null;
+  themeAccent?: ThemeAccent;
   address?: string;
   city?: string;
   phone?: string;
@@ -55,6 +57,7 @@ export class OrganizationService {
       fiscalYearStart: d.fiscal_year_start,
       industry: d.industry,
       businessType: d.business_type,
+      themeAccent: d.theme_accent,
       address: d.address,
       city: d.city,
       phone: d.phone,
@@ -90,6 +93,7 @@ export class OrganizationService {
       fiscalYearStart: data.fiscal_year_start,
       industry: data.industry,
       businessType: data.business_type,
+      themeAccent: data.theme_accent,
       address: data.address,
       city: data.city,
       phone: data.phone,
@@ -116,6 +120,7 @@ export class OrganizationService {
         fiscal_year_start: data.fiscalYearStart || 'January',
         industry: data.industry || 'General Business',
         business_type: data.businessType || null,
+        theme_accent: data.themeAccent || DEFAULT_THEME_ACCENT,
         address: data.address || '',
         city: data.city || '',
         phone: data.phone || '',
@@ -160,6 +165,7 @@ export class OrganizationService {
     if (data.fiscalYearStart !== undefined) updateData.fiscal_year_start = data.fiscalYearStart;
     if (data.industry !== undefined) updateData.industry = data.industry;
     if (data.businessType !== undefined) updateData.business_type = data.businessType;
+    if (data.themeAccent !== undefined) updateData.theme_accent = data.themeAccent;
     if (data.address !== undefined) updateData.address = data.address;
     if (data.city !== undefined) updateData.city = data.city;
     if (data.phone !== undefined) updateData.phone = data.phone;

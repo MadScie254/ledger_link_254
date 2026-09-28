@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import type { BusinessType } from './utils/businessTypes';
+import { applyThemeAccent, type ThemeAccent } from './utils/themeAccents';
 
 const THEME_STORAGE_KEY = 'll-theme';
 
@@ -28,6 +29,7 @@ export interface OrganizationData {
   fiscalYearStart?: string;
   industry?: string;
   businessType?: BusinessType | null;
+  themeAccent?: ThemeAccent | null;
   address?: string;
   city?: string;
   phone?: string;
@@ -88,11 +90,14 @@ export const useAppStore = create<AppState>((set) => ({
   organizations: [],
   setOrganizations: (orgs) => set({ organizations: orgs }),
   activeCompany: null,
-  setActiveCompany: (company) => set({
-    activeCompany: company,
-    currentOrgId: company?.id || '',
-    displayCurrency: company?.baseCurrency || 'KES'
-  }),
+  setActiveCompany: (company) => {
+    applyThemeAccent(company?.themeAccent);
+    set({
+      activeCompany: company,
+      currentOrgId: company?.id || '',
+      displayCurrency: company?.baseCurrency || 'KES'
+    });
+  },
   isCommandPaletteOpen: false,
   setCommandPaletteOpen: (isOpen) => set({ isCommandPaletteOpen: isOpen }),
   isMobileSidebarOpen: false,

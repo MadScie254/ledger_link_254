@@ -216,6 +216,104 @@
     --lift: 0 18px 40px -16px rgb(0 0 0 / 0.6), 0 3px 8px rgb(0 0 0 / 0.3);
   }
 
+  /*
+   * A company's own accent, in place of the default oxblood: the primary
+   * button, the sidebar spine, focus rings, the tour's spotlight border.
+   * Every other token (entered-figure blue, loss/error red, the tick green)
+   * is untouched here and stays identical on every accent, on purpose.
+   */
+  :root[data-accent="forest"] {
+    --oxblood: #1F4B3A;
+    --oxblood-fill: #1F4B3A;
+    --oxblood-fill-hover: #163627;
+    --oxblood-tint: #EAF1ED;
+    --spine: #1F4B3A;
+    --spine-raised: #2A5C48;
+    --spine-ink: #EAF3EE;
+    --spine-muted: #B9D4C6;
+    --spine-rule: rgb(234 243 238 / 0.14);
+  }
+  .dark[data-accent="forest"] {
+    --oxblood: #8FC9A9;
+    --oxblood-fill: #2E6B4E;
+    --oxblood-fill-hover: #3C7D5E;
+    --oxblood-tint: #16241D;
+    --spine: #12241C;
+    --spine-raised: #1C3227;
+    --spine-ink: #E7F2EC;
+    --spine-muted: #A9C9BA;
+    --spine-rule: rgb(231 242 236 / 0.12);
+  }
+
+  :root[data-accent="navy"] {
+    --oxblood: #1E2A52;
+    --oxblood-fill: #1E2A52;
+    --oxblood-fill-hover: #141C3A;
+    --oxblood-tint: #EAEDF6;
+    --spine: #1E2A52;
+    --spine-raised: #2A3A6B;
+    --spine-ink: #ECEFF8;
+    --spine-muted: #B7C0DD;
+    --spine-rule: rgb(236 239 248 / 0.14);
+  }
+  .dark[data-accent="navy"] {
+    --oxblood: #AFC0EA;
+    --oxblood-fill: #33427A;
+    --oxblood-fill-hover: #425290;
+    --oxblood-tint: #181D2E;
+    --spine: #12172A;
+    --spine-raised: #1E2540;
+    --spine-ink: #E9EDF8;
+    --spine-muted: #A7B3D6;
+    --spine-rule: rgb(233 237 248 / 0.12);
+  }
+
+  :root[data-accent="plum"] {
+    --oxblood: #4A1F4E;
+    --oxblood-fill: #4A1F4E;
+    --oxblood-fill-hover: #37163B;
+    --oxblood-tint: #F3ECF4;
+    --spine: #4A1F4E;
+    --spine-raised: #5C2C61;
+    --spine-ink: #F5EDF6;
+    --spine-muted: #D6B9D9;
+    --spine-rule: rgb(245 237 246 / 0.14);
+  }
+  .dark[data-accent="plum"] {
+    --oxblood: #DCAEDF;
+    --oxblood-fill: #6B3870;
+    --oxblood-fill-hover: #7D4784;
+    --oxblood-tint: #251A27;
+    --spine: #241226;
+    --spine-raised: #341D38;
+    --spine-ink: #F2E6F4;
+    --spine-muted: #C9A6CC;
+    --spine-rule: rgb(242 230 244 / 0.12);
+  }
+
+  :root[data-accent="slate"] {
+    --oxblood: #2B3542;
+    --oxblood-fill: #2B3542;
+    --oxblood-fill-hover: #1D242D;
+    --oxblood-tint: #EDEFF2;
+    --spine: #2B3542;
+    --spine-raised: #3A4756;
+    --spine-ink: #EEF1F4;
+    --spine-muted: #B9C2CC;
+    --spine-rule: rgb(238 241 244 / 0.14);
+  }
+  .dark[data-accent="slate"] {
+    --oxblood: #B7C2CE;
+    --oxblood-fill: #41505F;
+    --oxblood-fill-hover: #516272;
+    --oxblood-tint: #1A1F26;
+    --spine: #161B22;
+    --spine-raised: #232B34;
+    --spine-ink: #ECEFF3;
+    --spine-muted: #A7B2BE;
+    --spine-rule: rgb(236 239 243 / 0.12);
+  }
+
   html {
     min-width: 320px;
     background: var(--paper-ground);

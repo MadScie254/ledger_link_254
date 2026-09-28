@@ -10,6 +10,7 @@ import { PageHeading, IndexTabs, EmptyNote, buttonClass } from '../ledger/Page';
 import { BookOpen } from 'lucide-react';
 import { useOnboarding } from '../onboarding/OnboardingProvider';
 import { BUSINESS_TYPES, type BusinessType } from '../../utils/businessTypes';
+import { THEME_ACCENTS, DEFAULT_THEME_ACCENT, type ThemeAccent } from '../../utils/themeAccents';
 
 type Tab = 'companies' | 'currencies' | 'accounting' | 'security';
 
@@ -430,6 +431,7 @@ function CompanyModal({ initialData, onClose, onSuccess }: { initialData: Organi
   const [fiscalYearStart, setFiscalYearStart] = useState(initialData?.fiscalYearStart || 'January');
   const [industry, setIndustry] = useState(initialData?.industry || '');
   const [businessType, setBusinessType] = useState<BusinessType | ''>(initialData?.businessType || '');
+  const [themeAccent, setThemeAccent] = useState<ThemeAccent>(initialData?.themeAccent || DEFAULT_THEME_ACCENT);
   const [address, setAddress] = useState(initialData?.address || '');
   const [city, setCity] = useState(initialData?.city || 'Nairobi');
   const [phone, setPhone] = useState(initialData?.phone || '');
@@ -442,7 +444,7 @@ function CompanyModal({ initialData, onClose, onSuccess }: { initialData: Organi
     setIsSubmitting(true);
     setError(null);
     try {
-      const payload = { name, legalName: legalName || name, baseCurrency, country, taxId, fiscalYearStart, industry, businessType: businessType || null, address, city, phone, email };
+      const payload = { name, legalName: legalName || name, baseCurrency, country, taxId, fiscalYearStart, industry, businessType: businessType || null, themeAccent, address, city, phone, email };
       const res = await fetch(initialData ? `/api/organizations/${initialData.id}` : '/api/organizations', {
         method: initialData ? 'PUT' : 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -522,6 +524,26 @@ function CompanyModal({ initialData, onClose, onSuccess }: { initialData: Organi
             <option value="general">Something else</option>
           </select>
         </Field>
+        <div className="sm:col-span-2">
+          <Field label="Accent" hint="Shown to everyone who opens these books: the primary button, the sidebar, focus rings. Figures, totals and ticks keep their own colors on every accent.">
+            <div role="radiogroup" aria-label="Accent" className="flex flex-wrap gap-2 pt-1">
+              {THEME_ACCENTS.map((accent) => (
+                <button
+                  key={accent.id}
+                  type="button"
+                  role="radio"
+                  aria-checked={themeAccent === accent.id}
+                  onClick={() => setThemeAccent(accent.id)}
+                  title={accent.label}
+                  className={`flex h-9 items-center gap-2 border px-2.5 text-[12.5px] ${themeAccent === accent.id ? 'border-ink-900 text-ink-900' : 'border-field text-graphite-600 hover:border-ink-900'}`}
+                >
+                  <span className="h-4 w-4 shrink-0 border border-feint-strong" style={{ backgroundColor: accent.swatch }} aria-hidden="true" />
+                  {accent.label}
+                </button>
+              ))}
+            </div>
+          </Field>
+        </div>
         <Field label="Town or city">
           <input type="text" value={city} onChange={(e) => setCity(e.target.value)} />
         </Field>
