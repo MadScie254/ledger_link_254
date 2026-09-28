@@ -3,7 +3,6 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 import { lazy, Suspense, useEffect, useState } from "react";
-import { AnimatePresence } from "motion/react";
 import { useQuery } from "@tanstack/react-query";
 import { AppLayout } from "./components/layout/AppLayout";
 import { useAppStore } from "./store";
@@ -202,14 +201,15 @@ function LedgerApp() {
   };
 
   if (!session || isLocked) {
-    return (
-      <AnimatePresence mode="wait" initial={false}>
-        {showLanding ? (
-          <LandingPage key="landing" onSignIn={() => enterAuth('signIn')} onSignUp={() => enterAuth('signUp')} />
-        ) : (
-          <LockScreen key="lock" initialMode={authMode} onBack={() => setShowLanding(true)} />
-        )}
-      </AnimatePresence>
+    // Plain conditional, not AnimatePresence: wrapping this swap in
+    // AnimatePresence left the exit animation permanently unresolved, so
+    // LockScreen never mounted and "Get started"/"Sign in" did nothing —
+    // the entire sign-up funnel was unreachable. A slide transition here
+    // is not worth that risk again.
+    return showLanding ? (
+      <LandingPage onSignIn={() => enterAuth('signIn')} onSignUp={() => enterAuth('signUp')} />
+    ) : (
+      <LockScreen initialMode={authMode} onBack={() => setShowLanding(true)} />
     );
   }
 

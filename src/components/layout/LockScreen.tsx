@@ -18,7 +18,7 @@ const fieldClass =
 
 /** The cover of the book, and its first page. */
 export function LockScreen({ initialMode = 'signIn', onBack }: { initialMode?: Mode; onBack?: () => void } = {}) {
-  const { signIn, signUp } = useAuth();
+  const { signIn, signUp, resendConfirmation } = useAuth();
   const reducedMotion = useReducedMotion();
   const [mode, setMode] = useState<Mode>(initialMode);
   const [email, setEmail] = useState('');
@@ -27,6 +27,8 @@ export function LockScreen({ initialMode = 'signIn', onBack }: { initialMode?: M
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [confirmationSent, setConfirmationSent] = useState(false);
+  const [resendStatus, setResendStatus] = useState<'idle' | 'sending' | 'sent'>('idle');
+  const [resendError, setResendError] = useState('');
 
   const switchMode = (next: Mode) => {
     setMode(next);
@@ -65,6 +67,18 @@ export function LockScreen({ initialMode = 'signIn', onBack }: { initialMode?: M
     setLoading(false);
   };
 
+  const handleResend = async () => {
+    setResendStatus('sending');
+    setResendError('');
+    const { error: resendErr } = await resendConfirmation(email);
+    if (resendErr) {
+      setResendError(resendErr.message);
+      setResendStatus('idle');
+    } else {
+      setResendStatus('sent');
+    }
+  };
+
   const stampedLabel = (compact: boolean) => (
     <div className={`inline-block border border-[var(--spine-rule)] p-[3px] ${compact ? '' : 'w-full max-w-[20rem]'}`}>
       <div className={`border border-[var(--spine-rule)] ${compact ? 'px-3 py-2' : 'px-5 py-4'}`}>
@@ -82,7 +96,6 @@ export function LockScreen({ initialMode = 'signIn', onBack }: { initialMode?: M
       className="fixed inset-0 z-[100] overflow-y-auto ll-grain-bg"
       initial={reducedMotion ? false : { opacity: 0, x: 28 }}
       animate={{ opacity: 1, x: 0 }}
-      exit={reducedMotion ? undefined : { opacity: 0, x: -28 }}
       transition={{ duration: reducedMotion ? 0 : 0.32, ease: [0.2, 0.8, 0.2, 1] }}
     >
       <div className="grid min-h-full grid-cols-1 md:grid-cols-[minmax(22rem,44%)_minmax(0,1fr)]">
@@ -139,10 +152,30 @@ export function LockScreen({ initialMode = 'signIn', onBack }: { initialMode?: M
                   <p className="mt-3 text-[15px] leading-relaxed text-graphite-600">
                     Account created. A confirmation link went to <span className="font-semibold text-ink-900">{email}</span>. Open it to activate the account, then sign in.
                   </p>
+                  <p className="mt-4 text-[13px] leading-relaxed text-graphite-600">
+                    Nothing after a few minutes, check spam first. Still nothing?{' '}
+                    <button
+                      type="button"
+                      onClick={handleResend}
+                      disabled={resendStatus === 'sending'}
+                      className="font-semibold text-oxblood underline underline-offset-[3px] disabled:opacity-50"
+                    >
+                      {resendStatus === 'sending' ? 'Sending' : 'Send it again'}
+                    </button>
+                    .
+                  </p>
+                  {resendStatus === 'sent' && (
+                    <p role="status" className="mt-2 text-[13px] text-graphite-600">Sent again to {email}.</p>
+                  )}
+                  {resendError && (
+                    <p role="alert" className="mt-2 text-[13px] text-ledger-red">{resendError}</p>
+                  )}
                   <button
                     type="button"
                     onClick={() => {
                       setConfirmationSent(false);
+                      setResendStatus('idle');
+                      setResendError('');
                       switchMode('signIn');
                     }}
                     className="mt-7 h-11 w-full rounded-sm bg-oxblood-fill text-[15px] font-semibold text-white hover:bg-[var(--oxblood-fill-hover)]"

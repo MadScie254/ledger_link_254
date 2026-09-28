@@ -39,7 +39,7 @@ export function SettingsView() {
   const base = activeCompany?.baseCurrency || 'KES';
   const { restartTutorial, isReady: isOnboardingReady } = useOnboarding();
 
-  const { data: orgsData, refetch: refetchOrgs } = useQuery({
+  const { data: orgsData, refetch: refetchOrgs, isLoading: orgsLoading } = useQuery({
     queryKey: ['organizations'],
     queryFn: async () => {
       const res = await fetch('/api/organizations');
@@ -48,6 +48,19 @@ export function SettingsView() {
       return json.organizations as OrganizationData[];
     },
   });
+
+  // A freshly signed-up account has no company yet, so this screen is its
+  // first real step: open the form itself rather than leaving it to be
+  // found behind "Add a company". Runs once; closing it without saving
+  // never forces it back open.
+  const hasAutoOpenedCompanyModal = React.useRef(false);
+  React.useEffect(() => {
+    if (!orgsLoading && organizations.length === 0 && !hasAutoOpenedCompanyModal.current) {
+      hasAutoOpenedCompanyModal.current = true;
+      setEditingOrg(null);
+      setIsCompanyModalOpen(true);
+    }
+  }, [orgsLoading, organizations.length]);
 
   React.useEffect(() => {
     if (orgsData && orgsData.length > 0) {
@@ -142,8 +155,12 @@ export function SettingsView() {
     <div className="space-y-5 pb-16">
       <PageHeading
         tourId="settings-overview"
-        title="Settings"
-        note="Companies, currencies, the accounts postings use, and security"
+        title={organizations.length === 0 ? 'Set up your company' : 'Settings'}
+        note={
+          organizations.length === 0
+            ? 'What kind of business this is, and the accent it is shown in, before there are any books to open.'
+            : 'Companies, currencies, the accounts postings use, and security'
+        }
         actions={
           activeTab === 'companies' && (
             <button
@@ -178,7 +195,22 @@ export function SettingsView() {
             Each company keeps its own books. Opening another company changes the records, chart of accounts and reports throughout Ledger Link.
           </p>
           {organizations.length === 0 ? (
-            <EmptyNote>No companies yet.</EmptyNote>
+            <EmptyNote
+              action={
+                <button
+                  type="button"
+                  onClick={() => {
+                    setEditingOrg(null);
+                    setIsCompanyModalOpen(true);
+                  }}
+                  className={buttonClass.secondary}
+                >
+                  Add a company
+                </button>
+              }
+            >
+              No company yet. Add one to name the business, choose what kind it is and pick the accent these books open in.
+            </EmptyNote>
           ) : (
             <ul className="border-t border-feint-strong">
               {organizations.map((org) => {

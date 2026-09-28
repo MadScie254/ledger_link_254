@@ -298,6 +298,6 @@ Every table in the app shell or a lifted sheet follows one rule set: separated b
 - **Don't** put KPI figures in floating cards on grey, add area charts, or give the brand a blue accent.
 - **Don't** cast a shadow from anything that lives on the page, or use backdrop blur.
 - **Don't** round anything beyond 3px or make pills.
-- **Don't** animate opening, selection, hover or tabs; the pen tick and the posted stamp are the only two motions inside the working app. (The landing page, a Persuade surface outside the app shell, additionally slides between itself and the sign-in screen; that transition never appears once someone is signed in.)
+- **Don't** animate opening, selection, hover or tabs; the pen tick and the posted stamp are the only two motions inside the working app. The landing page swaps to the sign-in screen with a plain conditional render, not a wrapped transition: an AnimatePresence slide there once left the exit unresolved, so the swap never happened and "Get started" did nothing.
 - **Don't** set a heading in all caps or place a printed-caps eyebrow above a heading.
 - **Don't** repeat the currency code on every figure.

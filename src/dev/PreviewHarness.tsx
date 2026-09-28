@@ -256,6 +256,7 @@ const PREVIEW_AUTH = {
   signOut: async () => undefined,
   signIn: async () => ({ error: null }),
   signUp: async () => ({ error: null, needsEmailConfirmation: false }),
+  resendConfirmation: async () => ({ error: null }),
 };
 
 function installFixtureFetch() {

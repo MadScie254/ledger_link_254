@@ -9,6 +9,7 @@ interface AuthContextType {
   signOut: () => Promise<void>;
   signIn: (email: string, password: string) => Promise<{ error: any }>;
   signUp: (email: string, password: string) => Promise<{ error: any; needsEmailConfirmation: boolean }>;
+  resendConfirmation: (email: string) => Promise<{ error: any }>;
 }
 
 export const AuthContext = createContext<AuthContextType>({
@@ -16,7 +17,8 @@ export const AuthContext = createContext<AuthContextType>({
   user: null,
   signOut: async () => {},
   signIn: async () => ({ error: null }),
-  signUp: async () => ({ error: null, needsEmailConfirmation: false })
+  signUp: async () => ({ error: null, needsEmailConfirmation: false }),
+  resendConfirmation: async () => ({ error: null })
 });
 
 export const useAuth = () => useContext(AuthContext);
@@ -84,6 +86,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return { error, needsEmailConfirmation };
   };
 
+  // Supabase's own built-in email sender is rate-limited to a handful of
+  // messages an hour and is documented as best-effort, not for production
+  // use — a resend can fail quietly for that reason alone, with no error
+  // returned here to explain it. A custom SMTP provider, set in the
+  // Supabase project under Authentication > Settings, is the real fix.
+  const resendConfirmation = async (email: string) => {
+    const { error } = await supabase.auth.resend({
+      type: 'signup',
+      email,
+      options: { emailRedirectTo: window.location.origin },
+    });
+    return { error };
+  };
+
   if (loading) {
     return (
       <div className="fixed inset-0 bg-sidebar-bg z-[100] flex items-center justify-center">
@@ -93,7 +109,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }
 
   return (
-    <AuthContext.Provider value={{ session, user, signOut, signIn, signUp }}>
+    <AuthContext.Provider value={{ session, user, signOut, signIn, signUp, resendConfirmation }}>
       {children}
     </AuthContext.Provider>
   );

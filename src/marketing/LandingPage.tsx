@@ -102,7 +102,6 @@ export function LandingPage({ onSignIn, onSignUp }: LandingPageProps) {
       className="min-h-screen ll-grain-bg text-ink-900"
       initial={reducedMotion ? false : { opacity: 0, x: -28 }}
       animate={{ opacity: 1, x: 0 }}
-      exit={reducedMotion ? undefined : { opacity: 0, x: 28 }}
       transition={{ duration: reducedMotion ? 0 : 0.32, ease: [0.2, 0.8, 0.2, 1] }}
     >
       <header className="sticky top-0 z-40 border-b border-feint-strong bg-paper-50/95 backdrop-blur-sm">
