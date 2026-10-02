@@ -74,7 +74,9 @@ Edit `.env`:
 ```env
 SUPABASE_URL=https://your-project-ref.supabase.co
 SUPABASE_ANON_KEY=your-anon-key
-SUPABASE_SERVICE_ROLE_KEY=your-service-role-key    # backend only, never expose to client
+SUPABASE_SECRET_KEY=sb_secret_your-secret-key     # backend only, never expose to client
+# SUPABASE_SERVICE_ROLE_KEY still works as a fallback, but Supabase retires
+# legacy service_role keys at the end of 2026.
 GEMINI_API_KEY=your-gemini-api-key                 # backend only, never expose to client
 PORT=3001
 NODE_ENV=development
@@ -128,7 +130,7 @@ Non-secret config (`SUPABASE_URL`, `ALLOWED_ORIGINS`, `NODE_ENV`) lives in `wran
 Set the two real secrets once per environment:
 
 ```bash
-npx wrangler secret put SUPABASE_SERVICE_ROLE_KEY
+npx wrangler secret put SUPABASE_SECRET_KEY
 npx wrangler secret put GEMINI_API_KEY
 ```
 

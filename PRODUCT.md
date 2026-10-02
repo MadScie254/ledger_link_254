@@ -30,7 +30,7 @@ Success is a Kenyan bookkeeper using a feature for a full working day without su
 - M-Pesa is treated as a payment rail, not a bank statement import.
 - Kenyan statutory rules (PAYE bands, NSSF tiers, SHIF, Housing Levy, VAT, eTIMS) are the core of the product, not a localisation layer.
 - Double entry is enforced in Postgres through `post_journal_entry()`. The database refuses unbalanced entries, so no frontend bug can put the books out of balance.
-- Multi-currency (KES base; USD, UGX, TZS, RWF and others) holds invoices at the issue-date rate and posts unrealised FX to its own account.
+- Multi-currency (KES base; USD, UGX, TZS, RWF and others) holds invoices at the issue-date rate and calculates unrealised FX on open foreign invoices and bills against live rates. Posting that revaluation to account 8000, and realised FX on settlement, are not built yet.
 - Planned and not yet built: WhatsApp Business invoicing with an M-Pesa STK push payment link and auto-reconciliation (section 3.6).
 
 ## Operating Context
@@ -46,13 +46,13 @@ Success is a Kenyan bookkeeper using a feature for a full working day without su
 
 **Stack (fixed):** React 19, Vite, TypeScript, Tailwind CSS v4, Hono on Cloudflare Workers, Supabase (Postgres with row-level security, Auth with email and password), Zustand, TanStack Query, Recharts, Gemini for receipt OCR only. Do not port frameworks or add a component library.
 
-**Must survive any redesign, extended but not replaced:** the Zustand store, TanStack Query setup, RLS policies, the double-entry Postgres function, the currency service with unrealised-FX journals, the audit log, the eTIMS Type C draft, the Gemini receipt scanner, the dashboard widget picker (drag, pin, reset), the command palette architecture, the dark mode implementation, the print CSS, and the name.
+**Must survive any redesign, extended but not replaced:** the Zustand store, TanStack Query setup, RLS policies, the double-entry Postgres function, the currency service and its unrealised-FX calculation, the audit log, the eTIMS submission log (the KRA integration itself is not built), the Gemini receipt scanner, the dashboard widget picker (drag, pin, reset), the command palette architecture, the dark mode implementation, the print CSS, and the name.
 
 **Authentication:** email and password only. Magic links are out and must not be reintroduced.
 
-**Built today:** accounts, journals, invoices, recurring invoices, bills, vendors, customers, banking with AI match suggestions and rules, payroll runs and payslips, inventory, projects and time entries, budgets, team roles (owner, admin, accountant, member), audit log, reports, multi-org switching, demo tenant, onboarding tour and business-type customization, a public landing page, an accent color per organization. An accountant serves several client organizations from one login: the same membership and company-switcher mechanism as any other role, granted a role that posts to the books without administering the organization.
+**Built today:** accounts, journals, invoices, bills, vendors, customers, banking with match suggestions (posted entries, open invoices and bills, the company's rules, then keyword guesses) and rules, payroll runs and payslips (posted atomically, with statutory rate tables coded in src/utils/kenyaPayroll.ts by effective date), inventory, projects and time entries, budgets, team roles (owner, admin, accountant, member), audit log, reports, multi-org switching, demo tenant, onboarding tour and business-type customization, a public landing page, an accent color per organization, mobile bottom navigation. An accountant serves several client organizations from one login: the same membership and company-switcher mechanism as any other role, granted a role that posts to the books without administering the organization.
 
-**Specified but not built:** Daraja polling and live M-Pesa sync (3.3), CSV/OFX bank import with saved mappings (3.3), statutory rate tables with effective-from dates and atomic payroll journal batches (3.4), estimates and purchase orders (3.5), WhatsApp invoicing (3.6), mobile bottom navigation (3.7), ledger book view (3.8), react-hook-form and zod forms (3.9), keyboard leader sequences (4), onboarding wizard (3.2). The interface must never present these as working.
+**Specified but not built:** Daraja polling and live M-Pesa sync (3.3), CSV/OFX bank import with saved mappings (3.3), statutory rate tables held in the database rather than in code (3.4), recurring invoices, estimates and purchase orders (3.5), WhatsApp invoicing (3.6), ledger book view (3.8), react-hook-form and zod forms (3.9), keyboard leader sequences (4), onboarding wizard (3.2). The interface must never present these as working.
 
 **Terminology:** invoice, bill, vendor, customer, journal entry, chart of accounts, till, paybill, KRA PIN, PAYE, NSSF, SHIF, Housing Levy, eTIMS, trial balance, carried forward and brought forward.
 
@@ -66,7 +66,7 @@ Success is a Kenyan bookkeeper using a feature for a full working day without su
 
 ## Evidence on Hand
 
-- **Demo tenant:** Riverside Hardware Ltd (`146b2a09-11b0-47bd-a0ba-d9f27f1f12ec`), a Nairobi hardware retailer with 16 accounts and 12 balanced journal entries from January to June 2026. Served publicly at `GET /api/public/demo-balance-sheet`. Assets 3,151,250; liabilities 1,267,750; equity 1,883,500 (KES).
+- **Demo tenant:** Riverside Hardware Ltd (`146b2a09-11b0-47bd-a0ba-d9f27f1f12ec`), a Nairobi hardware retailer with 16 accounts and 12 balanced journal entries from January to June 2026. Created by `scripts/seed-demo-org.ts`; no public route serves it. Assets 3,151,250; liabilities 1,267,750; equity 1,883,500 (KES).
 - **Specification:** the product owner's remediation prompt, sections 0 to 7, in this session's history.
 - **Audit:** the interface strategy of 17 September 2026 (https://claude.ai/artifact/Hbr3aLKYbqZ5AVAS7QL6A7) with measured counts of the current UI.
 - **Absent, must not be fabricated:** customers, testimonials, case studies, press, usage figures, certifications (no SOC 2, ISO 27001 or penetration test), and the ODPC registration number (pending).
