@@ -51,6 +51,39 @@ const ORG = {
   isDemo: true,
 };
 
+const orderLine = (itemId: string | null, description: string, quantity: number, unitPriceCents: number, quantityOnHand: number | null) => {
+  const amountCents = quantity * unitPriceCents;
+  return {
+    id: `${itemId || 'free'}-${description}`,
+    description,
+    inventoryItemId: itemId,
+    itemName: itemId ? description : null,
+    itemType: itemId ? 'Physical Product' : null,
+    quantityOnHand,
+    accountId: 'a-4000',
+    quantity,
+    unitPriceCents,
+    taxRate: 16,
+    amountCents,
+    taxCents: Math.round(amountCents * 0.16),
+  };
+};
+
+const salesOrder = (
+  id: string, orderNumber: string, customerId: string, orderDate: string, promisedDate: string | null,
+  status: string, lines: ReturnType<typeof orderLine>[], notes?: string, extra: Record<string, unknown> = {},
+) => {
+  const subtotalCents = lines.reduce((sum, line) => sum + line.amountCents, 0);
+  const taxCents = lines.reduce((sum, line) => sum + line.taxCents, 0);
+  const customerNames: Record<string, string> = { 'c-1': 'Mwangaza Builders', 'c-2': 'Kiambu Contractors', 'c-3': 'Baraka Construction' };
+  return {
+    id, orderNumber, customerId, customerName: customerNames[customerId], orderDate, promisedDate, status, currency: 'KES',
+    subtotalCents, taxCents, totalCents: subtotalCents + taxCents, notes: notes ?? null,
+    invoiceId: null, invoiceNumber: null, invoiceStatus: null, completedAt: null, cancelledAt: null, cancelReason: null,
+    createdAt: `${orderDate}T08:00:00Z`, lines, ...extra,
+  };
+};
+
 const entry = (id: number, date: string, memo: string, cents: number, source = 'MANUAL') => ({
   id: `je-${id}`,
   orgId: ORG.id,
@@ -162,10 +195,28 @@ const FIXTURES: Record<string, unknown> = {
   },
   '/api/inventory': {
     items: [
-      { id: 'i-1', name: 'Cement 50kg, Bamburi', sku: 'CEM-50-BAM', unitOfMeasure: 'bags', unitPriceCents: 85_000, costPriceCents: 72_000, quantityOnHand: 340, reorderPoint: 120 },
-      { id: 'i-2', name: 'Y12 deformed bar, 12m', sku: 'STL-Y12-12', unitOfMeasure: 'lengths', unitPriceCents: 118_000, costPriceCents: 98_500, quantityOnHand: 64, reorderPoint: 80 },
-      { id: 'i-3', name: 'Iron sheets, gauge 30, 3m', sku: 'ROF-G30-3', unitOfMeasure: 'sheets', unitPriceCents: 92_000, costPriceCents: 76_000, quantityOnHand: 210, reorderPoint: 60 },
-      { id: 'i-4', name: 'Crown emulsion, white 20L', sku: 'PNT-CRW-20', unitOfMeasure: 'tins', unitPriceCents: 780_000, costPriceCents: 640_000, quantityOnHand: 9, reorderPoint: 12 },
+      { id: 'i-1', name: 'Cement 50kg, Bamburi', type: 'Physical Product', incomeAccountId: 'a-4000', sku: 'CEM-50-BAM', unitOfMeasure: 'bags', unitPriceCents: 85_000, costPriceCents: 72_000, quantityOnHand: 340, reorderPoint: 120 },
+      { id: 'i-2', name: 'Y12 deformed bar, 12m', type: 'Physical Product', incomeAccountId: 'a-4000', sku: 'STL-Y12-12', unitOfMeasure: 'lengths', unitPriceCents: 118_000, costPriceCents: 98_500, quantityOnHand: 64, reorderPoint: 80 },
+      { id: 'i-3', name: 'Iron sheets, gauge 30, 3m', type: 'Physical Product', incomeAccountId: 'a-4000', sku: 'ROF-G30-3', unitOfMeasure: 'sheets', unitPriceCents: 92_000, costPriceCents: 76_000, quantityOnHand: 210, reorderPoint: 60 },
+      { id: 'i-4', name: 'Crown emulsion, white 20L', type: 'Physical Product', incomeAccountId: 'a-4000', sku: 'PNT-CRW-20', unitOfMeasure: 'tins', unitPriceCents: 780_000, costPriceCents: 640_000, quantityOnHand: 9, reorderPoint: 12 },
+    ],
+  },
+  '/api/sales-orders': {
+    orders: [
+      salesOrder('so-7', 'SO-2026-00007', 'c-1', '2026-09-30', '2026-10-03', 'OPEN', [
+        orderLine('i-1', 'Cement 50kg, Bamburi', 40, 85_000, 340),
+        orderLine('i-3', 'Iron sheets, gauge 30, 3m', 24, 92_000, 210),
+      ], 'Deliver to the Ruiru site, gate B'),
+      salesOrder('so-6', 'SO-2026-00006', 'c-2', '2026-09-24', '2026-09-28', 'IN_PROGRESS', [
+        orderLine('i-2', 'Y12 deformed bar, 12m', 90, 118_000, 64),
+        orderLine(null, 'Cutting and bending', 1, 450_000, null),
+      ]),
+      salesOrder('so-5', 'SO-2026-00005', 'c-3', '2026-09-18', null, 'COMPLETED', [
+        orderLine('i-4', 'Crown emulsion, white 20L', 6, 780_000, 9),
+      ], undefined, { invoiceId: 'inv-44', invoiceNumber: 'INV-2026-0044', invoiceStatus: 'SENT', completedAt: '2026-09-20T09:12:00Z' }),
+      salesOrder('so-4', 'SO-2026-00004', 'c-1', '2026-09-10', null, 'CANCELLED', [
+        orderLine('i-1', 'Cement 50kg, Bamburi', 10, 85_000, 340),
+      ], undefined, { cancelledAt: '2026-09-11T08:00:00Z', cancelReason: 'Customer bought from another supplier' }),
     ],
   },
   '/api/reports/tax-summary': {
@@ -261,6 +312,19 @@ const PREVIEW_AUTH = {
   dismissEmailConfirmed: () => undefined,
 };
 
+// Writes answer with the shape the real route returns, so receipts read as they would.
+function previewWrite(pathname: string, rawBody: BodyInit | null | undefined) {
+  const order = /^\/api\/sales-orders\/([^/]+)\/(status|invoice)$/.exec(pathname);
+  const number = (id: string) => (FIXTURES['/api/sales-orders'] as any).orders.find((o: any) => o.id === id)?.orderNumber;
+  if (pathname === '/api/sales-orders') return { id: 'so-8', orderNumber: 'SO-2026-00008', totalCents: 0 };
+  if (order?.[2] === 'invoice') return { invoiceId: 'inv-45', invoiceNumber: 'INV-2026-0045' };
+  if (order?.[2] === 'status') {
+    const status = JSON.parse(typeof rawBody === 'string' ? rawBody : '{}').status;
+    return { orderNumber: number(order[1]), status, stockChanges: [] };
+  }
+  return { success: true };
+}
+
 function installFixtureFetch() {
   const realFetch = window.fetch.bind(window);
   window.fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
@@ -278,7 +342,7 @@ function installFixtureFetch() {
       return new Response(JSON.stringify(state), { status: 200, headers: { 'Content-Type': 'application/json' } });
     }
     const payslips = /^\/api\/payroll\/runs\/[^/]+\/payslips$/.test(url.pathname) ? PAYSLIPS : undefined;
-    const body = method === 'GET' ? payslips ?? FIXTURES[url.pathname] ?? {} : { success: true };
+    const body = method === 'GET' ? payslips ?? FIXTURES[url.pathname] ?? {} : previewWrite(url.pathname, init?.body);
     await new Promise((resolve) => setTimeout(resolve, 120));
     return new Response(JSON.stringify(body), { status: 200, headers: { 'Content-Type': 'application/json' } });
   };

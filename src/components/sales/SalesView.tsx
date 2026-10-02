@@ -10,14 +10,19 @@ import { useAppStore } from '../../store';
 import { Amount } from '../ledger/Amount';
 import { Dialog, Field } from '../ledger/Dialog';
 import { Mark } from '../ledger/Mark';
-import { PageHeading, PageNote, buttonClass } from '../ledger/Page';
+import { IndexTabs, PageHeading, PageNote, buttonClass } from '../ledger/Page';
 import { useConfirm } from '../../hooks/useConfirm';
 import { downloadCsv } from '../../utils/exportCsv';
+import { OrdersPanel } from './OrdersPanel';
+
+type SalesTab = 'Invoices' | 'Orders';
 
 export function SalesView() {
   useRenderTracker("SalesView");
   const { currentOrgId, activeCompany } = useAppStore();
+  const [salesTab, setSalesTab] = useState<SalesTab>('Invoices');
   const [isBuilding, setIsBuilding] = useState(false);
+  const [isOrdering, setIsOrdering] = useState(false);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [selectedInvoice, setSelectedInvoice] = useState<any | null>(null);
   const [paymentInvoice, setPaymentInvoice] = useState<any | null>(null);
@@ -203,9 +208,13 @@ export function SalesView() {
     <div>
       <PageHeading
         title="Sales"
-        note={<>{invoices.length} invoices for {activeCompany?.name || 'this organization'} · Figures in {baseCurrency}</>}
+        note={
+          salesTab === 'Invoices'
+            ? <>{invoices.length} invoices for {activeCompany?.name || 'this organization'} · Figures in {baseCurrency}</>
+            : <>Orders customers have placed with {activeCompany?.name || 'this organization'} · Figures in {baseCurrency}</>
+        }
         actions={
-          (
+          salesTab === 'Invoices' ? (
             <>
               <button type="button" onClick={handleExportCSV} className={buttonClass.secondary}>
                 <Download className="h-4 w-4" aria-hidden="true" /> Export CSV
@@ -214,10 +223,38 @@ export function SalesView() {
                 New invoice
               </button>
             </>
+          ) : (
+            <button type="button" onClick={() => setIsOrdering(true)} className={buttonClass.primary}>
+              New order
+            </button>
           )
         }
       />
 
+      <IndexTabs
+        label="Sales"
+        active={salesTab}
+        onChange={(tab) => {
+          setSalesTab(tab);
+          setSelectedIds([]);
+        }}
+        tabs={[
+          { id: 'Invoices', name: 'Invoices', count: invoices.length },
+          { id: 'Orders', name: 'Orders' },
+        ]}
+      />
+
+      {salesTab === 'Orders' ? (
+        <OrdersPanel
+          orgId={currentOrgId}
+          baseCurrency={baseCurrency}
+          customers={customersData?.customers || []}
+          accounts={accountsData?.accounts || []}
+          isCreating={isOrdering}
+          onCreatingChange={setIsOrdering}
+        />
+      ) : (
+      <>
       {loadingInvoices ? (
         <div aria-busy="true" aria-label="Loading invoices" className="mt-2">
           {Array.from({ length: 6 }).map((_, i) => (
@@ -393,6 +430,8 @@ export function SalesView() {
       />
       {bulkDeleteMutation.error && (
         <p role="alert" className="text-[13.5px] text-ledger-red">{bulkDeleteMutation.error.message}</p>
+      )}
+      </>
       )}
 
       <Dialog
