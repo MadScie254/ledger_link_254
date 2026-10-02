@@ -67,7 +67,9 @@ export class CurrencyService {
    * Secondary: api.exchangerate-api.com
    */
   static async fetchLiveRates(baseCurrency: string = 'KES', forceRefresh: boolean = false): Promise<ExchangeRateData> {
-    const base = baseCurrency.toUpperCase();
+    const base = String(baseCurrency || '').trim().toUpperCase();
+    // The code goes into the rate provider's URL path.
+    if (!/^[A-Z]{3}$/.test(base)) throw new Error('Currency must be a three-letter ISO code.');
     const now = Date.now();
 
     if (!forceRefresh && cachedRates[base] && (now - cachedRates[base].timestamp < CACHE_TTL_MS)) {

@@ -1,0 +1,17 @@
+# Security headers for the app shell and static assets.
+#
+# wrangler.jsonc runs the Worker only for /api/*, so index.html and every
+# asset are served by Workers Static Assets, which applies this file. The
+# headers the Worker sets reach JSON responses only.
+#
+# connect-src: the API is same-origin; the browser talks to Supabase only for
+# sign-in. No inline scripts are allowed; inline styles are, because React
+# style attributes need them. Camera stays available to this origin for the
+# receipt scanner.
+/*
+  Content-Security-Policy: default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: blob:; connect-src 'self' https://*.supabase.co wss://*.supabase.co; frame-ancestors 'none'; base-uri 'self'; form-action 'self'; object-src 'none'
+  X-Frame-Options: DENY
+  X-Content-Type-Options: nosniff
+  Referrer-Policy: strict-origin-when-cross-origin
+  Strict-Transport-Security: max-age=31536000; includeSubDomains
+  Permissions-Policy: camera=(self), microphone=(), geolocation=(), payment=()
