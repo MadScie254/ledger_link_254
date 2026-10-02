@@ -851,7 +851,7 @@ export const documentationSections: DocumentationSection[] = [
           ['400 Missing x-org-id', 'No active organization or bypassed fetch bridge', 'Request headers and Zustand currentOrgId', 'Select/create a company; use fetchWithTenant/authenticated fetch for tenant routes.'],
           ['400 Invalid x-org-id', 'Placeholder, malformed, or stale organization ID', 'Inspect x-org-id format without exposing other headers', 'Remove hard-coded defaults and load a real membership organization UUID.'],
           ['403 No organization access', 'Wrong company or missing membership', 'memberships row for verified user and org', 'Correct selection or have an owner/admin add the user. Never trust a client-supplied role.'],
-          ['403 Role cannot modify', 'Member attempted a write', 'Team screen and middleware orgRole', 'Use owner/admin for approved writes; keep Member read-only.'],
+          ['403 Role cannot modify', 'Member attempted a write', 'Team screen and middleware orgRole', 'Use owner, admin or accountant for approved writes; keep Member read-only.'],
           ['CORS blocked', 'Browser origin absent from ALLOWED_ORIGINS', 'Console error and exact protocol/host/port', 'Add the exact origin and redeploy/restart Worker. Do not use wildcard credentials CORS.'],
           ['500 on every API route', 'Missing SUPABASE_URL or secret key', 'Worker log initialization error', 'Set correct Worker vars/secrets and redeploy. Never substitute a browser publishable key.'],
           ['Relation/function does not exist', 'Application deployed before migrations', 'Supabase/Postgres error and migration history', 'Apply the expected migrations to the correct project, then rerun smoke tests.'],
