@@ -34,33 +34,26 @@ export class TeamService {
     if (error) throw error;
     if (!memberships || memberships.length === 0) return [];
 
-    const members = await Promise.all(
-      memberships.map(async (m) => {
-        let email = m.user_id;
-        try {
-          const { data: userData } = await supabase.auth.admin.getUserById(m.user_id);
-          if (userData?.user?.email) email = userData.user.email;
-        } catch {
-          // Fall back to showing the user id if the auth lookup fails
-        }
-
-        return {
-          id: m.id,
-          userId: m.user_id,
-          email,
-          role: m.role as OrganizationRole,
-          status: 'Active' as const,
-          isYou: m.user_id === currentUserId,
-        };
-      })
+    // One query for every member's email, instead of one Auth API call each.
+    const { data: emailRows, error: emailError } = await supabase.rpc('organization_member_emails', { p_org_id: orgId });
+    if (emailError) throw emailError;
+    const emailByUserId = new Map<string, string>(
+      ((emailRows || []) as Array<{ user_id: string; email: string | null }>).map((row) => [row.user_id, row.email || row.user_id]),
     );
 
-    return members;
+    return memberships.map((m) => ({
+      id: m.id,
+      userId: m.user_id,
+      email: emailByUserId.get(m.user_id) || m.user_id,
+      role: m.role as OrganizationRole,
+      status: 'Active' as const,
+      isYou: m.user_id === currentUserId,
+    }));
   }
 
   static async addMember(input: TeamMemberInput): Promise<string> {
     const supabase = getSupabase();
-    const email = input.email.trim().toLowerCase();
+    const email = String(input.email ?? '').trim().toLowerCase();
 
     if (!email || !email.includes('@')) {
       throw new Error('A valid email address is required.');
@@ -69,19 +62,13 @@ export class TeamService {
       throw new Error('Role must be admin, member or accountant.');
     }
 
-    // Try to find an existing Supabase Auth user with this email first —
-    // inviteUserByEmail errors if the user already exists.
-    let userId: string | null = null;
-    let page = 1;
-    while (!userId) {
-      const { data, error } = await supabase.auth.admin.listUsers({ page, perPage: 200 });
-      if (error) throw error;
-      const users = data.users as Array<{ id: string; email?: string }>;
-      const match = users.find((u) => u.email?.toLowerCase() === email);
-      if (match) userId = match.id;
-      if (users.length < 200) break; // last page
-      page += 1;
-    }
+    // Find an existing Supabase Auth user with this email first, since
+    // inviteUserByEmail errors if the user already exists. One indexed
+    // lookup; paging through every user in the project, across all
+    // companies, took one Worker subrequest per 200 users.
+    const { data: existingUserId, error: lookupError } = await supabase.rpc('auth_user_id_by_email', { p_email: email });
+    if (lookupError) throw lookupError;
+    let userId: string | null = typeof existingUserId === 'string' ? existingUserId : null;
 
     if (!userId) {
       const { data, error } = await supabase.auth.admin.inviteUserByEmail(email);
