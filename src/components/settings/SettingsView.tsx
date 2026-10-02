@@ -524,7 +524,7 @@ function CompanyModal({ initialData, onClose, onSuccess }: { initialData: Organi
         <Field label="Registered name" hint="As on the certificate of incorporation">
           <input type="text" value={legalName} onChange={(e) => setLegalName(e.target.value)} />
         </Field>
-        <Field label="Base currency" hint={initialData ? 'Changing it does not convert posted figures' : undefined}>
+        <Field label="Base currency" hint={initialData ? 'Fixed once any entry is posted, because every posted figure is in it' : undefined}>
           <select value={baseCurrency} onChange={(e) => setBaseCurrency(e.target.value)}>
             {SUPPORTED_CURRENCIES.map((c) => (
               <option key={c.code} value={c.code}>{c.code} · {c.name}</option>

@@ -158,7 +158,13 @@ export class OrganizationService {
     const updateData: any = {};
     if (data.name !== undefined) updateData.name = data.name;
     if (data.legalName !== undefined) updateData.legal_name = data.legalName;
-    if (data.baseCurrency !== undefined) updateData.base_currency = data.baseCurrency;
+    if (data.baseCurrency !== undefined) {
+      // The database refuses a change once any entry is posted
+      // (organizations_lock_base_currency); the format is checked here.
+      const currency = String(data.baseCurrency).trim().toUpperCase();
+      if (!/^[A-Z]{3}$/.test(currency)) throw new Error('Base currency must be a three-letter ISO code, such as KES.');
+      updateData.base_currency = currency;
+    }
     if (data.country !== undefined) updateData.country = data.country;
     if (data.taxId !== undefined) updateData.tax_id = data.taxId;
     if (data.fiscalYearStart !== undefined) updateData.fiscal_year_start = data.fiscalYearStart;
