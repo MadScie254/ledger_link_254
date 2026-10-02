@@ -1,6 +1,6 @@
 import { getSupabase } from './supabase';
 import { fetchAllRows } from './pagination';
-import { calculatePayslip } from '../utils/kenyaPayroll';
+import { calculatePayslip, isIsoCalendarDate, monthlyGrossCents, parsePayPeriod } from '../utils/kenyaPayroll';
 
 export { calculatePayslip } from '../utils/kenyaPayroll';
 export type { PayslipBreakdown } from '../utils/kenyaPayroll';
@@ -74,6 +74,31 @@ async function getPayrollAccountIds(orgId: string): Promise<Record<PayrollAccoun
   ) as Record<PayrollAccountKey, string>;
 }
 
+/** Trimmed text, null when blank; refuses non-text values instead of storing them. */
+function optionalText(value: unknown, label: string): string | null {
+  if (value === undefined || value === null) return null;
+  if (typeof value !== 'string') throw new Error(`${label} must be text.`);
+  const trimmed = value.trim();
+  if (trimmed.length > 200) throw new Error(`${label} must be 200 characters or fewer.`);
+  return trimmed || null;
+}
+
+function optionalDate(value: unknown, label: string): string | null {
+  const text = optionalText(value, label);
+  if (text === null) return null;
+  const date = text.slice(0, 10);
+  if (!isIsoCalendarDate(date)) throw new Error(`${label} must be a date in YYYY-MM-DD form.`);
+  return date;
+}
+
+/** A non-negative whole number of cents; blank is zero. */
+function centsOrZero(value: unknown, label: string): number {
+  if (value === undefined || value === null || value === '') return 0;
+  const cents = Number(value);
+  if (!Number.isSafeInteger(cents) || cents < 0) throw new Error(`${label} must be a whole, non-negative amount.`);
+  return cents;
+}
+
 export class PayrollService {
   static async getEmployees(orgId: string) {
     const supabase = getSupabase();
@@ -96,6 +121,16 @@ export class PayrollService {
       jobTitle: row.job_title,
       hireDate: row.hire_date,
       baseSalaryCents: row.base_salary,
+      housingAllowanceCents: Number(row.housing_allowance_cents) || 0,
+      transportAllowanceCents: Number(row.transport_allowance_cents) || 0,
+      grossPayCents: monthlyGrossCents({
+        baseSalaryCents: row.base_salary,
+        housingAllowanceCents: row.housing_allowance_cents,
+        transportAllowanceCents: row.transport_allowance_cents,
+      }),
+      nationalId: row.national_id,
+      employmentType: row.employment_type,
+      mpesaNumber: row.mpesa_number,
       currency: row.currency,
       payFrequency: row.pay_frequency,
       kraPin: row.kra_pin,
@@ -110,58 +145,79 @@ export class PayrollService {
 
   static async addEmployee(orgId: string, input: any) {
     const supabase = getSupabase();
+    const firstName = optionalText(input.firstName, 'First name');
+    const lastName = optionalText(input.lastName, 'Last name');
+    if (!firstName || !lastName) throw new Error('First and last name are required.');
+
     const { data, error } = await supabase
       .from('employees')
       .insert({
         org_id: orgId,
-        first_name: input.firstName,
-        last_name: input.lastName,
-        email: input.email || null,
-        phone: input.phone || null,
-        department: input.department || 'Operations',
-        job_title: input.jobTitle || 'Staff',
-        hire_date: input.hireDate || new Date().toISOString().substring(0, 10),
-        base_salary: input.baseSalaryCents || 0,
+        first_name: firstName,
+        last_name: lastName,
+        email: optionalText(input.email, 'Email'),
+        phone: optionalText(input.phone, 'Phone'),
+        department: optionalText(input.department, 'Department') || 'Operations',
+        job_title: optionalText(input.jobTitle, 'Job title') || 'Staff',
+        hire_date: optionalDate(input.hireDate, 'Hire date') || new Date().toISOString().substring(0, 10),
+        base_salary: centsOrZero(input.baseSalaryCents, 'Base salary'),
+        housing_allowance_cents: centsOrZero(input.housingAllowanceCents, 'Housing allowance'),
+        transport_allowance_cents: centsOrZero(input.transportAllowanceCents, 'Transport allowance'),
         currency: 'KES',
         pay_frequency: 'Monthly',
-        kra_pin: input.kraPin || null,
-        nssf_number: input.nssfNumber || null,
-        nhif_number: input.shifNumber || null,
-        bank_name: input.bankName || null,
-        bank_account: input.bankAccountNo || null,
+        kra_pin: optionalText(input.kraPin, 'KRA PIN'),
+        nssf_number: optionalText(input.nssfNumber, 'NSSF number'),
+        nhif_number: optionalText(input.shifNumber, 'SHA number'),
+        national_id: optionalText(input.nationalId, 'National ID'),
+        employment_type: optionalText(input.employmentType, 'Employment type'),
+        mpesa_number: optionalText(input.mpesaNumber, 'M-Pesa number'),
+        bank_name: optionalText(input.bankName, 'Bank name'),
+        bank_account: optionalText(input.bankAccountNo, 'Bank account'),
         status: 'Active'
       })
       .select('id')
       .single();
-      
+
     if (error) throw error;
     return data.id;
   }
 
   static async updateEmployee(orgId: string, id: string, input: any) {
     const supabase = getSupabase();
-    const updateData: any = {};
-    if (input.firstName !== undefined) updateData.first_name = input.firstName;
-    if (input.lastName !== undefined) updateData.last_name = input.lastName;
-    if (input.email !== undefined) updateData.email = input.email;
-    if (input.phone !== undefined) updateData.phone = input.phone;
-    if (input.department !== undefined) updateData.department = input.department;
-    if (input.jobTitle !== undefined) updateData.job_title = input.jobTitle;
-    if (input.hireDate !== undefined) updateData.hire_date = input.hireDate;
-    if (input.baseSalaryCents !== undefined) updateData.base_salary = input.baseSalaryCents;
-    if (input.kraPin !== undefined) updateData.kra_pin = input.kraPin;
-    if (input.nssfNumber !== undefined) updateData.nssf_number = input.nssfNumber;
-    if (input.shifNumber !== undefined) updateData.nhif_number = input.shifNumber;
-    if (input.bankName !== undefined) updateData.bank_name = input.bankName;
-    if (input.bankAccountNo !== undefined) updateData.bank_account = input.bankAccountNo;
+    const updateData: Record<string, unknown> = {};
+    if (input.firstName !== undefined) updateData.first_name = optionalText(input.firstName, 'First name');
+    if (input.lastName !== undefined) updateData.last_name = optionalText(input.lastName, 'Last name');
+    if (input.email !== undefined) updateData.email = optionalText(input.email, 'Email');
+    if (input.phone !== undefined) updateData.phone = optionalText(input.phone, 'Phone');
+    if (input.department !== undefined) updateData.department = optionalText(input.department, 'Department');
+    if (input.jobTitle !== undefined) updateData.job_title = optionalText(input.jobTitle, 'Job title');
+    if (input.hireDate !== undefined) updateData.hire_date = optionalDate(input.hireDate, 'Hire date');
+    if (input.baseSalaryCents !== undefined) updateData.base_salary = centsOrZero(input.baseSalaryCents, 'Base salary');
+    if (input.housingAllowanceCents !== undefined) updateData.housing_allowance_cents = centsOrZero(input.housingAllowanceCents, 'Housing allowance');
+    if (input.transportAllowanceCents !== undefined) updateData.transport_allowance_cents = centsOrZero(input.transportAllowanceCents, 'Transport allowance');
+    if (input.kraPin !== undefined) updateData.kra_pin = optionalText(input.kraPin, 'KRA PIN');
+    if (input.nssfNumber !== undefined) updateData.nssf_number = optionalText(input.nssfNumber, 'NSSF number');
+    if (input.shifNumber !== undefined) updateData.nhif_number = optionalText(input.shifNumber, 'SHA number');
+    if (input.nationalId !== undefined) updateData.national_id = optionalText(input.nationalId, 'National ID');
+    if (input.employmentType !== undefined) updateData.employment_type = optionalText(input.employmentType, 'Employment type');
+    if (input.mpesaNumber !== undefined) updateData.mpesa_number = optionalText(input.mpesaNumber, 'M-Pesa number');
+    if (input.bankName !== undefined) updateData.bank_name = optionalText(input.bankName, 'Bank name');
+    if (input.bankAccountNo !== undefined) updateData.bank_account = optionalText(input.bankAccountNo, 'Bank account');
+    if (updateData.first_name === null || updateData.last_name === null) {
+      throw new Error('First and last name cannot be blank.');
+    }
+    if (Object.keys(updateData).length === 0) return;
 
-    const { error } = await supabase
+    const { data, error } = await supabase
       .from('employees')
       .update(updateData)
       .eq('id', id)
-      .eq('org_id', orgId);
+      .eq('org_id', orgId)
+      .select('id')
+      .maybeSingle();
 
     if (error) throw error;
+    if (!data) throw new Error('Employee not found in this organization.');
   }
 
   static async runPayroll(
@@ -171,30 +227,42 @@ export class PayrollService {
     createdBy: string,
     idempotencyKey?: string,
   ): Promise<string> {
-    const normalizedPeriod = period.trim();
-    if (!normalizedPeriod) throw new Error('A payroll period is required.');
-    if (normalizedPeriod.length > 100) throw new Error('Payroll period must be 100 characters or fewer.');
+    // One canonical label per month, so "Aug 2026" and "August 2026" cannot
+    // both be run, and rates read for the month earned rather than the day paid.
+    const payPeriod = parsePayPeriod(String(period ?? ''));
+    if (!payPeriod) throw new Error('Write the payroll period as a month and year, such as September 2026.');
+    if (!isIsoCalendarDate(payDate)) throw new Error('The pay date must be a real date in YYYY-MM-DD form.');
+    const normalizedPeriod = payPeriod.label;
     if (!createdBy?.trim()) throw new Error('A payroll actor is required.');
 
-    // Validates the pay date and selects the effective table before any remote
-    // work. The same shared function calculates every employee below.
-    const rateProbe = calculatePayslip(0, payDate);
+    // Selects the rate table for the period before any remote work. The same
+    // shared function calculates every employee below.
+    const rateProbe = calculatePayslip(0, payPeriod.rateDate);
     const supabase = getSupabase();
-    const [employeeResult, accountIds] = await Promise.all([
-      supabase
+    const [employees, accountIds] = await Promise.all([
+      fetchAllRows<any>((from, to) => supabase
         .from('employees')
-        .select('id, base_salary')
+        .select('id, first_name, last_name, base_salary, housing_allowance_cents, transport_allowance_cents')
         .eq('org_id', orgId)
-        .eq('status', 'Active'),
+        .eq('status', 'Active')
+        .order('id')
+        .range(from, to)),
       getPayrollAccountIds(orgId),
     ]);
 
-    if (employeeResult.error) throw employeeResult.error;
-    const employees = employeeResult.data || [];
     if (employees.length === 0) throw new Error('No active employees to run payroll for.');
 
     const payslips: PayrollRpcPayslip[] = employees.map((employee: any) => {
-      const breakdown = calculatePayslip(employee.base_salary ?? 0, payDate);
+      const breakdown = calculatePayslip(monthlyGrossCents({
+        baseSalaryCents: employee.base_salary,
+        housingAllowanceCents: employee.housing_allowance_cents,
+        transportAllowanceCents: employee.transport_allowance_cents,
+      }), payPeriod.rateDate);
+      if (breakdown.netCents < 0) {
+        // The SHIF minimum can exceed very small pay; say who, instead of the
+        // database refusing the whole run with an unexplained total.
+        throw new Error(`Deductions for ${employee.first_name} ${employee.last_name} exceed their gross pay for ${normalizedPeriod}. Check their salary before running payroll.`);
+      }
       return {
         employeeId: employee.id,
         grossCents: breakdown.grossCents,

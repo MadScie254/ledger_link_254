@@ -240,3 +240,67 @@ export function calculatePayslip(grossCents: number, payDate: string): PayslipBr
     ratesEffectiveFrom: rates.effectiveFrom,
   };
 }
+
+/** The monthly pay components payroll taxes, in cents. */
+export interface EmployeePay {
+  readonly baseSalaryCents?: number | string | null;
+  readonly housingAllowanceCents?: number | string | null;
+  readonly transportAllowanceCents?: number | string | null;
+}
+
+/**
+ * Monthly gross pay: base salary plus cash housing and transport allowances,
+ * which are taxable pay and attract SHIF and the Housing Levy like salary.
+ */
+export function monthlyGrossCents(employee: EmployeePay): number {
+  const part = (value: number | string | null | undefined) => {
+    const cents = Number(value ?? 0);
+    return Number.isFinite(cents) ? Math.round(cents) : 0;
+  };
+  return part(employee.baseSalaryCents) + part(employee.housingAllowanceCents) + part(employee.transportAllowanceCents);
+}
+
+const PERIOD_MONTHS = [
+  'january', 'february', 'march', 'april', 'may', 'june',
+  'july', 'august', 'september', 'october', 'november', 'december',
+];
+
+/** A monthly pay period: its one canonical label and the date its rates are read on. */
+export interface PayPeriod {
+  /** "September 2026"; the same month always gets the same label. */
+  readonly label: string;
+  /** Last day of the month, YYYY-MM-DD. Statutory rates are those in force for the month earned. */
+  readonly rateDate: string;
+}
+
+/**
+ * Reads a monthly pay period written as "September 2026", "Sep 2026",
+ * "2026-09" or "09/2026". Returns null for anything else.
+ *
+ * Rates follow the month the pay was earned, not the day it was paid: a
+ * January payroll paid on 2 February still uses January's NSSF limits.
+ */
+export function parsePayPeriod(value: string): PayPeriod | null {
+  const text = value.trim().toLowerCase().replace(/\s+/g, ' ');
+  let year: number | null = null;
+  let monthIndex = -1;
+
+  const named = /^([a-z]+)\.? (\d{4})$/.exec(text);
+  const isoMonth = /^(\d{4})-(\d{1,2})$/.exec(text);
+  const slashMonth = /^(\d{1,2})\/(\d{4})$/.exec(text);
+  if (named) {
+    monthIndex = PERIOD_MONTHS.findIndex((month) => named[1].length >= 3 && month.startsWith(named[1]));
+    year = Number(named[2]);
+  } else if (isoMonth) {
+    year = Number(isoMonth[1]);
+    monthIndex = Number(isoMonth[2]) - 1;
+  } else if (slashMonth) {
+    monthIndex = Number(slashMonth[1]) - 1;
+    year = Number(slashMonth[2]);
+  }
+  if (year === null || monthIndex < 0 || monthIndex > 11 || year < 2000 || year > 2100) return null;
+
+  const name = PERIOD_MONTHS[monthIndex];
+  const lastDay = new Date(Date.UTC(year, monthIndex + 1, 0)).toISOString().slice(0, 10);
+  return { label: `${name[0].toUpperCase()}${name.slice(1)} ${year}`, rateDate: lastDay };
+}

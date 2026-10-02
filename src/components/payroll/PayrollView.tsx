@@ -9,15 +9,12 @@ import { Amount } from '../ledger/Amount';
 import { Mark } from '../ledger/Mark';
 import { PageHeading, IndexTabs, PageNote, SkeletonRows, EmptyNote, buttonClass } from '../ledger/Page';
 import { payrollReturnsDue } from '../../utils/statutory';
-import {
-  calculatePayslip,
-  findRateTable,
-  isIsoCalendarDate,
-  UNSUPPORTED_EMPLOYEE_ADJUSTMENTS,
-  type PayslipBreakdown,
-} from '../../utils/kenyaPayroll';
+import { calculatePayslip, findRateTable, isIsoCalendarDate, UNSUPPORTED_EMPLOYEE_ADJUSTMENTS, type PayslipBreakdown, monthlyGrossCents, parsePayPeriod } from '../../utils/kenyaPayroll';
 
 const tabs = ['Employees', 'Run payroll', 'Payslips', 'Statutory filings (PAYE/NSSF/SHA)'];
+
+/** The API refuses payroll data to the read-only member role. */
+const PAYROLL_RESTRICTED = 'payroll-restricted';
 
 type ReturnKey = 'PAYE' | 'NSSF' | 'SHA' | 'AHL';
 const STATUTORY_RETURNS: { key: ReturnKey; name: string; authority: string; field: 'payeCents' | 'nssfCents' | 'shifCents' | 'ahlCents' }[] = [
@@ -39,14 +36,17 @@ export function PayrollView() {
   const { currentOrgId, activeCompany } = useAppStore();
   const queryClient = useQueryClient();
 
-  const { data: employeesData, isLoading } = useQuery({
+  const { data: employeesData, isLoading, error: employeesError } = useQuery({
     queryKey: ['employees', currentOrgId],
     queryFn: async () => {
       const res = await fetch('/api/employees', { headers: { 'x-org-id': currentOrgId } });
+      if (res.status === 403) throw new Error(PAYROLL_RESTRICTED);
       if (!res.ok) throw new Error('Failed to fetch employees');
       return res.json();
-    }
+    },
+    retry: (count, err) => err.message !== PAYROLL_RESTRICTED && count < 3,
   });
+  const payrollRestricted = employeesError?.message === PAYROLL_RESTRICTED;
 
   const employees = employeesData?.employees || [];
   const activeEmployees = employees.filter((e: any) => (e.status || 'Active') === 'Active');
@@ -127,20 +127,26 @@ export function PayrollView() {
   };
 
   const baseCurrency = activeCompany?.baseCurrency || 'KES';
-  const previewRates = findRateTable(payDate);
+  // Rates follow the month earned, not the pay date, exactly as the posting does.
+  const previewPeriod = parsePayPeriod(payPeriod);
+  const previewRates = previewPeriod ? findRateTable(previewPeriod.rateDate) : null;
   const preview = (() => {
     if (!isIsoCalendarDate(payDate)) {
       return { rows: [] as { emp: any; p: PayslipBreakdown }[], error: 'Choose a valid pay date to calculate this preview.' };
     }
+    if (!previewPeriod) {
+      return { rows: [] as { emp: any; p: PayslipBreakdown }[], error: 'Write the pay period as a month and year, such as September 2026.' };
+    }
     if (!previewRates) {
-      return { rows: [] as { emp: any; p: PayslipBreakdown }[], error: `No statutory rate table is coded for ${payDate}.` };
+      return { rows: [] as { emp: any; p: PayslipBreakdown }[], error: `No statutory rate table is coded for ${previewPeriod.label}.` };
     }
 
     try {
       return {
         rows: activeEmployees.map((emp: any) => ({
           emp,
-          p: calculatePayslip(emp.baseSalaryCents ?? 0, payDate),
+          // Base salary plus housing and transport allowances.
+          p: calculatePayslip(monthlyGrossCents(emp), previewPeriod.rateDate),
         })),
         error: '',
       };
@@ -186,6 +192,12 @@ export function PayrollView() {
           ) : null
         }
       />
+
+      {payrollRestricted && (
+        <PageNote>
+          <span>Salaries, payslips and employees' bank details are open to the owner, administrators and accountants only. Ask the owner if you need them.</span>
+        </PageNote>
+      )}
 
       <IndexTabs
         label="Payroll"
@@ -315,7 +327,7 @@ export function PayrollView() {
             {previewRates ? (
               <>
                 Preview and posting use rate table <strong>{previewRates.version}</strong>, effective{' '}
-                {format(parse(previewRates.effectiveFrom, 'yyyy-MM-dd', new Date()), 'd MMMM yyyy')}, selected from the pay date.
+                {format(parse(previewRates.effectiveFrom, 'yyyy-MM-dd', new Date()), 'd MMMM yyyy')}, selected from the pay period (the month earned).
               </>
             ) : (
               <>Choose a supported pay date to select a statutory rate table.</>
@@ -458,9 +470,10 @@ export function PayrollView() {
                   <Mark
                     kind="query"
                     label={(() => {
-                      const table = selectedRun?.payDate ? findRateTable(selectedRun.payDate) : null;
+                      const runPeriod = selectedRun?.period ? parsePayPeriod(selectedRun.period) : null;
+                      const table = runPeriod ? findRateTable(runPeriod.rateDate) : selectedRun?.payDate ? findRateTable(selectedRun.payDate) : null;
                       return table
-                        ? `Recorded pay date maps to rate table ${table.version}, effective ${table.effectiveFrom}. Review employee-specific adjustments before filing.`
+                        ? `This run's pay period maps to rate table ${table.version}, effective ${table.effectiveFrom}. Review employee-specific adjustments before filing.`
                         : 'This run has no supported rate-table match. Check the posted figures before filing.';
                     })()}
                   />

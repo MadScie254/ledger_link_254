@@ -182,3 +182,38 @@ test('keeps rate tables in chronological order with unique versions', () => {
   assert.equal(new Set(versions).size, versions.length);
   for (const date of dates) assert.equal(isIsoCalendarDate(date), true);
 });
+
+test('gross pay includes cash housing and transport allowances', async () => {
+  const { monthlyGrossCents } = await import('./kenyaPayroll.ts');
+  assert.equal(monthlyGrossCents({ baseSalaryCents: KES(50_000), housingAllowanceCents: KES(10_000), transportAllowanceCents: KES(5_000) }), KES(65_000));
+  assert.equal(monthlyGrossCents({ baseSalaryCents: '5000000' }), KES(50_000));
+  assert.equal(monthlyGrossCents({}), 0);
+
+  // An allowance raises every gross-based deduction, so dropping it under-deducts.
+  const withAllowance = calculatePayslip(monthlyGrossCents({ baseSalaryCents: KES(50_000), housingAllowanceCents: KES(10_000) }), SEPTEMBER_2026);
+  const baseOnly = calculatePayslip(KES(50_000), SEPTEMBER_2026);
+  assert.ok(withAllowance.payeCents > baseOnly.payeCents);
+  assert.ok(withAllowance.shifCents > baseOnly.shifCents);
+  assert.ok(withAllowance.ahlCents > baseOnly.ahlCents);
+});
+
+test('pay periods read several spellings and always label the month the same way', async () => {
+  const { parsePayPeriod } = await import('./kenyaPayroll.ts');
+  for (const spelling of ['August 2026', 'aug 2026', 'Aug. 2026', '2026-08', '08/2026', '  AUGUST   2026 ']) {
+    assert.deepEqual(parsePayPeriod(spelling), { label: 'August 2026', rateDate: '2026-08-31' }, spelling);
+  }
+  assert.deepEqual(parsePayPeriod('February 2028'), { label: 'February 2028', rateDate: '2028-02-29' });
+  for (const bad of ['', 'Week 34 2026', '2026-13', 'Ma 2026', 'August', '13/2026']) {
+    assert.equal(parsePayPeriod(bad), null, bad);
+  }
+});
+
+test('rates follow the month earned, not the pay date', async () => {
+  const { parsePayPeriod } = await import('./kenyaPayroll.ts');
+  // January 2026 paid on 2 February 2026: Year 3 NSSF limits, not Year 4.
+  const january = parsePayPeriod('January 2026')!;
+  assert.equal(findRateTable(january.rateDate)?.version, 'KE-2025-02');
+  assert.equal(findRateTable('2026-02-02')?.version, 'KE-2026-02');
+  // December 2024 earnings use the rules in force from 27 December 2024.
+  assert.equal(findRateTable(parsePayPeriod('December 2024')!.rateDate)?.version, 'KE-2024-12');
+});
