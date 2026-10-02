@@ -13,6 +13,14 @@ import { Dialog, Field } from '../ledger/Dialog';
 
 const tabs = ['Bank transactions', 'AI Match Assistant', 'Rules', 'Reconcile', 'Bank connections'];
 
+/** What a statement line is matched to: exactly one target besides the line. */
+type MatchPayload = { transactionId: string } & (
+  | { targetAccountId: string }
+  | { existingJournalEntryId: string }
+  | { invoiceId: string }
+  | { billId: string }
+);
+
 export function BankingView() {
   useRenderTracker("BankingView");
   const [activeTab, setActiveTab] = useState('Bank transactions');
@@ -23,6 +31,8 @@ export function BankingView() {
   const [matchingTx, setMatchingTx] = useState<any>(null); // Transaction being matched
   const [selectedCandidate, setSelectedCandidate] = useState<any>(null);
   const [matchProblem, setMatchProblem] = useState('');
+  const [manualAccountId, setManualAccountId] = useState('');
+  const [autoReconcileNote, setAutoReconcileNote] = useState('');
   const [isCreatingRule, setIsCreatingRule] = useState(false);
   const [ruleMatchText, setRuleMatchText] = useState('');
   const [ruleAccountId, setRuleAccountId] = useState('');
@@ -180,6 +190,19 @@ export function BankingView() {
     }
   });
 
+  // Open invoices (money in) or bills (money out) the line being matched could pay.
+  const getList = async (path: string) => {
+    const res = await fetch(path, { headers: { 'x-org-id': currentOrgId } });
+    if (!res.ok) throw new Error(`Failed to fetch ${path}`);
+    return res.json();
+  };
+  const matchingIn = !!matchingTx && matchingTx.direction === 'IN';
+  const matchingOut = !!matchingTx && matchingTx.direction === 'OUT';
+  const { data: invoicesData } = useQuery({ queryKey: ['invoices', currentOrgId], queryFn: () => getList('/api/invoices'), enabled: matchingIn });
+  const { data: customersData } = useQuery({ queryKey: ['customers', currentOrgId], queryFn: () => getList('/api/customers'), enabled: matchingIn });
+  const { data: billsData } = useQuery({ queryKey: ['bills', currentOrgId], queryFn: () => getList('/api/bills'), enabled: matchingOut });
+  const { data: vendorsData } = useQuery({ queryKey: ['vendors', currentOrgId], queryFn: () => getList('/api/vendors'), enabled: matchingOut });
+
   // Sync Mutation
   const syncMutation = useMutation({
     mutationFn: async () => {
@@ -198,7 +221,7 @@ export function BankingView() {
 
   // Match Mutation (Create New or Link Existing)
   const matchMutation = useMutation({
-    mutationFn: async (payload: { transactionId: string, targetAccountId?: string, existingJournalEntryId?: string }) => {
+    mutationFn: async (payload: MatchPayload) => {
       const res = await fetch('/api/banking/match', {
         method: 'POST',
         headers: {
@@ -217,6 +240,10 @@ export function BankingView() {
       queryClient.invalidateQueries({ queryKey: ['bank_transactions', currentOrgId] });
       queryClient.invalidateQueries({ queryKey: ['banking_ai_matches', currentOrgId] });
       queryClient.invalidateQueries({ queryKey: ['accounts', currentOrgId] });
+      // A match can record an invoice or bill payment.
+      queryClient.invalidateQueries({ queryKey: ['invoices', currentOrgId] });
+      queryClient.invalidateQueries({ queryKey: ['bills', currentOrgId] });
+      queryClient.invalidateQueries({ queryKey: ['journal-entries', currentOrgId] });
       setMatchingTx(null);
       setSelectedCandidate(null);
       setMatchProblem('');
@@ -235,45 +262,58 @@ export function BankingView() {
         },
         body: JSON.stringify({ minConfidence })
       });
-      if (!res.ok) throw new Error('Failed to run auto-reconcile');
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.error || 'The strong matches could not be accepted.');
+      }
       return res.json();
     },
-    onSuccess: () => {
+    onSuccess: (result: { count: number; failed: number; remaining: number; failures?: Array<{ message: string }> }) => {
       queryClient.invalidateQueries({ queryKey: ['bank_transactions', currentOrgId] });
       queryClient.invalidateQueries({ queryKey: ['banking_ai_matches', currentOrgId] });
       queryClient.invalidateQueries({ queryKey: ['accounts', currentOrgId] });
-    }
+      queryClient.invalidateQueries({ queryKey: ['invoices', currentOrgId] });
+      queryClient.invalidateQueries({ queryKey: ['bills', currentOrgId] });
+      queryClient.invalidateQueries({ queryKey: ['journal-entries', currentOrgId] });
+      const parts = [`${result.count} ${result.count === 1 ? 'line' : 'lines'} matched.`];
+      if (result.failed > 0) parts.push(`${result.failed} could not be matched: ${result.failures?.[0]?.message || 'see each line'}.`);
+      if (result.remaining > 0) parts.push(`${result.remaining} more strong ${result.remaining === 1 ? 'match is' : 'matches are'} waiting; accept again to continue.`);
+      setAutoReconcileNote(parts.join(' '));
+    },
+    onError: (err: any) => setAutoReconcileNote(err.message),
   });
 
   // Lines matched during this visit get the auditor's tick drawn once, as the
   // pen makes it; lines already matched on load show it at rest.
   const [justMatched, setJustMatched] = useState<Set<string>>(() => new Set());
-  const reconcile = (payload: { transactionId: string; targetAccountId?: string; existingJournalEntryId?: string }) => {
+  const reconcile = (payload: MatchPayload) => {
     matchMutation.mutate(payload, {
       onSuccess: () => setJustMatched((prev) => new Set(prev).add(payload.transactionId)),
     });
   };
 
-  const handleMatchNew = (tx: any) => {
-    const targetAccount = accountsData?.accounts?.find((a: any) => a.code === tx.aiCategoryCode);
-    if (!targetAccount) {
-      setMatchProblem(`There is no account ${tx.aiCategoryCode} in the chart of accounts. Add it, or match an existing entry.`);
-      return;
-    }
-    reconcile({ transactionId: tx.id, targetAccountId: targetAccount.id });
-  };
-
   const handleAcceptAIMatch = (match: any) => {
-    const targetAccount = accountsData?.accounts?.find((a: any) => a.code === match.suggestedAccountCode);
-    if (!targetAccount) {
-      setMatchProblem(`There is no account ${match.suggestedAccountCode} in the chart of accounts, so ${match.description} was not posted.`);
-      return;
-    }
     setMatchProblem('');
-    reconcile({
-      transactionId: match.transactionId,
-      targetAccountId: targetAccount?.id
-    });
+    switch (match.matchType) {
+      case 'ENTRY':
+        reconcile({ transactionId: match.transactionId, existingJournalEntryId: match.journalEntryId });
+        return;
+      case 'INVOICE':
+        reconcile({ transactionId: match.transactionId, invoiceId: match.entityId });
+        return;
+      case 'BILL':
+        reconcile({ transactionId: match.transactionId, billId: match.entityId });
+        return;
+      default: {
+        const targetAccountId = match.suggestedAccountId
+          || accountsData?.accounts?.find((a: any) => a.code === match.suggestedAccountCode)?.id;
+        if (!targetAccountId) {
+          setMatchProblem(`There is no account ${match.suggestedAccountCode} in the chart of accounts, so ${match.description} was not posted.`);
+          return;
+        }
+        reconcile({ transactionId: match.transactionId, targetAccountId });
+      }
+    }
   };
 
   const handleExportCSV = () => {
@@ -292,13 +332,43 @@ export function BankingView() {
   const closeMatch = () => {
     setMatchingTx(null);
     setMatchProblem('');
+    setManualAccountId('');
   };
-  const candidateEntries = matchingTx
+  const allAccounts: any[] = accountsData?.accounts || [];
+  const bankAccountId = allAccounts.find((a: any) => a.code === '1000')?.id;
+  // Receivables and payables move only through invoices, bills and their
+  // payments, and a bank line cannot post back to the bank.
+  const postableAccounts = allAccounts.filter((a: any) => a.isActive !== false && !['1000', '1100', '2000'].includes(a.code));
+  const linkedEntryIds = new Set(rawTx.map((t: any) => t.matchedJournalEntryId).filter(Boolean));
+  const candidateEntries = matchingTx && bankAccountId
     ? (journalsData?.entries || [])
-        .map((je: any) => ({ je, cents: (je.lines || []).reduce((sum: number, l: any) => sum + Number(l.debit || 0), 0) }))
-        .sort((x: any, y: any) => Math.abs(x.cents - matchingTx.amountCents) - Math.abs(y.cents - matchingTx.amountCents))
-        .slice(0, 8) as { je: any; cents: number }[]
+        .map((je: any) => ({
+          je,
+          bankCents: (je.lines || [])
+            .filter((l: any) => l.accountId === bankAccountId)
+            .reduce((sum: number, l: any) => sum + Number(l.debit || 0) - Number(l.credit || 0), 0),
+        }))
+        .filter(({ je, bankCents }: any) =>
+          !linkedEntryIds.has(je.id) &&
+          bankCents === (matchingTx.direction === 'IN' ? matchingTx.amountCents : -matchingTx.amountCents))
+        .slice(0, 20) as { je: any; bankCents: number }[]
     : [];
+  const partyName = (list: any[] | undefined, id: string) => (list || []).find((p: any) => p.id === id)?.displayName;
+  const openDocuments = !matchingTx
+    ? []
+    : matchingTx.direction === 'IN'
+      ? (invoicesData?.invoices || [])
+          .filter((inv: any) => ['SENT', 'PARTIALLY_PAID'].includes(inv.status) && inv.amountDueCents >= matchingTx.amountCents)
+          .map((inv: any) => ({ id: inv.id, kind: 'invoice' as const, number: inv.invoiceNumber, party: partyName(customersData?.customers, inv.customerId), dueCents: inv.amountDueCents }))
+      : (billsData?.bills || [])
+          .filter((bill: any) => ['OPEN', 'PARTIALLY_PAID'].includes(bill.status) && bill.amountDueCents >= matchingTx.amountCents)
+          .map((bill: any) => ({ id: bill.id, kind: 'bill' as const, number: bill.billNumber, party: partyName(vendorsData?.vendors, bill.vendorId), dueCents: bill.amountDueCents }));
+  const sortedDocuments = [...openDocuments].sort((a, b) =>
+    Number(b.dueCents === matchingTx?.amountCents) - Number(a.dueCents === matchingTx?.amountCents) || a.dueCents - b.dueCents);
+  const suggestedManualAccount = matchingTx?.aiCategoryCode
+    ? postableAccounts.find((a: any) => a.code === matchingTx.aiCategoryCode)?.id
+    : undefined;
+  const chosenManualAccountId = manualAccountId || suggestedManualAccount || '';
 
   const highConfidenceCount = aiMatches.filter((m: any) => m.confidence >= 85).length;
   const unreviewedCount = rawTx.filter((t: any) => t.status !== 'MATCHED').length;
@@ -331,6 +401,10 @@ export function BankingView() {
           </>
         }
       />
+
+      {autoReconcileNote && (
+        <p role="status" className="text-[13.5px] text-ink-900">{autoReconcileNote}</p>
+      )}
 
       <IndexTabs
         label="Banking"
@@ -433,7 +507,7 @@ export function BankingView() {
                       ) : match ? (
                         <span className="inline-flex min-w-0 items-center gap-1.5 text-[12.5px] text-ink-900">
                           <Mark kind="query" />
-                          <span className="truncate">{match.matchedEntityNumber || match.suggestedAccountName}</span>
+                          <span className="truncate">{match.entityReference || match.suggestedAccountName}</span>
                           <span className="shrink-0 text-graphite-600">{match.confidence}% likely</span>
                         </span>
                       ) : (
@@ -498,7 +572,7 @@ export function BankingView() {
                           ) : match ? (
                             <span className="inline-flex flex-wrap items-center gap-x-2 text-[12px] text-ink-900">
                               <Mark kind="query" />
-                              <span>{match.matchedEntityNumber || match.suggestedAccountName}</span>
+                              <span>{match.entityReference || match.suggestedAccountName}</span>
                               <span className="text-graphite-600">{match.confidence}% likely</span>
                             </span>
                           ) : (
@@ -550,7 +624,7 @@ export function BankingView() {
         <div className="space-y-4">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
             <p className="max-w-2xl text-[13.5px] text-graphite-600">
-              Unmatched statement lines paired with an open invoice, bill or account, with how likely each pairing is and why. Nothing is posted until you accept it.
+              Unmatched statement lines paired with an entry already posted, an open invoice or bill, or an account, with how likely each pairing is and why. Nothing is posted until you accept it. Pairings guessed from wording alone stay below 85% and are never accepted in bulk.
             </p>
           </div>
 
@@ -581,15 +655,25 @@ export function BankingView() {
                     </p>
                   </div>
                   <div className="min-w-0">
-                    <p className="ll-printed text-[10.5px] text-graphite-600">Posts to</p>
+                    <p className="ll-printed text-[10.5px] text-graphite-600">
+                      {candidate.matchType === 'ENTRY' ? 'Links to' : candidate.matchType === 'INVOICE' ? 'Pays invoice' : candidate.matchType === 'BILL' ? 'Pays bill' : 'Posts to'}
+                    </p>
                     <p className="mt-0.5 text-[14px] text-ink-900">
-                      <span className="mr-1.5 ll-figure font-semibold">{candidate.suggestedAccountCode}</span>
-                      {candidate.suggestedAccountName}
+                      {candidate.matchType === 'ENTRY' ? (
+                        candidate.entityName
+                      ) : candidate.matchType === 'INVOICE' || candidate.matchType === 'BILL' ? (
+                        <>
+                          <span className="mr-1.5 ll-figure font-semibold">{candidate.entityReference}</span>
+                          {candidate.entityName}
+                        </>
+                      ) : (
+                        <>
+                          <span className="mr-1.5 ll-figure font-semibold">{candidate.suggestedAccountCode}</span>
+                          {candidate.suggestedAccountName}
+                        </>
+                      )}
                     </p>
-                    <p className="mt-0.5 text-[12.5px] text-graphite-600">
-                      {candidate.matchedEntityNumber ? `${candidate.matchedEntityNumber} · ` : ''}
-                      {candidate.matchReason}
-                    </p>
+                    <p className="mt-0.5 text-[12.5px] text-graphite-600">{candidate.reason}</p>
                   </div>
                   <div className="md:text-right">
                     <Amount cents={candidate.amountCents} currency={baseCurrency} tone="ink" />
@@ -832,30 +916,16 @@ export function BankingView() {
               </p>
             )}
 
-            <section aria-labelledby="match-new">
-              <h3 id="match-new" className="text-[14px] font-semibold text-ink-900">Post it to an account</h3>
-              {matchingTx.aiCategoryCode ? (
-                <div className="mt-2 flex flex-wrap items-baseline justify-between gap-3">
-                  <p className="text-[13.5px] text-ink-900">
-                    Suggested: <span className="ll-figure font-semibold">{matchingTx.aiCategoryCode}</span> {matchingTx.aiCategoryName}
-                  </p>
-                  <button type="button" onClick={() => handleMatchNew(matchingTx)} disabled={matchMutation.isPending} className={buttonClass.primary}>
-                    Post to {matchingTx.aiCategoryCode}
-                  </button>
-                </div>
-              ) : (
-                <p className="mt-2 text-[13.5px] text-graphite-600">No account is suggested for this line. Add a rule, or match it to an entry below.</p>
-              )}
-            </section>
-
             <section aria-labelledby="match-existing">
-              <h3 id="match-existing" className="text-[14px] font-semibold text-ink-900">Or match an entry already posted</h3>
-              <p className="mt-0.5 text-[12.5px] text-graphite-600">Closest amounts first.</p>
+              <h3 id="match-existing" className="text-[14px] font-semibold text-ink-900">Match an entry already posted</h3>
+              <p className="mt-0.5 text-[12.5px] text-graphite-600">
+                Entries that moved the bank account by exactly this amount, {matchingTx.direction === 'IN' ? 'in' : 'out'}, and are not matched to another line. Linking one posts nothing new.
+              </p>
               {candidateEntries.length === 0 ? (
-                <p className="mt-2 text-[13.5px] text-graphite-600">No journal entries yet.</p>
+                <p className="mt-2 text-[13.5px] text-graphite-600">No posted entry moved the bank account by this amount.</p>
               ) : (
                 <ul className="mt-2 max-h-64 overflow-y-auto border-t border-feint-strong">
-                  {candidateEntries.map(({ je, cents }) => (
+                  {candidateEntries.map(({ je, bankCents }) => (
                     <li key={je.id}>
                       <button
                         type="button"
@@ -867,15 +937,78 @@ export function BankingView() {
                           <span className="block truncate text-[13.5px] text-ink-900">{je.memo || 'Journal entry'}</span>
                           <span className="block text-[12px] text-graphite-600">{je.entryDate ? format(new Date(je.entryDate), 'dd/MM/yyyy') : ''}</span>
                         </span>
+                        <Amount cents={Math.abs(bankCents)} currency={baseCurrency} tone="ink" size="sm" />
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </section>
+
+            <section aria-labelledby="match-document">
+              <h3 id="match-document" className="text-[14px] font-semibold text-ink-900">
+                Or record it as payment of {matchingTx.direction === 'IN' ? 'an invoice' : 'a bill'}
+              </h3>
+              <p className="mt-0.5 text-[12.5px] text-graphite-600">
+                Open {matchingTx.direction === 'IN' ? 'invoices' : 'bills'} that still owe at least this amount. The {matchingTx.direction === 'IN' ? 'invoice' : 'bill'} and its balance are updated with the payment.
+              </p>
+              {sortedDocuments.length === 0 ? (
+                <p className="mt-2 text-[13.5px] text-graphite-600">
+                  No open {matchingTx.direction === 'IN' ? 'invoice' : 'bill'} owes this much.
+                </p>
+              ) : (
+                <ul className="mt-2 max-h-64 overflow-y-auto border-t border-feint-strong">
+                  {sortedDocuments.map((doc) => (
+                    <li key={doc.id}>
+                      <button
+                        type="button"
+                        onClick={() => reconcile(doc.kind === 'invoice'
+                          ? { transactionId: matchingTx.id, invoiceId: doc.id }
+                          : { transactionId: matchingTx.id, billId: doc.id })}
+                        disabled={matchMutation.isPending}
+                        className="flex w-full items-baseline justify-between gap-4 border-b border-feint py-2.5 text-left hover:bg-paper-200 disabled:opacity-50"
+                      >
+                        <span className="min-w-0">
+                          <span className="block truncate text-[13.5px] text-ink-900">
+                            <span className="mr-1.5 ll-figure font-semibold">{doc.number}</span>
+                            {doc.party || ''}
+                          </span>
+                          <span className="block text-[12px] text-graphite-600">Still owed</span>
+                        </span>
                         <span className="flex shrink-0 items-baseline gap-3">
-                          <Amount cents={cents} currency={baseCurrency} tone="ink" size="sm" />
-                          {cents === matchingTx.amountCents && <Mark kind="tick" label="Same amount" />}
+                          <Amount cents={doc.dueCents} currency={baseCurrency} tone="ink" size="sm" />
+                          {doc.dueCents === matchingTx.amountCents && <Mark kind="tick" label="Same amount" />}
                         </span>
                       </button>
                     </li>
                   ))}
                 </ul>
               )}
+            </section>
+
+            <section aria-labelledby="match-new">
+              <h3 id="match-new" className="text-[14px] font-semibold text-ink-900">Or post it to an account</h3>
+              <p className="mt-0.5 text-[12.5px] text-graphite-600">
+                Posts a new entry between the bank account and the account chosen. Receivables and payables are not listed: a line that pays an invoice or bill is recorded against it above.
+              </p>
+              <div className="mt-2 flex flex-wrap items-end gap-3">
+                <Field label="Account">
+                  <select value={chosenManualAccountId} onChange={(e) => setManualAccountId(e.target.value)}>
+                    <option value="">Choose an account</option>
+                    {postableAccounts.map((a: any) => (
+                      <option key={a.id} value={a.id}>{a.code} {a.name}</option>
+                    ))}
+                  </select>
+                </Field>
+                <button
+                  type="button"
+                  onClick={() => reconcile({ transactionId: matchingTx.id, targetAccountId: chosenManualAccountId })}
+                  disabled={matchMutation.isPending || !chosenManualAccountId}
+                  className={buttonClass.primary}
+                >
+                  Post
+                </button>
+              </div>
             </section>
           </div>
         )}

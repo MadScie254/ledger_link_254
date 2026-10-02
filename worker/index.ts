@@ -80,7 +80,11 @@ function serverError(c: any, err: unknown) {
 // checking that alone silently swallows every DB-originated 400 message.
 function clientError(c: any, err: unknown) {
   let message = 'Invalid request.';
-  if (err instanceof Error) {
+  if (err instanceof z.ZodError) {
+    // A ZodError's own message is a JSON dump of every issue; send the
+    // readable messages instead.
+    message = err.issues.map((issue) => (issue.path.length ? `${issue.path.join('.')}: ${issue.message}` : issue.message)).join(' ');
+  } else if (err instanceof Error) {
     message = err.message;
   } else if (err && typeof err === 'object' && typeof (err as any).message === 'string') {
     message = (err as any).message;
@@ -168,6 +172,20 @@ const journalEntrySchema = z.object({
     context.addIssue({ code: z.ZodIssueCode.custom, message: 'Journal debits and credits must be equal, positive safe-integer cents.' });
   }
 });
+
+const bankMatchSchema = z.object({
+  transactionId: z.string().uuid(),
+  targetAccountId: z.string().uuid().optional(),
+  existingJournalEntryId: z.string().uuid().optional(),
+  invoiceId: z.string().uuid().optional(),
+  billId: z.string().uuid().optional(),
+}).strict().refine(
+  (body) => [body.targetAccountId, body.existingJournalEntryId, body.invoiceId, body.billId].filter(Boolean).length === 1,
+  { message: 'Choose exactly one of an account, a posted entry, an invoice or a bill to match this line to.' },
+);
+const autoReconcileSchema = z.object({
+  minConfidence: z.number().min(0).max(100).optional(),
+}).strict();
 
 const bodyOf = (c: any) => c.req.json().catch(() => ({}));
 const onboardingSchema = z.object({
@@ -392,9 +410,12 @@ api.get('/banking/ai-matches', async (c) => {
 });
 
 api.post('/banking/auto-reconcile-all', async (c) => {
+  let body: z.infer<typeof autoReconcileSchema>;
   try {
-    const body = await bodyOf(c);
-    const result = await BankingService.autoReconcileAll(c.get('orgId'), body.minConfidence || 85, c.get('userId'));
+    body = autoReconcileSchema.parse(await bodyOf(c));
+  } catch (err) { return clientError(c, err); }
+  try {
+    const result = await BankingService.autoReconcileAll(c.get('orgId'), body.minConfidence, c.get('userId'));
     return c.json(result);
   } catch (err) { return serverError(c, err); }
 });
@@ -407,8 +428,8 @@ api.post('/banking/sync', async (c) => {
 
 api.post('/banking/match', async (c) => {
   try {
-    const { transactionId, targetAccountId, existingJournalEntryId } = await bodyOf(c);
-    const journalEntryId = await BankingService.matchTransaction(c.get('orgId'), transactionId, targetAccountId, existingJournalEntryId, c.get('userId'));
+    const { transactionId, ...target } = bankMatchSchema.parse(await bodyOf(c));
+    const journalEntryId = await BankingService.matchTransaction(c.get('orgId'), transactionId, target, c.get('userId'));
     return c.json({ journalEntryId });
   } catch (err) { return clientError(c, err); }
 });
@@ -421,7 +442,10 @@ api.get('/banking/rules', async (c) => {
 
 api.post('/banking/rules', async (c) => {
   try {
-    const body = await bodyOf(c);
+    const body = z.object({
+      matchText: z.string().trim().min(1).max(200),
+      targetAccountId: z.string().uuid(),
+    }).strict().parse(await bodyOf(c));
     const id = await BankingService.createRule(c.get('orgId'), body.matchText, body.targetAccountId, c.get('userId'));
     return c.json({ id });
   } catch (err) { return clientError(c, err); }
@@ -429,7 +453,7 @@ api.post('/banking/rules', async (c) => {
 
 api.delete('/banking/rules/:id', async (c) => {
   try {
-    await BankingService.deleteRule(c.get('orgId'), c.req.param('id'));
+    await BankingService.deleteRule(c.get('orgId'), z.string().uuid().parse(c.req.param('id')));
     return c.json({ success: true });
   } catch (err) { return clientError(c, err); }
 });

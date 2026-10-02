@@ -3,43 +3,125 @@ import { LedgerService } from './ledger';
 import { AccountService } from './accounts';
 import { InvoiceService } from './invoices';
 import { BillService } from './bills';
+import { fetchAllRows } from './pagination';
+import {
+  AUTO_ACCEPT_CONFIDENCE,
+  CONTROL_ACCOUNT_CODES,
+  suggestBankMatches,
+  type BankEntry,
+  type BankLine,
+  type BankMatchSuggestion,
+  type OpenDocument,
+} from '../utils/bankMatching';
 
-export interface AIMatchCandidate {
-  transactionId: string;
-  transaction: any;
-  confidence: number; // 0 - 100
-  matchType: 'INVOICE' | 'BILL' | 'ACCOUNT' | 'PAYROLL';
-  entityId?: string;
-  entityName: string;
-  entityReference?: string;
-  reason: string;
-  suggestedAccountCode: string;
-  suggestedAccountName: string;
+/** The account statement lines are reconciled against. */
+const BANK_ACCOUNT_CODE = '1000';
+
+/**
+ * Accepting a suggestion costs several Worker subrequests (the line, the
+ * target, the posting and the status update), and the Workers Free plan
+ * allows 50 per request. Each auto-accept run therefore takes a bounded batch;
+ * the response says how many strong matches remain for the next run.
+ */
+const AUTO_ACCEPT_BATCH = 5;
+
+/** What a statement line is matched to: exactly one of these. */
+export interface BankMatchTarget {
+  targetAccountId?: string;
+  existingJournalEntryId?: string;
+  invoiceId?: string;
+  billId?: string;
+}
+
+export type BankMatchCandidate = BankMatchSuggestion & {
+  description: string | null;
+  date: string;
+  direction: 'IN' | 'OUT';
+  amountCents: number;
+};
+
+function mapTransaction(row: any) {
+  return {
+    id: row.id,
+    orgId: row.org_id,
+    date: row.date,
+    description: row.description,
+    amountCents: Number(row.amount_cents) || 0,
+    direction: row.direction,
+    status: row.status,
+    matchedJournalEntryId: row.matched_journal_entry_id ?? null,
+    aiCategoryCode: row.ai_category_code,
+    aiCategoryName: row.ai_category_name,
+    createdAt: row.created_at
+  };
+}
+
+function addDays(date: string, days: number): string {
+  const value = new Date(`${date.slice(0, 10)}T00:00:00Z`);
+  value.setUTCDate(value.getUTCDate() + days);
+  return value.toISOString().slice(0, 10);
+}
+
+function targetFor(suggestion: BankMatchSuggestion): BankMatchTarget | null {
+  switch (suggestion.matchType) {
+    case 'ENTRY': return suggestion.journalEntryId ? { existingJournalEntryId: suggestion.journalEntryId } : null;
+    case 'INVOICE': return suggestion.entityId ? { invoiceId: suggestion.entityId } : null;
+    case 'BILL': return suggestion.entityId ? { billId: suggestion.entityId } : null;
+    case 'ACCOUNT': return suggestion.suggestedAccountId ? { targetAccountId: suggestion.suggestedAccountId } : null;
+  }
+}
+
+/** Net movement of each journal entry on one account: positive is money in. */
+async function bankMovementsByEntry(orgId: string, bankAccountId: string, range: { from?: string; to?: string; entryId?: string }) {
+  const supabase = getSupabase();
+  const rows = await fetchAllRows<any>((from, to) => {
+    let query = supabase
+      .from('journal_lines')
+      .select('id, debit, credit, journal_entry:journal_entries!inner(id, org_id, entry_date, memo)')
+      .eq('account_id', bankAccountId)
+      .eq('journal_entries.org_id', orgId);
+    if (range.entryId) query = query.eq('journal_entry_id', range.entryId);
+    if (range.from) query = query.gte('journal_entries.entry_date', range.from);
+    if (range.to) query = query.lte('journal_entries.entry_date', range.to);
+    return query.order('id').range(from, to);
+  });
+
+  const byEntry = new Map<string, BankEntry>();
+  for (const row of rows) {
+    const entry = Array.isArray(row.journal_entry) ? row.journal_entry[0] : row.journal_entry;
+    if (!entry?.id) continue;
+    const current = byEntry.get(entry.id) || { journalEntryId: entry.id, entryDate: String(entry.entry_date || ''), memo: entry.memo ?? null, netBankCents: 0 };
+    current.netBankCents += Math.round((Number(row.debit) || 0) - (Number(row.credit) || 0));
+    byEntry.set(entry.id, current);
+  }
+  return byEntry;
+}
+
+/** Journal entries already reconciled to a statement line. */
+async function linkedEntryIds(orgId: string): Promise<Set<string>> {
+  const supabase = getSupabase();
+  const rows = await fetchAllRows<{ matched_journal_entry_id: string | null }>((from, to) => supabase
+    .from('bank_transactions')
+    .select('id, matched_journal_entry_id')
+    .eq('org_id', orgId)
+    .not('matched_journal_entry_id', 'is', null)
+    .order('id')
+    .range(from, to));
+  return new Set(rows.map((row) => row.matched_journal_entry_id).filter((id): id is string => Boolean(id)));
 }
 
 export class BankingService {
   static async getTransactions(orgId: string) {
     const supabase = getSupabase();
-    const { data, error } = await supabase
+    const rows = await fetchAllRows<any>((from, to) => supabase
       .from('bank_transactions')
       .select('*')
       .eq('org_id', orgId)
-      .order('date', { ascending: false });
-      
-    if (error) throw error;
-    
-    return (data || []).map(row => ({
-      id: row.id,
-      orgId: row.org_id,
-      date: row.date,
-      description: row.description,
-      amountCents: row.amount_cents,
-      direction: row.direction,
-      status: row.status,
-      aiCategoryCode: row.ai_category_code,
-      aiCategoryName: row.ai_category_name,
-      createdAt: row.created_at
-    }));
+      .order('date', { ascending: false })
+      .order('id')
+      .range(from, to));
+
+    return rows.map(mapTransaction);
   }
 
   static async syncTransactions(orgId: string) {
@@ -68,18 +150,24 @@ export class BankingService {
 
   static async createRule(orgId: string, matchText: string, targetAccountId: string, createdBy?: string): Promise<string> {
     const supabase = getSupabase();
-    if (!matchText?.trim()) throw new Error('Match text is required.');
+    if (typeof matchText !== 'string' || !matchText.trim()) throw new Error('Match text is required.');
     if (!targetAccountId) throw new Error('A target account is required.');
 
     const { data: targetAccount, error: accountError } = await supabase
       .from('accounts')
-      .select('id')
+      .select('id, code')
       .eq('org_id', orgId)
       .eq('id', targetAccountId)
       .eq('is_active', true)
       .maybeSingle();
     if (accountError) throw accountError;
     if (!targetAccount) throw new Error('The target account is inactive or belongs to another organization.');
+    if (CONTROL_ACCOUNT_CODES.has(targetAccount.code)) {
+      throw new Error('A rule cannot post to accounts receivable or payable. Statement lines that pay an invoice or bill are matched to the document instead.');
+    }
+    if (targetAccount.code === BANK_ACCOUNT_CODE) {
+      throw new Error('A rule cannot post a bank line back to the bank account itself.');
+    }
 
     const { data, error } = await supabase
       .from('bank_rules')
@@ -138,13 +226,15 @@ export class BankingService {
   }
 
   static async getReconciliationSummary(orgId: string) {
-    const transactions = await this.getTransactions(orgId);
+    const [transactions, bankAccount] = await Promise.all([
+      this.getTransactions(orgId),
+      AccountService.getAccountByCode(orgId, BANK_ACCOUNT_CODE),
+    ]);
     const statementBalanceCents = transactions.reduce(
       (sum, tx: any) => sum + (tx.direction === 'IN' ? tx.amountCents : -tx.amountCents),
       0
     );
 
-    const bankAccount = await AccountService.getAccountByCode(orgId, '1000');
     let glBalanceCents = 0;
     if (bankAccount) {
       const balances = await AccountService.getAccountBalances(orgId);
@@ -159,273 +249,256 @@ export class BankingService {
     };
   }
 
-  static async getAIMatches(orgId: string): Promise<AIMatchCandidate[]> {
-    const transactions = await this.getTransactions(orgId);
-    const unreviewed = transactions.filter((t: any) => t.status !== 'MATCHED');
-    const rules = await this.getRules(orgId);
+  /**
+   * Suggests a match for each unmatched statement line. The scoring lives in
+   * src/utils/bankMatching.ts; this gathers its inputs: unmatched lines, the
+   * company's rules, open invoices and bills, and entries already posted to
+   * the bank account that no line has claimed yet.
+   */
+  static async getAIMatches(orgId: string): Promise<BankMatchCandidate[]> {
+    const supabase = getSupabase();
+    const [unmatchedRows, rules, accounts, bankAccount] = await Promise.all([
+      fetchAllRows<any>((from, to) => supabase
+        .from('bank_transactions')
+        .select('id, date, description, amount_cents, direction, status')
+        .eq('org_id', orgId)
+        .neq('status', 'MATCHED')
+        .order('id')
+        .range(from, to)),
+      this.getRules(orgId),
+      fetchAllRows<{ id: string; code: string; name: string; is_active: boolean }>((from, to) => supabase
+        .from('accounts')
+        .select('id, code, name, is_active')
+        .eq('org_id', orgId)
+        .order('id')
+        .range(from, to)),
+      AccountService.getAccountByCode(orgId, BANK_ACCOUNT_CODE),
+    ]);
 
-    let invoices: any[] = [];
-    let bills: any[] = [];
-    try {
-      invoices = await InvoiceService.getInvoices(orgId);
-    } catch (e) {}
-    try {
-      bills = await BillService.getBills(orgId);
-    } catch (e) {}
+    const lines: BankLine[] = unmatchedRows.map((row) => ({
+      id: row.id,
+      date: String(row.date),
+      description: row.description,
+      amountCents: Number(row.amount_cents),
+      direction: row.direction,
+    }));
+    if (lines.length === 0) return [];
 
-    const candidates: AIMatchCandidate[] = [];
+    const dates = lines.map((line) => line.date.slice(0, 10)).sort();
+    const [invoiceRows, billRows, movements, linked] = await Promise.all([
+      fetchAllRows<any>((from, to) => supabase
+        .from('invoices')
+        .select('id, invoice_number, amount_due_cents, customers(display_name)')
+        .eq('org_id', orgId)
+        .in('status', ['SENT', 'PARTIALLY_PAID'])
+        .order('id')
+        .range(from, to)),
+      fetchAllRows<any>((from, to) => supabase
+        .from('bills')
+        .select('id, bill_number, amount_due_cents, vendors(display_name)')
+        .eq('org_id', orgId)
+        .in('status', ['OPEN', 'PARTIALLY_PAID'])
+        .order('id')
+        .range(from, to)),
+      bankAccount
+        ? bankMovementsByEntry(orgId, bankAccount.id, { from: addDays(dates[0], -45), to: addDays(dates[dates.length - 1], 45) })
+        : Promise.resolve(new Map<string, BankEntry>()),
+      linkedEntryIds(orgId),
+    ]);
 
-    for (const tx of unreviewed as any[]) {
-      const desc = (tx.description || '').toUpperCase();
-      const amount = tx.amountCents;
-      const isIncoming = tx.direction === 'IN';
+    const relationName = (value: any) => (Array.isArray(value) ? value[0] : value)?.display_name ?? null;
+    const openInvoices: OpenDocument[] = invoiceRows.map((row) => ({
+      id: row.id, number: row.invoice_number, partyName: relationName(row.customers), amountDueCents: Number(row.amount_due_cents) || 0,
+    }));
+    const openBills: OpenDocument[] = billRows.map((row) => ({
+      id: row.id, number: row.bill_number, partyName: relationName(row.vendors), amountDueCents: Number(row.amount_due_cents) || 0,
+    }));
+    const bankEntries = [...movements.values()].filter((entry) => !linked.has(entry.journalEntryId));
 
-      let bestMatch: AIMatchCandidate | null = null;
+    const suggestions = suggestBankMatches({ lines, rules, openInvoices, openBills, bankEntries });
 
-      const matchedRule = rules.find(r => desc.includes(r.matchText.toUpperCase()));
-      if (matchedRule) {
-        bestMatch = {
-          transactionId: tx.id,
-          transaction: tx,
-          confidence: 99,
-          matchType: 'ACCOUNT',
-          entityName: matchedRule.targetAccountName,
-          reason: `Matched your rule: contains "${matchedRule.matchText}"`,
-          suggestedAccountCode: matchedRule.targetAccountCode,
-          suggestedAccountName: matchedRule.targetAccountName
-        };
-      } else if (isIncoming) {
-        // Try matching open invoices
-        const matchedInv = invoices.find(inv => {
-          const invTotal = (inv.totalAmount || inv.totalCents || 0);
-          const numMatch = inv.invoiceNumber && desc.includes(inv.invoiceNumber.toUpperCase());
-          const customerMatch = inv.customerName && desc.includes(inv.customerName.toUpperCase());
-          return (invTotal === amount || (invTotal > 0 && Math.abs(invTotal - amount) < 100)) || numMatch || customerMatch;
-        });
-
-        if (matchedInv) {
-          const isExactAmount = (matchedInv.totalAmount || matchedInv.totalCents) === amount;
-          bestMatch = {
-            transactionId: tx.id,
-            transaction: tx,
-            confidence: isExactAmount ? 98 : 88,
-            matchType: 'INVOICE',
-            entityId: matchedInv.id,
-            entityName: matchedInv.customerName || 'Customer Invoice',
-            entityReference: matchedInv.invoiceNumber || `INV-${matchedInv.id.slice(0, 6)}`,
-            reason: `Exact match for open ${matchedInv.invoiceNumber || 'invoice'} from ${matchedInv.customerName || 'client'}`,
-            suggestedAccountCode: '1100',
-            suggestedAccountName: 'Accounts Receivable (A/R)'
-          };
-        } else if (desc.includes('M-PESA') || desc.includes('PAYBILL') || desc.includes('TILL')) {
-          bestMatch = {
-            transactionId: tx.id,
-            transaction: tx,
-            confidence: 94,
-            matchType: 'ACCOUNT',
-            entityName: 'Direct Point of Sale (POS)',
-            reason: 'High-confidence retail revenue pattern from M-Pesa Merchant settlement',
-            suggestedAccountCode: '4000',
-            suggestedAccountName: 'Sales Revenue'
-          };
-        } else {
-          bestMatch = {
-            transactionId: tx.id,
-            transaction: tx,
-            confidence: 76,
-            matchType: 'ACCOUNT',
-            entityName: 'Customer Transfer / Sales',
-            reason: 'Categorized based on incoming funds inflow pattern',
-            suggestedAccountCode: '4000',
-            suggestedAccountName: 'Sales Revenue'
-          };
-        }
-      } else {
-        // Outgoing: match bills or standard operational accounts
-        const matchedBill = bills.find(b => {
-          const billTotal = (b.totalCents || b.totalAmount || 0);
-          const numMatch = b.billNumber && desc.includes(b.billNumber.toUpperCase());
-          const vendorMatch = b.vendorName && desc.includes(b.vendorName.toUpperCase());
-          return (billTotal === amount || (billTotal > 0 && Math.abs(billTotal - amount) < 100)) || numMatch || vendorMatch;
-        });
-
-        if (matchedBill) {
-          bestMatch = {
-            transactionId: tx.id,
-            transaction: tx,
-            confidence: 97,
-            matchType: 'BILL',
-            entityId: matchedBill.id,
-            entityName: matchedBill.vendorName || 'Vendor Bill',
-            entityReference: matchedBill.billNumber || `BILL-${matchedBill.id.slice(0, 6)}`,
-            reason: `Direct settlement match for open bill ${matchedBill.billNumber || ''} (${matchedBill.vendorName || ''})`,
-            suggestedAccountCode: '2000',
-            suggestedAccountName: 'Accounts Payable (A/P)'
-          };
-        } else if (desc.includes('SAFARICOM') || desc.includes('FIBER') || desc.includes('INTERNET')) {
-          bestMatch = {
-            transactionId: tx.id,
-            transaction: tx,
-            confidence: 92,
-            matchType: 'ACCOUNT',
-            entityName: 'Safaricom Telecommunications',
-            reason: 'Recurring telecommunications & fiber internet expense pattern',
-            suggestedAccountCode: '6200',
-            suggestedAccountName: 'Utilities & Internet Expense'
-          };
-        } else if (desc.includes('SHELL') || desc.includes('TOTAL') || desc.includes('PETROL') || desc.includes('FUEL')) {
-          bestMatch = {
-            transactionId: tx.id,
-            transaction: tx,
-            confidence: 95,
-            matchType: 'ACCOUNT',
-            entityName: 'Vehicle & Logistics Fuel',
-            reason: 'Fuel and transport operating expense pattern detected',
-            suggestedAccountCode: '6000',
-            suggestedAccountName: 'Operating Expenses'
-          };
-        } else if (desc.includes('KRA') || desc.includes('E-TIMS') || desc.includes('VAT') || desc.includes('TAX')) {
-          bestMatch = {
-            transactionId: tx.id,
-            transaction: tx,
-            confidence: 96,
-            matchType: 'ACCOUNT',
-            entityName: 'Kenya Revenue Authority',
-            reason: 'Statutory VAT / eTIMS settlement to government revenue collector',
-            suggestedAccountCode: '2100',
-            suggestedAccountName: 'VAT & Statutory Payables'
-          };
-        } else if (desc.includes('PAYROLL') || desc.includes('SALARY') || desc.includes('STAFF')) {
-          bestMatch = {
-            transactionId: tx.id,
-            transaction: tx,
-            confidence: 93,
-            matchType: 'PAYROLL',
-            entityName: 'Employee Payroll Disbursement',
-            reason: 'Staff payroll disbursement matching monthly compensation ledger',
-            suggestedAccountCode: '6000',
-            suggestedAccountName: 'Salaries & Staff Expenses'
-          };
-        } else {
-          bestMatch = {
-            transactionId: tx.id,
-            transaction: tx,
-            confidence: 72,
-            matchType: 'ACCOUNT',
-            entityName: 'Operating Disbursement',
-            reason: 'General business operational expenditure',
-            suggestedAccountCode: '6000',
-            suggestedAccountName: 'Operating Expenses'
-          };
-        }
+    // Resolve account guesses against this company's chart; a guess for an
+    // account the company does not have, or has switched off, is dropped.
+    const activeByCode = new Map(accounts.filter((a) => a.is_active !== false).map((a) => [a.code, a]));
+    const lineById = new Map(lines.map((line) => [line.id, line]));
+    const candidates: BankMatchCandidate[] = [];
+    for (const suggestion of suggestions) {
+      if (suggestion.matchType === 'ACCOUNT' && !suggestion.suggestedAccountId) {
+        const account = suggestion.suggestedAccountCode ? activeByCode.get(suggestion.suggestedAccountCode) : undefined;
+        if (!account) continue;
+        suggestion.suggestedAccountId = account.id;
+        suggestion.suggestedAccountName = account.name;
+        suggestion.entityName = account.name;
       }
-
-      if (bestMatch) {
-        candidates.push(bestMatch);
-      }
+      const line = lineById.get(suggestion.transactionId)!;
+      candidates.push({ ...suggestion, description: line.description, date: line.date, direction: line.direction, amountCents: line.amountCents });
     }
-
-    // Sort by confidence descending
-    return candidates.sort((a, b) => b.confidence - a.confidence);
+    return candidates;
   }
 
-  static async autoReconcileAll(orgId: string, minConfidence: number = 85, userId: string) {
+  /**
+   * Accepts the strong suggestions (AUTO_ACCEPT_CONFIDENCE or more; a lower
+   * threshold from the caller is ignored), a bounded batch per request.
+   */
+  static async autoReconcileAll(orgId: string, minConfidence: number = AUTO_ACCEPT_CONFIDENCE, userId: string) {
+    const threshold = Math.max(AUTO_ACCEPT_CONFIDENCE, Number(minConfidence) || 0);
     const matches = await this.getAIMatches(orgId);
-    const qualifying = matches.filter(m => m.confidence >= minConfidence);
+    const qualifying = matches.filter((m) => m.confidence >= threshold);
 
     let reconciledCount = 0;
-    for (const match of qualifying) {
+    const failures: Array<{ transactionId: string; message: string }> = [];
+    for (const match of qualifying.slice(0, AUTO_ACCEPT_BATCH)) {
+      const target = targetFor(match);
+      if (!target) continue;
       try {
-        const targetAccount = await AccountService.getAccountByCode(orgId, match.suggestedAccountCode) 
-          || await AccountService.getAccountByCode(orgId, match.transaction.direction === 'IN' ? '4000' : '6000');
-        
-        if (targetAccount) {
-          await this.matchTransaction(orgId, match.transactionId, targetAccount.id, undefined, userId);
-          reconciledCount++;
-        }
+        await this.matchTransaction(orgId, match.transactionId, target, userId);
+        reconciledCount++;
       } catch (err) {
+        failures.push({ transactionId: match.transactionId, message: err instanceof Error ? err.message : 'The line could not be matched.' });
         console.error('Error auto-reconciling match:', err);
       }
     }
 
-    return { count: reconciledCount, totalPending: matches.length };
+    return {
+      count: reconciledCount,
+      failed: failures.length,
+      failures,
+      remaining: Math.max(0, qualifying.length - AUTO_ACCEPT_BATCH),
+      totalPending: matches.length,
+    };
   }
 
-  static async matchTransaction(orgId: string, transactionId: string, targetAccountId: string | undefined, existingJournalEntryId: string | undefined, userId: string) {
+  /**
+   * Matches one statement line to exactly one target:
+   * - invoiceId or billId records a payment against that document through
+   *   receive_invoice_payment or pay_bill, so the invoice or bill, the
+   *   customer or supplier balance and the ledger all move together;
+   * - existingJournalEntryId links an entry already posted that moved the bank
+   *   account by the same amount in the same direction, posting nothing new;
+   * - targetAccountId posts a new bank entry against that account, which may
+   *   not be receivables, payables or the bank account itself.
+   *
+   * The posting uses the idempotency key bank-match:{line id}, so a retry
+   * after a failure part-way through returns the same payment or entry.
+   */
+  static async matchTransaction(orgId: string, transactionId: string, target: BankMatchTarget, userId: string) {
     const supabase = getSupabase();
-    
+    const chosen = [target.targetAccountId, target.existingJournalEntryId, target.invoiceId, target.billId].filter(Boolean);
+    if (chosen.length !== 1) {
+      throw new Error('Choose exactly one of an account, a posted entry, an invoice or a bill to match this line to.');
+    }
+
     const { data: tx, error: txError } = await supabase
       .from('bank_transactions')
       .select('*')
       .eq('org_id', orgId)
       .eq('id', transactionId)
-      .single();
-      
-    if (txError) throw new Error('Transaction not found');
+      .maybeSingle();
+
+    if (txError) throw txError;
+    if (!tx) throw new Error('Transaction not found');
     if (tx.status === 'MATCHED') throw new Error('Transaction is already matched');
-    if (!Number.isSafeInteger(Number(tx.amount_cents)) || Number(tx.amount_cents) <= 0) {
+    const amountCents = Number(tx.amount_cents);
+    if (!Number.isSafeInteger(amountCents) || amountCents <= 0) {
       throw new Error('Bank transaction amount must be a positive integer number of cents.');
     }
+    const lineDate = String(tx.date).slice(0, 10);
+    const idempotencyKey = `bank-match:${transactionId}`;
 
-    let finalJournalEntryId = existingJournalEntryId;
+    const bankAccount = await AccountService.getAccountByCode(orgId, BANK_ACCOUNT_CODE);
+    if (!bankAccount) throw new Error(`Bank account (${BANK_ACCOUNT_CODE}) not found in Chart of Accounts.`);
 
-    if (finalJournalEntryId) {
-      const { data: existingEntry, error: entryError } = await supabase
-        .from('journal_entries')
-        .select('id')
-        .eq('org_id', orgId)
-        .eq('id', finalJournalEntryId)
-        .maybeSingle();
-      if (entryError) throw entryError;
-      if (!existingEntry) throw new Error('The selected journal entry belongs to another organization or does not exist.');
-    }
+    let journalEntryId: string;
 
-    if (!finalJournalEntryId) {
-      if (!targetAccountId) throw new Error('Must provide either targetAccountId or existingJournalEntryId');
-
+    if (target.invoiceId) {
+      if (tx.direction !== 'IN') throw new Error('Only money coming in can pay an invoice.');
+      const payment = await InvoiceService.receivePayment(orgId, target.invoiceId, {
+        amountCents,
+        paymentDate: lineDate,
+        depositAccountId: bankAccount.id,
+        idempotencyKey,
+        createdBy: userId,
+      });
+      journalEntryId = payment.journalEntryId;
+    } else if (target.billId) {
+      if (tx.direction !== 'OUT') throw new Error('Only money going out can pay a bill.');
+      const payment = await BillService.recordPayment(orgId, target.billId, {
+        amountCents,
+        paymentDate: lineDate,
+        sourceAccountId: bankAccount.id,
+        idempotencyKey,
+        createdBy: userId,
+      });
+      journalEntryId = payment.journalEntryId;
+    } else if (target.existingJournalEntryId) {
+      const [movements, alreadyLinked] = await Promise.all([
+        bankMovementsByEntry(orgId, bankAccount.id, { entryId: target.existingJournalEntryId }),
+        supabase
+          .from('bank_transactions')
+          .select('id')
+          .eq('org_id', orgId)
+          .eq('matched_journal_entry_id', target.existingJournalEntryId)
+          .limit(1),
+      ]);
+      if (alreadyLinked.error) throw alreadyLinked.error;
+      const movement = movements.get(target.existingJournalEntryId);
+      if (!movement) {
+        throw new Error('That entry does not move the bank account, or belongs to another organization.');
+      }
+      const expected = tx.direction === 'IN' ? amountCents : -amountCents;
+      if (movement.netBankCents !== expected) {
+        throw new Error(`That entry moves the bank account by a different amount or in the other direction, so it cannot stand for this ${tx.direction === 'IN' ? 'money in' : 'money out'}.`);
+      }
+      if ((alreadyLinked.data || []).length > 0) {
+        throw new Error('That entry is already matched to another statement line.');
+      }
+      journalEntryId = target.existingJournalEntryId;
+    } else {
       const { data: targetAccount, error: accountError } = await supabase
         .from('accounts')
-        .select('id')
+        .select('id, code')
         .eq('org_id', orgId)
-        .eq('id', targetAccountId)
+        .eq('id', target.targetAccountId!)
         .eq('is_active', true)
         .maybeSingle();
       if (accountError) throw accountError;
       if (!targetAccount) throw new Error('The target account is inactive or belongs to another organization.');
-      
-      // Get the bank account (Code 1000)
-      const bankAccount = await AccountService.getAccountByCode(orgId, '1000');
-      if (!bankAccount) throw new Error('Bank account (1000) not found in Chart of Accounts.');
-
-      // Prepare ledger lines
-      const lines = [];
-      if (tx.direction === 'IN') {
-        lines.push({ accountId: bankAccount.id, debit: tx.amount_cents, credit: 0, description: tx.description });
-        lines.push({ accountId: targetAccountId, debit: 0, credit: tx.amount_cents, description: tx.description });
-      } else {
-        lines.push({ accountId: targetAccountId, debit: tx.amount_cents, credit: 0, description: tx.description });
-        lines.push({ accountId: bankAccount.id, debit: 0, credit: tx.amount_cents, description: tx.description });
+      if (CONTROL_ACCOUNT_CODES.has(targetAccount.code)) {
+        throw new Error(targetAccount.code === '1100'
+          ? 'Money paying an invoice is matched to the invoice, not posted to accounts receivable.'
+          : 'Money paying a bill is matched to the bill, not posted to accounts payable.');
+      }
+      if (targetAccount.id === bankAccount.id) {
+        throw new Error('A bank line cannot be posted back to the bank account itself.');
       }
 
-      // Post to ledger
-      finalJournalEntryId = await LedgerService.postJournalEntry({
+      const lines = tx.direction === 'IN'
+        ? [
+          { accountId: bankAccount.id, debit: amountCents, credit: 0, description: tx.description },
+          { accountId: targetAccount.id, debit: 0, credit: amountCents, description: tx.description },
+        ]
+        : [
+          { accountId: targetAccount.id, debit: amountCents, credit: 0, description: tx.description },
+          { accountId: bankAccount.id, debit: 0, credit: amountCents, description: tx.description },
+        ];
+
+      journalEntryId = await LedgerService.postJournalEntry({
         orgId,
-        entryDate: tx.date,
+        entryDate: lineDate,
         memo: `Bank Match: ${tx.description}`,
         sourceType: 'BANK',
         sourceId: transactionId,
         createdBy: userId,
-        idempotencyKey: `bank-match:${transactionId}`,
+        idempotencyKey,
         lines
       });
     }
 
-    // Mark as matched
     const { data: matchedTransaction, error: matchError } = await supabase
       .from('bank_transactions')
       .update({
         status: 'MATCHED',
-        matched_journal_entry_id: finalJournalEntryId,
+        matched_journal_entry_id: journalEntryId,
       })
       .eq('org_id', orgId)
       .eq('id', transactionId)
@@ -435,6 +508,6 @@ export class BankingService {
     if (matchError) throw matchError;
     if (!matchedTransaction) throw new Error('Transaction was already matched by another request.');
 
-    return finalJournalEntryId;
+    return journalEntryId;
   }
 }
