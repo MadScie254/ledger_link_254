@@ -53,7 +53,7 @@ function dateOnly(value: string | null | undefined): string | null {
 }
 
 /** The first YYYY-MM inside the trend window that ends in today's month. */
-function firstTrendPeriod(today: string): string {
+export function firstTrendPeriod(today: string): string {
   const year = Number(today.slice(0, 4));
   const monthIndex = Number(today.slice(5, 7)) - 1 - (TREND_MONTHS - 1);
   const start = new Date(Date.UTC(year, monthIndex, 1));
@@ -74,11 +74,16 @@ function firstTrendPeriod(today: string): string {
  *
  * `today` is a YYYY-MM-DD date. An invoice is overdue the day after its due
  * date, not on it.
+ *
+ * `lines` feed the all-time figures. `trendLines`, when given, feed the trend
+ * instead; each needs journalEntry.entryDate. The server passes per-account
+ * totals for both, so the dashboard never reads the whole ledger.
  */
 export function aggregateDashboardMetrics(input: {
   invoices: DashboardDocument[];
   bills: DashboardDocument[];
   lines: ReportLedgerLine[];
+  trendLines?: ReportLedgerLine[];
   today: string;
 }): DashboardTotals {
   const today = dateOnly(input.today);
@@ -123,7 +128,11 @@ export function aggregateDashboardMetrics(input: {
     if (type === 'INCOME') totalIncomeCents -= debitMinusCredit;
     if (type === 'COGS') totalCogsCents += debitMinusCredit;
     if (type === 'EXPENSE') totalExpenseCents += debitMinusCredit;
+  }
 
+  for (const line of input.trendLines ?? input.lines) {
+    const debitMinusCredit = amount(line.debit) - amount(line.credit);
+    const { type } = line.account;
     const period = dateOnly(line.journalEntry?.entryDate)?.slice(0, 7);
     if (!period || period < firstPeriod || period > lastPeriod) continue;
 

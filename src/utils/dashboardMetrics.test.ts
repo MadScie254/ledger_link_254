@@ -211,3 +211,23 @@ test('amounts arriving as numeric strings are summed as numbers', () => {
 test('a malformed date is refused rather than silently misdated', () => {
   assert.throws(() => aggregateDashboardMetrics({ ...empty, today: 'October' }), /YYYY-MM-DD/);
 });
+
+test('trend lines can come separately from the all-time lines', () => {
+  const result = aggregateDashboardMetrics({
+    ...empty,
+    // All-time totals per account, undated.
+    lines: [
+      { debit: 0, credit: 900_000, account: sales },
+      { debit: 900_000, credit: 0, account: bank },
+    ],
+    // Monthly totals per account, dated to the first of the month.
+    trendLines: [
+      { debit: 0, credit: 400_000, account: sales, journalEntry: { id: '2026-09', entryDate: '2026-09-01' } },
+      { debit: 0, credit: 500_000, account: sales, journalEntry: { id: '2026-10', entryDate: '2026-10-01' } },
+    ],
+  });
+
+  assert.equal(result.totalIncomeCents, 900_000);
+  assert.equal(result.cashPositionCents, 900_000);
+  assert.deepEqual(result.monthlyTrends.map((d) => [d.period, d.revenueCents]), [['2026-09', 400_000], ['2026-10', 500_000]]);
+});

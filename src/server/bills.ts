@@ -1,4 +1,5 @@
 import { getSupabase } from './supabase';
+import { fetchAllRows } from './pagination';
 
 export interface BillLineInput {
   description: string;
@@ -124,14 +125,15 @@ async function assertPaymentAccount(orgId: string, accountId: string) {
 export class BillService {
   static async getBills(orgId: string) {
     const supabase = getSupabase();
-    const { data, error } = await supabase
+    const data = await fetchAllRows<any>((from, to) => supabase
       .from('bills')
       .select('*, bill_lines(*), bill_payments(*)')
       .eq('org_id', orgId)
-      .order('created_at', { ascending: false });
+      .order('created_at', { ascending: false })
+      .order('id')
+      .range(from, to));
 
-    if (error) throw error;
-    return (data || []).map(mapBill);
+    return data.map(mapBill);
   }
 
   static async createBill(input: BillInput): Promise<string> {

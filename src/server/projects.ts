@@ -1,17 +1,18 @@
 import { getSupabase } from './supabase';
+import { fetchAllRows } from './pagination';
 
 export class ProjectService {
   static async getProjects(orgId: string) {
     const supabase = getSupabase();
-    const { data, error } = await supabase
+    const data = await fetchAllRows<any>((from, to) => supabase
       .from('projects')
       .select('*')
       .eq('org_id', orgId)
-      .order('created_at', { ascending: false });
-      
-    if (error) throw error;
-    
-    return (data || []).map(row => ({
+      .order('created_at', { ascending: false })
+      .order('id')
+      .range(from, to));
+
+    return data.map(row => ({
       id: row.id,
       orgId: row.org_id,
       name: row.name,
@@ -69,16 +70,16 @@ export class ProjectService {
 
   static async getTimeEntries(orgId: string) {
     const supabase = getSupabase();
-    const { data, error } = await supabase
+    // Every entry, not the latest hundred: project hours are totalled from this list.
+    const data = await fetchAllRows<any>((from, to) => supabase
       .from('time_entries')
       .select('id, project_id, user_id, entry_date, hours, description, created_at, projects!inner(name)')
       .eq('org_id', orgId)
       .order('entry_date', { ascending: false })
-      .limit(100);
+      .order('id')
+      .range(from, to));
 
-    if (error) throw error;
-
-    return (data || []).map((row: any) => ({
+    return data.map((row: any) => ({
       id: row.id,
       projectId: row.project_id,
       projectName: row.projects?.name || 'Unknown Project',

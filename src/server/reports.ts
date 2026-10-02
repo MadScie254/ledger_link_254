@@ -1,4 +1,6 @@
 import { getSupabase } from './supabase';
+import { fetchAllRows } from './pagination';
+import { AccountService } from './accounts';
 import {
   aggregateBalanceSheet,
   aggregateCashFlow,
@@ -12,26 +14,6 @@ import {
 } from '../utils/reportCalculations';
 
 const ACCOUNT_TYPES = new Set<ReportAccountType>(['ASSET', 'LIABILITY', 'EQUITY', 'INCOME', 'COGS', 'EXPENSE']);
-const REPORT_PAGE_SIZE = 1_000;
-
-interface QueryPage<T> {
-  data: T[] | null;
-  error: { message: string } | null;
-}
-
-export async function fetchAllRows<T>(
-  fetchPage: (from: number, to: number) => PromiseLike<QueryPage<T>>,
-): Promise<T[]> {
-  const rows: T[] = [];
-
-  for (let from = 0; ; from += REPORT_PAGE_SIZE) {
-    const { data, error } = await fetchPage(from, from + REPORT_PAGE_SIZE - 1);
-    if (error) throw error;
-    const page = data || [];
-    rows.push(...page);
-    if (page.length < REPORT_PAGE_SIZE) return rows;
-  }
-}
 
 function asRecord(value: unknown): Record<string, unknown> | null {
   if (Array.isArray(value)) return asRecord(value[0]);
@@ -74,48 +56,51 @@ export function normalizeLedgerLines(rows: unknown[] | null): ReportLedgerLine[]
   return normalized;
 }
 
+/**
+ * One ledger line per account carrying that account's summed debits and
+ * credits, for reports that only need per-account totals (P&L, balance sheet,
+ * trial balance). Postgres adds the lines up, so the report costs two queries
+ * however long the ledger is, instead of one query per thousand lines.
+ */
+async function accountTotalLines(orgId: string, range: { from?: string; to?: string }): Promise<ReportLedgerLine[]> {
+  const supabase = getSupabase();
+  const [totals, accounts] = await Promise.all([
+    AccountService.getAccountTotals(orgId, range),
+    fetchAllRows<{ id: string; code: string | null; name: string | null; type: string; subtype: string | null }>((from, to) => supabase
+      .from('accounts')
+      .select('id, code, name, type, subtype')
+      .eq('org_id', orgId)
+      .order('id')
+      .range(from, to)),
+  ]);
+
+  const lines: ReportLedgerLine[] = [];
+  for (const account of accounts) {
+    const total = totals.get(account.id);
+    if (!total || !ACCOUNT_TYPES.has(account.type as ReportAccountType)) continue;
+    lines.push({
+      debit: total.debitCents,
+      credit: total.creditCents,
+      account: {
+        code: String(account.code || ''),
+        name: String(account.name || 'Unnamed account'),
+        type: account.type as ReportAccountType,
+        subtype: account.subtype,
+      },
+    });
+  }
+  return lines;
+}
+
 export class ReportsService {
   static async getProfitAndLoss(orgId: string, dateRange: string) {
-    const supabase = getSupabase();
     const range = resolveReportDateRange(dateRange);
-
-    const lines = await fetchAllRows<unknown>((from, to) => supabase
-      .from('journal_lines')
-      .select(`
-        id,
-        debit,
-        credit,
-        account:accounts!inner(name, type, code, subtype),
-        journal_entry:journal_entries!inner(id, org_id, entry_date)
-      `)
-      .eq('journal_entries.org_id', orgId)
-      .gte('journal_entries.entry_date', range.start)
-      .lte('journal_entries.entry_date', range.end)
-      .order('id')
-      .range(from, to));
-
-    return aggregateProfitAndLoss(normalizeLedgerLines(lines));
+    return aggregateProfitAndLoss(await accountTotalLines(orgId, { from: range.start, to: range.end }));
   }
 
   static async getBalanceSheet(orgId: string, asOfDate: string) {
-    const supabase = getSupabase();
     const normalizedAsOfDate = normalizeAsOfDate(asOfDate || new Date().toISOString());
-
-    const lines = await fetchAllRows<unknown>((from, to) => supabase
-      .from('journal_lines')
-      .select(`
-        id,
-        debit,
-        credit,
-        account:accounts!inner(name, type, code, subtype),
-        journal_entry:journal_entries!inner(id, org_id, entry_date)
-      `)
-      .eq('journal_entries.org_id', orgId)
-      .lte('journal_entries.entry_date', normalizedAsOfDate)
-      .order('id')
-      .range(from, to));
-
-    return aggregateBalanceSheet(normalizeLedgerLines(lines));
+    return aggregateBalanceSheet(await accountTotalLines(orgId, { to: normalizedAsOfDate }));
   }
 
   static async getCashFlow(orgId: string, dateRange: string) {
@@ -154,52 +139,18 @@ export class ReportsService {
   }
 
   static async getTrialBalance(orgId: string) {
-    const supabase = getSupabase();
-    
-    const lines = await fetchAllRows<any>((from, to) => supabase
-      .from('journal_lines')
-      .select(`
-        id,
-        debit,
-        credit,
-        account:accounts!inner(code, name, type),
-        journal_entry:journal_entries!inner(org_id)
-      `)
-      .eq('journal_entries.org_id', orgId)
-      .order('id')
-      .range(from, to));
+    const lines = await accountTotalLines(orgId, {});
 
-    const accountMap: Record<string, any> = {};
-
-    lines.forEach((line: any) => {
-      const accountInfo = line.account;
-      if (!accountInfo) return;
-
-      const code = accountInfo.code;
-      if (!accountMap[code]) {
-        accountMap[code] = {
-          code,
-          name: accountInfo.name,
-          type: accountInfo.type,
-          debitCents: 0,
-          creditCents: 0
-        };
-      }
-      
-      accountMap[code].debitCents += Number(line.debit) || 0;
-      accountMap[code].creditCents += Number(line.credit) || 0;
-    });
-
-    const rows = Object.values(accountMap).map((row: any) => {
-      if (row.debitCents > row.creditCents) {
-        row.debitCents -= row.creditCents;
-        row.creditCents = 0;
-      } else {
-        row.creditCents -= row.debitCents;
-        row.debitCents = 0;
-      }
-      return row;
-    }).sort((a: any, b: any) => a.code.localeCompare(b.code));
+    const rows = lines.map((line) => {
+      const net = Number(line.debit) - Number(line.credit);
+      return {
+        code: line.account.code,
+        name: line.account.name,
+        type: line.account.type,
+        debitCents: net > 0 ? net : 0,
+        creditCents: net < 0 ? -net : 0,
+      };
+    }).sort((a, b) => a.code.localeCompare(b.code));
 
     return { rows };
   }

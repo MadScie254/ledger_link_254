@@ -1,17 +1,18 @@
 import { getSupabase } from './supabase';
+import { fetchAllRows } from './pagination';
 
 export class VendorService {
   static async getVendors(orgId: string) {
     const supabase = getSupabase();
-    const { data, error } = await supabase
+    const data = await fetchAllRows<any>((from, to) => supabase
       .from('vendors')
       .select('*')
       .eq('org_id', orgId)
-      .order('display_name');
-      
-    if (error) throw error;
-    
-    return (data || []).map(row => ({
+      .order('display_name')
+      .order('id')
+      .range(from, to));
+
+    return data.map(row => ({
       id: row.id,
       orgId: row.org_id,
       displayName: row.display_name,

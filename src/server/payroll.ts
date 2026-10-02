@@ -1,4 +1,5 @@
 import { getSupabase } from './supabase';
+import { fetchAllRows } from './pagination';
 import { calculatePayslip } from '../utils/kenyaPayroll';
 
 export { calculatePayslip } from '../utils/kenyaPayroll';
@@ -76,15 +77,15 @@ async function getPayrollAccountIds(orgId: string): Promise<Record<PayrollAccoun
 export class PayrollService {
   static async getEmployees(orgId: string) {
     const supabase = getSupabase();
-    const { data, error } = await supabase
+    const data = await fetchAllRows<any>((from, to) => supabase
       .from('employees')
       .select('*')
       .eq('org_id', orgId)
-      .order('last_name');
-      
-    if (error) throw error;
-    
-    return (data || []).map(row => ({
+      .order('last_name')
+      .order('id')
+      .range(from, to));
+
+    return data.map(row => ({
       id: row.id,
       orgId: row.org_id,
       firstName: row.first_name,
@@ -239,14 +240,15 @@ export class PayrollService {
 
   static async getPayrollRuns(orgId: string) {
     const supabase = getSupabase();
-    const { data, error } = await supabase
+    const data = await fetchAllRows<any>((from, to) => supabase
       .from('payroll_runs')
       .select('*')
       .eq('org_id', orgId)
-      .order('created_at', { ascending: false });
+      .order('created_at', { ascending: false })
+      .order('id')
+      .range(from, to));
 
-    if (error) throw error;
-    return (data || []).map((row: any) => ({
+    return data.map((row: any) => ({
       id: row.id,
       period: row.period,
       payDate: row.pay_date,
@@ -265,14 +267,15 @@ export class PayrollService {
 
   static async getPayslips(orgId: string, payrollRunId: string) {
     const supabase = getSupabase();
-    const { data, error } = await supabase
+    const data = await fetchAllRows<any>((from, to) => supabase
       .from('payslips')
       .select('*, payroll_runs!inner(org_id), employees(first_name, last_name)')
       .eq('payroll_run_id', payrollRunId)
-      .eq('payroll_runs.org_id', orgId);
+      .eq('payroll_runs.org_id', orgId)
+      .order('id')
+      .range(from, to));
 
-    if (error) throw error;
-    return (data || []).map((row: any) => ({
+    return data.map((row: any) => ({
       id: row.id,
       employeeId: row.employee_id,
       employeeName: row.employees ? `${row.employees.first_name} ${row.employees.last_name}` : 'Unknown',

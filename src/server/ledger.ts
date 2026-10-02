@@ -1,4 +1,5 @@
 import { getSupabase } from './supabase';
+import { fetchAllRows } from './pagination';
 import { JournalEntryInput, LedgerEngineError } from './types';
 
 export class LedgerService {
@@ -38,18 +39,20 @@ export class LedgerService {
     const supabase = getSupabase();
     
     // The new Postgres version must return entries with their lines joined, since reports depend on line-level data.
-    const { data, error } = await supabase
+    // Every entry, page by page: this feeds the journal list and the
+    // "export general ledger" CSV, which must not stop at the API row cap.
+    const data = await fetchAllRows<any>((from, to) => supabase
       .from('journal_entries')
       .select(`
         *,
         lines:journal_lines(*)
       `)
       .eq('org_id', orgId)
-      .order('posted_at', { ascending: false });
-      
-    if (error) throw error;
-    
-    return (data || []).map((entry: any) => ({
+      .order('posted_at', { ascending: false })
+      .order('id')
+      .range(from, to));
+
+    return data.map((entry: any) => ({
       id: entry.id,
       orgId: entry.org_id,
       entryDate: entry.entry_date,

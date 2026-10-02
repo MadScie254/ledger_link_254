@@ -9,18 +9,34 @@ export interface AuditLogInput {
   details: any;
 }
 
+function toRow(input: AuditLogInput) {
+  return {
+    org_id: input.orgId,
+    user_id: input.userId,
+    action: input.action,
+    resource_type: input.resourceType,
+    resource_id: input.resourceId,
+    details: input.details,
+  };
+}
+
 export class AuditService {
-  static async logEvent(input: AuditLogInput) {
+  /**
+   * Writes audit rows after the change they describe has already been saved,
+   * so a failure here must not report the change itself as failed. It is
+   * logged to the Worker log instead of disappearing.
+   */
+  static async logEvents(inputs: AuditLogInput[]) {
+    if (inputs.length === 0) return;
     const supabase = getSupabase();
-    
-    await supabase.from('audit_logs').insert({
-      org_id: input.orgId,
-      user_id: input.userId,
-      action: input.action,
-      resource_type: input.resourceType,
-      resource_id: input.resourceId,
-      details: input.details
-    });
+    const { error } = await supabase.from('audit_logs').insert(inputs.map(toRow));
+    if (error) {
+      console.error('[Audit] Failed to write audit rows:', error.message, inputs.map((i) => `${i.action} ${i.resourceType} ${i.resourceId}`));
+    }
+  }
+
+  static async logEvent(input: AuditLogInput) {
+    await this.logEvents([input]);
   }
 
   static async getLogs(orgId: string, maxResults = 50) {

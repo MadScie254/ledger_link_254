@@ -1,4 +1,5 @@
 import { getSupabase } from './supabase';
+import { fetchAllRows } from './pagination';
 import { EtimsService } from './etims';
 
 export interface InvoiceLineInput {
@@ -121,14 +122,15 @@ async function assertDepositAccount(orgId: string, accountId: string) {
 export class InvoiceService {
   static async getInvoices(orgId: string) {
     const supabase = getSupabase();
-    const { data, error } = await supabase
+    const data = await fetchAllRows<any>((from, to) => supabase
       .from('invoices')
       .select('*, invoice_lines(*), invoice_payments(*)')
       .eq('org_id', orgId)
-      .order('created_at', { ascending: false });
+      .order('created_at', { ascending: false })
+      .order('id')
+      .range(from, to));
 
-    if (error) throw error;
-    return (data || []).map(mapInvoice);
+    return data.map(mapInvoice);
   }
 
   static async createInvoice(input: InvoiceInput): Promise<string> {

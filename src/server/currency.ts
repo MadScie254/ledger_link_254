@@ -1,4 +1,5 @@
 import { getSupabase } from './supabase';
+import { fetchAllRows } from './pagination';
 
 export interface ExchangeRateData {
   base: string;
@@ -183,15 +184,15 @@ export class CurrencyService {
     };
 
     // 1. Evaluate Open Receivables (Invoices)
-    const { data: invoices, error: invoicesError } = await supabase
+    const invoices = await fetchAllRows<any>((from, to) => supabase
       .from('invoices')
       .select('id, invoice_number, customer_id, currency, exchange_rate, foreign_amount_cents, total_cents, amount_due_cents, status, customer:customers(display_name)')
       .eq('org_id', orgId)
-      .neq('status', 'PAID')
-      .neq('status', 'VOID');
+      .in('status', ['SENT', 'PARTIALLY_PAID'])
+      .order('id')
+      .range(from, to));
 
-    if (invoicesError) throw invoicesError;
-    for (const data of invoices || []) {
+    for (const data of invoices) {
       const foreignCurr = (data.currency || normalizedBase).toUpperCase();
       if (foreignCurr === normalizedBase) continue;
 
@@ -221,15 +222,15 @@ export class CurrencyService {
     }
 
     // 2. Evaluate Open Payables (Bills)
-    const { data: bills, error: billsError } = await supabase
+    const bills = await fetchAllRows<any>((from, to) => supabase
       .from('bills')
       .select('id, bill_number, vendor_id, currency, exchange_rate, foreign_amount_cents, total_cents, amount_due_cents, status, vendor:vendors(display_name)')
       .eq('org_id', orgId)
-      .neq('status', 'PAID')
-      .neq('status', 'VOID');
+      .in('status', ['OPEN', 'PARTIALLY_PAID'])
+      .order('id')
+      .range(from, to));
 
-    if (billsError) throw billsError;
-    for (const data of bills || []) {
+    for (const data of bills) {
       const foreignCurr = (data.currency || normalizedBase).toUpperCase();
       if (foreignCurr === normalizedBase) continue;
 
