@@ -10,6 +10,7 @@ export interface ReportAccount {
 export interface ReportJournalEntry {
   id: string;
   sourceType?: string | null;
+  entryDate?: string | null;
 }
 
 export interface ReportLedgerLine {

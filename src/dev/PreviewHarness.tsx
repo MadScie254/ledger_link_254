@@ -91,10 +91,10 @@ const FIXTURES: Record<string, unknown> = {
     totalExpenseCents: 64_650_000,
     netProfitCents: 28_350_000,
     monthlyTrends: [
-      { month: 'Mar', revenue: 1_500_000, expense: 900_000 },
-      { month: 'Apr', revenue: 800_000, expense: 470_000 },
-      { month: 'May', revenue: 0, expense: 420_000 },
-      { month: 'Jun', revenue: 0, expense: 226_500 },
+      { period: '2026-03', month: 'Mar', year: 2026, revenue: 1_500_000, expense: 900_000, revenueCents: 150_000_000, expenseCents: 90_000_000 },
+      { period: '2026-04', month: 'Apr', year: 2026, revenue: 800_000, expense: 470_000, revenueCents: 80_000_000, expenseCents: 47_000_000 },
+      { period: '2026-05', month: 'May', year: 2026, revenue: 0, expense: 420_000, revenueCents: 0, expenseCents: 42_000_000 },
+      { period: '2026-06', month: 'Jun', year: 2026, revenue: 0, expense: 226_500, revenueCents: 0, expenseCents: 22_650_000 },
     ],
     unrealizedFX: {
       totalUnrealizedGainLossCents: -1_240_000,

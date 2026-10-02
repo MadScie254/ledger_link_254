@@ -258,7 +258,8 @@ export function DashboardView() {
   /* Queries: what needs doing ------------------------------------------ */
   const unmatchedLines = (bankLines.data?.transactions || []).filter((t: any) => t.status !== 'MATCHED');
   const deadlines = statutoryDeadlines(today);
-  const monthCount = Math.max(1, (m.monthlyTrends || []).length);
+  const trendMonths: any[] = m.monthlyTrends || [];
+  const monthCount = Math.max(1, trendMonths.length);
 
   /* Recent entries ------------------------------------------------------- */
   const recentEntries = [...(entries.data?.entries || [])]
@@ -335,7 +336,13 @@ export function DashboardView() {
         link = <TextLink onClick={() => setActiveView('Tax')}>Tax</TextLink>;
         break;
       case 'cash-runway': {
-        const monthlySpend = (m.totalExpenseCents || 0) / monthCount;
+        // Average over the months in the trend chart (the last twelve), so the
+        // spending total and the month count cover the same period.
+        const trendSpendCents = trendMonths.reduce(
+          (sum: number, d: any) => sum + (d.expenseCents ?? (d.expense || 0) * 100),
+          0,
+        );
+        const monthlySpend = trendSpendCents / monthCount;
         const months = monthlySpend > 0 ? (m.cashPositionCents || 0) / monthlySpend : null;
         figure = (
           <span className="ll-figure text-[26px] xl:text-[32px] leading-none text-ink-900">
@@ -418,8 +425,12 @@ export function DashboardView() {
       }
 
       case 'financial-trends': {
-        const byMonth = [...(m.monthlyTrends || [])].sort(
-          (a: any, b: any) => MONTHS.indexOf(a.month) - MONTHS.indexOf(b.month),
+        // Trends are keyed by calendar month (YYYY-MM), so September 2025 sorts
+        // before January 2026; the month-name fallback covers an older response.
+        const byMonth = [...trendMonths].sort(
+          (a: any, b: any) =>
+            String(a.period ?? '').localeCompare(String(b.period ?? '')) ||
+            MONTHS.indexOf(a.month) - MONTHS.indexOf(b.month),
         );
         const scale = Math.max(1, ...byMonth.flatMap((d: any) => [d.revenue || 0, d.expense || 0]));
         body =
@@ -431,7 +442,7 @@ export function DashboardView() {
                 {byMonth.map((d: any) => {
                   const net = (d.revenue || 0) - (d.expense || 0);
                   return (
-                    <div key={d.month} className="flex-1 min-w-0 flex flex-col items-stretch">
+                    <div key={d.period ?? d.month} className="flex-1 min-w-0 flex flex-col items-stretch">
                       <div className="h-28 flex items-end justify-center gap-[3px] border-b border-feint-strong">
                         <div className="w-full max-w-3 bg-ink-900" style={{ height: `${((d.revenue || 0) / scale) * 100}%` }} />
                         <div className="w-full max-w-3 border border-graphite-500 bg-paper-200" style={{ height: `${((d.expense || 0) / scale) * 100}%` }} />
@@ -456,7 +467,7 @@ export function DashboardView() {
                 </thead>
                 <tbody>
                   {byMonth.map((d: any) => (
-                    <tr key={d.month}><th scope="row">{d.month}</th><td>{d.revenue}</td><td>{d.expense}</td></tr>
+                    <tr key={d.period ?? d.month}><th scope="row">{d.year ? `${d.month} ${d.year}` : d.month}</th><td>{d.revenue}</td><td>{d.expense}</td></tr>
                   ))}
                 </tbody>
               </table>

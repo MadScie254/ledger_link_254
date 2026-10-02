@@ -19,7 +19,7 @@ interface QueryPage<T> {
   error: { message: string } | null;
 }
 
-async function fetchAllRows<T>(
+export async function fetchAllRows<T>(
   fetchPage: (from: number, to: number) => PromiseLike<QueryPage<T>>,
 ): Promise<T[]> {
   const rows: T[] = [];
@@ -38,7 +38,7 @@ function asRecord(value: unknown): Record<string, unknown> | null {
   return value !== null && typeof value === 'object' ? value as Record<string, unknown> : null;
 }
 
-function normalizeLedgerLines(rows: unknown[] | null): ReportLedgerLine[] {
+export function normalizeLedgerLines(rows: unknown[] | null): ReportLedgerLine[] {
   const normalized: ReportLedgerLine[] = [];
 
   for (const value of rows || []) {
@@ -62,7 +62,11 @@ function normalizeLedgerLines(rows: unknown[] | null): ReportLedgerLine[] {
       credit: typeof row.credit === 'number' || typeof row.credit === 'string' ? row.credit : 0,
       account,
       journalEntry: journalRow && typeof journalRow.id === 'string'
-        ? { id: journalRow.id, sourceType: typeof journalRow.source_type === 'string' ? journalRow.source_type : null }
+        ? {
+          id: journalRow.id,
+          sourceType: typeof journalRow.source_type === 'string' ? journalRow.source_type : null,
+          entryDate: typeof journalRow.entry_date === 'string' ? journalRow.entry_date : null,
+        }
         : null,
     });
   }
