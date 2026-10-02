@@ -205,21 +205,38 @@ export class BillService {
     };
   }
 
+  /**
+   * Pays several bills. The source account is checked once and each payment
+   * goes straight to pay_bill, which re-checks the bill, so a payment costs
+   * one Worker subrequest instead of three. One failure does not stop the
+   * others; each is reported by its position.
+   */
   static async recordBatchPayment(
     orgId: string,
     payments: BillBatchPaymentInput[],
     paidBy: string,
   ): Promise<{ paid: number; failed: number; errors: Array<{ index: number; message: string }> }> {
+    const supabase = getSupabase();
+    const sourceAccounts = [...new Set(payments.map((payment) => payment.sourceAccountId))];
+    await Promise.all(sourceAccounts.map((accountId) => assertPaymentAccount(orgId, accountId)));
+
     let paid = 0;
     const errors: Array<{ index: number; message: string }> = [];
 
     for (const [index, payment] of payments.entries()) {
-      try {
-        const { billId, ...paymentInput } = payment;
-        await this.recordPayment(orgId, billId, { ...paymentInput, createdBy: paidBy });
+      const { error } = await supabase.rpc('pay_bill', {
+        p_org_id: orgId,
+        p_bill_id: payment.billId,
+        p_amount_cents: Math.trunc(payment.amountCents),
+        p_payment_date: payment.paymentDate,
+        p_source_account_id: payment.sourceAccountId,
+        p_idempotency_key: payment.idempotencyKey,
+        p_created_by: paidBy,
+      });
+      if (error) {
+        errors.push({ index, message: error.message || 'Payment failed.' });
+      } else {
         paid += 1;
-      } catch (err) {
-        errors.push({ index, message: err instanceof Error ? err.message : 'Payment failed.' });
       }
     }
 

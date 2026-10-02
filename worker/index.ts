@@ -26,6 +26,7 @@ import { OnboardingService } from '../src/server/onboarding';
 import {
   requireAuthenticationAndOrganization,
   requireOrganizationAdministrator,
+  requirePayrollAccess,
   requireRequestedOrganization,
   type Variables,
 } from './auth';
@@ -65,6 +66,10 @@ app.use(
 
 const api = new Hono<{ Variables: Variables }>();
 api.use('*', requireAuthenticationAndOrganization);
+// Employee and payroll records are personal data: not for the read-only member role.
+api.use('/employees', requirePayrollAccess);
+api.use('/employees/*', requirePayrollAccess);
+api.use('/payroll/*', requirePayrollAccess);
 
 // 500s can carry raw Supabase/Postgres error text (constraint names, column
 // names) — log the detail server-side and never forward it to the client.
@@ -78,8 +83,29 @@ function serverError(c: any, err: unknown) {
 // Supabase/PostgREST errors thrown via `if (error) throw error` are plain
 // { message, code, details, hint } objects — not `instanceof Error` — so
 // checking that alone silently swallows every DB-originated 400 message.
+// Postgres's own wording for constraint failures names tables, columns and
+// constraints. Those are replaced with a plain sentence for the SQLSTATE;
+// messages the app's own functions RAISE are sentences already and pass
+// through.
+const RAW_DATABASE_MESSAGE = /violates|constraint|column|relation|syntax|invalid input|permission denied|null value/i;
+const DATABASE_MESSAGES: Record<string, string> = {
+  '23505': 'That record already exists.',
+  '23503': 'A linked record does not exist or belongs to another organization.',
+  '23514': 'A value is outside what is allowed.',
+  '23502': 'A required value is missing.',
+  '22P02': 'A value is in the wrong format.',
+  '22001': 'A value is too long.',
+  '42501': 'Your role does not allow this.',
+};
+
 function clientError(c: any, err: unknown) {
   let message = 'Invalid request.';
+  const code = err && typeof err === 'object' && typeof (err as any).code === 'string' ? (err as any).code : '';
+  const rawMessage = err && typeof err === 'object' && typeof (err as any).message === 'string' ? (err as any).message : '';
+  if (/^[0-9A-Z]{5}$/.test(code) && RAW_DATABASE_MESSAGE.test(rawMessage)) {
+    console.error('[API] Database rejected request:', err);
+    return c.json({ error: DATABASE_MESSAGES[code] || 'The request could not be saved.' }, 400);
+  }
   if (err instanceof z.ZodError) {
     // A ZodError's own message is a JSON dump of every issue; send the
     // readable messages instead.
@@ -173,6 +199,16 @@ const journalEntrySchema = z.object({
   }
 });
 
+// A report asked for with a period or date it does not understand is the
+// caller's mistake (400), not a server failure (500).
+function reportError(c: any, err: unknown) {
+  const message = err instanceof Error ? err.message : '';
+  if (/^(Unsupported report period|The balance-sheet date|accountName is required)/.test(message)) {
+    return clientError(c, err);
+  }
+  return serverError(c, err);
+}
+
 const bankMatchSchema = z.object({
   transactionId: z.string().uuid(),
   targetAccountId: z.string().uuid().optional(),
@@ -215,35 +251,35 @@ api.get('/reports/pnl', async (c) => {
   try {
     const data = await ReportsService.getProfitAndLoss(c.get('orgId'), c.req.query('dateRange') || 'This Year-to-date');
     return c.json(data);
-  } catch (err) { return serverError(c, err); }
+  } catch (err) { return reportError(c, err); }
 });
 
 api.get('/reports/balance-sheet', async (c) => {
   try {
     const data = await ReportsService.getBalanceSheet(c.get('orgId'), c.req.query('asOfDate') || new Date().toISOString());
     return c.json(data);
-  } catch (err) { return serverError(c, err); }
+  } catch (err) { return reportError(c, err); }
 });
 
 api.get('/reports/cash-flow', async (c) => {
   try {
     const data = await ReportsService.getCashFlow(c.get('orgId'), c.req.query('dateRange') || 'This Year-to-date');
     return c.json(data);
-  } catch (err) { return serverError(c, err); }
+  } catch (err) { return reportError(c, err); }
 });
 
 api.get('/reports/trial-balance', async (c) => {
   try {
     const data = await ReportsService.getTrialBalance(c.get('orgId'));
     return c.json(data);
-  } catch (err) { return serverError(c, err); }
+  } catch (err) { return reportError(c, err); }
 });
 
 api.get('/reports/tax-summary', async (c) => {
   try {
-    const data = await ReportsService.getTaxSummary(c.get('orgId'), c.req.query('period') || 'August 2026');
+    const data = await ReportsService.getTaxSummary(c.get('orgId'), c.req.query('period') || 'This month');
     return c.json(data);
-  } catch (err) { return serverError(c, err); }
+  } catch (err) { return reportError(c, err); }
 });
 
 api.get('/reports/ledger', async (c) => {
@@ -252,7 +288,7 @@ api.get('/reports/ledger', async (c) => {
     if (!accountName) throw new Error('accountName is required');
     const lines = await ReportsService.getLedgerLinesForAccount(c.get('orgId'), accountName);
     return c.json({ lines });
-  } catch (err) { return serverError(c, err); }
+  } catch (err) { return reportError(c, err); }
 });
 
 api.get('/reports/ar-aging', async (c) => {
@@ -650,8 +686,9 @@ api.get('/payroll/runs', async (c) => {
 
 api.get('/payroll/runs/:id/payslips', async (c) => {
   try {
-    return c.json({ payslips: await PayrollService.getPayslips(c.get('orgId'), c.req.param('id')) });
-  } catch (err) { return serverError(c, err); }
+    const runId = z.string().uuid().parse(c.req.param('id'));
+    return c.json({ payslips: await PayrollService.getPayslips(c.get('orgId'), runId) });
+  } catch (err) { return err instanceof z.ZodError ? clientError(c, err) : serverError(c, err); }
 });
 
 api.post('/payroll/runs', async (c) => {
@@ -719,60 +756,90 @@ api.post('/time-entries', async (c) => {
 });
 
 // --- Bulk Operations ---
+// Customers, suppliers, stock items and employees are deleted outright;
+// invoices and bills are voided with a reversing entry, never deleted.
+const BULK_COLLECTIONS: Record<string, { table: string; resourceType: 'CUSTOMER' | 'VENDOR' | 'INVENTORY_ITEM' | 'EMPLOYEE' }> = {
+  CUSTOMERS: { table: 'customers', resourceType: 'CUSTOMER' },
+  VENDORS: { table: 'vendors', resourceType: 'VENDOR' },
+  INVENTORY: { table: 'inventory_items', resourceType: 'INVENTORY_ITEM' },
+  EMPLOYEES: { table: 'employees', resourceType: 'EMPLOYEE' },
+};
+
 api.post('/bulk/delete', async (c) => {
   try {
     const orgId = c.get('orgId');
     const userId = c.get('userId');
     const { entityType, ids } = bulkDeleteSchema.parse(await bodyOf(c));
 
-    if (entityType === 'INVOICES') {
-      for (const id of ids) await InvoiceService.voidInvoice(orgId, id, userId);
-      return c.json({ success: true, count: ids.length, action: 'VOID' });
+    if (entityType === 'INVOICES' || entityType === 'BILLS') {
+      // Each void is its own transaction. One that is refused (for example
+      // an invoice with payments) no longer stops the rest; each refusal is
+      // reported with its document.
+      const failures: Array<{ id: string; message: string }> = [];
+      for (const id of ids) {
+        try {
+          if (entityType === 'INVOICES') await InvoiceService.voidInvoice(orgId, id, userId);
+          else await BillService.voidBill(orgId, id, userId);
+        } catch (err: any) {
+          failures.push({ id, message: err?.message || 'Could not be voided.' });
+        }
+      }
+      return c.json({ success: failures.length === 0, count: ids.length - failures.length, failed: failures.length, failures, action: 'VOID' });
     }
 
-    if (entityType === 'BILLS') {
-      for (const id of ids) await BillService.voidBill(orgId, id, userId);
-      return c.json({ success: true, count: ids.length, action: 'VOID' });
-    }
-
-    const collectionMap: Record<string, string> = {
-      CUSTOMERS: 'customers',
-      VENDORS: 'vendors',
-      INVENTORY: 'inventory_items',
-      EMPLOYEES: 'employees',
-    };
-
-    const collName = collectionMap[entityType];
-    if (!collName) throw new Error(`Unsupported entity type: ${entityType}`);
+    const collection = BULK_COLLECTIONS[entityType];
+    if (!collection) throw new Error(`Unsupported entity type: ${entityType}`);
 
     const supabase = getSupabase();
-    const { error } = await supabase.from(collName).delete().eq('org_id', orgId).in('id', ids);
+    const { data: deleted, error } = await supabase
+      .from(collection.table)
+      .delete()
+      .eq('org_id', orgId)
+      .in('id', ids)
+      .select('id');
     if (error) throw error;
 
-    return c.json({ success: true, count: ids.length, action: 'DELETE' });
+    await AuditService.logEvents((deleted || []).map((row: any) => ({
+      orgId,
+      userId,
+      action: 'DELETE' as const,
+      resourceType: collection.resourceType,
+      resourceId: row.id,
+      details: { bulk: true },
+    })));
+
+    return c.json({ success: true, count: deleted?.length || 0, action: 'DELETE' });
   } catch (err) { return clientError(c, err); }
 });
 
 api.post('/bulk/status-update', async (c) => {
   try {
     const orgId = c.get('orgId');
+    const userId = c.get('userId');
     const { entityType, ids, status } = bulkStatusUpdateSchema.parse(await bodyOf(c));
 
-    const collectionMap: Record<string, string> = {
-      CUSTOMERS: 'customers',
-      VENDORS: 'vendors',
-      INVENTORY: 'inventory_items',
-      EMPLOYEES: 'employees',
-    };
-
-    const collName = collectionMap[entityType];
-    if (!collName) throw new Error(`Unsupported entity type: ${entityType}`);
+    const collection = BULK_COLLECTIONS[entityType];
+    if (!collection) throw new Error(`Unsupported entity type: ${entityType}`);
 
     const supabase = getSupabase();
-    const { error } = await supabase.from(collName).update({ status }).eq('org_id', orgId).in('id', ids);
+    const { data: updated, error } = await supabase
+      .from(collection.table)
+      .update({ status })
+      .eq('org_id', orgId)
+      .in('id', ids)
+      .select('id');
     if (error) throw error;
 
-    return c.json({ success: true, count: ids.length });
+    await AuditService.logEvents((updated || []).map((row: any) => ({
+      orgId,
+      userId,
+      action: 'UPDATE' as const,
+      resourceType: collection.resourceType,
+      resourceId: row.id,
+      details: { status, bulk: true },
+    })));
+
+    return c.json({ success: true, count: updated?.length || 0 });
   } catch (err) { return clientError(c, err); }
 });
 

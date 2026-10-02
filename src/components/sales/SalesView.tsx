@@ -65,13 +65,16 @@ export function SalesView() {
         headers: { 'Content-Type': 'application/json', 'x-org-id': currentOrgId },
         body: JSON.stringify({ entityType: 'INVOICES', ids })
       });
-      if (!res.ok) throw new Error('Failed to delete invoices');
-      return res.json();
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(body.error || 'The invoices could not be voided.');
+      if (body.failed > 0) {
+        throw new Error(`${body.count} voided. ${body.failed} could not be voided: ${body.failures?.[0]?.message || 'see each invoice'}`);
+      }
+      return body;
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['invoices', currentOrgId] });
-      setSelectedIds([]);
-    }
+    onSuccess: () => setSelectedIds([]),
+    // Some may have been voided even when others were refused.
+    onSettled: () => queryClient.invalidateQueries({ queryKey: ['invoices', currentOrgId] }),
   });
 
   const receivePaymentMutation = useMutation({
@@ -381,13 +384,16 @@ export function SalesView() {
         onClearSelection={() => setSelectedIds([])}
         onDelete={() => {
           confirm(
-            { title: 'Delete invoices', message: `Delete ${selectedIds.length} invoice(s)?`, confirmText: 'Delete', isDestructive: true },
+            { title: 'Void invoices', message: `Void ${selectedIds.length} invoice(s)? Each is reversed in the ledger with an entry dated today. Invoices with payments are refused.`, confirmText: 'Void', isDestructive: true },
             () => bulkDeleteMutation.mutate(selectedIds)
           );
         }}
         onExport={handleExportCSV}
         isLoading={bulkDeleteMutation.isPending}
       />
+      {bulkDeleteMutation.error && (
+        <p role="alert" className="text-[13.5px] text-ledger-red">{bulkDeleteMutation.error.message}</p>
+      )}
 
       <Dialog
         open={!!paymentInvoice}

@@ -99,6 +99,18 @@ export async function requireOrganizationAdministrator(c: Context<{ Variables: V
   await next();
 }
 
+/**
+ * Salaries, KRA PINs, bank details and payslips are personal data. The
+ * read-only member role reads the books but not payroll; owners, admins and
+ * accountants, who run payroll, can.
+ */
+export async function requirePayrollAccess(c: Context<{ Variables: Variables }>, next: Next) {
+  if (!writeRoles.has(c.get('orgRole'))) {
+    return c.json({ error: 'Payroll and employee records are open to the owner, administrators and accountants only.' }, 403);
+  }
+  await next();
+}
+
 export async function requireRequestedOrganization(c: Context<{ Variables: Variables }>, next: Next) {
   if (c.req.param('id') !== c.get('orgId')) {
     return c.json({ error: 'The requested organization does not match the active organization.' }, 403);

@@ -17,6 +17,15 @@ import { useConfirm } from '../../hooks/useConfirm';
 
 const tabs = ['Vendors', 'Bills', 'Expenses', 'Bill payments'];
 
+/** A UUID-shaped key derived from text with SHA-256, the same every time for the same text. */
+async function stableUuid(text: string): Promise<string> {
+  const bytes = new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(text))).slice(0, 16);
+  bytes[6] = (bytes[6] & 0x0f) | 0x50;
+  bytes[8] = (bytes[8] & 0x3f) | 0x80;
+  const hex = [...bytes].map((b) => b.toString(16).padStart(2, '0')).join('');
+  return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
+}
+
 export function ExpensesView() {
   const [activeTab, setActiveTab] = useState('Bills');
   const [isCreatingVendor, setIsCreatingVendor] = useState(false);
@@ -105,30 +114,35 @@ export function ExpensesView() {
         headers: { 'Content-Type': 'application/json', 'x-org-id': currentOrgId },
         body: JSON.stringify({ entityType: 'BILLS', ids })
       });
-      if (!res.ok) throw new Error('Failed to delete bills');
-      return res.json();
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(body.error || 'The bills could not be voided.');
+      if (body.failed > 0) {
+        throw new Error(`${body.count} voided. ${body.failed} could not be voided: ${body.failures?.[0]?.message || 'see each bill'}`);
+      }
+      return body;
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['bills', currentOrgId] });
-      setSelectedBillIds([]);
-    }
+    onSuccess: () => setSelectedBillIds([]),
+    // Some may have been voided even when others were refused.
+    onSettled: () => queryClient.invalidateQueries({ queryKey: ['bills', currentOrgId] }),
   });
 
   const batchPaymentMutation = useMutation({
     mutationFn: async ({ targetBills, sourceAccountId }: { targetBills: any[]; sourceAccountId: string }) => {
       const paymentDate = format(new Date(), 'yyyy-MM-dd');
+      // The same bill, amount, day and account always get the same key, so
+      // pressing pay again after a dropped connection returns the payment
+      // already made instead of paying twice.
+      const payments = await Promise.all(targetBills.map(async (bill) => ({
+        billId: bill.id,
+        amountCents: bill.amountDueCents,
+        paymentDate,
+        sourceAccountId,
+        idempotencyKey: await stableUuid(`bill-batch-pay:${currentOrgId}:${bill.id}:${bill.amountDueCents}:${paymentDate}:${sourceAccountId}`),
+      })));
       const res = await fetch('/api/bills/batch-pay', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'x-org-id': currentOrgId },
-        body: JSON.stringify({
-          payments: targetBills.map((bill) => ({
-            billId: bill.id,
-            amountCents: bill.amountDueCents,
-            paymentDate,
-            sourceAccountId,
-            idempotencyKey: crypto.randomUUID(),
-          })),
-        })
+        body: JSON.stringify({ payments })
       });
       const body = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(body.error || 'Failed to record bill payments');
@@ -485,12 +499,15 @@ export function ExpensesView() {
           onClearSelection={() => setSelectedBillIds([])}
           onDelete={() => {
             confirm(
-              { title: 'Delete bills', message: `Delete ${selectedBillIds.length} bill(s)?`, confirmText: 'Delete', isDestructive: true },
+              { title: 'Void bills', message: `Void ${selectedBillIds.length} bill(s)? Each is reversed in the ledger with an entry dated today. Bills with payments are refused.`, confirmText: 'Void', isDestructive: true },
               () => bulkDeleteBillsMutation.mutate(selectedBillIds)
             );
           }}
           isLoading={bulkDeleteBillsMutation.isPending}
         />
+      )}
+      {bulkDeleteBillsMutation.error && (
+        <p role="alert" className="text-[13.5px] text-ledger-red">{bulkDeleteBillsMutation.error.message}</p>
       )}
 
       {activeTab === 'Vendors' && (

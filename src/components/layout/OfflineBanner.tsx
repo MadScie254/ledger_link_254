@@ -23,7 +23,7 @@ export function OfflineBanner() {
 
   return (
     <div role="status" className="fixed inset-x-0 top-0 z-40 border-b border-oxblood bg-oxblood px-3 py-1.5 text-center text-[12.5px] font-semibold text-white">
-      Offline. Changes made now will not reach the books until the connection returns.
+      Offline. Nothing can be saved until the connection returns; anything submitted now is not posted.
     </div>
   );
 }
