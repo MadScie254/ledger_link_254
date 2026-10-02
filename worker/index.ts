@@ -23,6 +23,7 @@ import { GeminiService } from '../src/server/gemini';
 import { BudgetService } from '../src/server/budgets';
 import { AIInsightsService } from '../src/server/aiInsights';
 import { OnboardingService } from '../src/server/onboarding';
+import { SalesOrderService, type SalesOrderInput } from '../src/server/salesOrders';
 import {
   requireAuthenticationAndOrganization,
   requireOrganizationAdministrator,
@@ -222,6 +223,42 @@ const bankMatchSchema = z.object({
 const autoReconcileSchema = z.object({
   minConfidence: z.number().min(0).max(100).optional(),
 }).strict();
+
+const decimals = (value: number) => {
+  const text = String(value);
+  return /e/i.test(text) ? Infinity : (text.split('.')[1] || '').length;
+};
+const salesOrderLineSchema = z.object({
+  description: z.string().trim().min(1).max(500),
+  accountId: z.string().uuid(),
+  inventoryItemId: z.string().uuid().optional(),
+  quantity: z.number().positive().max(1_000_000_000)
+    .refine((value) => decimals(value) <= 3, 'Use at most three decimals for a quantity.'),
+  unitPriceCents: z.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER),
+  taxRate: z.number().min(0).max(100)
+    .refine((value) => decimals(value) <= 2, 'Use at most two decimals for a VAT rate.')
+    .default(0),
+}).strict();
+const createSalesOrderSchema = z.object({
+  customerId: z.string().uuid(),
+  orderDate: dateSchema,
+  promisedDate: dateSchema.optional(),
+  notes: z.string().trim().max(4000).optional(),
+  idempotencyKey: z.string().uuid(),
+  lines: z.array(salesOrderLineSchema).min(1).max(200),
+}).strict().refine((order) => !order.promisedDate || order.promisedDate >= order.orderDate, {
+  message: 'The promised date cannot be before the order date.',
+});
+const salesOrderStatusSchema = z.object({
+  status: z.enum(['IN_PROGRESS', 'COMPLETED', 'CANCELLED']),
+  reason: z.string().trim().max(500).optional(),
+}).strict();
+const invoiceSalesOrderSchema = z.object({
+  issueDate: dateSchema,
+  dueDate: dateSchema,
+}).strict().refine((body) => body.dueDate >= body.issueDate, {
+  message: 'The due date cannot be before the issue date.',
+});
 
 const bodyOf = (c: any) => c.req.json().catch(() => ({}));
 const onboardingSchema = z.object({
@@ -588,6 +625,40 @@ api.patch('/vendors/:id', async (c) => {
   try {
     await VendorService.updateVendor(c.get('orgId'), c.req.param('id'), await bodyOf(c));
     return c.json({ success: true });
+  } catch (err) { return clientError(c, err); }
+});
+
+// --- Sales orders ---
+// An order is recorded, moved through its statuses (completion counts stock
+// out, reopening counts it back) and invoiced in one step. Each write is one
+// Postgres function call, one transaction.
+api.get('/sales-orders', async (c) => {
+  try {
+    return c.json({ orders: await SalesOrderService.getOrders(c.get('orgId')) });
+  } catch (err) { return serverError(c, err); }
+});
+
+api.post('/sales-orders', async (c) => {
+  try {
+    const body = createSalesOrderSchema.parse(await bodyOf(c)) as Omit<SalesOrderInput, 'orgId' | 'createdBy'>;
+    const order = await SalesOrderService.createOrder({ ...body, orgId: c.get('orgId'), createdBy: c.get('userId') });
+    return c.json(order);
+  } catch (err) { return clientError(c, err); }
+});
+
+api.post('/sales-orders/:id/status', async (c) => {
+  try {
+    const orderId = z.string().uuid().parse(c.req.param('id'));
+    const body = salesOrderStatusSchema.parse(await bodyOf(c));
+    return c.json(await SalesOrderService.setStatus(c.get('orgId'), orderId, body.status, body.reason, c.get('userId')));
+  } catch (err) { return clientError(c, err); }
+});
+
+api.post('/sales-orders/:id/invoice', async (c) => {
+  try {
+    const orderId = z.string().uuid().parse(c.req.param('id'));
+    const body = invoiceSalesOrderSchema.parse(await bodyOf(c));
+    return c.json(await SalesOrderService.invoiceOrder(c.get('orgId'), orderId, body.issueDate, body.dueDate, c.get('userId')));
   } catch (err) { return clientError(c, err); }
 });
 
