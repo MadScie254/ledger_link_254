@@ -1,6 +1,7 @@
 import { ReportsService } from '../../src/server/reports';
 import { DashboardService } from '../../src/server/metrics';
 import { respondError, UserError } from '../http';
+import { uuid } from '../schemas';
 import type { Api } from './types';
 
 export function registerReportRoutes(api: Api) {
@@ -36,9 +37,13 @@ export function registerReportRoutes(api: Api) {
 
   api.get('/reports/ledger', async (c) => {
     try {
+      const accountId = c.req.query('accountId');
       const accountName = c.req.query('accountName');
+      if (accountId) {
+        return c.json({ lines: await ReportsService.getLedgerLinesForAccount(c.get('orgId'), { id: uuid.parse(accountId) }) });
+      }
       if (!accountName || accountName.length > 200) throw new UserError('Choose an account.');
-      return c.json({ lines: await ReportsService.getLedgerLinesForAccount(c.get('orgId'), accountName) });
+      return c.json({ lines: await ReportsService.getLedgerLinesForAccount(c.get('orgId'), { name: accountName }) });
     } catch (err) { return respondError(c, err); }
   });
 

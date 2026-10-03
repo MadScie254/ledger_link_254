@@ -67,7 +67,11 @@ export function registerAccountingRoutes(api: Api) {
   // --- Journal entries ---
   api.get('/journal-entries', async (c) => {
     try {
-      return c.json({ entries: await LedgerService.getJournalEntries(c.get('orgId')) });
+      // Pages of up to 200 entries; ?cursor= continues from a page's nextCursor.
+      return c.json(await LedgerService.getJournalEntriesPage(c.get('orgId'), {
+        cursor: c.req.query('cursor') || undefined,
+        limit: Number(c.req.query('limit')) || 100,
+      }));
     } catch (err) { return respondError(c, err); }
   });
 

@@ -180,13 +180,14 @@ export function BankingView() {
     }
   });
 
-  // Fetch Journal Entries (for matching)
-  const { data: journalsData } = useQuery({
-    queryKey: ['journal-entries', currentOrgId],
+  // Posted entries that could stand for the line being matched.
+  const { data: candidatesData } = useQuery({
+    queryKey: ['bank-candidates', currentOrgId, matchingTx?.id],
+    enabled: Boolean(matchingTx?.id),
     queryFn: async () => {
-      const res = await fetch('/api/journal-entries', { headers: { 'x-org-id': currentOrgId } });
-      if (!res.ok) throw new Error('Failed to fetch journals');
-      return res.json();
+      const res = await fetch(`/api/banking/transactions/${matchingTx.id}/candidates`);
+      if (!res.ok) throw new Error('Failed to fetch matching entries');
+      return res.json() as Promise<{ entries: any[] }>;
     }
   });
 
@@ -244,6 +245,7 @@ export function BankingView() {
       queryClient.invalidateQueries({ queryKey: ['invoices', currentOrgId] });
       queryClient.invalidateQueries({ queryKey: ['bills', currentOrgId] });
       queryClient.invalidateQueries({ queryKey: ['journal-entries', currentOrgId] });
+      queryClient.invalidateQueries({ queryKey: ['bank-candidates', currentOrgId] });
       setMatchingTx(null);
       setSelectedCandidate(null);
       setMatchProblem('');
@@ -364,33 +366,21 @@ export function BankingView() {
     setManualAccountId('');
   };
   const allAccounts: any[] = accountsData?.accounts || [];
-  const bankAccountId = allAccounts.find((a: any) => a.code === '1000')?.id;
   // Receivables and payables move only through invoices, bills and their
   // payments, and a bank line cannot post back to the bank.
   const postableAccounts = allAccounts.filter((a: any) => a.isActive !== false && !['1000', '1100', '2000'].includes(a.code));
-  const linkedEntryIds = new Set(rawTx.map((t: any) => t.matchedJournalEntryId).filter(Boolean));
-  const candidateEntries = matchingTx && bankAccountId
-    ? (journalsData?.entries || [])
-        .map((je: any) => ({
-          je,
-          bankCents: (je.lines || [])
-            .filter((l: any) => l.accountId === bankAccountId)
-            .reduce((sum: number, l: any) => sum + Number(l.debit || 0) - Number(l.credit || 0), 0),
-        }))
-        .filter(({ je, bankCents }: any) =>
-          !linkedEntryIds.has(je.id) &&
-          bankCents === (matchingTx.direction === 'IN' ? matchingTx.amountCents : -matchingTx.amountCents))
-        .slice(0, 20) as { je: any; bankCents: number }[]
+  const candidateEntries = matchingTx
+    ? (candidatesData?.entries || []).map((je: any) => ({ je, bankCents: Number(je.bankCents) })) as { je: any; bankCents: number }[]
     : [];
   const partyName = (list: any[] | undefined, id: string) => (list || []).find((p: any) => p.id === id)?.displayName;
   const openDocuments = !matchingTx
     ? []
     : matchingTx.direction === 'IN'
       ? (invoicesData?.invoices || [])
-          .filter((inv: any) => ['SENT', 'PARTIALLY_PAID'].includes(inv.status) && inv.amountDueCents >= matchingTx.amountCents)
+          .filter((inv: any) => !['PAID', 'VOID', 'DRAFT'].includes(inv.status) && inv.amountDueCents >= matchingTx.amountCents)
           .map((inv: any) => ({ id: inv.id, kind: 'invoice' as const, number: inv.invoiceNumber, party: partyName(customersData?.customers, inv.customerId), dueCents: inv.amountDueCents }))
       : (billsData?.bills || [])
-          .filter((bill: any) => ['OPEN', 'PARTIALLY_PAID'].includes(bill.status) && bill.amountDueCents >= matchingTx.amountCents)
+          .filter((bill: any) => !['PAID', 'VOID', 'DRAFT'].includes(bill.status) && bill.amountDueCents >= matchingTx.amountCents)
           .map((bill: any) => ({ id: bill.id, kind: 'bill' as const, number: bill.billNumber, party: partyName(vendorsData?.vendors, bill.vendorId), dueCents: bill.amountDueCents }));
   const sortedDocuments = [...openDocuments].sort((a, b) =>
     Number(b.dueCents === matchingTx?.amountCents) - Number(a.dueCents === matchingTx?.amountCents) || a.dueCents - b.dueCents);

@@ -124,15 +124,20 @@ async function assertDepositAccount(orgId: string, accountId: string) {
 }
 
 export class InvoiceService {
-  static async getInvoices(orgId: string) {
+  /** Every invoice, newest first, or one customer's when customerId is given. */
+  static async getInvoices(orgId: string, filter: { customerId?: string } = {}) {
     const supabase = getSupabase();
-    const data = await fetchAllRows<any>((from, to) => supabase
-      .from('invoices')
-      .select('*, invoice_lines(*), invoice_payments(*)')
-      .eq('org_id', orgId)
-      .order('created_at', { ascending: false })
-      .order('id')
-      .range(from, to));
+    const data = await fetchAllRows<any>((from, to) => {
+      let request = supabase
+        .from('invoices')
+        .select('*, invoice_lines(*), invoice_payments(*)')
+        .eq('org_id', orgId);
+      if (filter.customerId) request = request.eq('customer_id', filter.customerId);
+      return request
+        .order('created_at', { ascending: false })
+        .order('id')
+        .range(from, to);
+    });
 
     return data.map(mapInvoice);
   }

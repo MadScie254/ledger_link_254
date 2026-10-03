@@ -133,15 +133,20 @@ async function assertPaymentAccount(orgId: string, accountId: string) {
 }
 
 export class BillService {
-  static async getBills(orgId: string) {
+  /** Every bill, newest first, or one supplier's when vendorId is given. */
+  static async getBills(orgId: string, filter: { vendorId?: string } = {}) {
     const supabase = getSupabase();
-    const data = await fetchAllRows<any>((from, to) => supabase
-      .from('bills')
-      .select('*, bill_lines(*), bill_payments(*)')
-      .eq('org_id', orgId)
-      .order('created_at', { ascending: false })
-      .order('id')
-      .range(from, to));
+    const data = await fetchAllRows<any>((from, to) => {
+      let request = supabase
+        .from('bills')
+        .select('*, bill_lines(*), bill_payments(*)')
+        .eq('org_id', orgId);
+      if (filter.vendorId) request = request.eq('vendor_id', filter.vendorId);
+      return request
+        .order('created_at', { ascending: false })
+        .order('id')
+        .range(from, to);
+    });
 
     return data.map(mapBill);
   }

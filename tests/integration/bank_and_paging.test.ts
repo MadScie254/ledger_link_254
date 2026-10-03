@@ -152,6 +152,46 @@ test('lists, balances and the ledger export do not stop at 1,000 rows', async ()
   assert.equal(accounts.find((a) => a.id === BANK)!.balanceCents, dbBank);
 });
 
+test('the journal reads in pages that neither skip nor repeat an entry', async () => {
+  const total = Number(sql(`SELECT count(*) FROM public.journal_entries WHERE org_id = '${ORG}'`));
+  const seen = new Set<string>();
+  let cursor: string | undefined;
+  let previous = '9999-12-31';
+  for (;;) {
+    const page = await LedgerService.getJournalEntriesPage(ORG, { cursor, limit: 200 });
+    for (const entry of page.entries) {
+      assert.ok(!seen.has(entry.id), 'no entry twice');
+      assert.ok(entry.entryDate <= previous, 'newest entry date first');
+      previous = entry.entryDate;
+      seen.add(entry.id);
+    }
+    if (!page.nextCursor) break;
+    cursor = page.nextCursor;
+  }
+  assert.equal(seen.size, total);
+  await refused(LedgerService.getJournalEntriesPage(ORG, { cursor: '2026-01-01|x),id.gt.(0' }), /not valid/);
+});
+
+test('a customer\'s invoices and a statement line\'s candidate entries are read on their own', async () => {
+  const mine = await InvoiceService.getInvoices(ORG, { customerId: CUSTOMER });
+  assert.ok(mine.length > 0);
+  assert.ok(mine.every((invoice) => invoice.customerId === CUSTOMER));
+  assert.deepEqual(await InvoiceService.getInvoices(ORG, { customerId: uuid() }), []);
+
+  const entryId = await LedgerService.postJournalEntry({
+    orgId: ORG, entryDate: '2026-09-21', memo: 'Odd amount takings', sourceType: 'MANUAL', createdBy: OWNER,
+    lines: [{ accountId: BANK, debit: 77_701, credit: 0 }, { accountId: SALES, debit: 0, credit: 77_701 }],
+  });
+  const line = uuid();
+  addBankLine(line, 'IN', 77_701, 'ODD AMOUNT');
+  const candidates = await BankingService.getEntryCandidates(ORG, line);
+  assert.deepEqual(candidates.map((c) => [c.id, c.bankCents]), [[entryId, 77_701]]);
+  await BankingService.matchTransaction(ORG, line, { existingJournalEntryId: entryId }, OWNER);
+  const otherLine = uuid();
+  addBankLine(otherLine, 'IN', 77_701, 'ODD AMOUNT AGAIN');
+  assert.deepEqual(await BankingService.getEntryCandidates(ORG, otherLine), [], 'a linked entry is not offered again');
+});
+
 test('reports and the dashboard agree with the ledger', async () => {
   const tb = await ReportsService.getTrialBalance(ORG);
   const debits = tb.rows.reduce((s, r) => s + r.debitCents, 0);
@@ -164,6 +204,12 @@ test('reports and the dashboard agree with the ledger', async () => {
 
   const pl = await ReportsService.getProfitAndLoss(ORG, 'This year-to-date');
   assert.ok(Array.isArray(pl.income));
+
+  // Opening cash for a period is every bank movement dated before it.
+  const cashFlow = await ReportsService.getCashFlow(ORG, '2026-09');
+  const bankBefore = Number(sql(`SELECT coalesce(sum(l.debit) - sum(l.credit), 0) FROM public.journal_lines l JOIN public.journal_entries e ON e.id = l.journal_entry_id WHERE e.org_id = '${ORG}' AND l.account_id = '${BANK}' AND e.entry_date < '2026-09-01'`));
+  assert.notEqual(bankBefore, 0, 'the test ledger has bank movements before September');
+  assert.equal(cashFlow.beginningCashCents, bankBefore);
 
   const metrics = await DashboardService.getMetrics(ORG);
   const dbBank = Number(sql(`SELECT sum(l.debit) - sum(l.credit) FROM public.journal_lines l JOIN public.journal_entries e ON e.id = l.journal_entry_id WHERE e.org_id = '${ORG}' AND l.account_id = '${BANK}'`));

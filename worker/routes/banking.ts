@@ -37,6 +37,12 @@ export function registerBankingRoutes(api: Api) {
     } catch (err) { return respondError(c, err); }
   });
 
+  api.get('/banking/transactions/:id/candidates', async (c) => {
+    try {
+      return c.json({ entries: await BankingService.getEntryCandidates(c.get('orgId'), uuid.parse(c.req.param('id'))) });
+    } catch (err) { return respondError(c, err); }
+  });
+
   api.post('/banking/transactions/:id/unmatch', async (c) => {
     try {
       return c.json(await BankingService.unmatchTransaction(c.get('orgId'), uuid.parse(c.req.param('id')), c.get('userId')));

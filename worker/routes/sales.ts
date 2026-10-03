@@ -42,7 +42,8 @@ export function registerSalesRoutes(api: Api) {
   // --- Invoices ---
   api.get('/invoices', async (c) => {
     try {
-      return c.json({ invoices: await InvoiceService.getInvoices(c.get('orgId')) });
+      const customerId = c.req.query('customerId');
+      return c.json({ invoices: await InvoiceService.getInvoices(c.get('orgId'), { customerId: customerId ? uuid.parse(customerId) : undefined }) });
     } catch (err) { return respondError(c, err); }
   });
 

@@ -123,6 +123,47 @@ export class BankingService {
     return rows.map(mapTransaction);
   }
 
+  /**
+   * Posted entries that could stand for one statement line: they move the
+   * bank account by exactly the line's amount, in its direction, and no
+   * other line claims them. Read straight from the bank account's lines of
+   * that amount, not from the whole journal.
+   */
+  static async getEntryCandidates(orgId: string, transactionId: string) {
+    const supabase = getSupabase();
+    const [{ data: tx, error: txError }, bankAccount, linked] = await Promise.all([
+      supabase.from('bank_transactions').select('id, amount_cents, direction').eq('org_id', orgId).eq('id', transactionId).maybeSingle(),
+      AccountService.getAccountByCode(orgId, BANK_ACCOUNT_CODE),
+      linkedEntryIds(orgId),
+    ]);
+    if (txError) throw txError;
+    if (!tx) throw new UserError('Statement line not found in this organization.', 404);
+    if (!bankAccount) return [];
+    const cents = Number(tx.amount_cents);
+    const { data: lines, error } = await supabase
+      .from('journal_lines')
+      .select('journal_entry_id, debit, credit, journal_entry:journal_entries!inner(id, org_id, entry_date, memo, reference_no, source_type)')
+      .eq('account_id', bankAccount.id)
+      .eq('journal_entries.org_id', orgId)
+      .eq(tx.direction === 'IN' ? 'debit' : 'credit', cents)
+      .order('journal_entry_id')
+      .limit(200);
+    if (error) throw error;
+    const seen = new Set<string>();
+    return (lines || [])
+      .filter((line: any) => !linked.has(line.journal_entry_id) && !seen.has(line.journal_entry_id) && seen.add(line.journal_entry_id))
+      .map((line: any) => ({
+        id: line.journal_entry.id,
+        entryDate: line.journal_entry.entry_date,
+        memo: line.journal_entry.memo,
+        referenceNo: line.journal_entry.reference_no,
+        sourceType: line.journal_entry.source_type,
+        bankCents: tx.direction === 'IN' ? cents : -cents,
+      }))
+      .sort((a, b) => String(b.entryDate).localeCompare(String(a.entryDate)))
+      .slice(0, 20);
+  }
+
   static async syncTransactions(orgId: string) {
     // Bank integration (e.g. Daraja API or OFX upload) is not yet implemented.
     return { count: 0, message: "Bank sync isn't connected yet" };

@@ -113,14 +113,14 @@ export function EntityDrillDownModal({ isOpen, onClose, entityType, entityId, in
     queryFn: async () => {
       if (!entityId) return [];
       if (entityType === 'CUSTOMER') {
-        const res = await fetch('/api/invoices', { headers: { 'x-org-id': currentOrgId } });
+        const res = await fetch(`/api/invoices?customerId=${entityId}`);
         if (!res.ok) throw new Error('Failed to fetch invoices');
-        return ((await res.json()).invoices || []).filter((inv: any) => inv.customerId === entityId);
+        return (await res.json()).invoices || [];
       }
       if (entityType === 'VENDOR') {
-        const res = await fetch('/api/bills', { headers: { 'x-org-id': currentOrgId } });
+        const res = await fetch(`/api/bills?vendorId=${entityId}`);
         if (!res.ok) throw new Error('Failed to fetch bills');
-        return ((await res.json()).bills || []).filter((b: any) => b.vendorId === entityId);
+        return (await res.json()).bills || [];
       }
       if (entityType === 'ITEM') {
         const res = await fetch(`/api/inventory/${entityId}/movements`);
@@ -128,9 +128,9 @@ export function EntityDrillDownModal({ isOpen, onClose, entityType, entityId, in
         return (await res.json()).movements || [];
       }
       if (entityType === 'ACCOUNT') {
-        const res = await fetch('/api/journal-entries', { headers: { 'x-org-id': currentOrgId } });
-        if (!res.ok) throw new Error('Failed to fetch journal entries');
-        return ((await res.json()).entries || []).filter((entry: any) => entry.lines?.some((l: any) => l.accountId === entityId));
+        const res = await fetch(`/api/reports/ledger?accountId=${entityId}`);
+        if (!res.ok) throw new Error('Failed to fetch the ledger');
+        return (await res.json()).lines || [];
       }
       return [];
     },
@@ -364,11 +364,7 @@ export function EntityDrillDownModal({ isOpen, onClose, entityType, entityId, in
 
   const accountLines: LedgerLine[] =
     entityType === 'ACCOUNT'
-      ? transactions.flatMap((entry: any) =>
-          (entry.lines || [])
-            .filter((l: any) => l.accountId === entityId)
-            .map((l: any, i: number) => ({ id: `${entry.id}-${i}`, date: entry.entryDate, sourceType: entry.sourceType, memo: l.description || entry.memo, debit: Number(l.debit || 0), credit: Number(l.credit || 0) })),
-        )
+      ? transactions.map((l: any) => ({ id: l.id, date: l.date, sourceType: l.sourceType, memo: l.memo, debit: Number(l.debit || 0), credit: Number(l.credit || 0) }))
       : [];
 
   const documentsTotal = transactions.reduce((s, t) => s + (t.totalCents || 0), 0);

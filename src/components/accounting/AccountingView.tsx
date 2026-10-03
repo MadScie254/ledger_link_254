@@ -1,7 +1,7 @@
 import React from 'react';
 import { X } from 'lucide-react';
 import { useState, useRef } from 'react';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useInfiniteQuery, useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAppStore } from '../../store';
 import { format } from 'date-fns';
 import { BudgetPlanner } from './BudgetPlanner';
@@ -50,14 +50,18 @@ export function AccountingView() {
     }
   });
 
-  const { data: journalsData, isLoading: isLoadingJournals } = useQuery({
+  // Newest first, 100 entries a page; older pages load on request.
+  const journals = useInfiniteQuery({
     queryKey: ['journal-entries', currentOrgId],
-    queryFn: async () => {
-      const res = await fetch('/api/journal-entries', { headers: { 'x-org-id': currentOrgId } });
+    initialPageParam: '',
+    queryFn: async ({ pageParam }) => {
+      const res = await fetch(`/api/journal-entries?limit=100${pageParam ? `&cursor=${encodeURIComponent(pageParam)}` : ''}`);
       if (!res.ok) throw new Error('Failed to fetch journals');
-      return res.json();
-    }
+      return res.json() as Promise<{ entries: any[]; nextCursor: string | null }>;
+    },
+    getNextPageParam: (lastPage) => lastPage.nextCursor || undefined,
   });
+  const isLoadingJournals = journals.isLoading;
 
   const handleSeed = async () => {
     await fetch('/api/accounts/seed', {
@@ -172,7 +176,7 @@ export function AccountingView() {
     setJeLines((prev) => prev.map((l, i) => (i === index ? { ...l, ...patch } : l)));
 
   const accounts = accountsData?.accounts || [];
-  const entries = journalsData?.entries || [];
+  const entries = (journals.data?.pages || []).flatMap((page) => page.entries);
 
   const activeAccounts = accounts.filter((acc: any) => acc.isActive !== false);
   const inactiveCount = accounts.length - activeAccounts.length;
@@ -229,7 +233,9 @@ export function AccountingView() {
     );
   };
   const entryAmount = (je: any) => (je.lines || []).reduce((sum: number, line: any) => sum + Number(line.debit || 0), 0);
-  const sortedEntries = [...entries].sort((a: any, b: any) => String(b.entryDate).localeCompare(String(a.entryDate)));
+  // Pages arrive newest entry date first already.
+  const sortedEntries = entries;
+  const moreEntries = Boolean(journals.hasNextPage);
   const entriesTotal = sortedEntries.reduce((sum: number, je: any) => sum + entryAmount(je), 0);
   const skeleton = (label: string) => (
     <div aria-busy="true" aria-label={label}>
@@ -264,7 +270,7 @@ export function AccountingView() {
         onChange={setActiveTab}
         tabs={[
           { id: 'Chart of Accounts', name: 'Chart of accounts', count: accounts.length },
-          { id: 'Journal Entries', name: 'Journal entries', count: entries.length },
+          { id: 'Journal Entries', name: 'Journal entries' },
           { id: 'Budgets', name: 'Budgets' },
           { id: 'Settings', name: 'Import and export' },
         ]}
@@ -411,7 +417,7 @@ export function AccountingView() {
                 </li>
               ))}
               <li className="ll-total mt-px flex items-baseline justify-between gap-3 py-2 text-[13.5px]">
-                <span className="font-semibold text-ink-900">Total of {sortedEntries.length} entries</span>
+                <span className="font-semibold text-ink-900">Total of the {sortedEntries.length} {moreEntries ? 'latest ' : ''}entries</span>
                 <Amount cents={entriesTotal} currency={baseCurrency} tone="ink" className="font-semibold" />
               </li>
             </ul>
@@ -440,12 +446,17 @@ export function AccountingView() {
                 </tbody>
                 <tfoot>
                   <tr>
-                    <th scope="row" colSpan={4} className="ll-total py-2 pr-4 text-left font-semibold text-ink-900">Total of {sortedEntries.length} entries</th>
+                    <th scope="row" colSpan={4} className="ll-total py-2 pr-4 text-left font-semibold text-ink-900">Total of the {sortedEntries.length} {moreEntries ? 'latest ' : ''}entries</th>
                     <td className="ll-total py-2 text-right whitespace-nowrap"><Amount cents={entriesTotal} currency={baseCurrency} tone="ink" className="font-semibold" /></td>
                   </tr>
                 </tfoot>
               </table>
             </div>
+            {moreEntries && (
+              <button type="button" onClick={() => journals.fetchNextPage()} disabled={journals.isFetchingNextPage} className={`${buttonClass.secondary} mt-3`}>
+                {journals.isFetchingNextPage ? 'Loading' : 'Load older entries'}
+              </button>
+            )}
           </>
         )
       )}

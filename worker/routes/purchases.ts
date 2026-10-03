@@ -40,7 +40,8 @@ export function registerPurchaseRoutes(api: Api) {
   // --- Bills ---
   api.get('/bills', async (c) => {
     try {
-      return c.json({ bills: await BillService.getBills(c.get('orgId')) });
+      const vendorId = c.req.query('vendorId');
+      return c.json({ bills: await BillService.getBills(c.get('orgId'), { vendorId: vendorId ? uuid.parse(vendorId) : undefined }) });
     } catch (err) { return respondError(c, err); }
   });
 

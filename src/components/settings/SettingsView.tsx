@@ -118,16 +118,25 @@ export function SettingsView() {
   const exportLedger = async () => {
     setExportProblem('');
     try {
-      const res = await fetch('/api/journal-entries', { headers: { 'x-org-id': currentOrgId } });
-      if (!res.ok) throw new Error('Failed to fetch journal entries');
-      const { entries } = await res.json();
-      const rows = (entries || []).flatMap((entry: any) =>
+      // Read page by page, so a long ledger never needs one huge response.
+      const entries: any[] = [];
+      let cursor = '';
+      do {
+        const res = await fetch(`/api/journal-entries?limit=200${cursor ? `&cursor=${encodeURIComponent(cursor)}` : ''}`);
+        if (!res.ok) throw new Error('Failed to fetch journal entries');
+        const page = await res.json();
+        entries.push(...(page.entries || []));
+        cursor = page.nextCursor || '';
+      } while (cursor);
+      const accountsRes = await fetch('/api/accounts');
+      const accountsById = new Map<string, any>(accountsRes.ok ? ((await accountsRes.json()).accounts || []).map((a: any) => [a.id, a]) : []);
+      const rows = entries.reverse().flatMap((entry: any) =>
         (entry.lines || []).map((line: any) => ({
           Date: entry.entryDate,
           Memo: entry.memo || '',
           Source: entry.sourceType,
           Reference: entry.referenceNo || '',
-          AccountId: line.accountId,
+          Account: accountsById.get(line.accountId) ? `${accountsById.get(line.accountId).code} ${accountsById.get(line.accountId).name}` : line.accountId,
           Debit: (line.debit || 0) / 100,
           Credit: (line.credit || 0) / 100,
         })),

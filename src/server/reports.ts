@@ -1,6 +1,7 @@
 import { getSupabase } from './supabase';
 import { fetchAllRows } from './pagination';
 import { AccountService } from './accounts';
+import { addDaysIso } from '../utils/dates';
 import {
   aggregateBalanceSheet,
   aggregateCashFlow,
@@ -114,6 +115,9 @@ export class ReportsService {
       journal_entry:journal_entries!inner(id, org_id, entry_date, source_type)
     `;
 
+    // The period's lines are read one by one, because cash is classified by
+    // entry. The opening cash only needs each account's total before the
+    // period, which Postgres adds up (account_balance_totals).
     const [periodLines, openingLines] = await Promise.all([
       fetchAllRows<unknown>((from, to) => supabase
         .from('journal_lines')
@@ -123,19 +127,10 @@ export class ReportsService {
         .lte('journal_entries.entry_date', range.end)
         .order('id')
         .range(from, to)),
-      fetchAllRows<unknown>((from, to) => supabase
-        .from('journal_lines')
-        .select(select)
-        .eq('journal_entries.org_id', orgId)
-        .lt('journal_entries.entry_date', range.start)
-        .order('id')
-        .range(from, to)),
+      accountTotalLines(orgId, { to: addDaysIso(range.start, -1) }),
     ]);
 
-    return aggregateCashFlow(
-      normalizeLedgerLines(periodLines),
-      normalizeLedgerLines(openingLines),
-    );
+    return aggregateCashFlow(normalizeLedgerLines(periodLines), openingLines);
   }
 
   static async getTrialBalance(orgId: string) {
@@ -309,19 +304,22 @@ export class ReportsService {
     };
   }
 
-  static async getLedgerLinesForAccount(orgId: string, accountName: string) {
+  /** Every line posted to one account, oldest first, with its entry's date and particulars. */
+  static async getLedgerLinesForAccount(orgId: string, account: { id?: string; name?: string }) {
     const supabase = getSupabase();
-    
-    // Find account by name
-    const { data: accounts, error: accountError } = await supabase
-      .from('accounts')
-      .select('id')
-      .eq('org_id', orgId)
-      .eq('name', accountName)
-      .limit(1);
-
-    if (accountError || !accounts || accounts.length === 0) return [];
-    const accountId = accounts[0].id;
+    let accountId = account.id;
+    if (!accountId) {
+      const { data: accounts, error: accountError } = await supabase
+        .from('accounts')
+        .select('id')
+        .eq('org_id', orgId)
+        .eq('name', account.name || '')
+        .order('code')
+        .limit(1);
+      if (accountError) throw accountError;
+      if (!accounts || accounts.length === 0) return [];
+      accountId = accounts[0].id;
+    }
 
     const lines = await fetchAllRows<any>((from, to) => supabase
       .from('journal_lines')
@@ -329,20 +327,24 @@ export class ReportsService {
         id,
         debit,
         credit,
-        journal_entry:journal_entries!inner(entry_date, source_type, memo, org_id)
+        description,
+        journal_entry:journal_entries!inner(id, entry_date, source_type, memo, org_id)
       `)
       .eq('account_id', accountId)
       .eq('journal_entries.org_id', orgId)
       .order('id')
       .range(from, to));
 
-    return lines.map((line: any) => ({
-      id: line.id,
-      date: line.journal_entry.entry_date,
-      sourceType: line.journal_entry.source_type,
-      memo: line.journal_entry.memo,
-      debit: line.debit,
-      credit: line.credit
-    }));
+    return lines
+      .map((line: any) => ({
+        id: line.id,
+        journalEntryId: line.journal_entry.id,
+        date: line.journal_entry.entry_date,
+        sourceType: line.journal_entry.source_type,
+        memo: line.description || line.journal_entry.memo,
+        debit: line.debit,
+        credit: line.credit
+      }))
+      .sort((a, b) => String(a.date).localeCompare(String(b.date)) || String(a.id).localeCompare(String(b.id)));
   }
 }
