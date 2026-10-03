@@ -1,5 +1,6 @@
 import type { Context, Next } from 'hono';
 import { getSupabase } from '../src/server/supabase';
+import { runWithRequestContext } from '../src/server/requestContext';
 
 // Must match the public.membership_role Postgres enum exactly
 // (supabase/migrations/20260829221831_001_core_tables.sql, extended by
@@ -19,11 +20,18 @@ const writeRoles = new Set<OrganizationRole>(['owner', 'admin', 'accountant']);
 const ALL_ROLES: readonly OrganizationRole[] = ['owner', 'admin', 'member', 'accountant'];
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
+const UUID_SEGMENT = '[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}';
+const INVITATION_RESPONSE = new RegExp(`^/api/invitations/${UUID_SEGMENT}/(accept|decline)$`, 'i');
+
+/** Requests about the signed-in person themselves, not one organization. */
 function isUserScopedRequest(c: Context) {
   const path = new URL(c.req.url).pathname;
+  const method = c.req.method;
   return (
-    (path === '/api/organizations' && (c.req.method === 'GET' || c.req.method === 'POST')) ||
-    (path === '/api/onboarding' && (c.req.method === 'GET' || c.req.method === 'PATCH'))
+    (path === '/api/organizations' && (method === 'GET' || method === 'POST')) ||
+    (path === '/api/onboarding' && (method === 'GET' || method === 'PATCH')) ||
+    (path === '/api/invitations' && method === 'GET') ||
+    (INVITATION_RESPONSE.test(path) && method === 'POST')
   );
 }
 
@@ -51,11 +59,17 @@ export async function requireAuthenticationAndOrganization(c: Context<{ Variable
 
   c.set('userId', user.id);
 
-  // Personal onboarding and organization collection requests are authenticated
-  // but do not require an existing organization selection.
+  // Everything the request does from here on is attributed to this person.
+  return runWithRequestContext({ actorId: user.id }, () => selectOrganization(c, next, user.id));
+}
+
+async function selectOrganization(c: Context<{ Variables: Variables }>, next: Next, userId: string) {
+  // Personal onboarding, invitation and organization collection requests are
+  // authenticated but do not require an existing organization selection.
   if (isUserScopedRequest(c)) {
     return next();
   }
+  const supabase = getSupabase();
 
   const requestedOrgId = c.req.header('x-org-id');
   if (!requestedOrgId) {
@@ -69,7 +83,7 @@ export async function requireAuthenticationAndOrganization(c: Context<{ Variable
     .from('memberships')
     .select('role')
     .eq('org_id', requestedOrgId)
-    .eq('user_id', user.id)
+    .eq('user_id', userId)
     .maybeSingle();
 
   if (membershipError) {
@@ -82,12 +96,21 @@ export async function requireAuthenticationAndOrganization(c: Context<{ Variable
     return c.json({ error: 'You do not have access to this organization.' }, 403);
   }
 
-  if (!['GET', 'HEAD', 'OPTIONS'].includes(c.req.method) && !writeRoles.has(role)) {
+  // Leaving an organization is the one change a read-only member may make.
+  const isLeaving = c.req.method === 'POST' && new URL(c.req.url).pathname === '/api/membership/leave';
+  if (!['GET', 'HEAD', 'OPTIONS'].includes(c.req.method) && !writeRoles.has(role) && !isLeaving) {
     return c.json({ error: 'Your organization role cannot modify data.' }, 403);
   }
 
   c.set('orgId', requestedOrgId);
   c.set('orgRole', role);
+  await next();
+}
+
+export async function requireOrganizationOwner(c: Context<{ Variables: Variables }>, next: Next) {
+  if (c.get('orgRole') !== 'owner') {
+    return c.json({ error: 'Only the organization owner can do this.' }, 403);
+  }
   await next();
 }
 

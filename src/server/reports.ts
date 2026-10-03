@@ -288,6 +288,27 @@ export class ReportsService {
     return { rows, totals: buckets, grandTotalCents: Object.values(buckets).reduce((a, b) => a + b, 0) };
   }
 
+  /**
+   * Receivables and payables in the ledger against the open invoices and
+   * bills behind them. Any difference means something reached account 1100
+   * or 2000 without a document, and is shown as a problem to resolve.
+   */
+  static async getControlCheck(orgId: string) {
+    const supabase = getSupabase();
+    const { data, error } = await supabase.rpc('control_account_check', { p_org_id: orgId });
+    if (error) throw error;
+    const row = (Array.isArray(data) ? data[0] : data) || {};
+    const arLedgerCents = Math.round(Number(row.ar_ledger_cents) || 0);
+    const openInvoiceCents = Math.round(Number(row.open_invoice_cents) || 0);
+    const apLedgerCents = Math.round(Number(row.ap_ledger_cents) || 0);
+    const openBillCents = Math.round(Number(row.open_bill_cents) || 0);
+    return {
+      receivables: { ledgerCents: arLedgerCents, documentsCents: openInvoiceCents, differenceCents: arLedgerCents - openInvoiceCents },
+      payables: { ledgerCents: apLedgerCents, documentsCents: openBillCents, differenceCents: apLedgerCents - openBillCents },
+      agrees: arLedgerCents === openInvoiceCents && apLedgerCents === openBillCents,
+    };
+  }
+
   static async getLedgerLinesForAccount(orgId: string, accountName: string) {
     const supabase = getSupabase();
     

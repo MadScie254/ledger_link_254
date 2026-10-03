@@ -1,6 +1,8 @@
 import { getSupabase } from './supabase';
 import { fetchAllRows } from './pagination';
 import { EtimsService } from './etims';
+import { UserError } from './errors';
+import { organizationToday } from './organizationDates';
 
 export interface InvoiceLineInput {
   description: string;
@@ -57,6 +59,8 @@ function mapInvoicePayment(row: any) {
     paymentDate: row.payment_date,
     accountId: row.account_id,
     journalEntryId: row.journal_entry_id,
+    reversedAt: row.reversed_at ?? null,
+    reversalReason: row.reversal_reason ?? null,
     createdAt: row.created_at,
   };
 }
@@ -96,26 +100,26 @@ async function assertInvoiceRelations(orgId: string, customerId: string, lines: 
   ]);
 
   if (customerError) throw customerError;
-  if (!customer) throw new Error('The selected customer does not belong to this organization.');
+  if (!customer) throw new UserError('The selected customer does not belong to this organization.');
   if (accountsError) throw accountsError;
 
   const activeAccountIds = new Set((accounts || []).filter((account: any) => account.is_active !== false).map((account: any) => account.id));
   const missingAccount = accountIds.find((accountId) => !activeAccountIds.has(accountId));
-  if (missingAccount) throw new Error('One or more invoice accounts do not belong to this organization or are inactive.');
+  if (missingAccount) throw new UserError('One or more invoice accounts do not belong to this organization or are inactive.');
 }
 
 async function assertDepositAccount(orgId: string, accountId: string) {
   const supabase = getSupabase();
   const { data, error } = await supabase
     .from('accounts')
-    .select('id, type, is_active')
+    .select('id, type, is_active, is_bank_account')
     .eq('org_id', orgId)
     .eq('id', accountId)
     .maybeSingle();
 
   if (error) throw error;
-  if (!data || data.is_active === false || data.type !== 'ASSET') {
-    throw new Error('The deposit account must be an active asset account in this organization.');
+  if (!data || data.is_active === false || data.type !== 'ASSET' || !data.is_bank_account) {
+    throw new UserError('Payments are deposited to an active bank, cash or M-Pesa account in this organization.');
   }
 }
 
@@ -131,6 +135,19 @@ export class InvoiceService {
       .range(from, to));
 
     return data.map(mapInvoice);
+  }
+
+  static async getInvoice(orgId: string, invoiceId: string) {
+    const supabase = getSupabase();
+    const { data, error } = await supabase
+      .from('invoices')
+      .select('*, invoice_lines(*), invoice_payments(*)')
+      .eq('org_id', orgId)
+      .eq('id', invoiceId)
+      .maybeSingle();
+    if (error) throw error;
+    if (!data) throw new UserError('Invoice not found in this organization.', 404);
+    return mapInvoice(data);
   }
 
   static async createInvoice(input: InvoiceInput): Promise<string> {
@@ -188,9 +205,9 @@ export class InvoiceService {
 
     if (invoiceResult.error) throw invoiceResult.error;
     const invoice = invoiceResult.data;
-    if (!invoice) throw new Error('Invoice not found in this organization.');
-    if (invoice.status === 'VOID') throw new Error('A void invoice cannot receive a payment.');
-    if (input.amountCents > Number(invoice.amount_due_cents)) throw new Error('Payment cannot exceed the invoice amount due.');
+    if (!invoice) throw new UserError('Invoice not found in this organization.', 404);
+    if (invoice.status === 'VOID') throw new UserError('A void invoice cannot receive a payment.');
+    if (input.amountCents > Number(invoice.amount_due_cents)) throw new UserError('Payment cannot exceed the invoice amount due.');
 
     const { data, error } = await supabase.rpc('receive_invoice_payment', {
       p_org_id: orgId,
@@ -211,21 +228,61 @@ export class InvoiceService {
     };
   }
 
-  static async voidInvoice(orgId: string, invoiceId: string, voidedBy: string) {
+  static async voidInvoice(orgId: string, invoiceId: string, voidedBy: string, voidDate?: string) {
     const supabase = getSupabase();
     const { error } = await supabase.rpc('void_invoice_with_reversal', {
       p_org_id: orgId,
       p_invoice_id: invoiceId,
-      p_void_date: new Date().toISOString().slice(0, 10),
+      p_void_date: voidDate || await organizationToday(orgId),
       p_created_by: voidedBy,
     });
     if (error) throw error;
   }
 
+  /**
+   * Reverses one payment: a reversing entry is posted, the invoice's amount
+   * due is restored and a statement line matched to the payment is opened
+   * again (public.reverse_invoice_payment).
+   */
+  static async reversePayment(orgId: string, invoiceId: string, paymentId: string, reversalDate: string, reason: string, actor: string) {
+    const supabase = getSupabase();
+    const { data: payment, error: paymentError } = await supabase
+      .from('invoice_payments')
+      .select('id')
+      .eq('org_id', orgId)
+      .eq('invoice_id', invoiceId)
+      .eq('id', paymentId)
+      .maybeSingle();
+    if (paymentError) throw paymentError;
+    if (!payment) throw new UserError('That payment is not on this invoice.', 404);
+    const { data, error } = await supabase.rpc('reverse_invoice_payment', {
+      p_org_id: orgId,
+      p_payment_id: paymentId,
+      p_reversal_date: reversalDate,
+      p_reason: reason,
+      p_actor: actor,
+    });
+    if (error) throw error;
+    return data as { reversalJournalEntryId: string; amountDueCents: number; status: string };
+  }
+
   static async updateInvoice(orgId: string, id: string, input: { dueDate?: string; notes?: string; status?: never }) {
     const supabase = getSupabase();
     if ((input as any).status !== undefined) {
-      throw new Error('Invoice status must be changed through a dedicated payment or void workflow.');
+      throw new UserError('Invoice status must be changed through a dedicated payment or void workflow.');
+    }
+    if (input.dueDate !== undefined) {
+      const { data: current, error: currentError } = await supabase
+        .from('invoices')
+        .select('status')
+        .eq('org_id', orgId)
+        .eq('id', id)
+        .maybeSingle();
+      if (currentError) throw currentError;
+      if (!current) throw new UserError('Invoice not found in this organization.', 404);
+      if (current.status === 'VOID' || current.status === 'PAID') {
+        throw new UserError(`A ${current.status === 'VOID' ? 'void' : 'paid'} invoice's due date no longer changes.`);
+      }
     }
 
     const updateData: Record<string, unknown> = {};
@@ -241,7 +298,7 @@ export class InvoiceService {
         .select('id')
         .maybeSingle();
       if (error) throw error;
-      if (!data) throw new Error('Invoice not found in this organization.');
+      if (!data) throw new UserError('Invoice not found in this organization.', 404);
     }
   }
 }

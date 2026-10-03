@@ -25,8 +25,10 @@ async function seedDemoOrg() {
     baseCurrency: 'KES',
     country: 'Kenya',
     taxId: 'P012345678Z',
-    isDemo: true,
   }, userId);
+  // Marks the organization as sample books; only this script does that.
+  const { error: demoError } = await supabase.from('organizations').update({ is_demo: true }).eq('id', orgId);
+  if (demoError) throw demoError;
   console.log(`Created Demo Org ID: ${orgId}`);
 
   const bankAccount = await AccountService.getAccountByCode(orgId, '1000');

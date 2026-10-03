@@ -1,184 +1,213 @@
 import { getSupabase } from './supabase';
-import { AuditService } from './audit';
+import { UserError } from './errors';
 import type { OrganizationRole } from '../../worker/auth';
 
-const ASSIGNABLE_ROLES = new Set(['admin', 'member', 'accountant']);
 type AssignableRole = 'admin' | 'member' | 'accountant';
-
-export interface TeamMemberInput {
-  orgId: string;
-  email: string;
-  role: AssignableRole;
-  invitedBy?: string;
-}
 
 export interface TeamMember {
   id: string;
   userId: string;
   email: string;
   role: OrganizationRole;
-  status: 'Active' | 'Invited';
+  status: 'Active';
   isYou: boolean;
+  joinedAt: string;
 }
 
+export interface PendingInvitation {
+  id: string;
+  email: string;
+  role: AssignableRole;
+  status: 'Invited';
+  invitedAt: string;
+}
+
+export interface MyInvitation {
+  id: string;
+  orgId: string;
+  organizationName: string;
+  role: AssignableRole;
+  invitedByEmail: string | null;
+  invitedAt: string;
+}
+
+/**
+ * Team membership. Invitations are pending until the invited person accepts
+ * them, signed in with that confirmed email address (public.invite_member,
+ * public.respond_to_invitation); nobody is added to an organization without
+ * agreeing to it. Only the owner manages administrators. Membership changes
+ * are written to the audit log by the database.
+ */
 export class TeamService {
-  static async getMembers(orgId: string, currentUserId?: string): Promise<TeamMember[]> {
+  static async getTeam(orgId: string, currentUserId: string): Promise<{ members: TeamMember[]; invitations: PendingInvitation[] }> {
     const supabase = getSupabase();
+    const [membershipsResult, emailsResult, invitationsResult] = await Promise.all([
+      supabase
+        .from('memberships')
+        .select('id, user_id, role, created_at')
+        .eq('org_id', orgId)
+        .order('created_at', { ascending: true }),
+      supabase.rpc('organization_member_emails', { p_org_id: orgId }),
+      supabase
+        .from('organization_invitations')
+        .select('id, email, role, created_at')
+        .eq('org_id', orgId)
+        .eq('status', 'PENDING')
+        .order('created_at', { ascending: true }),
+    ]);
+    if (membershipsResult.error) throw membershipsResult.error;
+    if (emailsResult.error) throw emailsResult.error;
+    if (invitationsResult.error) throw invitationsResult.error;
 
-    const { data: memberships, error } = await supabase
-      .from('memberships')
-      .select('id, user_id, role, created_at')
-      .eq('org_id', orgId)
-      .order('created_at', { ascending: true });
-
-    if (error) throw error;
-    if (!memberships || memberships.length === 0) return [];
-
-    // One query for every member's email, instead of one Auth API call each.
-    const { data: emailRows, error: emailError } = await supabase.rpc('organization_member_emails', { p_org_id: orgId });
-    if (emailError) throw emailError;
     const emailByUserId = new Map<string, string>(
-      ((emailRows || []) as Array<{ user_id: string; email: string | null }>).map((row) => [row.user_id, row.email || row.user_id]),
+      ((emailsResult.data || []) as Array<{ user_id: string; email: string | null }>).map((row) => [row.user_id, row.email || row.user_id]),
     );
 
-    return memberships.map((m) => ({
-      id: m.id,
-      userId: m.user_id,
-      email: emailByUserId.get(m.user_id) || m.user_id,
-      role: m.role as OrganizationRole,
-      status: 'Active' as const,
-      isYou: m.user_id === currentUserId,
+    return {
+      members: (membershipsResult.data || []).map((m) => ({
+        id: m.id,
+        userId: m.user_id,
+        email: emailByUserId.get(m.user_id) || m.user_id,
+        role: m.role as OrganizationRole,
+        status: 'Active' as const,
+        isYou: m.user_id === currentUserId,
+        joinedAt: m.created_at,
+      })),
+      invitations: (invitationsResult.data || []).map((invitation) => ({
+        id: invitation.id,
+        email: invitation.email,
+        role: invitation.role as AssignableRole,
+        status: 'Invited' as const,
+        invitedAt: invitation.created_at,
+      })),
+    };
+  }
+
+  /**
+   * Records an invitation. A person without an account yet is also sent
+   * Supabase's sign-up invitation email; one who has an account sees the
+   * invitation the next time they sign in.
+   */
+  static async invite(orgId: string, email: string, role: AssignableRole, invitedBy: string): Promise<{ invitationId: string; emailed: boolean }> {
+    const supabase = getSupabase();
+    const { data, error } = await supabase.rpc('invite_member', {
+      p_org_id: orgId,
+      p_email: email,
+      p_role: role,
+      p_actor: invitedBy,
+    });
+    if (error) throw error;
+    const result = data as { invitationId: string; hasAccount: boolean };
+
+    let emailed = false;
+    if (!result.hasAccount) {
+      const { error: inviteError } = await supabase.auth.admin.inviteUserByEmail(email);
+      // The invitation stands either way: it is waiting for them when they sign up.
+      if (!inviteError) emailed = true;
+      else console.warn('[Team] Sign-up invitation email was not sent:', inviteError.status ?? '-', inviteError.code ?? '-');
+    }
+    return { invitationId: result.invitationId, emailed };
+  }
+
+  static async revokeInvitation(orgId: string, invitationId: string, actor: string): Promise<void> {
+    const supabase = getSupabase();
+    const { error } = await supabase.rpc('revoke_invitation', {
+      p_org_id: orgId,
+      p_invitation_id: invitationId,
+      p_actor: actor,
+    });
+    if (error) throw error;
+  }
+
+  static async myInvitations(userId: string): Promise<MyInvitation[]> {
+    const supabase = getSupabase();
+    const { data, error } = await supabase.rpc('pending_invitations', { p_user_id: userId });
+    if (error) throw error;
+    return ((data || []) as any[]).map((row) => ({
+      id: row.invitation_id,
+      orgId: row.org_id,
+      organizationName: row.organization_name,
+      role: row.role,
+      invitedByEmail: row.invited_by_email,
+      invitedAt: row.created_at,
     }));
   }
 
-  static async addMember(input: TeamMemberInput): Promise<string> {
+  static async respond(invitationId: string, userId: string, accept: boolean): Promise<{ orgId: string; accepted: boolean }> {
     const supabase = getSupabase();
-    const email = String(input.email ?? '').trim().toLowerCase();
-
-    if (!email || !email.includes('@')) {
-      throw new Error('A valid email address is required.');
-    }
-    if (!ASSIGNABLE_ROLES.has(input.role)) {
-      throw new Error('Role must be admin, member or accountant.');
-    }
-
-    // Find an existing Supabase Auth user with this email first, since
-    // inviteUserByEmail errors if the user already exists. One indexed
-    // lookup; paging through every user in the project, across all
-    // companies, took one Worker subrequest per 200 users.
-    const { data: existingUserId, error: lookupError } = await supabase.rpc('auth_user_id_by_email', { p_email: email });
-    if (lookupError) throw lookupError;
-    let userId: string | null = typeof existingUserId === 'string' ? existingUserId : null;
-
-    if (!userId) {
-      const { data, error } = await supabase.auth.admin.inviteUserByEmail(email);
-      if (error) throw new Error(`Failed to invite ${email}: ${error.message}`);
-      userId = data.user.id;
-    }
-
-    const { data: existingMembership } = await supabase
-      .from('memberships')
-      .select('id')
-      .eq('org_id', input.orgId)
-      .eq('user_id', userId)
-      .maybeSingle();
-
-    if (existingMembership) {
-      throw new Error(`${email} is already a member of this organization.`);
-    }
-
-    const { data: newMembership, error: membershipError } = await supabase
-      .from('memberships')
-      .insert({ org_id: input.orgId, user_id: userId, role: input.role })
-      .select('id')
-      .single();
-
-    if (membershipError) throw membershipError;
-
-    if (input.invitedBy) {
-      await AuditService.logEvent({
-        orgId: input.orgId,
-        userId: input.invitedBy,
-        action: 'CREATE',
-        resourceType: 'TEAM_MEMBER',
-        resourceId: newMembership.id,
-        details: { email, role: input.role }
-      });
-    }
-
-    return newMembership.id;
+    const { data, error } = await supabase.rpc('respond_to_invitation', {
+      p_invitation_id: invitationId,
+      p_user_id: userId,
+      p_accept: accept,
+    });
+    if (error) throw error;
+    return data as { orgId: string; accepted: boolean };
   }
 
-  static async updateMemberRole(orgId: string, membershipId: string, role: AssignableRole, updatedBy?: string): Promise<void> {
+  private static async membership(orgId: string, membershipId: string) {
     const supabase = getSupabase();
-    if (!ASSIGNABLE_ROLES.has(role)) {
-      throw new Error('Role must be admin, member or accountant.');
-    }
-
-    const { data: membership, error: fetchError } = await supabase
+    const { data, error } = await supabase
       .from('memberships')
-      .select('role')
+      .select('id, user_id, role')
       .eq('id', membershipId)
       .eq('org_id', orgId)
-      .single();
+      .maybeSingle();
+    if (error) throw error;
+    if (!data) throw new UserError('Team member not found.', 404);
+    return data;
+  }
 
-    if (fetchError || !membership) throw new Error('Team member not found.');
+  /**
+   * Changes a member's role. The owner's role never changes this way; only
+   * the owner makes, unmakes or changes an administrator.
+   */
+  static async updateMemberRole(orgId: string, membershipId: string, role: AssignableRole, actorRole: OrganizationRole): Promise<void> {
+    const supabase = getSupabase();
+    const membership = await this.membership(orgId, membershipId);
     if (membership.role === 'owner') {
-      throw new Error("The organization owner's role cannot be changed.");
+      throw new UserError("The owner's role cannot be changed. The owner can transfer ownership instead.");
     }
-
+    if ((membership.role === 'admin' || role === 'admin') && actorRole !== 'owner') {
+      throw new UserError('Only the owner adds or changes administrators.', 403);
+    }
     const { error } = await supabase
       .from('memberships')
       .update({ role })
       .eq('id', membershipId)
       .eq('org_id', orgId);
-
     if (error) throw error;
-
-    if (updatedBy) {
-      await AuditService.logEvent({
-        orgId,
-        userId: updatedBy,
-        action: 'UPDATE',
-        resourceType: 'TEAM_MEMBER',
-        resourceId: membershipId,
-        details: { role }
-      });
-    }
   }
 
-  static async removeMember(orgId: string, membershipId: string, removedBy?: string): Promise<void> {
+  static async removeMember(orgId: string, membershipId: string, actorRole: OrganizationRole): Promise<void> {
     const supabase = getSupabase();
-
-    const { data: membership, error: fetchError } = await supabase
-      .from('memberships')
-      .select('role, user_id')
-      .eq('id', membershipId)
-      .eq('org_id', orgId)
-      .single();
-
-    if (fetchError || !membership) throw new Error('Team member not found.');
+    const membership = await this.membership(orgId, membershipId);
     if (membership.role === 'owner') {
-      throw new Error('The organization owner cannot be removed.');
+      throw new UserError('The owner cannot be removed. The owner can transfer ownership instead.');
     }
-
+    if (membership.role === 'admin' && actorRole !== 'owner') {
+      throw new UserError('Only the owner removes administrators.', 403);
+    }
     const { error } = await supabase
       .from('memberships')
       .delete()
       .eq('id', membershipId)
       .eq('org_id', orgId);
-
     if (error) throw error;
+  }
 
-    if (removedBy) {
-      await AuditService.logEvent({
-        orgId,
-        userId: removedBy,
-        action: 'DELETE',
-        resourceType: 'TEAM_MEMBER',
-        resourceId: membershipId,
-        details: {}
-      });
-    }
+  static async transferOwnership(orgId: string, membershipId: string, actor: string): Promise<void> {
+    const supabase = getSupabase();
+    const { error } = await supabase.rpc('transfer_ownership', {
+      p_org_id: orgId,
+      p_new_owner_membership_id: membershipId,
+      p_actor: actor,
+    });
+    if (error) throw error;
+  }
+
+  static async leave(orgId: string, userId: string): Promise<void> {
+    const supabase = getSupabase();
+    const { error } = await supabase.rpc('leave_organization', { p_org_id: orgId, p_user_id: userId });
+    if (error) throw error;
   }
 }

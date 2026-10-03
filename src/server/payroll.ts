@@ -1,4 +1,5 @@
 import { getSupabase } from './supabase';
+import { UserError } from './errors';
 import { fetchAllRows } from './pagination';
 import { calculatePayslip, isIsoCalendarDate, monthlyGrossCents, parsePayPeriod } from '../utils/kenyaPayroll';
 
@@ -114,6 +115,7 @@ export class PayrollService {
       id: row.id,
       orgId: row.org_id,
       firstName: row.first_name,
+      middleName: row.middle_name ?? null,
       lastName: row.last_name,
       email: row.email,
       phone: row.phone,
@@ -154,6 +156,7 @@ export class PayrollService {
       .insert({
         org_id: orgId,
         first_name: firstName,
+        middle_name: optionalText(input.middleName, 'Middle name'),
         last_name: lastName,
         email: optionalText(input.email, 'Email'),
         phone: optionalText(input.phone, 'Phone'),
@@ -187,6 +190,7 @@ export class PayrollService {
     const updateData: Record<string, unknown> = {};
     if (input.firstName !== undefined) updateData.first_name = optionalText(input.firstName, 'First name');
     if (input.lastName !== undefined) updateData.last_name = optionalText(input.lastName, 'Last name');
+    if (input.middleName !== undefined) updateData.middle_name = optionalText(input.middleName, 'Middle name');
     if (input.email !== undefined) updateData.email = optionalText(input.email, 'Email');
     if (input.phone !== undefined) updateData.phone = optionalText(input.phone, 'Phone');
     if (input.department !== undefined) updateData.department = optionalText(input.department, 'Department');
@@ -217,7 +221,7 @@ export class PayrollService {
       .maybeSingle();
 
     if (error) throw error;
-    if (!data) throw new Error('Employee not found in this organization.');
+    if (!data) throw new UserError('Employee not found in this organization.', 404);
   }
 
   static async runPayroll(
@@ -298,7 +302,7 @@ export class PayrollService {
     };
 
     const { data: runId, error } = await supabase.rpc('run_payroll_with_journal', payload);
-    if (error) throw new Error(`Payroll could not be posted atomically: ${error.message}`);
+    if (error) throw error;
     if (typeof runId !== 'string' || !runId) {
       throw new Error('Payroll posting did not return a payroll run ID.');
     }
@@ -329,8 +333,28 @@ export class PayrollService {
       totalEmployerNssfCents: row.total_employer_nssf_cents,
       totalEmployerAhlCents: row.total_employer_ahl_cents,
       rateVersion: row.rate_version,
+      reversedAt: row.reversed_at ?? null,
+      reversalReason: row.reversal_reason ?? null,
       createdAt: row.created_at
     }));
+  }
+
+  /**
+   * Reverses a payroll run: a reversing entry is posted and the month is free
+   * for a corrected run (public.reverse_payroll_run). The payslips stay on
+   * record, marked with the run's reversal.
+   */
+  static async reversePayrollRun(orgId: string, runId: string, reversalDate: string, reason: string, actor: string) {
+    const supabase = getSupabase();
+    const { data, error } = await supabase.rpc('reverse_payroll_run', {
+      p_org_id: orgId,
+      p_run_id: runId,
+      p_reversal_date: reversalDate,
+      p_reason: reason,
+      p_actor: actor,
+    });
+    if (error) throw error;
+    return data as { reversalJournalEntryId: string; period: string };
   }
 
   static async getPayslips(orgId: string, payrollRunId: string) {

@@ -1,8 +1,7 @@
 import { getSupabase } from './supabase';
-import { LedgerService } from './ledger';
 import { AccountService } from './accounts';
-import { InvoiceService } from './invoices';
-import { BillService } from './bills';
+import { UserError } from './errors';
+import { publicMessage } from './publicMessage';
 import { fetchAllRows } from './pagination';
 import {
   AUTO_ACCEPT_CONFIDENCE,
@@ -354,8 +353,7 @@ export class BankingService {
         await this.matchTransaction(orgId, match.transactionId, target, userId);
         reconciledCount++;
       } catch (err) {
-        failures.push({ transactionId: match.transactionId, message: err instanceof Error ? err.message : 'The line could not be matched.' });
-        console.error('Error auto-reconciling match:', err);
+        failures.push({ transactionId: match.transactionId, message: publicMessage(err) });
       }
     }
 
@@ -369,145 +367,50 @@ export class BankingService {
   }
 
   /**
-   * Matches one statement line to exactly one target:
-   * - invoiceId or billId records a payment against that document through
-   *   receive_invoice_payment or pay_bill, so the invoice or bill, the
-   *   customer or supplier balance and the ledger all move together;
+   * Matches one statement line to exactly one target, in one database
+   * transaction that locks the line (public.match_bank_transaction):
+   * - invoiceId or billId records a payment against that document, so the
+   *   invoice or bill, the customer or supplier balance and the ledger move
+   *   together;
    * - existingJournalEntryId links an entry already posted that moved the bank
    *   account by the same amount in the same direction, posting nothing new;
    * - targetAccountId posts a new bank entry against that account, which may
    *   not be receivables, payables or the bank account itself.
-   *
-   * The posting uses the idempotency key bank-match:{line id}, so a retry
-   * after a failure part-way through returns the same payment or entry.
+   * Two people matching the same line at once cannot both post: the second
+   * waits for the lock and is then told the line is already matched.
    */
-  static async matchTransaction(orgId: string, transactionId: string, target: BankMatchTarget, userId: string) {
-    const supabase = getSupabase();
+  static async matchTransaction(orgId: string, transactionId: string, target: BankMatchTarget, userId: string): Promise<string> {
     const chosen = [target.targetAccountId, target.existingJournalEntryId, target.invoiceId, target.billId].filter(Boolean);
     if (chosen.length !== 1) {
-      throw new Error('Choose exactly one of an account, a posted entry, an invoice or a bill to match this line to.');
+      throw new UserError('Choose exactly one of an account, a posted entry, an invoice or a bill to match this line to.');
     }
+    const supabase = getSupabase();
+    const { data, error } = await supabase.rpc('match_bank_transaction', {
+      p_org_id: orgId,
+      p_transaction_id: transactionId,
+      p_target_account_id: target.targetAccountId || null,
+      p_existing_journal_entry_id: target.existingJournalEntryId || null,
+      p_invoice_id: target.invoiceId || null,
+      p_bill_id: target.billId || null,
+      p_actor: userId,
+    });
+    if (error) throw error;
+    return data as string;
+  }
 
-    const { data: tx, error: txError } = await supabase
-      .from('bank_transactions')
-      .select('*')
-      .eq('org_id', orgId)
-      .eq('id', transactionId)
-      .maybeSingle();
-
-    if (txError) throw txError;
-    if (!tx) throw new Error('Transaction not found');
-    if (tx.status === 'MATCHED') throw new Error('Transaction is already matched');
-    const amountCents = Number(tx.amount_cents);
-    if (!Number.isSafeInteger(amountCents) || amountCents <= 0) {
-      throw new Error('Bank transaction amount must be a positive integer number of cents.');
-    }
-    const lineDate = String(tx.date).slice(0, 10);
-    const idempotencyKey = `bank-match:${transactionId}`;
-
-    const bankAccount = await AccountService.getAccountByCode(orgId, BANK_ACCOUNT_CODE);
-    if (!bankAccount) throw new Error(`Bank account (${BANK_ACCOUNT_CODE}) not found in Chart of Accounts.`);
-
-    let journalEntryId: string;
-
-    if (target.invoiceId) {
-      if (tx.direction !== 'IN') throw new Error('Only money coming in can pay an invoice.');
-      const payment = await InvoiceService.receivePayment(orgId, target.invoiceId, {
-        amountCents,
-        paymentDate: lineDate,
-        depositAccountId: bankAccount.id,
-        idempotencyKey,
-        createdBy: userId,
-      });
-      journalEntryId = payment.journalEntryId;
-    } else if (target.billId) {
-      if (tx.direction !== 'OUT') throw new Error('Only money going out can pay a bill.');
-      const payment = await BillService.recordPayment(orgId, target.billId, {
-        amountCents,
-        paymentDate: lineDate,
-        sourceAccountId: bankAccount.id,
-        idempotencyKey,
-        createdBy: userId,
-      });
-      journalEntryId = payment.journalEntryId;
-    } else if (target.existingJournalEntryId) {
-      const [movements, alreadyLinked] = await Promise.all([
-        bankMovementsByEntry(orgId, bankAccount.id, { entryId: target.existingJournalEntryId }),
-        supabase
-          .from('bank_transactions')
-          .select('id')
-          .eq('org_id', orgId)
-          .eq('matched_journal_entry_id', target.existingJournalEntryId)
-          .limit(1),
-      ]);
-      if (alreadyLinked.error) throw alreadyLinked.error;
-      const movement = movements.get(target.existingJournalEntryId);
-      if (!movement) {
-        throw new Error('That entry does not move the bank account, or belongs to another organization.');
-      }
-      const expected = tx.direction === 'IN' ? amountCents : -amountCents;
-      if (movement.netBankCents !== expected) {
-        throw new Error(`That entry moves the bank account by a different amount or in the other direction, so it cannot stand for this ${tx.direction === 'IN' ? 'money in' : 'money out'}.`);
-      }
-      if ((alreadyLinked.data || []).length > 0) {
-        throw new Error('That entry is already matched to another statement line.');
-      }
-      journalEntryId = target.existingJournalEntryId;
-    } else {
-      const { data: targetAccount, error: accountError } = await supabase
-        .from('accounts')
-        .select('id, code')
-        .eq('org_id', orgId)
-        .eq('id', target.targetAccountId!)
-        .eq('is_active', true)
-        .maybeSingle();
-      if (accountError) throw accountError;
-      if (!targetAccount) throw new Error('The target account is inactive or belongs to another organization.');
-      if (CONTROL_ACCOUNT_CODES.has(targetAccount.code)) {
-        throw new Error(targetAccount.code === '1100'
-          ? 'Money paying an invoice is matched to the invoice, not posted to accounts receivable.'
-          : 'Money paying a bill is matched to the bill, not posted to accounts payable.');
-      }
-      if (targetAccount.id === bankAccount.id) {
-        throw new Error('A bank line cannot be posted back to the bank account itself.');
-      }
-
-      const lines = tx.direction === 'IN'
-        ? [
-          { accountId: bankAccount.id, debit: amountCents, credit: 0, description: tx.description },
-          { accountId: targetAccount.id, debit: 0, credit: amountCents, description: tx.description },
-        ]
-        : [
-          { accountId: targetAccount.id, debit: amountCents, credit: 0, description: tx.description },
-          { accountId: bankAccount.id, debit: 0, credit: amountCents, description: tx.description },
-        ];
-
-      journalEntryId = await LedgerService.postJournalEntry({
-        orgId,
-        entryDate: lineDate,
-        memo: `Bank Match: ${tx.description}`,
-        sourceType: 'BANK',
-        sourceId: transactionId,
-        createdBy: userId,
-        idempotencyKey,
-        lines
-      });
-    }
-
-    const { data: matchedTransaction, error: matchError } = await supabase
-      .from('bank_transactions')
-      .update({
-        status: 'MATCHED',
-        matched_journal_entry_id: journalEntryId,
-      })
-      .eq('org_id', orgId)
-      .eq('id', transactionId)
-      .neq('status', 'MATCHED')
-      .select('id')
-      .maybeSingle();
-    if (matchError) throw matchError;
-    if (!matchedTransaction) throw new Error('Transaction was already matched by another request.');
-
-    return journalEntryId;
+  /**
+   * Undoes a match: a posting the match made is reversed, and a link to an
+   * entry posted elsewhere is removed. A line that recorded a payment is
+   * undone by reversing that payment instead.
+   */
+  static async unmatchTransaction(orgId: string, transactionId: string, userId: string) {
+    const supabase = getSupabase();
+    const { data, error } = await supabase.rpc('unmatch_bank_transaction', {
+      p_org_id: orgId,
+      p_transaction_id: transactionId,
+      p_actor: userId,
+    });
+    if (error) throw error;
+    return data as { reversalJournalEntryId: string | null };
   }
 }

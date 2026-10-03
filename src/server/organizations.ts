@@ -1,6 +1,6 @@
 import { getSupabase } from './supabase';
 import { extraAccountsFor, type BusinessType } from '../utils/businessTypes';
-import { DEFAULT_THEME_ACCENT, type ThemeAccent } from '../utils/themeAccents';
+import type { ThemeAccent } from '../utils/themeAccents';
 
 export interface Organization {
   id: string;
@@ -20,8 +20,90 @@ export interface Organization {
   website?: string;
   isDefault?: boolean;
   isDemo?: boolean;
+  booksClosedThrough?: string | null;
+  approvalThresholdCents?: number | null;
+  aiEnabled?: boolean;
+  timeZone?: string;
   createdAt?: any;
   updatedAt?: any;
+}
+
+export type OrganizationCreateInput = Omit<Organization, 'id' | 'createdAt' | 'updatedAt' | 'isDemo' | 'isDefault'> & {
+  creationKey?: string;
+};
+
+export type OrganizationUpdateInput = Partial<Omit<Organization, 'id' | 'createdAt' | 'updatedAt' | 'isDemo' | 'isDefault'>>;
+
+/** The standard chart every organization starts with. Codes 1000-1099 hold money. */
+export const STANDARD_ACCOUNTS = [
+  { code: '1000', name: 'Cash equivalents (Operating Account)', type: 'ASSET' as const },
+  { code: '1010', name: 'USD Bank Account (Foreign Holding)', type: 'ASSET' as const, currency: 'USD' },
+  { code: '1020', name: 'EUR Bank Account (Foreign Holding)', type: 'ASSET' as const, currency: 'EUR' },
+  { code: '1050', name: 'M-Pesa Business Till / Paybill', type: 'ASSET' as const },
+  { code: '1100', name: 'Accounts Receivable (A/R)', type: 'ASSET' as const },
+  { code: '1150', name: 'Recoverable VAT / Input Tax', type: 'ASSET' as const },
+  { code: '1200', name: 'Inventory Asset', type: 'ASSET' as const },
+  { code: '2000', name: 'Accounts Payable (A/P)', type: 'LIABILITY' as const },
+  { code: '2100', name: 'Output VAT Payable', type: 'LIABILITY' as const },
+  { code: '2110', name: 'PAYE Payable', type: 'LIABILITY' as const },
+  { code: '2120', name: 'NSSF Payable', type: 'LIABILITY' as const },
+  { code: '2130', name: 'SHA Payable', type: 'LIABILITY' as const },
+  { code: '2140', name: 'Affordable Housing Levy Payable', type: 'LIABILITY' as const },
+  { code: '3000', name: "Owner's Equity / Share Capital", type: 'EQUITY' as const },
+  { code: '3100', name: 'Retained Earnings', type: 'EQUITY' as const },
+  { code: '4000', name: 'Sales Revenue & Billing', type: 'INCOME' as const },
+  { code: '4100', name: 'Consulting & Service Income', type: 'INCOME' as const },
+  { code: '5000', name: 'Cost of Goods Sold (COGS)', type: 'COGS' as const },
+  { code: '6000', name: 'Operating Expenses', type: 'EXPENSE' as const },
+  { code: '6100', name: 'Salaries & Payroll Expense', type: 'EXPENSE' as const },
+  { code: '6110', name: 'Employer Payroll Contributions', type: 'EXPENSE' as const },
+  { code: '6200', name: 'Office Rent & Utilities', type: 'EXPENSE' as const },
+  { code: '8000', name: 'Unrealized FX Gain / Loss', type: 'INCOME' as const },
+  { code: '8100', name: 'Realized FX Gain / Loss', type: 'INCOME' as const },
+];
+
+/** Money accounts (bank, cash, M-Pesa) are 1000-1099 in the standard numbering. */
+export function isMoneyAccountCode(code: string): boolean {
+  return /^10\d\d$/.test(code);
+}
+
+/** The chart for a new organization: the standard accounts plus its business type's. */
+export function chartFor(businessType: BusinessType | null | undefined, baseCurrency: string) {
+  return [...STANDARD_ACCOUNTS, ...extraAccountsFor(businessType)].map((account) => ({
+    code: account.code,
+    name: account.name,
+    type: account.type,
+    currency: ('currency' in account && account.currency) || baseCurrency,
+    isBankAccount: account.type === 'ASSET' && isMoneyAccountCode(account.code),
+  }));
+}
+
+function mapOrganization(d: any): Organization {
+  return {
+    id: d.id,
+    name: d.name,
+    legalName: d.legal_name,
+    baseCurrency: d.base_currency,
+    country: d.country,
+    taxId: d.tax_id,
+    fiscalYearStart: d.fiscal_year_start,
+    industry: d.industry,
+    businessType: d.business_type,
+    themeAccent: d.theme_accent,
+    address: d.address,
+    city: d.city,
+    phone: d.phone,
+    email: d.email,
+    website: d.website,
+    isDefault: d.is_default,
+    isDemo: d.is_demo,
+    booksClosedThrough: d.books_closed_through ?? null,
+    approvalThresholdCents: d.approval_threshold_cents == null ? null : Number(d.approval_threshold_cents),
+    aiEnabled: Boolean(d.ai_enabled),
+    timeZone: d.time_zone,
+    createdAt: d.created_at,
+    updatedAt: d.updated_at,
+  };
 }
 
 export class OrganizationService {
@@ -45,28 +127,7 @@ export class OrganizationService {
       .order('name');
 
     if (error) throw error;
-    
-    return (data || []).map(d => ({
-      id: d.id,
-      name: d.name,
-      legalName: d.legal_name,
-      baseCurrency: d.base_currency,
-      country: d.country,
-      taxId: d.tax_id,
-      fiscalYearStart: d.fiscal_year_start,
-      industry: d.industry,
-      businessType: d.business_type,
-      themeAccent: d.theme_accent,
-      address: d.address,
-      city: d.city,
-      phone: d.phone,
-      email: d.email,
-      website: d.website,
-      isDefault: d.is_default,
-      isDemo: d.is_demo,
-      createdAt: d.created_at,
-      updatedAt: d.updated_at
-    }));
+    return (data || []).map(mapOrganization);
   }
 
   static async getOrganization(orgId: string): Promise<Organization | null> {
@@ -75,128 +136,100 @@ export class OrganizationService {
       .from('organizations')
       .select('*')
       .eq('id', orgId)
-      .single();
-      
-    if (error) {
-      if (error.code === 'PGRST116') return null; // No rows
-      throw error;
-    }
-    
-    return {
-      id: data.id,
-      name: data.name,
-      legalName: data.legal_name,
-      baseCurrency: data.base_currency,
-      country: data.country,
-      taxId: data.tax_id,
-      fiscalYearStart: data.fiscal_year_start,
-      industry: data.industry,
-      businessType: data.business_type,
-      themeAccent: data.theme_accent,
-      address: data.address,
-      city: data.city,
-      phone: data.phone,
-      email: data.email,
-      website: data.website,
-      isDefault: data.is_default,
-      isDemo: data.is_demo,
-      createdAt: data.created_at,
-      updatedAt: data.updated_at
-    };
-  }
-
-  static async createOrganization(data: Omit<Organization, 'id' | 'createdAt' | 'updatedAt'>, ownerId?: string): Promise<string> {
-    const supabase = getSupabase();
-    
-    const { data: newOrg, error } = await supabase
-      .from('organizations')
-      .insert({
-        name: data.name,
-        legal_name: data.legalName || data.name,
-        base_currency: data.baseCurrency || 'KES',
-        country: data.country || 'Kenya',
-        tax_id: data.taxId || '',
-        fiscal_year_start: data.fiscalYearStart || 'January',
-        industry: data.industry || 'General Business',
-        business_type: data.businessType || null,
-        theme_accent: data.themeAccent || DEFAULT_THEME_ACCENT,
-        address: data.address || '',
-        city: data.city || '',
-        phone: data.phone || '',
-        email: data.email || '',
-        website: data.website || '',
-        is_default: false,
-        is_demo: data.isDemo === true,
-      })
-      .select('id')
-      .single();
-
+      .maybeSingle();
     if (error) throw error;
-    const orgId = newOrg.id;
-
-    if (ownerId) {
-      const { error: membershipError } = await supabase.from('memberships').insert({
-        org_id: orgId,
-        user_id: ownerId,
-        role: 'owner'
-      });
-
-      if (membershipError) {
-        await supabase.from('organizations').delete().eq('id', orgId);
-        throw membershipError;
-      }
-    }
-
-    // Initialize Standard Chart of Accounts, plus this type's own if chosen at creation.
-    await this.seedDefaultAccounts(orgId, data.businessType || null);
-
-    return orgId;
+    return data ? mapOrganization(data) : null;
   }
 
-  static async updateOrganization(orgId: string, data: Partial<Organization>): Promise<void> {
+  /**
+   * The organization, its owner and its chart of accounts, in one
+   * transaction (public.create_organization). A retry with the same
+   * creation key returns the same organization.
+   */
+  static async createOrganization(data: OrganizationCreateInput, ownerId: string): Promise<string> {
     const supabase = getSupabase();
-    const updateData: any = {};
-    if (data.name !== undefined) updateData.name = data.name;
-    if (data.legalName !== undefined) updateData.legal_name = data.legalName;
-    if (data.baseCurrency !== undefined) {
-      // The database refuses a change once any entry is posted
-      // (organizations_lock_base_currency); the format is checked here.
-      const currency = String(data.baseCurrency).trim().toUpperCase();
-      if (!/^[A-Z]{3}$/.test(currency)) throw new Error('Base currency must be a three-letter ISO code, such as KES.');
-      updateData.base_currency = currency;
+    const baseCurrency = String(data.baseCurrency || 'KES').trim().toUpperCase();
+    const { data: orgId, error } = await supabase.rpc('create_organization', {
+      p_owner: ownerId,
+      p_organization: {
+        name: data.name,
+        legalName: data.legalName,
+        baseCurrency,
+        country: data.country,
+        taxId: data.taxId,
+        fiscalYearStart: data.fiscalYearStart,
+        industry: data.industry,
+        businessType: data.businessType || null,
+        themeAccent: data.themeAccent,
+        address: data.address,
+        city: data.city,
+        phone: data.phone,
+        email: data.email,
+        website: data.website,
+      },
+      p_accounts: chartFor(data.businessType || null, baseCurrency),
+      p_creation_key: data.creationKey || null,
+    });
+    if (error) throw error;
+    return orgId as string;
+  }
+
+  static async updateOrganization(orgId: string, data: OrganizationUpdateInput): Promise<void> {
+    const supabase = getSupabase();
+    const columns: Record<keyof OrganizationUpdateInput, string> = {
+      name: 'name',
+      legalName: 'legal_name',
+      baseCurrency: 'base_currency',
+      country: 'country',
+      taxId: 'tax_id',
+      fiscalYearStart: 'fiscal_year_start',
+      industry: 'industry',
+      businessType: 'business_type',
+      themeAccent: 'theme_accent',
+      address: 'address',
+      city: 'city',
+      phone: 'phone',
+      email: 'email',
+      website: 'website',
+      booksClosedThrough: 'books_closed_through',
+      approvalThresholdCents: 'approval_threshold_cents',
+      aiEnabled: 'ai_enabled',
+      timeZone: 'time_zone',
+    };
+    const updateData: Record<string, unknown> = {};
+    for (const [key, column] of Object.entries(columns) as Array<[keyof OrganizationUpdateInput, string]>) {
+      if (data[key] !== undefined) updateData[column] = data[key];
     }
-    if (data.country !== undefined) updateData.country = data.country;
-    if (data.taxId !== undefined) updateData.tax_id = data.taxId;
-    if (data.fiscalYearStart !== undefined) updateData.fiscal_year_start = data.fiscalYearStart;
-    if (data.industry !== undefined) updateData.industry = data.industry;
-    if (data.businessType !== undefined) updateData.business_type = data.businessType;
-    if (data.themeAccent !== undefined) updateData.theme_accent = data.themeAccent;
-    if (data.address !== undefined) updateData.address = data.address;
-    if (data.city !== undefined) updateData.city = data.city;
-    if (data.phone !== undefined) updateData.phone = data.phone;
-    if (data.email !== undefined) updateData.email = data.email;
-    if (data.website !== undefined) updateData.website = data.website;
 
     if (Object.keys(updateData).length > 0) {
+      // The database refuses a base-currency change once any entry is
+      // posted (organizations_lock_base_currency).
       const { error } = await supabase
         .from('organizations')
         .update(updateData)
         .eq('id', orgId);
-
       if (error) throw error;
     }
 
     // Choosing (or changing) a business type adds its accounts; it never
-    // removes what the org already has, and seedDefaultAccounts already
-    // skips codes that exist, so calling it again on every change is safe.
+    // removes what the org already has.
     if (data.businessType) await this.seedDefaultAccounts(orgId, data.businessType);
   }
 
+  /** Whether the organization has agreed to send receipts and figures to Google Gemini. */
+  static async aiEnabled(orgId: string): Promise<boolean> {
+    const supabase = getSupabase();
+    const { data, error } = await supabase.from('organizations').select('ai_enabled').eq('id', orgId).maybeSingle();
+    if (error) throw error;
+    return Boolean(data?.ai_enabled);
+  }
+
+  /** Adds any standard (and business-type) accounts the organization is missing. */
   static async seedDefaultAccounts(orgId: string, businessType: BusinessType | null = null): Promise<void> {
     const supabase = getSupabase();
     const { data: organization, error } = await supabase
       .from('organizations')
-      .select('base_currency')
+      .select('base_currency, business_type')
       .eq('id', orgId)
       .single();
     if (error) throw error;
@@ -208,49 +241,18 @@ export class OrganizationService {
     if (existingAccountsError) throw existingAccountsError;
     const existingCodes = new Set((existingAccounts || []).map((account) => account.code));
 
-    const standardAccounts = [
-      { code: '1000', name: 'Cash equivalents (Operating Account)', type: 'ASSET' as const },
-      { code: '1010', name: 'USD Bank Account (Foreign Holding)', type: 'ASSET' as const },
-      { code: '1020', name: 'EUR Bank Account (Foreign Holding)', type: 'ASSET' as const },
-      { code: '1050', name: 'M-Pesa Business Till / Paybill', type: 'ASSET' as const },
-      { code: '1100', name: 'Accounts Receivable (A/R)', type: 'ASSET' as const },
-      { code: '1150', name: 'Recoverable VAT / Input Tax', type: 'ASSET' as const },
-      { code: '1200', name: 'Inventory Asset', type: 'ASSET' as const },
-      { code: '2000', name: 'Accounts Payable (A/P)', type: 'LIABILITY' as const },
-      { code: '2100', name: 'Output VAT Payable', type: 'LIABILITY' as const },
-      { code: '2110', name: 'PAYE Payable', type: 'LIABILITY' as const },
-      { code: '2120', name: 'NSSF Payable', type: 'LIABILITY' as const },
-      { code: '2130', name: 'SHA Payable', type: 'LIABILITY' as const },
-      { code: '2140', name: 'Affordable Housing Levy Payable', type: 'LIABILITY' as const },
-      { code: '3000', name: "Owner's Equity / Share Capital", type: 'EQUITY' as const },
-      { code: '3100', name: 'Retained Earnings', type: 'EQUITY' as const },
-      { code: '4000', name: 'Sales Revenue & Billing', type: 'INCOME' as const },
-      { code: '4100', name: 'Consulting & Service Income', type: 'INCOME' as const },
-      { code: '5000', name: 'Cost of Goods Sold (COGS)', type: 'COGS' as const },
-      { code: '6000', name: 'Operating Expenses', type: 'EXPENSE' as const },
-      { code: '6100', name: 'Salaries & Payroll Expense', type: 'EXPENSE' as const },
-      { code: '6110', name: 'Employer Payroll Contributions', type: 'EXPENSE' as const },
-      { code: '6200', name: 'Office Rent & Utilities', type: 'EXPENSE' as const },
-      { code: '8000', name: 'Unrealized FX Gain / Loss', type: 'INCOME' as const },
-      { code: '8100', name: 'Realized FX Gain / Loss', type: 'INCOME' as const },
-    ];
-
-    // One bulk insert, not one round trip per account: two dozen-plus
-    // individual creates (each already an existence-check plus an insert)
-    // pushed a single organization signup past the Worker's subrequest
-    // limit and failed outright.
-    const newAccounts = [...standardAccounts, ...extraAccountsFor(businessType)].filter(
-      (acc) => !existingCodes.has(acc.code)
-    );
+    const newAccounts = chartFor(businessType || organization.business_type, baseCurrency)
+      .filter((account) => !existingCodes.has(account.code));
     if (newAccounts.length === 0) return;
 
     const { error: insertError } = await supabase.from('accounts').insert(
-      newAccounts.map((acc) => ({
+      newAccounts.map((account) => ({
         org_id: orgId,
-        code: acc.code,
-        name: acc.name,
-        type: acc.type,
-        currency: acc.code === '1010' ? 'USD' : acc.code === '1020' ? 'EUR' : baseCurrency,
+        code: account.code,
+        name: account.name,
+        type: account.type,
+        currency: account.currency,
+        is_bank_account: account.isBankAccount,
         is_active: true,
       }))
     );

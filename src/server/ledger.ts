@@ -28,9 +28,9 @@ export class LedgerService {
       p_idempotency_key: input.idempotencyKey?.trim() || null,
     });
 
-    if (error) {
-      throw new LedgerEngineError(`Failed to post journal entry: ${error.message}`);
-    }
+    // The database error keeps its SQLSTATE, so the Worker can tell a rule
+    // the entry broke from an internal failure.
+    if (error) throw error;
 
     return entryId;
   }
