@@ -2,6 +2,7 @@ import React from 'react';
 import { useState } from 'react';
 import { format } from 'date-fns';
 import { ReceiptScanner } from './ReceiptScanner';
+import { BillBuilder } from './BillBuilder';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAppStore } from '../../store';
 import { DynamicQuickAddModal } from '../common/DynamicQuickAddModal';
@@ -10,12 +11,10 @@ import { BulkActionBar } from '../common/BulkActionBar';
 import { Amount } from '../ledger/Amount';
 import { Mark } from '../ledger/Mark';
 import { PageHeading, IndexTabs, buttonClass } from '../ledger/Page';
-import { Dialog, Field } from '../ledger/Dialog';
-import { SUPPORTED_CURRENCIES } from '../../utils/currency';
-import { PostedStamp } from '../ledger/PostedStamp';
+import { Field } from '../ledger/Dialog';
 import { useConfirm } from '../../hooks/useConfirm';
 import { inParts } from '../../utils/apiRequest';
-import { todayIn, addDaysIso } from '../../utils/dates';
+import { todayIn } from '../../utils/dates';
 
 const tabs = ['Vendors', 'Bills', 'Expenses', 'Bill payments'];
 
@@ -37,15 +36,11 @@ export function ExpensesView() {
   const [selectedEntity, setSelectedEntity] = useState<{ type: 'VENDOR' | 'BILL'; id: string; data: any } | null>(null);
   const [selectedBillIds, setSelectedBillIds] = useState<string[]>([]);
   const [selectedVendorIds, setSelectedVendorIds] = useState<string[]>([]);
-  const [billIdempotencyKey, setBillIdempotencyKey] = useState(() => crypto.randomUUID());
   const [batchPaymentAccountId, setBatchPaymentAccountId] = useState('');
-  const [justPostedBill, setJustPostedBill] = useState(false);
   const { confirm, confirmDialog } = useConfirm();
 
-  const { currentOrgId, activeCompany, exchangeRates } = useAppStore();
+  const { currentOrgId, activeCompany } = useAppStore();
   const baseCurrency = activeCompany?.baseCurrency || 'KES';
-  const [billCurrency, setBillCurrency] = useState(baseCurrency);
-  const [billExchangeRate, setBillExchangeRate] = useState('1');
   const queryClient = useQueryClient();
 
   const { data: vendorsData, isLoading: vendorsLoading } = useQuery({
@@ -75,37 +70,9 @@ export function ExpensesView() {
     }
   });
 
-  const createBillMutation = useMutation({
-    mutationFn: async (bill: any) => {
-      const res = await fetch('/api/bills', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'x-org-id': currentOrgId },
-        body: JSON.stringify({ ...bill, idempotencyKey: billIdempotencyKey })
-      });
-      if (!res.ok) {
-        const error = await res.json();
-        throw new Error(error.error || 'Failed to create bill');
-      }
-      return res.json();
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['bills', currentOrgId] });
-      queryClient.invalidateQueries({ queryKey: ['accounts', currentOrgId] });
-      setJustPostedBill(true);
-      window.setTimeout(() => {
-        setJustPostedBill(false);
-        closeBill();
-      }, 520);
-    }
-  });
-
   function closeBill() {
     setIsCreatingBill(false);
     setScannedData(null);
-    createBillMutation.reset();
-    setBillIdempotencyKey(crypto.randomUUID());
-    setBillCurrency(baseCurrency);
-    setBillExchangeRate('1');
   }
 
   // Bulk void bills, sent in parts the API accepts.
@@ -198,8 +165,6 @@ export function ExpensesView() {
 
   const vendors = vendorsData?.vendors || [];
   const bills = billsData?.bills || [];
-  const expenseAccounts = accountsData?.accounts?.filter((a: any) => a.type === 'EXPENSE' || a.type === 'COGS') || [];
-  const expenseAccountsActive = expenseAccounts.filter((a: any) => a.isActive !== false);
   // Payments go out of money accounts only: bank, cash or M-Pesa.
   const paymentAccounts = accountsData?.accounts?.filter((a: any) => a.isBankAccount && a.isActive !== false) || [];
   const approvalThreshold = activeCompany?.approvalThresholdCents ?? null;
@@ -214,8 +179,6 @@ export function ExpensesView() {
   const awaitingApproval = unpaidBills.filter(needsApproval);
   const openBills = unpaidBills.filter((b: any) => !needsApproval(b));
   const openBillsTotal = openBills.reduce((sum: number, b: any) => sum + (b.amountDueCents || 0), 0);
-  const scannedVendorId = vendors.find((v: any) => v.displayName === scannedData?.vendor)?.id || '';
-  const scannedVendorUnknown = !!scannedData?.vendor && !scannedVendorId;
   const billsTotal = bills.reduce((sum: number, b: any) => sum + (b.totalCents || 0), 0);
   const vendorsTotal = vendors.reduce((sum: number, v: any) => sum + (v.balance || 0), 0);
   const today = todayIn(activeCompany?.timeZone);
@@ -592,124 +555,7 @@ export function ExpensesView() {
         />
       )}
 
-      <Dialog
-        open={isCreatingBill}
-        onClose={closeBill}
-        width="lg"
-        title={scannedData ? 'Check the receipt' : 'New bill'}
-        note={scannedData ? 'Read from the photo. Correct anything misread before saving.' : 'Saving it posts the expense and the amount owed to the supplier.'}
-        footer={
-          <>
-            {createBillMutation.isError && (
-              <p role="alert" className="mr-auto text-[13px] text-ledger-red">
-                {createBillMutation.error.message}
-              </p>
-            )}
-            <button type="button" onClick={closeBill} className={buttonClass.secondary}>
-              Cancel
-            </button>
-            <button type="submit" form="bill-form" disabled={createBillMutation.isPending} className={buttonClass.primary}>
-              {createBillMutation.isPending ? 'Saving' : 'Save bill'}
-            </button>
-          </>
-        }
-      >
-        <div className="relative">
-          {justPostedBill && <PostedStamp label="Bill posted" />}
-          <form
-          id="bill-form"
-          key={scannedData ? `scan-${scannedData.date}-${scannedData.amount}` : 'manual'}
-          onSubmit={(e) => {
-            e.preventDefault();
-            const fd = new FormData(e.currentTarget);
-            const amountCents = Math.round(parseFloat(fd.get('amount') as string) * 100);
-            const taxRate = Number(fd.get('taxRate')) || 0;
-            const exchangeRate = Number(billExchangeRate);
-            const isForeign = billCurrency !== baseCurrency;
-            const baseAmountCents = isForeign ? Math.round(amountCents / exchangeRate) : amountCents;
-            createBillMutation.mutate({
-              vendorId: fd.get('vendorId'),
-              billDate: fd.get('billDate'),
-              dueDate: fd.get('dueDate'),
-              supplierReference: String(fd.get('supplierReference') || '').trim() || undefined,
-              currency: billCurrency,
-              exchangeRate,
-              lines: [{
-                description: fd.get('description'),
-                accountId: fd.get('accountId'),
-                amountCents: baseAmountCents,
-                foreignAmountCents: isForeign ? amountCents : undefined,
-                taxCents: Math.round(baseAmountCents * taxRate / 100),
-              }],
-            });
-          }}
-          className="grid grid-cols-1 gap-4 sm:grid-cols-2"
-        >
-          <Field label="Supplier" hint={scannedVendorUnknown ? `The receipt names ${scannedData?.vendor}. Add them as a vendor if they are new.` : undefined}>
-            <select required name="vendorId" defaultValue={scannedVendorId}>
-              <option value="">Choose a vendor</option>
-              {vendors.map((v: any) => (
-                <option key={v.id} value={v.id}>{v.displayName}</option>
-              ))}
-            </select>
-          </Field>
-          <Field label="Expense account">
-            <select required name="accountId" defaultValue="">
-              <option value="">Choose an account</option>
-              {expenseAccountsActive.map((a: any) => (
-                <option key={a.id} value={a.id}>{a.code} · {a.name}</option>
-              ))}
-            </select>
-          </Field>
-          <Field label="Bill date">
-            <input required name="billDate" type="date" defaultValue={scannedData?.date || today} />
-          </Field>
-          <Field label="Due">
-            <input required name="dueDate" type="date" defaultValue={addDaysIso(today, 30)} />
-          </Field>
-          <Field label="Supplier's invoice number" hint="Optional. The same number cannot be entered twice for one supplier.">
-            <input name="supplierReference" type="text" maxLength={100} autoComplete="off" />
-          </Field>
-          <Field label="Currency">
-            <select
-              value={billCurrency}
-              onChange={(event) => {
-                const next = event.target.value;
-                setBillCurrency(next);
-                setBillExchangeRate(next === baseCurrency ? '1' : String(exchangeRates[next] || 1));
-              }}
-            >
-              {SUPPORTED_CURRENCIES.map((currency) => (
-                <option key={currency.code} value={currency.code}>{currency.code} · {currency.name}</option>
-              ))}
-            </select>
-          </Field>
-          {billCurrency !== baseCurrency && (
-            <Field label={`${billCurrency} per 1 ${baseCurrency}`}>
-              <input
-                required
-                type="number"
-                min="0.00000001"
-                step="any"
-                inputMode="decimal"
-                value={billExchangeRate}
-                onChange={(event) => setBillExchangeRate(event.target.value)}
-                className="text-right tabular-currency"
-              />
-            </Field>
-          )}
-          <Field label="Particulars">
-            <input required name="description" type="text" defaultValue={scannedData?.vendor ? `Receipt from ${scannedData.vendor}` : ''} />
-          </Field>
-          <Field label={`Amount (${billCurrency})`}>
-            <input required name="amount" type="number" step="0.01" min="0.01" inputMode="decimal" defaultValue={scannedData?.amount || ''} className="text-right tabular-currency text-ink-blue" />
-          </Field>
-          <Field label="VAT percentage" hint="Enter zero for exempt or non-taxable purchases.">
-            <input required name="taxRate" type="number" step="0.01" min="0" max="100" inputMode="decimal" defaultValue="0" className="text-right tabular-currency" />
-          </Field>
-          </form>
-        </div>
-      </Dialog>
+      <BillBuilder open={isCreatingBill} onClose={closeBill} scanned={scannedData} />
 
       {confirmDialog}
     </div>

@@ -190,3 +190,29 @@ test('an edit changes only the fields sent, and null clears a field', async () =
   assert.throws(() => customerUpdateSchema.parse({ displayName: null }));
   assert.throws(() => itemUpdateSchema.parse({ itemType: null }));
 });
+
+test('a bill line for a stock item counts it in, and voiding the bill counts it out', async () => {
+  const DELIVERY_ITEM = '00000000-0000-0000-0000-0000000000e2';
+  const before = Number(sql(`SELECT quantity_on_hand FROM public.inventory_items WHERE id = '${CEMENT}'`));
+  const billId = await BillService.createBill({
+    orgId: ORG, vendorId: VENDOR, billDate: '2026-09-20', dueDate: '2026-10-20', currency: 'KES', idempotencyKey: uuid(), createdBy: OWNER,
+    lines: [
+      { description: 'Cement 50kg', accountId: OPEX, amountCents: 72_000 * 4, inventoryItemId: CEMENT, quantity: 4 },
+      { description: 'Delivery', accountId: OPEX, amountCents: 5_000, inventoryItemId: DELIVERY_ITEM, quantity: 1.5 },
+    ],
+  });
+  assert.equal(Number(sql(`SELECT quantity_on_hand FROM public.inventory_items WHERE id = '${CEMENT}'`)), before + 4);
+  assert.equal(sql(`SELECT cost_price_cents FROM public.inventory_items WHERE id = '${CEMENT}'`), '72000');
+  assert.equal(sql(`SELECT quantity_on_hand FROM public.inventory_items WHERE id = '${DELIVERY_ITEM}'`), '0', 'services are not counted');
+  const bill = (await BillService.getBill(ORG, billId))!;
+  assert.deepEqual(bill.lines.map((l: any) => [l.inventoryItemId, l.quantity]), [[CEMENT, 4], [DELIVERY_ITEM, 1.5]]);
+
+  await BillService.voidBill(ORG, billId, OWNER, '2026-09-21');
+  assert.equal(Number(sql(`SELECT quantity_on_hand FROM public.inventory_items WHERE id = '${CEMENT}'`)), before);
+  assert.equal(sql(`SELECT string_agg(quantity::text, ',' ORDER BY created_at) FROM public.inventory_movements WHERE source_type = 'BILL' AND source_id = '${billId}'`), '4,-4');
+
+  await refused(BillService.createBill({
+    orgId: ORG, vendorId: VENDOR, billDate: '2026-09-20', dueDate: '2026-10-20', currency: 'KES', idempotencyKey: uuid(), createdBy: OWNER,
+    lines: [{ description: 'Half a bag', accountId: OPEX, amountCents: 36_000, inventoryItemId: CEMENT, quantity: 0.5 }],
+  }), /whole units/);
+});

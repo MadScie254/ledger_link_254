@@ -47,6 +47,7 @@ const MOVEMENT_LABEL: Record<string, string> = {
   OPENING: 'Opening count',
   ADJUSTMENT: 'Stock count adjustment',
   SALES_ORDER: 'Sales order',
+  BILL: 'Received on a bill',
 };
 
 type Value = React.ReactNode | string | number | null | undefined;

@@ -50,15 +50,22 @@ test('a bill with a supplier reference is entered and paid', async () => {
   await page.getByRole('button', { name: 'New bill' }).click();
   const dialog = page.getByRole('dialog');
   await dialog.locator('select[name="vendorId"]').selectOption({ label: 'Kenya Power' });
-  await dialog.locator('select[name="accountId"]').selectOption({ label: '6000 · Operating expenses' });
-  await dialog.getByLabel("Supplier's invoice number").fill('KPLC-2026-0917');
-  await dialog.getByLabel('Particulars').fill('Electricity, September');
-  await dialog.getByLabel(/^Amount/).fill('12000');
-  await dialog.getByLabel('VAT percentage').fill('16');
+  await dialog.locator('input[name="supplierReference"]').fill('KPLC-2026-0917');
+  await dialog.getByLabel('Line 1 particulars').fill('Electricity, September');
+  await dialog.getByLabel('Line 1 account').selectOption({ label: '6000 · Operating expenses' });
+  await dialog.getByLabel('Line 1 amount').fill('12,000');
+  await dialog.getByLabel('Line 1 VAT percentage').fill('16');
+  await dialog.getByRole('button', { name: 'Add a line' }).click();
+  await dialog.getByLabel('Line 2 stock item').selectOption({ label: 'Cement 50kg' });
+  await dialog.getByLabel('Line 2 account').selectOption({ label: '5000 · Cost of Goods Sold' });
+  await dialog.getByLabel('Line 2 quantity').fill('10');
+  await dialog.getByLabel('Line 2 amount').fill('7000');
+  await dialog.getByLabel('Line 2 VAT percentage').fill('0');
   await dialog.getByRole('button', { name: 'Save bill' }).click();
   await dialog.waitFor({ state: 'hidden', timeout: 10_000 });
   assert.deepEqual(refusedWrites(api), []);
-  assert.equal(sql(`SELECT total_cents || ' ' || supplier_reference FROM public.bills WHERE org_id = '${ORG}'`), '1392000 KPLC-2026-0917');
+  assert.equal(sql(`SELECT total_cents || ' ' || supplier_reference FROM public.bills WHERE org_id = '${ORG}'`), '2092000 KPLC-2026-0917');
+  assert.equal(sql(`SELECT quantity_on_hand || ' ' || cost_price_cents FROM public.inventory_items WHERE name = 'Cement 50kg'`), '15 70000');
 
   await page.getByRole('tab', { name: /Bill payments/ }).click();
   await page.getByLabel('Pay from').selectOption({ label: '1000 · Bank' });

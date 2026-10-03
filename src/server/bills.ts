@@ -10,6 +10,9 @@ export interface BillLineInput {
   amountCents: number;
   foreignAmountCents?: number;
   taxCents?: number;
+  /** A stock item received on this line; the bill counts it in. */
+  inventoryItemId?: string;
+  quantity?: number;
 }
 
 export interface BillInput {
@@ -50,6 +53,8 @@ function mapBillLine(row: any) {
     foreignAmountCents: row.foreign_amount_cents == null ? null : Number(row.foreign_amount_cents),
     taxCents: Number(row.tax_cents) || 0,
     foreignTaxCents: Number(row.foreign_tax_cents) || 0,
+    inventoryItemId: row.inventory_item_id ?? null,
+    quantity: row.quantity == null ? null : Number(row.quantity),
     createdAt: row.created_at,
   };
 }
@@ -175,6 +180,8 @@ export class BillService {
       amountCents: Math.trunc(line.amountCents),
       foreignAmountCents: line.foreignAmountCents == null ? null : Math.trunc(line.foreignAmountCents),
       taxCents: Math.trunc(line.taxCents || 0),
+      inventoryItemId: line.inventoryItemId || null,
+      quantity: line.quantity ?? null,
     }));
 
     const supabase = getSupabase();

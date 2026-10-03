@@ -291,6 +291,9 @@ const documentLineSchema = z.object({
   amountCents: cents,
   foreignAmountCents: positiveCents.optional(),
   taxCents: cents.default(0),
+  /** A stock item on the line, and how many. */
+  inventoryItemId: optionalUuid,
+  quantity: z.number().positive().max(1_000_000_000).optional(),
 }).refine((line) => line.amountCents > 0 || (line.foreignAmountCents || 0) > 0, {
   message: 'Each line needs a base or foreign-currency amount.',
 });
