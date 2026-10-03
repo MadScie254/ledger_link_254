@@ -16,8 +16,9 @@ import { downloadCsv } from '../../utils/exportCsv';
 import { todayIn } from '../../utils/dates';
 import { inParts } from '../../utils/apiRequest';
 import { OrdersPanel } from './OrdersPanel';
+import { EstimatesPanel } from './EstimatesPanel';
 
-type SalesTab = 'Invoices' | 'Orders';
+type SalesTab = 'Invoices' | 'Estimates' | 'Orders';
 
 export function SalesView() {
   useRenderTracker("SalesView");
@@ -25,6 +26,7 @@ export function SalesView() {
   const [salesTab, setSalesTab] = useState<SalesTab>('Invoices');
   const [isBuilding, setIsBuilding] = useState(false);
   const [isOrdering, setIsOrdering] = useState(false);
+  const [isEstimating, setIsEstimating] = useState(false);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [selectedInvoice, setSelectedInvoice] = useState<any | null>(null);
   const [paymentInvoice, setPaymentInvoice] = useState<any | null>(null);
@@ -220,7 +222,9 @@ export function SalesView() {
         note={
           salesTab === 'Invoices'
             ? <>{invoices.length} invoices for {activeCompany?.name || 'this organization'} · Figures in {baseCurrency}</>
-            : <>Orders customers have placed with {activeCompany?.name || 'this organization'} · Figures in {baseCurrency}</>
+            : salesTab === 'Estimates'
+              ? <>Quotes to customers, before they become invoices · Figures in {baseCurrency}</>
+              : <>Orders customers have placed with {activeCompany?.name || 'this organization'} · Figures in {baseCurrency}</>
         }
         actions={
           salesTab === 'Invoices' ? (
@@ -232,6 +236,10 @@ export function SalesView() {
                 New invoice
               </button>
             </>
+          ) : salesTab === 'Estimates' ? (
+            <button type="button" onClick={() => setIsEstimating(true)} className={buttonClass.primary}>
+              New estimate
+            </button>
           ) : (
             <button type="button" onClick={() => setIsOrdering(true)} className={buttonClass.primary}>
               New order
@@ -249,11 +257,21 @@ export function SalesView() {
         }}
         tabs={[
           { id: 'Invoices', name: 'Invoices', count: invoices.length },
+          { id: 'Estimates', name: 'Estimates' },
           { id: 'Orders', name: 'Orders' },
         ]}
       />
 
-      {salesTab === 'Orders' ? (
+      {salesTab === 'Estimates' ? (
+        <EstimatesPanel
+          orgId={currentOrgId}
+          baseCurrency={baseCurrency}
+          customers={customersData?.customers || []}
+          accounts={accountsData?.accounts || []}
+          isCreating={isEstimating}
+          onCreatingChange={setIsEstimating}
+        />
+      ) : salesTab === 'Orders' ? (
         <OrdersPanel
           orgId={currentOrgId}
           baseCurrency={baseCurrency}

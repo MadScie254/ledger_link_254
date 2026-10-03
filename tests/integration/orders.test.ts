@@ -147,3 +147,29 @@ test('the list reads past PostgREST\'s 1,000-row page', async () => {
   assert.equal(orders[0].orderDate >= orders[orders.length - 1].orderDate, true, 'newest first');
   assert.ok(orders.some((o) => o.orderNumber === orderNumber));
 });
+
+import { EstimateService } from '../../src/server/estimates';
+
+test('an estimate is saved, edited, accepted and converted through the service', async () => {
+  const key = crypto.randomUUID();
+  const input = {
+    orgId: ORG, customerId: CUSTOMER, estimateDate: '2026-10-01', expiryDate: '2026-10-31', idempotencyKey: key, actor: OWNER,
+    lines: [{ description: 'Cement 50kg', accountId: SALES, inventoryItemId: CEMENT, quantity: 3, unitPriceCents: 75_000, taxRate: 16 }],
+  };
+  const saved = await EstimateService.saveEstimate(input);
+  assert.match(saved.estimateNumber, /^EST-2026-\d{5}$/);
+  assert.equal((await EstimateService.saveEstimate(input)).id, saved.id);
+
+  await EstimateService.saveEstimate({ ...input, lines: [{ ...input.lines[0], quantity: 4 }] }, saved.id);
+  let [estimate] = (await EstimateService.getEstimates(ORG)).filter((e) => e.id === saved.id);
+  assert.equal(estimate.totalCents, 348_000);
+  assert.equal(estimate.lines[0].itemName, 'Cement 50kg');
+
+  await EstimateService.setStatus(ORG, saved.id, 'ACCEPTED', undefined, OWNER);
+  const converted = await EstimateService.convert(ORG, saved.id, 'INVOICE', '2026-10-02', '2026-11-01', OWNER);
+  assert.match(converted.number, /^INV-/);
+  [estimate] = (await EstimateService.getEstimates(ORG)).filter((e) => e.id === saved.id);
+  assert.equal(estimate.status, 'CONVERTED');
+  assert.equal(estimate.invoiceNumber, converted.number);
+  await assert.rejects(EstimateService.saveEstimate(input, saved.id), (err: any) => /converted/.test(err.message));
+});

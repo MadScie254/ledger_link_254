@@ -1,9 +1,13 @@
 import { CustomerService } from '../../src/server/customers';
 import { InvoiceService, type InvoiceInput, type InvoicePaymentInput } from '../../src/server/invoices';
 import { SalesOrderService, type SalesOrderInput } from '../../src/server/salesOrders';
-import { bodyOf, respondError } from '../http';
+import { EstimateService, type EstimateInput } from '../../src/server/estimates';
+import { bodyOf, respondError, UserError } from '../http';
 import {
+  convertEstimateSchema,
   createInvoiceSchema,
+  estimateSchema,
+  estimateStatusSchema,
   createSalesOrderSchema,
   customerSchema,
   customerUpdateSchema,
@@ -118,6 +122,48 @@ export function registerSalesRoutes(api: Api) {
       const orderId = uuid.parse(c.req.param('id'));
       const body = invoiceSalesOrderSchema.parse(await bodyOf(c));
       return c.json(await SalesOrderService.invoiceOrder(c.get('orgId'), orderId, body.issueDate, body.dueDate, c.get('userId')));
+    } catch (err) { return respondError(c, err); }
+  });
+
+  // --- Estimates ---
+  // Quotes: saved, sent, accepted or declined, and converted to an invoice or
+  // a sales order in one step. An estimate posts nothing.
+  api.get('/estimates', async (c) => {
+    try {
+      return c.json({ estimates: await EstimateService.getEstimates(c.get('orgId')) });
+    } catch (err) { return respondError(c, err); }
+  });
+
+  api.post('/estimates', async (c) => {
+    try {
+      const body = estimateSchema.parse(await bodyOf(c)) as Omit<EstimateInput, 'orgId' | 'actor'>;
+      if (!body.idempotencyKey) throw new UserError('An idempotency key is required.');
+      return c.json(await EstimateService.saveEstimate({ ...body, orgId: c.get('orgId'), actor: c.get('userId') }));
+    } catch (err) { return respondError(c, err); }
+  });
+
+  api.put('/estimates/:id', async (c) => {
+    try {
+      const estimateId = uuid.parse(c.req.param('id'));
+      const body = estimateSchema.parse(await bodyOf(c)) as Omit<EstimateInput, 'orgId' | 'actor'>;
+      return c.json(await EstimateService.saveEstimate({ ...body, orgId: c.get('orgId'), actor: c.get('userId') }, estimateId));
+    } catch (err) { return respondError(c, err); }
+  });
+
+  api.post('/estimates/:id/status', async (c) => {
+    try {
+      const body = estimateStatusSchema.parse(await bodyOf(c));
+      return c.json(await EstimateService.setStatus(c.get('orgId'), uuid.parse(c.req.param('id')), body.status, body.reason, c.get('userId')));
+    } catch (err) { return respondError(c, err); }
+  });
+
+  api.post('/estimates/:id/convert', async (c) => {
+    try {
+      const body = convertEstimateSchema.parse(await bodyOf(c));
+      return c.json(await EstimateService.convert(
+        c.get('orgId'), uuid.parse(c.req.param('id')), body.target, body.date,
+        body.target === 'INVOICE' ? body.dueDate : undefined, c.get('userId'),
+      ));
     } catch (err) { return respondError(c, err); }
   });
 }

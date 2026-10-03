@@ -6,7 +6,7 @@ import { Dialog, Field } from '../ledger/Dialog';
 import { Mark } from '../ledger/Mark';
 import { EmptyNote, LoadProblem, PageNote, SkeletonRows, buttonClass } from '../ledger/Page';
 import { useConfirm } from '../../hooks/useConfirm';
-import { OrderBuilder } from './OrderBuilder';
+import { OrderBuilder } from './SalesDocumentBuilder';
 import {
   cancelBlockedByInvoice,
   nextStatuses,

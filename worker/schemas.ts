@@ -438,3 +438,26 @@ export const onboardingSchema = z.object({
 });
 
 export const currencyRefreshSchema = z.object({ base: currency.default('KES') });
+
+// --- Estimates -------------------------------------------------------------------------
+
+export const estimateSchema = z.object({
+  customerId: uuid,
+  estimateDate: isoDate,
+  expiryDate: isoDate.optional(),
+  notes: text(4000),
+  idempotencyKey: idempotencyKey.optional(),
+  lines: z.array(salesOrderLineSchema).min(1).max(200),
+}).refine((estimate) => !estimate.expiryDate || estimate.expiryDate >= estimate.estimateDate, {
+  message: 'An estimate cannot expire before its date.',
+});
+export const estimateStatusSchema = z.object({
+  status: z.enum(['DRAFT', 'SENT', 'ACCEPTED', 'DECLINED']),
+  reason: text(500),
+});
+export const convertEstimateSchema = z.discriminatedUnion('target', [
+  z.object({ target: z.literal('INVOICE'), date: isoDate, dueDate: isoDate }),
+  z.object({ target: z.literal('SALES_ORDER'), date: isoDate }),
+]).refine((body) => body.target !== 'INVOICE' || body.dueDate >= body.date, {
+  message: 'The due date cannot be before the issue date.',
+});

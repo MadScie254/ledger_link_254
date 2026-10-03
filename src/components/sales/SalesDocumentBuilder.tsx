@@ -34,37 +34,117 @@ interface Checked {
   unitPriceCents: number | null;
 }
 
+export type SalesDocumentKind = 'order' | 'estimate';
+
+/** What differs between the documents this builder writes. */
+const KINDS: Record<SalesDocumentKind, {
+  endpoint: string;
+  title: string;
+  editTitle: string;
+  note: string;
+  dateLabel: string;
+  dateKey: string;
+  secondDate: { label: string; key: string; hint: string };
+  linesHeading: string;
+  totalLabel: string;
+  submit: string;
+  pending: string;
+  failed: string;
+  stockNote: (onHand: number) => string;
+  serviceNote: string;
+  notesHint: string;
+}> = {
+  order: {
+    endpoint: '/api/sales-orders',
+    title: 'New order',
+    editTitle: 'Edit order',
+    note: 'Recorded now, invoiced when you choose. An order does not post to the books.',
+    dateLabel: 'Order date',
+    dateKey: 'orderDate',
+    secondDate: { label: 'Promised for', key: 'promisedDate', hint: 'Optional' },
+    linesHeading: 'What was ordered',
+    totalLabel: 'Order total',
+    submit: 'Record order',
+    pending: 'Recording',
+    failed: 'The order could not be recorded.',
+    stockNote: (onHand) => `Only ${onHand} in stock. The order can still be recorded; completing it takes the count below zero.`,
+    serviceNote: 'A service: completing the order does not change any stock count.',
+    notesHint: 'Optional. Delivery address, colours, anything the team needs.',
+  },
+  estimate: {
+    endpoint: '/api/estimates',
+    title: 'New estimate',
+    editTitle: 'Edit estimate',
+    note: 'A priced offer to the customer. Nothing posts to the books until it becomes an invoice.',
+    dateLabel: 'Estimate date',
+    dateKey: 'estimateDate',
+    secondDate: { label: 'Valid until', key: 'expiryDate', hint: 'Optional' },
+    linesHeading: 'What is quoted',
+    totalLabel: 'Estimate total',
+    submit: 'Save estimate',
+    pending: 'Saving',
+    failed: 'The estimate could not be saved.',
+    stockNote: (onHand) => `Only ${onHand} in stock now.`,
+    serviceNote: 'A service, not counted as stock.',
+    notesHint: 'Optional. Scope, terms or anything the customer should know.',
+  },
+};
+
+export interface SalesDocumentDraft {
+  id: string;
+  customerId: string;
+  date: string;
+  secondDate?: string | null;
+  notes?: string | null;
+  lines: Array<{ inventoryItemId?: string | null; description: string; quantity: number; unitPriceCents: number; taxRate: number; accountId: string }>;
+}
+
 /**
- * Records a customer's order. Nothing here posts to the books; the totals are
- * a preview computed the same way the database computes them.
+ * Writes a customer's order or an estimate: who it is for, its dates, and
+ * priced lines with stock items, quantities and VAT. Nothing here posts to
+ * the books; the totals are a preview computed the same way the database
+ * computes them. With `initial`, the document is rewritten instead.
  */
-export function OrderBuilder({
+export function SalesDocumentBuilder({
+  kind,
   orgId,
   baseCurrency,
   customers,
   incomeAccounts,
   items,
+  initial,
   onClose,
   onRecorded,
 }: {
+  kind: SalesDocumentKind;
   orgId: string;
   baseCurrency: string;
   customers: any[];
   incomeAccounts: any[];
   items: any[];
+  initial?: SalesDocumentDraft | null;
   onClose: () => void;
-  onRecorded: (order: { id: string; orderNumber: string }) => void;
+  onRecorded: (document: any) => void;
 }) {
-  // One key per opening of the form: pressing Record twice saves one order.
+  const config = KINDS[kind];
+  // One key per opening of the form: pressing the button twice saves one document.
   const [idempotencyKey] = useState(() => crypto.randomUUID());
-  const [customerId, setCustomerId] = useState('');
-  const [orderDate, setOrderDate] = useState(format(new Date(), 'yyyy-MM-dd'));
-  const [promisedDate, setPromisedDate] = useState('');
-  const [notes, setNotes] = useState('');
+  const [customerId, setCustomerId] = useState(initial?.customerId || '');
+  const [orderDate, setOrderDate] = useState(initial?.date || format(new Date(), 'yyyy-MM-dd'));
+  const [promisedDate, setPromisedDate] = useState(initial?.secondDate || '');
+  const [notes, setNotes] = useState(initial?.notes || '');
   const [problem, setProblem] = useState('');
-  const [lines, setLines] = useState<DraftLine[]>([
-    { key: 1, itemId: '', description: '', quantity: '1', unitPrice: '', taxRate: '0', accountId: incomeAccounts[0]?.id || '' },
-  ]);
+  const [lines, setLines] = useState<DraftLine[]>(() => initial?.lines.length
+    ? initial.lines.map((line, index) => ({
+        key: index + 1,
+        itemId: line.inventoryItemId || '',
+        description: line.description,
+        quantity: String(line.quantity),
+        unitPrice: (line.unitPriceCents / 100).toFixed(2),
+        taxRate: String(line.taxRate),
+        accountId: line.accountId,
+      }))
+    : [{ key: 1, itemId: '', description: '', quantity: '1', unitPrice: '', taxRate: '0', accountId: incomeAccounts[0]?.id || '' }]);
 
   const setLine = (key: number, patch: Partial<DraftLine>) =>
     setLines((prev) => prev.map((line) => (line.key === key ? { ...line, ...patch } : line)));
@@ -112,13 +192,13 @@ export function OrderBuilder({
 
   const record = useMutation({
     mutationFn: async () => {
-      const res = await fetch('/api/sales-orders', {
-        method: 'POST',
+      const res = await fetch(initial ? `${config.endpoint}/${initial.id}` : config.endpoint, {
+        method: initial ? 'PUT' : 'POST',
         headers: { 'Content-Type': 'application/json', 'x-org-id': orgId },
         body: JSON.stringify({
           customerId,
-          orderDate,
-          promisedDate: promisedDate || undefined,
+          [config.dateKey]: orderDate,
+          [config.secondDate.key]: promisedDate || undefined,
           notes: notes.trim() || undefined,
           idempotencyKey,
           lines: checked.map(({ line, unitPriceCents }) => ({
@@ -132,18 +212,18 @@ export function OrderBuilder({
         }),
       });
       const body = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(body.error || 'The order could not be recorded.');
-      return body as { id: string; orderNumber: string };
+      if (!res.ok) throw new Error(body.error || config.failed);
+      return body;
     },
-    onSuccess: (order) => onRecorded(order),
+    onSuccess: (document) => onRecorded(document),
     onError: (err: Error) => setProblem(err.message),
   });
 
   const submit = () => {
     setProblem('');
-    if (!customerId) return setProblem('Choose the customer who placed the order.');
-    if (!orderDate) return setProblem('Enter the order date.');
-    if (promisedDate && promisedDate < orderDate) return setProblem('The promised date cannot be before the order date.');
+    if (!customerId) return setProblem(kind === 'order' ? 'Choose the customer who placed the order.' : 'Choose the customer.');
+    if (!orderDate) return setProblem(`Enter the ${config.dateLabel.toLowerCase()}.`);
+    if (promisedDate && promisedDate < orderDate) return setProblem(`${config.secondDate.label} cannot be before the ${config.dateLabel.toLowerCase()}.`);
     const firstBad = checked.findIndex((c) => c.problem);
     if (firstBad !== -1) return setProblem(`Line ${firstBad + 1}: ${checked[firstBad].problem}`);
     record.mutate();
@@ -154,13 +234,13 @@ export function OrderBuilder({
       open
       onClose={() => { if (!record.isPending) onClose(); }}
       width="lg"
-      title="New order"
-      note="Recorded now, invoiced when you choose. An order does not post to the books."
+      title={initial ? config.editTitle : config.title}
+      note={config.note}
       footer={
         <>
           <button type="button" onClick={onClose} disabled={record.isPending} className={buttonClass.secondary}>Cancel</button>
           <button type="button" onClick={submit} disabled={record.isPending} className={buttonClass.primary}>
-            {record.isPending ? 'Recording' : 'Record order'}
+            {record.isPending ? config.pending : config.submit}
           </button>
         </>
       }
@@ -175,16 +255,16 @@ export function OrderBuilder({
               ))}
             </select>
           </Field>
-          <Field label="Order date">
+          <Field label={config.dateLabel}>
             <input type="date" value={orderDate} onChange={(e) => setOrderDate(e.target.value)} />
           </Field>
-          <Field label="Promised for" hint="Optional">
+          <Field label={config.secondDate.label} hint={config.secondDate.hint}>
             <input type="date" min={orderDate} value={promisedDate} onChange={(e) => setPromisedDate(e.target.value)} />
           </Field>
         </div>
 
         <section aria-labelledby="order-lines">
-          <h3 id="order-lines" className="text-[14px] font-semibold text-ink-900 border-b border-feint-strong pb-1.5">What was ordered <span className="font-normal text-graphite-600">· prices in {baseCurrency}</span></h3>
+          <h3 id="order-lines" className="text-[14px] font-semibold text-ink-900 border-b border-feint-strong pb-1.5">{config.linesHeading} <span className="font-normal text-graphite-600">· prices in {baseCurrency}</span></h3>
           <ol className="divide-y divide-feint">
             {checked.map(({ line, item, stocked, problem: lineProblem, amountCents }, index) => {
               const onHand = Number(item?.quantityOnHand ?? 0);
@@ -275,12 +355,10 @@ export function OrderBuilder({
                     </div>
                   </div>
                   {stocked && Number.isFinite(quantity) && quantity > onHand && (
-                    <p className="mt-1.5 text-[12.5px] text-graphite-600">
-                      Only {onHand} in stock. The order can still be recorded; completing it takes the count below zero.
-                    </p>
+                    <p className="mt-1.5 text-[12.5px] text-graphite-600">{config.stockNote(onHand)}</p>
                   )}
                   {item && !stocked && (
-                    <p className="mt-1.5 text-[12.5px] text-graphite-600">A service: completing the order does not change any stock count.</p>
+                    <p className="mt-1.5 text-[12.5px] text-graphite-600">{config.serviceNote}</p>
                   )}
                 </li>
               );
@@ -310,12 +388,12 @@ export function OrderBuilder({
             <dd><Amount cents={totals.taxCents} currency={baseCurrency} tone="ink" /></dd>
           </div>
           <div className="ll-total flex items-baseline justify-between gap-4 py-2">
-            <dt className="font-semibold text-ink-900">Order total, {baseCurrency}</dt>
+            <dt className="font-semibold text-ink-900">{config.totalLabel}, {baseCurrency}</dt>
             <dd><Amount cents={totals.totalCents} currency={baseCurrency} tone="ink" className="font-semibold" /></dd>
           </div>
         </dl>
 
-        <Field label="Notes" hint="Optional. Delivery address, colours, anything the team needs.">
+        <Field label="Notes" hint={config.notesHint}>
           <textarea rows={2} maxLength={4000} value={notes} onChange={(e) => setNotes(e.target.value)} />
         </Field>
 
@@ -323,4 +401,9 @@ export function OrderBuilder({
       </div>
     </Dialog>
   );
+}
+
+/** The order form, as the Orders tab has always opened it. */
+export function OrderBuilder(props: Omit<Parameters<typeof SalesDocumentBuilder>[0], 'kind'>) {
+  return <SalesDocumentBuilder kind="order" {...props} />;
 }

@@ -98,3 +98,33 @@ test('a journal entry is posted by hand', async () => {
   assert.deepEqual(problems, []);
   });
 });
+
+test('an estimate is written, sent, accepted and invoiced', async () => {
+  const session = await signedIn();
+  const { page, api, problems } = session;
+  await flow('estimate', session, async () => {
+    await openView(page, 'Sales');
+    await page.getByRole('tab', { name: /Estimates/ }).click();
+    await page.getByRole('button', { name: 'New estimate' }).click();
+    const dialog = page.getByRole('dialog');
+    await dialog.locator('select').first().selectOption({ label: 'Acme' });
+    await dialog.getByLabel('Line 1 stock item').selectOption({ label: 'Cement 50kg' });
+    await dialog.getByLabel('Line 1 quantity').fill('20');
+    await dialog.getByLabel('Line 1 VAT rate').fill('16');
+    await dialog.getByRole('button', { name: 'Save estimate' }).click();
+    await dialog.waitFor({ state: 'hidden', timeout: 10_000 });
+    assert.equal(sql(`SELECT status || ' ' || total_cents FROM public.estimates`), 'DRAFT 1740000');
+
+    await page.getByRole('button', { name: 'Mark sent' }).click();
+    await page.getByText(/marked sent/).waitFor({ timeout: 10_000 });
+    await page.getByRole('button', { name: 'Accepted', exact: true }).click();
+    await page.getByText(/marked accepted/).waitFor({ timeout: 10_000 });
+    await page.getByLabel('Show').selectOption('ACCEPTED');
+    await page.getByRole('button', { name: 'Invoice', exact: true }).click();
+    await page.getByRole('dialog').getByRole('button', { name: 'Raise invoice' }).click();
+    await page.getByText(/raised from estimate/).waitFor({ timeout: 10_000 });
+    assert.deepEqual(refusedWrites(api), []);
+    assert.equal(sql(`SELECT e.status || ' ' || i.total_cents FROM public.estimates e JOIN public.invoices i ON i.id = e.invoice_id`), 'CONVERTED 1740000');
+    assert.deepEqual(problems, []);
+  });
+});
