@@ -1,0 +1,59 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  app:
+    name: Types, unit tests, audit and build
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run lint
+      - run: npm test
+      - name: Dependency audit
+        run: npm audit --audit-level=high
+      - name: Build
+        run: npm run build
+        env:
+          # A build needs a project URL; this one is never contacted.
+          VITE_SUPABASE_URL: https://ci-build.invalid
+          VITE_SUPABASE_PUBLISHABLE_KEY: ci-build
+
+  database:
+    name: Database and integration tests
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    env:
+      # The runner's own PostgreSQL 16, as its postgres superuser.
+      PSQL: sudo -u postgres sh -c
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Start PostgreSQL
+        run: |
+          sudo systemctl start postgresql.service
+          pg_lsclusters
+      - name: Migrations and SQL tests
+        run: npm run test:db
+      - name: Services through PostgREST
+        run: npm run test:integration
