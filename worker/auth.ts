@@ -96,9 +96,11 @@ async function selectOrganization(c: Context<{ Variables: Variables }>, next: Ne
     return c.json({ error: 'You do not have access to this organization.' }, 403);
   }
 
-  // Leaving an organization is the one change a read-only member may make.
-  const isLeaving = c.req.method === 'POST' && new URL(c.req.url).pathname === '/api/membership/leave';
-  if (!['GET', 'HEAD', 'OPTIONS'].includes(c.req.method) && !writeRoles.has(role) && !isLeaving) {
+  // A read-only member may leave the organization, and may ask a question
+  // about the books (a POST only because the question is in the body).
+  const pathname = new URL(c.req.url).pathname;
+  const isMemberPost = c.req.method === 'POST' && (pathname === '/api/membership/leave' || pathname === '/api/ai/ask');
+  if (!['GET', 'HEAD', 'OPTIONS'].includes(c.req.method) && !writeRoles.has(role) && !isMemberPost) {
     return c.json({ error: 'Your organization role cannot modify data.' }, 403);
   }
 

@@ -40,8 +40,8 @@ async function seedDemoOrg() {
 
   // 2. Customers
   const customers = [
-    { displayName: 'Safaricom PLC', email: 'billing@safaricom.co.ke', currency: 'KES' },
-    { displayName: 'Equity Bank', email: 'vendors@equitybank.co.ke', currency: 'KES' }
+    { displayName: 'Savanna Telecom Ltd', email: 'billing@savanna-telecom.example', currency: 'KES' },
+    { displayName: 'Rift Valley Credit Co-op', email: 'vendors@riftvalley-credit.example', currency: 'KES' }
   ];
   
   const customerIds = [];
@@ -53,8 +53,8 @@ async function seedDemoOrg() {
 
   // 3. Vendors
   const vendors = [
-    { displayName: 'Kenya Power', email: 'billing@kplc.co.ke', currency: 'KES' },
-    { displayName: 'Shell Petrol', email: 'invoicing@shell.co.ke', currency: 'KES' }
+    { displayName: 'Lakeside Power & Light', email: 'billing@lakeside-power.example', currency: 'KES' },
+    { displayName: 'Highway Fuels', email: 'invoicing@highway-fuels.example', currency: 'KES' }
   ];
 
   const vendorIds = [];
@@ -73,7 +73,7 @@ async function seedDemoOrg() {
     const dueDate = new Date(invDate);
     dueDate.setDate(dueDate.getDate() + 30);
     
-    // Safaricom
+    // Savanna Telecom
     const inv1Id = await InvoiceService.createInvoice({
       orgId,
       customerId: customerIds[0],
@@ -93,7 +93,7 @@ async function seedDemoOrg() {
     });
     invoiceIds.push({ id: inv1Id, date: invDate, customer: customers[0].displayName, amount: 17400000, paid: i > 1 });
 
-    // Equity Bank
+    // Rift Valley Credit
     const inv2Id = await InvoiceService.createInvoice({
       orgId,
       customerId: customerIds[1],
@@ -120,7 +120,7 @@ async function seedDemoOrg() {
     const dueDate = new Date(billDate);
     dueDate.setDate(dueDate.getDate() + 30);
 
-    // KPLC
+    // Lakeside Power
     await BillService.createBill({
       orgId,
       vendorId: vendorIds[0],

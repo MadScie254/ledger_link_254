@@ -5,12 +5,15 @@
 # headers the Worker sets reach JSON responses only.
 #
 # connect-src: the API is same-origin; the browser talks to Supabase only for
-# sign-in. No inline scripts are allowed; inline styles are, because React
+# sign-in, and only to this project's host (change it here if the project
+# moves). No inline scripts are allowed; inline styles are, because React
 # style attributes need them. Camera stays available to this origin for the
-# receipt scanner.
+# receipt scanner. The opener policy keeps other windows from reaching this
+# one.
 /*
-  Content-Security-Policy: default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: blob:; connect-src 'self' https://*.supabase.co wss://*.supabase.co; frame-ancestors 'none'; base-uri 'self'; form-action 'self'; object-src 'none'
+  Content-Security-Policy: default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: blob:; connect-src 'self' https://jhmlkcuqsmynnkqgfisf.supabase.co wss://jhmlkcuqsmynnkqgfisf.supabase.co; frame-ancestors 'none'; base-uri 'self'; form-action 'self'; object-src 'none'
   X-Frame-Options: DENY
+  Cross-Origin-Opener-Policy: same-origin
   X-Content-Type-Options: nosniff
   Referrer-Policy: strict-origin-when-cross-origin
   Strict-Transport-Security: max-age=31536000; includeSubDomains

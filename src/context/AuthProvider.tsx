@@ -10,6 +10,10 @@ interface AuthContextType {
   signIn: (email: string, password: string) => Promise<{ error: any }>;
   signUp: (email: string, password: string) => Promise<{ error: any; needsEmailConfirmation: boolean }>;
   resendConfirmation: (email: string) => Promise<{ error: any }>;
+  requestPasswordReset: (email: string) => Promise<{ error: any }>;
+  updatePassword: (password: string) => Promise<{ error: any }>;
+  /** Signed in from a password-reset link: a new password is set before anything else. */
+  isRecoveringPassword: boolean;
   justConfirmedEmail: boolean;
   dismissEmailConfirmed: () => void;
 }
@@ -21,6 +25,9 @@ export const AuthContext = createContext<AuthContextType>({
   signIn: async () => ({ error: null }),
   signUp: async () => ({ error: null, needsEmailConfirmation: false }),
   resendConfirmation: async () => ({ error: null }),
+  requestPasswordReset: async () => ({ error: null }),
+  updatePassword: async () => ({ error: null }),
+  isRecoveringPassword: false,
   justConfirmedEmail: false,
   dismissEmailConfirmed: () => {}
 });
@@ -32,23 +39,23 @@ export const useAuth = () => useContext(AuthContext);
 // confirmation-link visit apart from an ordinary sign-in.
 let cameFromEmailConfirmation =
   typeof window !== 'undefined' && new URLSearchParams(window.location.hash.slice(1)).get('type') === 'signup';
+let cameFromPasswordRecovery =
+  typeof window !== 'undefined' && new URLSearchParams(window.location.hash.slice(1)).get('type') === 'recovery';
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
   const [justConfirmedEmail, setJustConfirmedEmail] = useState(false);
+  const [isRecoveringPassword, setIsRecoveringPassword] = useState(false);
   const { setLocked } = useAppStore();
 
   const noteSession = (session: Session | null) => {
     setSession(session);
     setUser(session?.user ?? null);
     setLocked(!session);
-    if (session?.access_token) {
-      localStorage.setItem('supabase-auth-token', session.access_token);
-    } else {
-      localStorage.removeItem('supabase-auth-token');
-    }
+    // Removes the copy of the access token earlier versions kept.
+    try { localStorage.removeItem('supabase-auth-token'); } catch { /* storage unavailable */ }
     // A confirmation link's tokens arrive in the URL hash, which Supabase
     // reads once on load. They are only useful for that one read: leaving
     // them visible afterwards is a bare access token sitting in the address
@@ -59,6 +66,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setJustConfirmedEmail(true);
       window.history.replaceState(null, '', window.location.pathname + window.location.search);
     }
+    // A password-reset link signs the person in only so they can choose a
+    // new password; nothing else opens until they do.
+    if (session && cameFromPasswordRecovery) {
+      cameFromPasswordRecovery = false;
+      setIsRecoveringPassword(true);
+      window.history.replaceState(null, '', window.location.pathname + window.location.search);
+    }
   };
 
   useEffect(() => {
@@ -67,7 +81,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setLoading(false);
     });
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      if (event === 'PASSWORD_RECOVERY') setIsRecoveringPassword(true);
       noteSession(session);
     });
 
@@ -76,7 +91,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const signOut = async () => {
     await supabase.auth.signOut();
-    localStorage.removeItem('supabase-auth-token');
     setLocked(true);
   };
 
@@ -118,6 +132,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return { error };
   };
 
+  // Always answers the same way, so the form cannot be used to learn which
+  // addresses have accounts. The link lands back on this origin, which must
+  // be on the Supabase project's redirect allow-list.
+  const requestPasswordReset = async (email: string) => {
+    const { error } = await supabase.auth.resetPasswordForEmail(email, { redirectTo: window.location.origin });
+    return { error };
+  };
+
+  const updatePassword = async (password: string) => {
+    const { error } = await supabase.auth.updateUser({ password });
+    if (!error) setIsRecoveringPassword(false);
+    return { error };
+  };
+
   if (loading) {
     return (
       <div className="fixed inset-0 bg-sidebar-bg z-[100] flex items-center justify-center">
@@ -129,7 +157,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const dismissEmailConfirmed = () => setJustConfirmedEmail(false);
 
   return (
-    <AuthContext.Provider value={{ session, user, signOut, signIn, signUp, resendConfirmation, justConfirmedEmail, dismissEmailConfirmed }}>
+    <AuthContext.Provider value={{ session, user, signOut, signIn, signUp, resendConfirmation, requestPasswordReset, updatePassword, isRecoveringPassword, justConfirmedEmail, dismissEmailConfirmed }}>
       {children}
     </AuthContext.Provider>
   );

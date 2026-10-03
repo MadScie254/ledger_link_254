@@ -5,7 +5,7 @@ import { useAuth } from '../../context/AuthProvider';
 import { Mark } from '../ledger/Mark';
 import { BrandMark } from '../ledger/BrandMark';
 
-type Mode = 'signIn' | 'signUp';
+type Mode = 'signIn' | 'signUp' | 'reset';
 
 const CONTENTS = [
   ['General ledger', 'Posted entries, account balances and a complete audit history.'],
@@ -17,8 +17,8 @@ const fieldClass =
   'mt-1.5 block w-full h-11 rounded-sm border border-field bg-paper-100 px-3 text-[15px] text-ink-900 placeholder:text-graphite-500 focus:border-oxblood focus:shadow-[0_0_0_1px_var(--oxblood)] focus:outline-none';
 
 /** The cover of the book, and its first page. */
-export function LockScreen({ initialMode = 'signIn', onBack }: { initialMode?: Mode; onBack?: () => void } = {}) {
-  const { signIn, signUp, resendConfirmation } = useAuth();
+export function LockScreen({ initialMode = 'signIn', onBack }: { initialMode?: 'signIn' | 'signUp'; onBack?: () => void } = {}) {
+  const { signIn, signUp, resendConfirmation, requestPasswordReset } = useAuth();
   const reducedMotion = useReducedMotion();
   const [mode, setMode] = useState<Mode>(initialMode);
   const [email, setEmail] = useState('');
@@ -29,9 +29,11 @@ export function LockScreen({ initialMode = 'signIn', onBack }: { initialMode?: M
   const [confirmationSent, setConfirmationSent] = useState(false);
   const [resendStatus, setResendStatus] = useState<'idle' | 'sending' | 'sent'>('idle');
   const [resendError, setResendError] = useState('');
+  const [resetSent, setResetSent] = useState(false);
 
   const switchMode = (next: Mode) => {
     setMode(next);
+    setResetSent(false);
     setError('');
     setPassword('');
     setConfirmPassword('');
@@ -53,7 +55,12 @@ export function LockScreen({ initialMode = 'signIn', onBack }: { initialMode?: M
     }
 
     setLoading(true);
-    if (mode === 'signIn') {
+    if (mode === 'reset') {
+      const { error: resetError } = await requestPasswordReset(email.trim());
+      // A rate limit or a bad address is worth saying; whether the account exists is not.
+      if (resetError && /rate|limit|invalid/i.test(resetError.message)) setError(resetError.message);
+      else setResetSent(true);
+    } else if (mode === 'signIn') {
       const { error: signInError } = await signIn(email, password);
       if (signInError) setError(signInError.message);
     } else {
@@ -186,11 +193,20 @@ export function LockScreen({ initialMode = 'signIn', onBack }: { initialMode?: M
               ) : (
                 <>
                   <h2 className="ll-cover text-[32px] leading-tight text-ink-900">
-                    {mode === 'signIn' ? 'Open your books' : 'Start a new book'}
+                    {mode === 'signIn' ? 'Open your books' : mode === 'reset' ? 'Reset your password' : 'Start a new book'}
                   </h2>
                   <p className="mt-2 text-[15px] text-graphite-600">
-                    {mode === 'signIn' ? 'Sign in with the email and password on your account.' : 'Use your work email. Your organization is set up next.'}
+                    {mode === 'signIn'
+                      ? 'Sign in with the email and password on your account.'
+                      : mode === 'reset'
+                        ? 'Enter the email on your account. A link to choose a new password is sent to it.'
+                        : 'Use your work email. Your organization is set up next.'}
                   </p>
+                  {mode === 'reset' && resetSent && (
+                    <p role="status" className="mt-6 text-[14px] text-ink-900">
+                      <Mark kind="tick" label={`If an account uses ${email.trim()}, a reset link is on its way. Open it on this device to choose a new password.`} />
+                    </p>
+                  )}
 
                   {error && (
                     <p role="alert" className="mt-6 flex items-start gap-2 text-[14px] text-ledger-red">
@@ -213,6 +229,7 @@ export function LockScreen({ initialMode = 'signIn', onBack }: { initialMode?: M
                       />
                     </label>
 
+                    {mode !== 'reset' && (
                     <label className="block">
                       <span className="text-[13.5px] font-semibold text-ink-900">Password</span>
                       <input
@@ -225,7 +242,17 @@ export function LockScreen({ initialMode = 'signIn', onBack }: { initialMode?: M
                         className={fieldClass}
                       />
                       {mode === 'signUp' && <span className="mt-1.5 block text-[12.5px] text-graphite-600">At least 8 characters.</span>}
+                      {mode === 'signIn' && (
+                        <button
+                          type="button"
+                          onClick={() => switchMode('reset')}
+                          className="mt-1.5 text-[12.5px] text-oxblood underline underline-offset-[3px] decoration-[color-mix(in_srgb,currentColor_40%,transparent)] hover:decoration-current"
+                        >
+                          Forgot your password?
+                        </button>
+                      )}
                     </label>
+                    )}
 
                     {mode === 'signUp' && (
                       <label className="block">
@@ -247,12 +274,14 @@ export function LockScreen({ initialMode = 'signIn', onBack }: { initialMode?: M
                       disabled={loading}
                       className="h-11 w-full rounded-sm bg-oxblood-fill text-[15px] font-semibold text-white hover:bg-[var(--oxblood-fill-hover)] disabled:cursor-wait disabled:opacity-60"
                     >
-                      {loading ? (mode === 'signIn' ? 'Signing in…' : 'Creating account…') : mode === 'signIn' ? 'Sign in' : 'Create account'}
+                      {loading
+                        ? mode === 'signIn' ? 'Signing in…' : mode === 'reset' ? 'Sending…' : 'Creating account…'
+                        : mode === 'signIn' ? 'Sign in' : mode === 'reset' ? 'Send the reset link' : 'Create account'}
                     </button>
                   </form>
 
                   <p className="mt-8 border-t border-feint pt-5 text-[14px] text-graphite-600">
-                    {mode === 'signIn' ? 'New to Ledger Link? ' : 'Already have an account? '}
+                    {mode === 'signIn' ? 'New to Ledger Link? ' : mode === 'reset' ? 'Remembered it? ' : 'Already have an account? '}
                     <button
                       type="button"
                       onClick={() => switchMode(mode === 'signIn' ? 'signUp' : 'signIn')}

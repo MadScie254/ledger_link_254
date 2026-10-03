@@ -1,5 +1,6 @@
 import { useAppStore } from '../store';
 import { useMonitoringStore } from './monitoring';
+import { supabase } from '../lib/supabase';
 
 let apiFetchInstalled = false;
 
@@ -29,7 +30,10 @@ export function installAuthenticatedApiFetch() {
     const requestHeaders = input instanceof Request ? input.headers : undefined;
     const headers = new Headers(init?.headers || requestHeaders);
     const { currentOrgId } = useAppStore.getState();
-    const token = localStorage.getItem('supabase-auth-token');
+    // Supabase keeps the session and refreshes it before it expires; asking
+    // it each time means no second copy of the token is kept anywhere.
+    const { data: { session } } = await supabase.auth.getSession();
+    const token = session?.access_token;
 
     if (currentOrgId && !headers.has('x-org-id')) {
       headers.set('x-org-id', currentOrgId);
