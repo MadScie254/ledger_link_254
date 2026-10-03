@@ -100,8 +100,8 @@ export function InvoiceBuilder({ onDone }: { onDone: () => void }) {
         headers: { 'Content-Type': 'application/json', 'x-org-id': currentOrgId },
         body: JSON.stringify({
           customerId,
-          issueDate: new Date(issueDate).toISOString(),
-          dueDate: new Date(dueDate).toISOString(),
+          issueDate,
+          dueDate,
           currency,
           exchangeRate: rateNum,
           idempotencyKey,

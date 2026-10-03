@@ -9,8 +9,15 @@ import { isCalendarDate, isTimeZone } from '../src/utils/dates';
 
 export const uuid = z.string().uuid();
 
-/** A real calendar date written YYYY-MM-DD; 2026-02-30 and "1" are refused. */
-export const isoDate = z.string().trim().refine(isCalendarDate, 'Use a real date in YYYY-MM-DD form.');
+/**
+ * A real calendar date written YYYY-MM-DD; 2026-02-30 and "1" are refused.
+ * A full ISO timestamp keeps its date part, so screens loaded before dates
+ * were sent plain still post.
+ */
+export const isoDate = z.preprocess(
+  (value) => (typeof value === 'string' && /^\d{4}-\d{2}-\d{2}T/.test(value.trim()) ? value.trim().slice(0, 10) : value),
+  z.string().trim().refine(isCalendarDate, 'Use a real date in YYYY-MM-DD form.'),
+);
 
 export const currency = z.string().trim().toUpperCase().regex(/^[A-Z]{3}$/, 'Currency must be a three-letter ISO code.');
 
