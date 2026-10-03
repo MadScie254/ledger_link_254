@@ -10,7 +10,9 @@
     "deploy": "vite build && wrangler deploy",
     "clean": "rm -rf dist",
     "lint": "tsc --noEmit",
-    "test": "node --test src/utils/*.test.ts src/components/onboarding/*.test.ts src/components/documentation/*.test.ts"
+    "test": "node --test src/utils/*.test.ts src/components/onboarding/*.test.ts src/components/documentation/*.test.ts",
+    "test:db": "bash tests/db/run.sh",
+    "test:integration": "bash tests/integration/run.sh"
   },
   "dependencies": {
     "@google/genai": "^2.19.0",

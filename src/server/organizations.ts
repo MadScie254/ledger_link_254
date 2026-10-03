@@ -1,4 +1,5 @@
 import { getSupabase } from './supabase';
+import { UserError } from './errors';
 import { extraAccountsFor, type BusinessType } from '../utils/businessTypes';
 import type { ThemeAccent } from '../utils/themeAccents';
 
@@ -199,6 +200,11 @@ export class OrganizationService {
     const updateData: Record<string, unknown> = {};
     for (const [key, column] of Object.entries(columns) as Array<[keyof OrganizationUpdateInput, string]>) {
       if (data[key] !== undefined) updateData[column] = data[key];
+    }
+    if (data.baseCurrency !== undefined) {
+      const baseCurrency = String(data.baseCurrency).trim().toUpperCase();
+      if (!/^[A-Z]{3}$/.test(baseCurrency)) throw new UserError('Base currency must be a three-letter ISO code, such as KES.');
+      updateData.base_currency = baseCurrency;
     }
 
     if (Object.keys(updateData).length > 0) {
