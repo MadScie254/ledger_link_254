@@ -195,7 +195,8 @@ export function DashboardView() {
   const customers = useQuery({ queryKey: ['customers', currentOrgId], queryFn: () => getJson('/api/customers', currentOrgId) });
   const customerName = (id: string) =>
     (customers.data?.customers || []).find((c: any) => c.id === id)?.displayName;
-  const entries = useQuery({ queryKey: ['journal-entries', currentOrgId], queryFn: () => getJson('/api/journal-entries', currentOrgId) });
+  // Its own key: the Accounting page keeps the paged journal under ['journal-entries', org].
+  const entries = useQuery({ queryKey: ['journal-entries', currentOrgId, 'recent'], queryFn: () => getJson('/api/journal-entries?limit=20', currentOrgId) });
   const bankLines = useQuery({ queryKey: ['banking-transactions', currentOrgId], queryFn: () => getJson('/api/banking/transactions', currentOrgId) });
 
   const m = metrics.data || {};
