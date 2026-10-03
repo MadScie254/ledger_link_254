@@ -10,6 +10,7 @@ import { Dialog } from '../ledger/Dialog';
 import { RunningLedger, LedgerLine } from '../ledger/RunningLedger';
 import { buttonClass } from '../ledger/Page';
 import { DocumentPayments } from './DocumentPayments';
+import { DynamicQuickAddModal } from './DynamicQuickAddModal';
 
 export type DrillDownEntityType = 'ITEM' | 'VENDOR' | 'CUSTOMER' | 'EMPLOYEE' | 'ACCOUNT' | 'INVOICE' | 'BILL';
 
@@ -82,8 +83,11 @@ function Section({ title, children }: { title: string; children: React.ReactNode
 export function EntityDrillDownModal({ isOpen, onClose, entityType, entityId, initialData, onEdit }: EntityDrillDownModalProps) {
   const [activeTab, setActiveTab] = useState<'details' | 'transactions'>('details');
   const [copiedField, setCopiedField] = useState<string | null>(null);
+  const [isEditing, setIsEditing] = useState(false);
   const { currentOrgId, activeCompany } = useAppStore();
   const currency = activeCompany?.baseCurrency || 'KES';
+  // Customers, suppliers, stock items and employees are edited here by anyone who may post.
+  const canEdit = ['ITEM', 'VENDOR', 'CUSTOMER', 'EMPLOYEE'].includes(entityType) && activeCompany?.role !== 'member';
 
   const { data: entityData } = useQuery({
     queryKey: ['drilldown', entityType, entityId, currentOrgId],
@@ -139,6 +143,7 @@ export function EntityDrillDownModal({ isOpen, onClose, entityType, entityId, in
 
   React.useEffect(() => {
     if (isOpen) setActiveTab('details');
+    setIsEditing(false);
   }, [isOpen, entityId]);
 
   if (!isOpen) return null;
@@ -378,6 +383,11 @@ export function EntityDrillDownModal({ isOpen, onClose, entityType, entityId, in
       note={NOUN[entityType]}
       footer={
         <>
+          {canEdit && !onEdit && (
+            <button type="button" onClick={() => setIsEditing(true)} className={buttonClass.secondary}>
+              Edit
+            </button>
+          )}
           {onEdit && (
             <button
               type="button"
@@ -502,6 +512,13 @@ export function EntityDrillDownModal({ isOpen, onClose, entityType, entityId, in
             </tfoot>
           </table>
         </div>
+      )}
+      {canEdit && entityId && (
+        <DynamicQuickAddModal
+          isOpen={isEditing}
+          onClose={() => setIsEditing(false)}
+          editing={isEditing ? { type: entityType as 'ITEM' | 'VENDOR' | 'CUSTOMER' | 'EMPLOYEE', id: entityId, data: raw } : null}
+        />
       )}
     </Dialog>
   );

@@ -138,8 +138,10 @@ export class PayrollService {
       kraPin: row.kra_pin,
       nssfNumber: row.nssf_number,
       nhifNumber: row.nhif_number,
+      shifNumber: row.nhif_number,
       bankName: row.bank_name,
       bankAccount: row.bank_account,
+      bankAccountNo: row.bank_account,
       status: row.status,
       createdAt: row.created_at
     }));

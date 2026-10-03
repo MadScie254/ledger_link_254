@@ -1,4 +1,4 @@
-import { InventoryService } from '../../src/server/inventory';
+import { InventoryService, type ItemInput } from '../../src/server/inventory';
 import { ProjectService } from '../../src/server/projects';
 import { bodyOf, respondError } from '../http';
 import { itemSchema, itemUpdateSchema, projectSchema, projectUpdateSchema, stockAdjustmentSchema, timeEntrySchema, uuid } from '../schemas';
@@ -25,7 +25,7 @@ export function registerOperationsRoutes(api: Api) {
       // A stock count is set through an adjustment, never by editing the item.
       const body = itemUpdateSchema.parse(raw);
       await InventoryService.updateItem(c.get('orgId'), uuid.parse(c.req.param('id')), {
-        ...body,
+        ...(body as ItemInput),
         ...(raw && raw.quantityOnHand !== undefined ? { quantityOnHand: raw.quantityOnHand } : {}),
       });
       return c.json({ success: true });

@@ -6,14 +6,24 @@ import { formatCurrency } from '../../utils/currency';
 import { Dialog } from '../ledger/Dialog';
 import { Amount } from '../ledger/Amount';
 import { buttonClass } from '../ledger/Page';
+import { formValuesFor, changedFields } from '../../utils/recordForm';
 
 interface DynamicQuickAddModalProps {
   isOpen: boolean;
   onClose: () => void;
   overrideType?: EntityType;
   onSuccess?: () => void;
+  /** An existing record to edit instead of creating one. */
+  editing?: { type: EntityType; id: string; data: any } | null;
 }
 
+type EditableType = 'ITEM' | 'VENDOR' | 'CUSTOMER' | 'EMPLOYEE';
+const EDIT_ENDPOINT: Record<EditableType, string> = {
+  ITEM: '/api/inventory',
+  VENDOR: '/api/vendors',
+  CUSTOMER: '/api/customers',
+  EMPLOYEE: '/api/employees',
+};
 /**
  * Maps the app's active view to the most relevant entity creation type
  */
@@ -42,13 +52,15 @@ export function DynamicQuickAddModal({
   isOpen,
   onClose,
   overrideType,
-  onSuccess
+  onSuccess,
+  editing = null,
 }: DynamicQuickAddModalProps) {
   const { activeView, currentOrgId } = useAppStore();
   const queryClient = useQueryClient();
+  const isEditing = Boolean(editing);
 
   // Context-aware default selection
-  const contextualDefault = overrideType || getContextualEntityType(activeView);
+  const contextualDefault = editing?.type || overrideType || getContextualEntityType(activeView);
   const [selectedType, setSelectedType] = useState<EntityType>(contextualDefault);
   const [activeSubTab, setActiveSubTab] = useState<'general' | 'financial' | 'tax' | 'contact' | 'address'>('general');
   const [serverError, setServerError] = useState<string | null>(null);
@@ -56,11 +68,11 @@ export function DynamicQuickAddModal({
   // Sync selected type when modal opens or view changes
   useEffect(() => {
     if (isOpen) {
-      setSelectedType(overrideType || getContextualEntityType(activeView));
+      setSelectedType(editing?.type || overrideType || getContextualEntityType(activeView));
       setActiveSubTab('general');
       setServerError(null);
     }
-  }, [isOpen, overrideType, activeView]);
+  }, [isOpen, overrideType, activeView, editing?.type]);
 
   // Use unified form state management with isDirty and validations
   const {
@@ -76,9 +88,17 @@ export function DynamicQuickAddModal({
     resetForm,
     discardDraft
   } = useEntityForm(selectedType, undefined, {
-    autoSaveDraft: true,
+    // An edit starts from the record itself, never from a stored draft.
+    autoSaveDraft: !isEditing,
     storageKeyPrefix: 'quickadd'
   });
+
+  // Opening an edit fills the form with the record as it is now.
+  // Keyed on the record's id: the parent passes a fresh object each render.
+  useEffect(() => {
+    if (isOpen && editing) resetForm(formValuesFor(editing.type, editing.data));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOpen, editing?.id, editing?.type]);
 
   // Queries for relations
   const { data: accountsData } = useQuery({
@@ -109,6 +129,18 @@ export function DynamicQuickAddModal({
   // Mutation
   const createMutation = useMutation({
     mutationFn: async (payload: any) => {
+      if (editing) {
+        const res = await fetch(`${EDIT_ENDPOINT[editing.type as EditableType]}/${editing.id}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+        });
+        if (!res.ok) {
+          const data = await res.json().catch(() => ({}));
+          throw new Error(data.error || 'The changes could not be saved.');
+        }
+        return res.json();
+      }
       let endpoint = '';
       switch (selectedType) {
         case 'ITEM': endpoint = '/api/inventory'; break;
@@ -140,6 +172,7 @@ export function DynamicQuickAddModal({
       queryClient.invalidateQueries({ queryKey: ['accounts', currentOrgId] });
       queryClient.invalidateQueries({ queryKey: ['bills', currentOrgId] });
       queryClient.invalidateQueries({ queryKey: ['invoices', currentOrgId] });
+      queryClient.invalidateQueries({ queryKey: ['drilldown'] });
       resetForm();
       setServerError(null);
       if (onSuccess) onSuccess();
@@ -159,10 +192,28 @@ export function DynamicQuickAddModal({
     const isValid = validateAll();
     if (!isValid) return;
 
-    if (selectedType === 'ITEM') {
+    const payload = payloadFor(selectedType, values);
+    if (!payload) return;
+    if (editing) {
+      // The count changes through a stock count, not an edit.
+      const { quantityOnHand: _count, ...after } = payload as Record<string, unknown>;
+      const { quantityOnHand: _was, ...before } = (payloadFor(editing.type, formValuesFor(editing.type, editing.data)) || {}) as Record<string, unknown>;
+      const changes = changedFields(before, after);
+      if (Object.keys(changes).length === 0) {
+        onClose();
+        return;
+      }
+      createMutation.mutate(changes);
+      return;
+    }
+    createMutation.mutate(payload);
+  };
+
+  function payloadFor(type: EntityType, values: Record<string, any>): Record<string, unknown> | null {
+    if (type === 'ITEM') {
       const price = parseFloat(values.price || '0');
       const cost = parseFloat(values.cost || '0');
-      createMutation.mutate({
+      return {
         name: values.name,
         itemType: values.itemType || 'Physical Product',
         sku: values.sku,
@@ -181,9 +232,9 @@ export function DynamicQuickAddModal({
         preferredVendorId: values.preferredVendorId,
         location: values.location,
         notes: values.notes
-      });
-    } else if (selectedType === 'VENDOR') {
-      createMutation.mutate({
+      };
+    } else if (type === 'VENDOR') {
+      return {
         displayName: values.displayName,
         legalName: values.legalName,
         vendorType: values.vendorType || 'Direct Supplier',
@@ -206,11 +257,11 @@ export function DynamicQuickAddModal({
         postalCode: values.postalCode,
         country: values.country || 'Kenya',
         notes: values.notes
-      });
-    } else if (selectedType === 'CUSTOMER') {
+      };
+    } else if (type === 'CUSTOMER') {
       const creditLimit = parseFloat(values.creditLimit || '0');
       const discount = parseFloat(values.discountPercent || '0');
-      createMutation.mutate({
+      return {
         displayName: values.displayName,
         legalName: values.legalName,
         customerType: values.customerType || 'Corporate',
@@ -229,12 +280,12 @@ export function DynamicQuickAddModal({
         postalCode: values.postalCode,
         country: values.country || 'Kenya',
         notes: values.notes
-      });
-    } else if (selectedType === 'EMPLOYEE') {
+      };
+    } else if (type === 'EMPLOYEE') {
       const salary = parseFloat(values.baseSalary || '0');
       const housing = parseFloat(values.housingAllowance || '0');
       const transport = parseFloat(values.transportAllowance || '0');
-      createMutation.mutate({
+      return {
         firstName: values.firstName,
         middleName: values.middleName,
         lastName: values.lastName,
@@ -254,9 +305,9 @@ export function DynamicQuickAddModal({
         bankName: values.bankName,
         bankAccountNo: values.bankAccountNo,
         mpesaNumber: values.mpesaNumber
-      });
-    } else if (selectedType === 'ACCOUNT') {
-      createMutation.mutate({
+      };
+    } else if (type === 'ACCOUNT') {
+      return {
         code: values.code,
         name: values.name,
         type: values.type,
@@ -264,9 +315,10 @@ export function DynamicQuickAddModal({
         parentId: values.parentId || null,
         description: values.description,
         isBankAccount: (values.type || 'EXPENSE') === 'ASSET' && Boolean(values.isBankAccount),
-      });
+      };
     }
-  };
+    return null;
+  }
 
   // Profit Margin Calculation for Item form
   const numPrice = parseFloat(values.price || '0');
@@ -287,8 +339,8 @@ export function DynamicQuickAddModal({
       open={isOpen}
       onClose={onClose}
       width="xl"
-      title={`New ${TYPE_NAME[selectedType] || 'record'}`}
-      note={isDirty ? 'Your entries are kept as a draft on this device until you save or discard them.' : undefined}
+      title={editing ? `Edit ${editing.data?.displayName || editing.data?.name || [editing.data?.firstName, editing.data?.lastName].filter(Boolean).join(' ') || TYPE_NAME[selectedType]}` : `New ${TYPE_NAME[selectedType] || 'record'}`}
+      note={editing ? 'Only the fields you change are saved, and each change is recorded in the audit log.' : isDirty ? 'Your entries are kept as a draft on this device until you save or discard them.' : undefined}
       footer={
         <>
           {serverError && (
@@ -300,7 +352,7 @@ export function DynamicQuickAddModal({
             Cancel
           </button>
           <button type="submit" form="quick-add-form" disabled={createMutation.isPending} className={buttonClass.primary}>
-            {createMutation.isPending ? 'Saving' : `Save ${TYPE_NAME[selectedType] || 'record'}`}
+            {createMutation.isPending ? 'Saving' : editing ? 'Save changes' : `Save ${TYPE_NAME[selectedType] || 'record'}`}
           </button>
         </>
       }
@@ -322,7 +374,7 @@ export function DynamicQuickAddModal({
               </button>
             ))}
         </div>
-        {!overrideType && (
+        {!overrideType && !editing && (
           <label className="mb-2 flex items-center gap-2 text-[12.5px] text-graphite-600">
             Record
             <select
@@ -344,7 +396,7 @@ export function DynamicQuickAddModal({
         )}
       </div>
 
-      {hasRecoveredDraft && isDirty && (
+      {hasRecoveredDraft && isDirty && !editing && (
         <p className="mb-4 flex flex-wrap items-baseline justify-between gap-2 border-y border-feint py-2 text-[13px] text-ink-900">
           <span>Your unsaved {TYPE_NAME[selectedType] || 'record'} from earlier has been put back.</span>
           <button type="button" onClick={discardDraft} className={buttonClass.quiet}>
@@ -582,7 +634,7 @@ export function DynamicQuickAddModal({
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-2">
                     <div>
                       <label htmlFor="qa-quantityOnHand-13" className="block text-[13px] font-semibold text-ink-900 mb-1.5">
-                        Opening quantity
+                        {editing ? 'On hand' : 'Opening quantity'}
                       </label>
                       <input
                         id="qa-quantityOnHand-13" name="quantityOnHand"
@@ -590,8 +642,11 @@ export function DynamicQuickAddModal({
                         min="0"
                         value={values.quantityOnHand || '0'}
                         onChange={handleInputChange}
-                        className="w-full h-10 border px-3 text-[14px]"
+                        readOnly={Boolean(editing)}
+                        aria-describedby={editing ? 'qa-quantityOnHand-note' : undefined}
+                        className="w-full h-10 border px-3 text-[14px] read-only:bg-paper-200"
                       />
+                      {editing && <p id="qa-quantityOnHand-note" className="mt-1 text-[12.5px] text-graphite-600">Changed with Count on the Inventory page, so each change has a reason.</p>}
                     </div>
                     <div>
                       <label htmlFor="qa-reorderPoint-14" className="block text-[13px] font-semibold text-ink-900 mb-1.5">

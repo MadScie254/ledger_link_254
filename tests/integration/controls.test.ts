@@ -15,6 +15,7 @@ import { BankingService } from '../../src/server/banking';
 import { AuditService } from '../../src/server/audit';
 import { runWithRequestContext } from '../../src/server/requestContext';
 import { getSupabase } from '../../src/server/supabase';
+import { customerUpdateSchema, itemUpdateSchema } from '../../worker/schemas';
 import { ORG, OWNER, MEMBER, BANK, AR, AP, SALES, OPEX, CUSTOMER, VENDOR, CEMENT, sql, uuid, refused } from './helpers';
 
 test('a received payment is reversed with a dated entry, and the invoice is owed again', async () => {
@@ -177,4 +178,15 @@ test('a new organization is created with its owner and chart in one step, once p
   assert.ok(accounts.some((a) => a.code === '1000' && a.isBankAccount));
   assert.ok(!accounts.some((a) => a.code === '1100' && a.isBankAccount));
   assert.equal(sql(`SELECT role FROM public.memberships WHERE org_id = '${first}' AND user_id = '${MEMBER}'`), 'owner');
+});
+
+test('an edit changes only the fields sent, and null clears a field', async () => {
+  const id = await CustomerService.createCustomer(ORG, { displayName: 'Kisumu Traders', phone: '0711 000 000', email: 'pay@kisumu.example' });
+  const body = customerUpdateSchema.parse({ displayName: 'Kisumu Traders Ltd', phone: null, unknownField: 'dropped' });
+  assert.deepEqual(body, { displayName: 'Kisumu Traders Ltd', phone: null });
+  await CustomerService.updateCustomer(ORG, id, body as any);
+  const [phone, email, name] = sql(`SELECT coalesce(phone, '(none)') || '|' || email || '|' || display_name FROM public.customers WHERE id = '${id}'`).split('|');
+  assert.deepEqual([phone, email, name], ['(none)', 'pay@kisumu.example', 'Kisumu Traders Ltd']);
+  assert.throws(() => customerUpdateSchema.parse({ displayName: null }));
+  assert.throws(() => itemUpdateSchema.parse({ itemType: null }));
 });

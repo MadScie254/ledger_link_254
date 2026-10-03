@@ -31,6 +31,18 @@ export const optionalUuid = z.preprocess((value) => (value === '' || value === n
 export const reason = requiredText(500, 'A reason');
 export const idempotencyKey = uuid;
 
+/**
+ * The schema for editing a record: every field optional, and every field
+ * but the named required ones may be sent as null to clear it.
+ */
+function forUpdate<T extends z.ZodRawShape>(shape: T, required: Array<keyof T>) {
+  const fields: Record<string, z.ZodTypeAny> = {};
+  for (const [key, schema] of Object.entries(shape)) {
+    fields[key] = required.includes(key as keyof T) ? schema.optional() : schema.optional().nullable();
+  }
+  return z.object(fields);
+}
+
 // --- Customers and suppliers -------------------------------------------------
 
 const partyFields = {
@@ -58,7 +70,7 @@ export const customerSchema = z.object({
   isActive: z.boolean().optional(),
   ...partyFields,
 });
-export const customerUpdateSchema = customerSchema.partial();
+export const customerUpdateSchema = forUpdate(customerSchema.shape, ['displayName', 'isActive', 'currency', 'creditLimitCents', 'discountPercent']);
 
 export const vendorSchema = z.object({
   displayName: requiredText(200, 'A display name'),
@@ -76,7 +88,7 @@ export const vendorSchema = z.object({
   isActive: z.boolean().optional(),
   ...partyFields,
 });
-export const vendorUpdateSchema = vendorSchema.partial();
+export const vendorUpdateSchema = forUpdate(vendorSchema.shape, ['displayName', 'isActive', 'currency']);
 
 // --- Stock items, projects, time ----------------------------------------------
 
@@ -104,7 +116,7 @@ export const itemSchema = z.object({
   quantityOnHand: z.number().int().min(0).max(1_000_000_000).optional(),
 });
 // The stock count is not editable: it changes through adjustments and orders.
-export const itemUpdateSchema = z.object(itemFields).partial().extend({
+export const itemUpdateSchema = forUpdate(itemFields, ['name', 'itemType', 'priceCents', 'costCents', 'reorderPoint']).extend({
   status: z.enum(['Active', 'Inactive']).optional(),
 });
 export const stockAdjustmentSchema = z.object({
@@ -158,7 +170,7 @@ const employeeFields = {
   bankAccountNo: text(60),
 };
 export const employeeSchema = z.object(employeeFields);
-export const employeeUpdateSchema = z.object(employeeFields).partial();
+export const employeeUpdateSchema = forUpdate(employeeFields, ['firstName', 'lastName', 'hireDate', 'baseSalaryCents', 'housingAllowanceCents', 'transportAllowanceCents']);
 export const payrollRunSchema = z.object({
   period: requiredText(40, 'The payroll period'),
   payDate: isoDate,
