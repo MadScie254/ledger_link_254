@@ -4,6 +4,8 @@ import { useAppStore } from '../../store';
 import { Dialog, Field } from '../ledger/Dialog';
 import { PageHeading, SkeletonRows, EmptyNote, LoadProblem, buttonClass } from '../ledger/Page';
 import { useConfirm } from '../../hooks/useConfirm';
+import { apiRequest } from '../../utils/apiRequest';
+import { format } from 'date-fns';
 
 type AssignableRole = 'admin' | 'member' | 'accountant';
 type Role = 'owner' | AssignableRole;
@@ -17,6 +19,13 @@ interface TeamMember {
   isYou: boolean;
 }
 
+interface PendingInvitation {
+  id: string;
+  email: string;
+  role: AssignableRole;
+  invitedAt: string;
+}
+
 const ROLE_NOTE: Record<Role, string> = {
   owner: 'Holds the organization and posts to the books',
   admin: 'Posts to the books, invites members, changes roles and settings',
@@ -24,79 +33,79 @@ const ROLE_NOTE: Record<Role, string> = {
   member: 'Can read the books; posting needs an owner or admin',
 };
 
+const ROLE_LABEL: Record<Role, string> = {
+  owner: 'Owner',
+  admin: 'Admin',
+  accountant: 'Accountant',
+  member: 'Member',
+};
+
 export function TeamView() {
-  const { currentOrgId, setActiveView } = useAppStore();
+  const { currentOrgId, setActiveView, activeCompany, setCurrentOrgId } = useAppStore();
   const queryClient = useQueryClient();
   const [isInviteOpen, setIsInviteOpen] = useState(false);
   const [inviteEmail, setInviteEmail] = useState('');
   const [inviteRole, setInviteRole] = useState<AssignableRole>('member');
   const [formError, setFormError] = useState('');
   const [rowError, setRowError] = useState('');
+  const [notice, setNotice] = useState('');
   const { confirm, confirmDialog } = useConfirm();
 
   const team = useQuery({
     queryKey: ['team', currentOrgId],
-    queryFn: async () => {
-      const res = await fetch('/api/team', { headers: { 'x-org-id': currentOrgId } });
-      if (!res.ok) throw new Error('Failed to fetch team');
-      return res.json();
-    },
+    queryFn: () => apiRequest<{ members: TeamMember[]; invitations: PendingInvitation[] }>('/api/team', { fallback: 'Failed to fetch team' }),
   });
+  const refreshTeam = () => queryClient.invalidateQueries({ queryKey: ['team', currentOrgId] });
+  const rowFailed = (err: Error) => { setNotice(''); setRowError(err.message); };
+  const rowDone = (message: string) => { setRowError(''); setNotice(message); refreshTeam(); };
 
   const inviteMutation = useMutation({
-    mutationFn: async () => {
-      const res = await fetch('/api/team', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'x-org-id': currentOrgId },
-        body: JSON.stringify({ email: inviteEmail.trim(), role: inviteRole }),
-      });
-      if (!res.ok) {
-        const data = await res.json().catch(() => ({}));
-        throw new Error(data.error || 'The invitation could not be sent.');
-      }
-      return res.json();
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['team', currentOrgId] });
+    mutationFn: () => apiRequest<{ emailed: boolean }>('/api/team', {
+      body: { email: inviteEmail.trim(), role: inviteRole },
+      fallback: 'The invitation could not be sent.',
+    }),
+    onSuccess: (result) => {
+      rowDone(result.emailed
+        ? `Invitation sent to ${inviteEmail.trim()}. They join once they create an account and accept.`
+        : `Invitation recorded for ${inviteEmail.trim()}. They join once they accept it, signed in with that address.`);
       closeInvite();
     },
-    onError: (err: any) => setFormError(err.message),
+    onError: (err: Error) => setFormError(err.message),
   });
 
   const roleMutation = useMutation({
-    mutationFn: async ({ id, role }: { id: string; role: AssignableRole }) => {
-      const res = await fetch(`/api/team/${id}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json', 'x-org-id': currentOrgId },
-        body: JSON.stringify({ role }),
-      });
-      if (!res.ok) {
-        const data = await res.json().catch(() => ({}));
-        throw new Error(data.error || 'The role could not be changed.');
-      }
-      return res.json();
-    },
-    onSuccess: () => {
-      setRowError('');
-      queryClient.invalidateQueries({ queryKey: ['team', currentOrgId] });
-    },
-    onError: (err: any) => setRowError(err.message),
+    mutationFn: ({ id, role }: { id: string; role: AssignableRole }) =>
+      apiRequest(`/api/team/${id}`, { method: 'PATCH', body: { role }, fallback: 'The role could not be changed.' }),
+    onSuccess: () => rowDone('Role changed.'),
+    onError: rowFailed,
   });
 
   const removeMutation = useMutation({
-    mutationFn: async (id: string) => {
-      const res = await fetch(`/api/team/${id}`, { method: 'DELETE', headers: { 'x-org-id': currentOrgId } });
-      if (!res.ok) {
-        const data = await res.json().catch(() => ({}));
-        throw new Error(data.error || 'The member could not be removed.');
-      }
-      return res.json();
-    },
+    mutationFn: (id: string) => apiRequest(`/api/team/${id}`, { method: 'DELETE', fallback: 'The member could not be removed.' }),
+    onSuccess: () => rowDone('Member removed.'),
+    onError: rowFailed,
+  });
+
+  const revokeMutation = useMutation({
+    mutationFn: (id: string) => apiRequest(`/api/team/invitations/${id}`, { method: 'DELETE', fallback: 'The invitation could not be withdrawn.' }),
+    onSuccess: () => rowDone('Invitation withdrawn.'),
+    onError: rowFailed,
+  });
+
+  const transferMutation = useMutation({
+    mutationFn: (id: string) => apiRequest(`/api/team/${id}/transfer-ownership`, { method: 'POST', fallback: 'Ownership could not be transferred.' }),
+    onSuccess: () => rowDone('Ownership transferred. You are now an admin.'),
+    onError: rowFailed,
+  });
+
+  const leaveMutation = useMutation({
+    mutationFn: () => apiRequest('/api/membership/leave', { method: 'POST', fallback: 'You could not leave this organization.' }),
     onSuccess: () => {
-      setRowError('');
-      queryClient.invalidateQueries({ queryKey: ['team', currentOrgId] });
+      setCurrentOrgId('');
+      queryClient.invalidateQueries();
+      setActiveView('Home / Dashboard');
     },
-    onError: (err: any) => setRowError(err.message),
+    onError: rowFailed,
   });
 
   function closeInvite() {
@@ -107,50 +116,97 @@ export function TeamView() {
   }
 
   const members: TeamMember[] = team.data?.members || [];
-  // Only an owner or admin can invite, change a role, or remove someone;
-  // an accountant posts to the books but does not administer the
-  // organization, same restriction a plain member already has.
+  const invitations: PendingInvitation[] = team.data?.invitations || [];
+  // Only an owner or admin can invite, change a role, or remove someone, and
+  // only the owner can change or remove an admin.
   const myRole = members.find((m) => m.isYou)?.role;
-  const canManageTeam = myRole === 'owner' || myRole === 'admin';
+  const isOwner = myRole === 'owner';
+  const canManageTeam = isOwner || myRole === 'admin';
+  const canManage = (m: TeamMember) => canManageTeam && !m.isYou && m.role !== 'owner' && (isOwner || m.role !== 'admin');
 
   const roleControl = (m: TeamMember) => {
-    if (m.role === 'owner') return <span className="text-[13.5px] font-semibold text-ink-900">Owner</span>;
-    if (!canManageTeam) return <span className="text-[13.5px] text-ink-900">{ROLE_LABEL[m.role]}</span>;
+    if (!canManage(m)) {
+      return <span className={`text-[13.5px] text-ink-900 ${m.role === 'owner' ? 'font-semibold' : ''}`}>{ROLE_LABEL[m.role]}</span>;
+    }
     return (
       <select
         aria-label={`Role for ${m.email}`}
         value={m.role}
         onChange={(e) => roleMutation.mutate({ id: m.id, role: e.target.value as AssignableRole })}
-        disabled={roleMutation.isPending || m.isYou}
+        disabled={roleMutation.isPending}
         className="h-8 border px-2 text-[13px]"
       >
-        <option value="admin">Admin</option>
+        {isOwner && <option value="admin">Admin</option>}
         <option value="accountant">Accountant</option>
         <option value="member">Member</option>
       </select>
     );
   };
 
-  const removeControl = (m: TeamMember) =>
-    canManageTeam && m.role !== 'owner' && !m.isYou ? (
-      <button
-        type="button"
-        onClick={() => {
-          confirm(
+  const rowActions = (m: TeamMember) => {
+    const actions = [];
+    if (isOwner && !m.isYou) {
+      actions.push(
+        <button
+          key="transfer"
+          type="button"
+          className={buttonClass.quiet}
+          onClick={() => confirm(
+            {
+              title: 'Transfer ownership',
+              message: `Make ${m.email} the owner of ${activeCompany?.name || 'this organization'}? You become an admin, and only the new owner can transfer it back.`,
+              confirmText: 'Transfer ownership',
+              isDestructive: true,
+            },
+            () => transferMutation.mutate(m.id),
+          )}
+        >
+          Make owner
+        </button>,
+      );
+    }
+    if (canManage(m)) {
+      actions.push(
+        <button
+          key="remove"
+          type="button"
+          className={buttonClass.quiet}
+          onClick={() => confirm(
             {
               title: 'Remove team member',
               message: `Remove ${m.email} from this organization? They lose access to its books straight away.`,
               confirmText: 'Remove',
               isDestructive: true,
             },
-            () => removeMutation.mutate(m.id)
-          );
-        }}
-        className={buttonClass.quiet}
-      >
-        Remove
-      </button>
-    ) : null;
+            () => removeMutation.mutate(m.id),
+          )}
+        >
+          Remove
+        </button>,
+      );
+    }
+    if (m.isYou && !isOwner) {
+      actions.push(
+        <button
+          key="leave"
+          type="button"
+          className={buttonClass.quiet}
+          onClick={() => confirm(
+            {
+              title: 'Leave this organization',
+              message: `Leave ${activeCompany?.name || 'this organization'}? You lose access to its books until someone invites you again.`,
+              confirmText: 'Leave',
+              isDestructive: true,
+            },
+            () => leaveMutation.mutate(),
+          )}
+        >
+          Leave
+        </button>,
+      );
+    }
+    return actions.length ? <div className="flex flex-wrap gap-3 sm:justify-end">{actions}</div> : null;
+  };
 
   return (
     <div className="max-w-4xl space-y-5 pb-16">
@@ -180,6 +236,11 @@ export function TeamView() {
           {rowError}
         </p>
       )}
+      {notice && !rowError && (
+        <p role="status" className="text-[13.5px] text-ink-900">
+          {notice}
+        </p>
+      )}
 
       {team.isError ? (
         <LoadProblem what="the team" path="/api/team" onRetry={() => team.refetch()} />
@@ -190,7 +251,7 @@ export function TeamView() {
       ) : (
         <ul className="border-t border-feint-strong">
           {members.map((m) => (
-            <li key={m.id} className="grid grid-cols-1 gap-2 border-b border-feint py-3 sm:grid-cols-[minmax(0,1fr)_10rem_5rem] sm:items-center sm:gap-4">
+            <li key={m.id} className="grid grid-cols-1 gap-2 border-b border-feint py-3 sm:grid-cols-[minmax(0,1fr)_10rem_12rem] sm:items-center sm:gap-4">
               <div className="min-w-0">
                 <p className="truncate text-[14.5px] text-ink-900">
                   {m.email}
@@ -202,17 +263,48 @@ export function TeamView() {
                 </p>
               </div>
               <div>{roleControl(m)}</div>
-              <div className="sm:text-right">{removeControl(m)}</div>
+              <div className="sm:text-right">{rowActions(m)}</div>
             </li>
           ))}
         </ul>
+      )}
+
+      {canManageTeam && invitations.length > 0 && (
+        <section aria-labelledby="pending-invitations" className="space-y-2">
+          <h2 id="pending-invitations" className="ll-heading text-[17px] text-ink-900">Waiting to accept</h2>
+          <ul className="border-t border-feint-strong">
+            {invitations.map((invitation) => (
+              <li key={invitation.id} className="grid grid-cols-1 gap-2 border-b border-feint py-3 sm:grid-cols-[minmax(0,1fr)_10rem_12rem] sm:items-center sm:gap-4">
+                <div className="min-w-0">
+                  <p className="truncate text-[14.5px] text-ink-900">{invitation.email}</p>
+                  <p className="mt-0.5 text-[12.5px] text-graphite-600">
+                    Invited {invitation.invitedAt ? format(new Date(invitation.invitedAt), 'dd/MM/yyyy') : ''}
+                  </p>
+                </div>
+                <div className="text-[13.5px] text-ink-900">{ROLE_LABEL[invitation.role]}</div>
+                <div className="sm:text-right">
+                  {(isOwner || invitation.role !== 'admin') && (
+                    <button
+                      type="button"
+                      className={buttonClass.quiet}
+                      disabled={revokeMutation.isPending}
+                      onClick={() => revokeMutation.mutate(invitation.id)}
+                    >
+                      Withdraw
+                    </button>
+                  )}
+                </div>
+              </li>
+            ))}
+          </ul>
+        </section>
       )}
 
       <Dialog
         open={isInviteOpen}
         onClose={closeInvite}
         title="Invite a member"
-        note="A new address receives an email invitation. Someone who already uses Ledger Link, including for another organization, is added straight away."
+        note="Nobody joins without agreeing to. They see the invitation when they sign in with this address, and join when they accept it. A new address is also emailed a link to create an account."
         footer={
           <>
             <button type="button" onClick={closeInvite} className={buttonClass.secondary}>
@@ -240,7 +332,7 @@ export function TeamView() {
             <select value={inviteRole} onChange={(e) => setInviteRole(e.target.value as AssignableRole)}>
               <option value="member">Member</option>
               <option value="accountant">Accountant</option>
-              <option value="admin">Admin</option>
+              {isOwner && <option value="admin">Admin</option>}
             </select>
           </Field>
         </form>
@@ -250,10 +342,3 @@ export function TeamView() {
     </div>
   );
 }
-
-const ROLE_LABEL: Record<Role, string> = {
-  owner: 'Owner',
-  admin: 'Admin',
-  accountant: 'Accountant',
-  member: 'Member',
-};

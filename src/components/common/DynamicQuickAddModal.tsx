@@ -262,7 +262,8 @@ export function DynamicQuickAddModal({
         type: values.type,
         subtype: values.subtype,
         parentId: values.parentId || null,
-        description: values.description
+        description: values.description,
+        isBankAccount: (values.type || 'EXPENSE') === 'ASSET' && Boolean(values.isBankAccount),
       });
     }
   };
@@ -1361,6 +1362,22 @@ export function DynamicQuickAddModal({
                   />
                 </div>
               </div>
+
+              {(values.type || 'EXPENSE') === 'ASSET' && (
+                <label className="flex items-start gap-2 text-[13.5px] text-ink-900">
+                  <input
+                    type="checkbox"
+                    name="isBankAccount"
+                    checked={Boolean(values.isBankAccount)}
+                    onChange={handleInputChange}
+                    className="mt-0.5"
+                  />
+                  <span>
+                    A bank, cash or M-Pesa account
+                    <span className="block text-[12.5px] text-graphite-600">Payments are received into and paid out of these accounts only.</span>
+                  </span>
+                </label>
+              )}
 
               <div>
                 <label htmlFor="qa-description-60" className="block text-[13px] font-semibold text-ink-900 mb-1.5">

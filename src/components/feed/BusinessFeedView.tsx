@@ -11,7 +11,7 @@ const SUGGESTED_QUESTIONS = [
 ];
 
 export function BusinessFeedView() {
-  const { currentOrgId } = useAppStore();
+  const { currentOrgId, activeCompany } = useAppStore();
   const [question, setQuestion] = useState('');
   const [history, setHistory] = useState<Array<{ question: string; answer: string; askedAt: Date }>>([]);
 
@@ -48,6 +48,12 @@ export function BusinessFeedView() {
         title="Business feed"
         note="Ask about this organization’s books. Gemini writes each answer from the posted P&L, receivables and payables it is given, and it can be wrong. Check a figure against Reports before acting on it."
       />
+
+      {!activeCompany?.aiEnabled && (
+        <p className="text-[13.5px] text-ink-900">
+          Questions send a summary of this company’s figures to Google Gemini, so they are off until an owner or admin turns on AI features in Settings, Closing and controls.
+        </p>
+      )}
 
       <form
         onSubmit={(e) => {

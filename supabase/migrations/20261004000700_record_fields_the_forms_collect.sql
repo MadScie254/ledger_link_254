@@ -3,7 +3,8 @@
 -- The supplier form asks for VAT number, category, payment method, bank and
 -- M-Pesa details and a default expense account; the stock item form for unit
 -- of measure, barcode, VAT rate, preferred supplier, location, target stock
--- and notes; the employee form for a middle name. The tables had no columns
+-- and notes; the employee form for a middle name; the account form for what
+-- the account is for. The tables had no columns
 -- for them and the API dropped them without a word. Supplier bank and M-Pesa
 -- details are recorded by the vendors audit trigger whenever they change.
 
@@ -43,5 +44,10 @@ ALTER TABLE public.inventory_items
 
 ALTER TABLE public.employees
   ADD COLUMN IF NOT EXISTS middle_name TEXT;
+
+ALTER TABLE public.accounts
+  ADD COLUMN IF NOT EXISTS description TEXT;
+ALTER TABLE public.accounts
+  ADD CONSTRAINT accounts_description_length_check CHECK (description IS NULL OR char_length(description) <= 1000);
 
 -- Rollback: drop the added columns and constraints.

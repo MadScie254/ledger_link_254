@@ -207,7 +207,8 @@ export function OrdersPanel({
 
   const actions = (order: any) => {
     const next = nextStatuses(order.status as SalesOrderStatus);
-    const canInvoice = !order.invoiceId && order.status !== 'CANCELLED';
+    // An order whose invoice was voided can be invoiced again.
+    const canInvoice = (!order.invoiceId || order.invoiceStatus === 'VOID') && order.status !== 'CANCELLED';
     return (
       <span className="flex flex-wrap items-center gap-x-3 gap-y-1">
         {order.status === 'OPEN' && next.includes('IN_PROGRESS') && (

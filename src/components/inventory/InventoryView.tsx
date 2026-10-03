@@ -8,6 +8,8 @@ import { Amount } from '../ledger/Amount';
 import { Mark } from '../ledger/Mark';
 import { PageHeading, IndexTabs, SkeletonRows, EmptyNote, LoadProblem, buttonClass } from '../ledger/Page';
 import { useConfirm } from '../../hooks/useConfirm';
+import { inParts } from '../../utils/apiRequest';
+import { StockCountDialog } from './StockCountDialog';
 
 type Tab = 'Items' | 'Reorder';
 
@@ -16,6 +18,8 @@ export function InventoryView() {
   const [isAddingItem, setIsAddingItem] = useState(false);
   const [selectedItem, setSelectedItem] = useState<any | null>(null);
   const [selectedItemIds, setSelectedItemIds] = useState<string[]>([]);
+  const [countingItem, setCountingItem] = useState<any | null>(null);
+  const [notice, setNotice] = useState('');
 
   const { currentOrgId, activeCompany } = useAppStore();
   const baseCurrency = activeCompany?.baseCurrency || 'KES';
@@ -37,24 +41,32 @@ export function InventoryView() {
     priceCents: item.unitPriceCents ?? item.priceCents ?? 0,
     costCents: item.costPriceCents ?? item.costCents ?? 0,
   }));
-  const isLow = (item: any) => item.quantityOnHand <= item.reorderPoint;
+  // Services are not counted.
+  const isStocked = (item: any) => item.type !== 'Digital Service' && item.type !== 'Service';
+  const isLow = (item: any) => isStocked(item) && item.status !== 'Inactive' && item.quantityOnHand <= item.reorderPoint;
   const lowItems = items.filter(isLow);
   const stockValue = items.reduce((sum, item) => sum + (item.costCents || 0) * (item.quantityOnHand || 0), 0);
 
   const bulkDeleteMutation = useMutation({
     mutationFn: async (ids: string[]) => {
-      const res = await fetch('/api/bulk/delete', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'x-org-id': currentOrgId },
-        body: JSON.stringify({ entityType: 'ITEMS', ids }),
-      });
-      if (!res.ok) throw new Error('Failed to delete items');
-      return res.json();
+      let deleted = 0;
+      for (const part of inParts(ids)) {
+        const res = await fetch('/api/bulk/delete', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'x-org-id': currentOrgId },
+          body: JSON.stringify({ entityType: 'INVENTORY', ids: part }),
+        });
+        const body = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(`${deleted ? `${deleted} deleted. ` : ''}${body.error || 'Failed to delete items'}`);
+        deleted += body.count || 0;
+      }
+      return { count: deleted };
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['inventory', currentOrgId] });
+    onSuccess: (result) => {
+      setNotice(`${result.count} stock ${result.count === 1 ? 'item' : 'items'} deleted.`);
       setSelectedItemIds([]);
     },
+    onSettled: () => queryClient.invalidateQueries({ queryKey: ['inventory', currentOrgId] }),
   });
 
   const isAllSelected = items.length > 0 && selectedItemIds.length === items.length;
@@ -78,6 +90,13 @@ export function InventoryView() {
           </button>
         }
       />
+
+      {notice && <p role="status" className="text-[13.5px] text-ink-900">{notice}</p>}
+      {bulkDeleteMutation.isError && (
+        <p role="alert" className="text-[13.5px] text-ledger-red">
+          {bulkDeleteMutation.error.message} Items used on orders or invoices stay; mark them inactive instead.
+        </p>
+      )}
 
       <IndexTabs
         label="Inventory"
@@ -124,6 +143,11 @@ export function InventoryView() {
                   </span>
                   {isLow(item) && <span className="mt-1.5 block"><Mark kind="query" label={`At or below reorder point of ${item.reorderPoint}`} /></span>}
                 </button>
+                {isStocked(item) && (
+                  <button type="button" onClick={() => setCountingItem(item)} className={`${buttonClass.quiet} mb-3`}>
+                    Count {item.name}
+                  </button>
+                )}
               </li>
             ))}
           </ul>
@@ -146,7 +170,8 @@ export function InventoryView() {
                   <th scope="col" className="pr-4 text-right">Cost</th>
                   <th scope="col" className="pr-4 text-right">Price</th>
                   <th scope="col" className="pr-4 text-right">On hand</th>
-                  <th scope="col" className="text-left">Standing</th>
+                  <th scope="col" className="pr-4 text-left">Standing</th>
+                  <th scope="col" className="w-14"><span className="sr-only">Count</span></th>
                 </tr>
               </thead>
               <tbody>
@@ -177,8 +202,23 @@ export function InventoryView() {
                     <td className="pr-4 text-right whitespace-nowrap"><Amount cents={item.costCents || 0} currency={baseCurrency} /></td>
                     <td className="pr-4 text-right whitespace-nowrap"><Amount cents={item.priceCents || 0} currency={baseCurrency} /></td>
                     <td className="pr-4 text-right whitespace-nowrap">{quantity(item)}</td>
-                    <td className="whitespace-nowrap">
-                      {isLow(item) ? <Mark kind="query" label="Reorder" /> : <span className="text-[12px] text-graphite-600">In stock</span>}
+                    <td className="pr-4 whitespace-nowrap">
+                      {item.status === 'Inactive' ? (
+                        <span className="text-[12px] text-graphite-600">Inactive</span>
+                      ) : !isStocked(item) ? (
+                        <span className="text-[12px] text-graphite-600">Service</span>
+                      ) : isLow(item) ? (
+                        <Mark kind="query" label="Reorder" />
+                      ) : (
+                        <span className="text-[12px] text-graphite-600">In stock</span>
+                      )}
+                    </td>
+                    <td className="text-right" onClick={(e) => e.stopPropagation()}>
+                      {isStocked(item) && (
+                        <button type="button" onClick={() => setCountingItem(item)} aria-label={`Count ${item.name}`} className={buttonClass.quiet}>
+                          Count
+                        </button>
+                      )}
                     </td>
                   </tr>
                 ))}
@@ -188,7 +228,7 @@ export function InventoryView() {
                   <th scope="row" colSpan={6} className="ll-total py-2 pr-4 text-left font-semibold text-ink-900">
                     Stock at cost, {items.length} items
                   </th>
-                  <td className="ll-total py-2 text-left whitespace-nowrap font-semibold">
+                  <td colSpan={2} className="ll-total py-2 text-left whitespace-nowrap font-semibold">
                     <Amount cents={stockValue} currency={baseCurrency} tone="ink" />
                   </td>
                 </tr>
@@ -227,7 +267,7 @@ export function InventoryView() {
           onClearSelection={() => setSelectedItemIds([])}
           onDelete={() => {
             confirm(
-              { title: 'Delete stock items', message: `Delete ${selectedItemIds.length} stock item(s)? This cannot be undone.`, confirmText: 'Delete', isDestructive: true },
+              { title: 'Delete stock items', message: `Delete ${selectedItemIds.length} stock item(s)? This cannot be undone. Items used on orders or invoices are refused.`, confirmText: 'Delete', isDestructive: true },
               () => bulkDeleteMutation.mutate(selectedItemIds)
             );
           }}
@@ -236,6 +276,8 @@ export function InventoryView() {
       )}
 
       <DynamicQuickAddModal isOpen={isAddingItem} onClose={() => setIsAddingItem(false)} overrideType="ITEM" />
+
+      <StockCountDialog item={countingItem} orgId={currentOrgId} onClose={() => setCountingItem(null)} onDone={setNotice} />
 
       <EntityDrillDownModal isOpen={!!selectedItem} onClose={() => setSelectedItem(null)} entityType="ITEM" entityId={selectedItem?.id || null} initialData={selectedItem} />
 

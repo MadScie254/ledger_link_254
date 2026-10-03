@@ -14,6 +14,8 @@ import { Dialog, Field } from '../ledger/Dialog';
 import { SUPPORTED_CURRENCIES } from '../../utils/currency';
 import { PostedStamp } from '../ledger/PostedStamp';
 import { useConfirm } from '../../hooks/useConfirm';
+import { inParts } from '../../utils/apiRequest';
+import { todayIn, addDaysIso } from '../../utils/dates';
 
 const tabs = ['Vendors', 'Bills', 'Expenses', 'Bill payments'];
 
@@ -106,20 +108,26 @@ export function ExpensesView() {
     setBillExchangeRate('1');
   }
 
-  // Bulk Delete Bills
+  // Bulk void bills, sent in parts the API accepts.
   const bulkDeleteBillsMutation = useMutation({
     mutationFn: async (ids: string[]) => {
-      const res = await fetch('/api/bulk/delete', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'x-org-id': currentOrgId },
-        body: JSON.stringify({ entityType: 'BILLS', ids })
-      });
-      const body = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(body.error || 'The bills could not be voided.');
-      if (body.failed > 0) {
-        throw new Error(`${body.count} voided. ${body.failed} could not be voided: ${body.failures?.[0]?.message || 'see each bill'}`);
+      let voided = 0;
+      const failures: Array<{ message: string }> = [];
+      for (const part of inParts(ids)) {
+        const res = await fetch('/api/bulk/delete', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'x-org-id': currentOrgId },
+          body: JSON.stringify({ entityType: 'BILLS', ids: part })
+        });
+        const body = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(`${voided ? `${voided} voided. ` : ''}${body.error || 'The bills could not be voided.'}`);
+        voided += body.count || 0;
+        failures.push(...(body.failures || []));
       }
-      return body;
+      if (failures.length > 0) {
+        throw new Error(`${voided} voided. ${failures.length} could not be voided: ${failures[0]?.message || 'see each bill'}`);
+      }
+      return { count: voided };
     },
     onSuccess: () => setSelectedBillIds([]),
     // Some may have been voided even when others were refused.
@@ -128,7 +136,7 @@ export function ExpensesView() {
 
   const batchPaymentMutation = useMutation({
     mutationFn: async ({ targetBills, sourceAccountId }: { targetBills: any[]; sourceAccountId: string }) => {
-      const paymentDate = format(new Date(), 'yyyy-MM-dd');
+      const paymentDate = todayIn(activeCompany?.timeZone);
       // The same bill, amount, day and account always get the same key, so
       // pressing pay again after a dropped connection returns the payment
       // already made instead of paying twice.
@@ -139,15 +147,23 @@ export function ExpensesView() {
         sourceAccountId,
         idempotencyKey: await stableUuid(`bill-batch-pay:${currentOrgId}:${bill.id}:${bill.amountDueCents}:${paymentDate}:${sourceAccountId}`),
       })));
-      const res = await fetch('/api/bills/batch-pay', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'x-org-id': currentOrgId },
-        body: JSON.stringify({ payments })
-      });
-      const body = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(body.error || 'Failed to record bill payments');
-      if (body.failed > 0) throw new Error(`${body.paid} payment(s) posted; ${body.failed} failed. Refresh and review the open bills.`);
-      return body;
+      let paid = 0;
+      let failed = 0;
+      let firstFailure = '';
+      for (const part of inParts(payments)) {
+        const res = await fetch('/api/bills/batch-pay', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'x-org-id': currentOrgId },
+          body: JSON.stringify({ payments: part })
+        });
+        const body = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(`${paid ? `${paid} payment(s) posted. ` : ''}${body.error || 'Failed to record bill payments'}`);
+        paid += body.paid || 0;
+        failed += body.failed || 0;
+        firstFailure ||= body.errors?.[0]?.message || body.failures?.[0]?.message || '';
+      }
+      if (failed > 0) throw new Error(`${paid} payment(s) posted; ${failed} failed${firstFailure ? `: ${firstFailure}` : ''}. Refresh and review the open bills.`);
+      return { paid };
     },
     onSuccess: () => {
       setSelectedBillIds([]);
@@ -158,16 +174,21 @@ export function ExpensesView() {
     },
   });
 
-  // Bulk Delete Vendors
+  // Bulk delete vendors. The database refuses any vendor with bills; mark those inactive instead.
   const bulkDeleteVendorsMutation = useMutation({
     mutationFn: async (ids: string[]) => {
-      const res = await fetch('/api/bulk/delete', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'x-org-id': currentOrgId },
-        body: JSON.stringify({ entityType: 'VENDORS', ids })
-      });
-      if (!res.ok) throw new Error('Failed to delete vendors');
-      return res.json();
+      let deleted = 0;
+      for (const part of inParts(ids)) {
+        const res = await fetch('/api/bulk/delete', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'x-org-id': currentOrgId },
+          body: JSON.stringify({ entityType: 'VENDORS', ids: part })
+        });
+        const body = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(`${deleted ? `${deleted} deleted. ` : ''}${body.error || 'Failed to delete vendors'}`);
+        deleted += body.count || 0;
+      }
+      return { count: deleted };
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['vendors', currentOrgId] });
@@ -178,22 +199,31 @@ export function ExpensesView() {
   const vendors = vendorsData?.vendors || [];
   const bills = billsData?.bills || [];
   const expenseAccounts = accountsData?.accounts?.filter((a: any) => a.type === 'EXPENSE' || a.type === 'COGS') || [];
-  const paymentAccounts = accountsData?.accounts?.filter((a: any) => a.type === 'ASSET' && a.isActive !== false) || [];
+  const expenseAccountsActive = expenseAccounts.filter((a: any) => a.isActive !== false);
+  // Payments go out of money accounts only: bank, cash or M-Pesa.
+  const paymentAccounts = accountsData?.accounts?.filter((a: any) => a.isBankAccount && a.isActive !== false) || [];
+  const approvalThreshold = activeCompany?.approvalThresholdCents ?? null;
+  const needsApproval = (bill: any) =>
+    approvalThreshold != null && bill.status !== 'VOID' && !bill.approvedAt && Number(bill.totalCents || 0) >= approvalThreshold;
 
   const isAllBillsSelected = bills.length > 0 && selectedBillIds.length === bills.length;
   const isAllVendorsSelected = vendors.length > 0 && selectedVendorIds.length === vendors.length;
 
   const vendorName = (id: string) => vendors.find((v: any) => v.id === id)?.displayName;
-  const openBills = bills.filter((b: any) => Number(b.amountDueCents || 0) > 0 && b.status !== 'VOID');
+  const unpaidBills = bills.filter((b: any) => Number(b.amountDueCents || 0) > 0 && b.status !== 'VOID');
+  const awaitingApproval = unpaidBills.filter(needsApproval);
+  const openBills = unpaidBills.filter((b: any) => !needsApproval(b));
   const openBillsTotal = openBills.reduce((sum: number, b: any) => sum + (b.amountDueCents || 0), 0);
   const scannedVendorId = vendors.find((v: any) => v.displayName === scannedData?.vendor)?.id || '';
   const scannedVendorUnknown = !!scannedData?.vendor && !scannedVendorId;
   const billsTotal = bills.reduce((sum: number, b: any) => sum + (b.totalCents || 0), 0);
   const vendorsTotal = vendors.reduce((sum: number, v: any) => sum + (v.balance || 0), 0);
-  const today = new Date();
+  const today = todayIn(activeCompany?.timeZone);
   const billStanding = (bill: any) => {
+    if (bill.status === 'VOID') return <Mark kind="circled" label="Void" />;
     if (bill.status === 'PAID') return <Mark kind="tick" label="Paid" />;
-    if (bill.status === 'OVERDUE' || (bill.dueDate && new Date(bill.dueDate) < today)) return <Mark kind="circled" label="Overdue" />;
+    if (needsApproval(bill)) return <Mark kind="query" label="Needs approval" />;
+    if (bill.status === 'OVERDUE' || (bill.dueDate && bill.dueDate < today)) return <Mark kind="circled" label="Overdue" />;
     return <Mark kind="query" label={bill.dueDate ? `Due ${format(new Date(bill.dueDate), 'dd/MM/yyyy')}` : 'To pay'} />;
   };
   const skeleton = (label: string) => (
@@ -258,7 +288,7 @@ export function ExpensesView() {
                     </button>
                     <Amount cents={bill.totalCents || 0} currency={baseCurrency} className="shrink-0" />
                   </div>
-                  <p className="mt-1 text-[12.5px] text-graphite-600">{bill.billNo} · {format(new Date(bill.billDate), 'dd/MM/yyyy')}</p>
+                  <p className="mt-1 text-[12.5px] text-graphite-600">{bill.billNo}{bill.supplierReference ? ` · ${bill.supplierReference}` : ''} · {format(new Date(bill.billDate), 'dd/MM/yyyy')}</p>
                   <div className="mt-1.5">{billStanding(bill)}</div>
                 </li>
               ))}
@@ -302,7 +332,10 @@ export function ExpensesView() {
                           className="h-4 w-4"
                         />
                       </td>
-                      <td className="pr-4 whitespace-nowrap text-graphite-600">{bill.billNo}</td>
+                      <td className="pr-4 whitespace-nowrap text-graphite-600">
+                        {bill.billNo}
+                        {bill.supplierReference && <span className="block text-[12px]">{bill.supplierReference}</span>}
+                      </td>
                       <td className="pr-4">
                         <button
                           type="button"
@@ -427,8 +460,13 @@ export function ExpensesView() {
           <p className="text-[14px] leading-relaxed text-ink-900">
             A cash or card purchase is recorded as a bill from the supplier, then marked paid. Take a photo of the receipt and the supplier, amount and date are read from it for you to check.
           </p>
+          {!activeCompany?.aiEnabled && (
+            <p className="text-[13px] text-graphite-600">
+              Reading receipts sends the photo to Google Gemini, so it is off until an owner or admin turns on AI features in Settings, Closing and controls.
+            </p>
+          )}
           <div className="flex flex-wrap items-center gap-4">
-            <button type="button" onClick={() => setIsScanningReceipt(true)} className={buttonClass.secondary}>
+            <button type="button" onClick={() => setIsScanningReceipt(true)} disabled={!activeCompany?.aiEnabled} className={buttonClass.secondary}>
               Read a receipt
             </button>
             <button type="button" onClick={() => setIsCreatingBill(true)} className={buttonClass.quiet}>
@@ -444,9 +482,14 @@ export function ExpensesView() {
             Once suppliers have been paid outside Ledger Link, record it here. Each open bill is posted as paid: accounts payable is debited and cash credited.
           </p>
           <p className="text-[13px] text-graphite-600">No money moves. Ledger Link is not connected to M-Pesa or a bank.</p>
+          {awaitingApproval.length > 0 && (
+            <p className="text-[13.5px] text-ink-900">
+              {awaitingApproval.length} {awaitingApproval.length === 1 ? 'bill is' : 'bills are'} over the approval limit and waiting for an owner or admin who did not enter {awaitingApproval.length === 1 ? 'it' : 'them'} to approve. Open a bill to approve it.
+            </p>
+          )}
           {openBills.length === 0 ? (
             <p className="text-[14px]">
-              <Mark kind="tick" label="No open bills." />
+              <Mark kind="tick" label={awaitingApproval.length ? 'No other open bills.' : 'No open bills.'} />
             </p>
           ) : (
             <>
@@ -456,7 +499,7 @@ export function ExpensesView() {
                 </span>
                 <Amount cents={openBillsTotal} currency={baseCurrency} tone="ink" />
               </div>
-              <Field label="Pay from" hint={paymentAccounts.length === 0 ? 'Add an active cash or bank asset account before posting payments.' : undefined}>
+              <Field label="Pay from" hint={paymentAccounts.length === 0 ? 'Mark a bank, cash or M-Pesa account as holding money (Accounting, Edit) before posting payments.' : undefined}>
                 <select value={batchPaymentAccountId} onChange={(event) => setBatchPaymentAccountId(event.target.value)}>
                   <option value="">Choose an account</option>
                   {paymentAccounts.map((account: any) => (
@@ -588,6 +631,7 @@ export function ExpensesView() {
               vendorId: fd.get('vendorId'),
               billDate: fd.get('billDate'),
               dueDate: fd.get('dueDate'),
+              supplierReference: String(fd.get('supplierReference') || '').trim() || undefined,
               currency: billCurrency,
               exchangeRate,
               lines: [{
@@ -612,16 +656,19 @@ export function ExpensesView() {
           <Field label="Expense account">
             <select required name="accountId" defaultValue="">
               <option value="">Choose an account</option>
-              {expenseAccounts.map((a: any) => (
+              {expenseAccountsActive.map((a: any) => (
                 <option key={a.id} value={a.id}>{a.code} · {a.name}</option>
               ))}
             </select>
           </Field>
           <Field label="Bill date">
-            <input required name="billDate" type="date" defaultValue={scannedData?.date || format(new Date(), 'yyyy-MM-dd')} />
+            <input required name="billDate" type="date" defaultValue={scannedData?.date || today} />
           </Field>
           <Field label="Due">
-            <input required name="dueDate" type="date" defaultValue={format(new Date(Date.now() + 30 * 86400000), 'yyyy-MM-dd')} />
+            <input required name="dueDate" type="date" defaultValue={addDaysIso(today, 30)} />
+          </Field>
+          <Field label="Supplier's invoice number" hint="Optional. The same number cannot be entered twice for one supplier.">
+            <input name="supplierReference" type="text" maxLength={100} autoComplete="off" />
           </Field>
           <Field label="Currency">
             <select

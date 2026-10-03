@@ -37,6 +37,15 @@ export interface OrganizationData {
   website?: string;
   isDefault?: boolean;
   isDemo?: boolean;
+  /** No entry may be dated on or before this day (YYYY-MM-DD). */
+  booksClosedThrough?: string | null;
+  /** Bills at or over this amount need an owner's or admin's approval before payment. */
+  approvalThresholdCents?: number | null;
+  /** Whether receipts and figures may be sent to Google Gemini. */
+  aiEnabled?: boolean;
+  timeZone?: string;
+  /** The signed-in person's role in this organization. */
+  role?: 'owner' | 'admin' | 'accountant' | 'member';
 }
 
 interface AppState {

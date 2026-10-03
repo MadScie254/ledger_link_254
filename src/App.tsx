@@ -1,7 +1,3 @@
-/**
- * @license
- * SPDX-License-Identifier: Apache-2.0
- */
 import { lazy, Suspense, useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { AppLayout } from "./components/layout/AppLayout";
@@ -18,6 +14,8 @@ import type { OrganizationData } from "./store";
 import { OnboardingProvider } from "./components/onboarding/OnboardingProvider";
 import { LandingPage } from "./marketing/LandingPage";
 import { Mark } from "./components/ledger/Mark";
+import { InvitationsPrompt } from "./components/team/InvitationsPrompt";
+import { NewPasswordScreen } from "./components/layout/NewPasswordScreen";
 
 /** A tab that has already gone past the landing page (signed in, or clicked
  * through) never sees it again this tab, including after a later sign-out:
@@ -36,6 +34,23 @@ function markVisitedAuth() {
     sessionStorage.setItem(VISITED_AUTH_KEY, '1');
   } catch {
     // Private mode or blocked storage: the landing page just shows again next reload, which is harmless.
+  }
+}
+
+/** The organization each person last worked in, so a reload opens the same books. */
+const lastOrganizationKey = (userId: string) => `ll-last-org:${userId}`;
+function readLastOrganization(userId: string): string | null {
+  try {
+    return localStorage.getItem(lastOrganizationKey(userId));
+  } catch {
+    return null;
+  }
+}
+function rememberOrganization(userId: string, orgId: string) {
+  try {
+    localStorage.setItem(lastOrganizationKey(userId), orgId);
+  } catch {
+    // Blocked storage: the first organization opens next time instead.
   }
 }
 
@@ -95,7 +110,7 @@ export default function App() {
 }
 
 function LedgerApp() {
-  const { session, signOut, justConfirmedEmail, dismissEmailConfirmed } = useAuth();
+  const { session, signOut, justConfirmedEmail, dismissEmailConfirmed, isRecoveringPassword } = useAuth();
   const [showLanding, setShowLanding] = useState(() => !hasVisitedAuth());
   const [authMode, setAuthMode] = useState<'signIn' | 'signUp'>('signIn');
   const enterAuth = (mode: 'signIn' | 'signUp') => {
@@ -127,15 +142,20 @@ function LedgerApp() {
     },
   });
 
+  const userId = session?.user.id;
   useEffect(() => {
     if (!organizations?.length) return;
 
     setOrganizations(organizations);
-    const selectedOrganization = organizations.find((organization) => organization.id === currentOrgId) || organizations[0];
+    const remembered = userId ? readLastOrganization(userId) : null;
+    const selectedOrganization = organizations.find((organization) => organization.id === currentOrgId)
+      || organizations.find((organization) => organization.id === remembered)
+      || organizations[0];
     setCurrentOrgId(selectedOrganization.id);
     setActiveCompany(selectedOrganization);
     setDisplayCurrency(selectedOrganization.baseCurrency);
-  }, [organizations, currentOrgId, setActiveCompany, setCurrentOrgId, setDisplayCurrency, setOrganizations]);
+    if (userId) rememberOrganization(userId, selectedOrganization.id);
+  }, [organizations, currentOrgId, userId, setActiveCompany, setCurrentOrgId, setDisplayCurrency, setOrganizations]);
 
   // Automated daily exchange rate sync on startup
   useEffect(() => {
@@ -221,6 +241,10 @@ function LedgerApp() {
     return <DashboardView />;
   };
 
+  if (session && isRecoveringPassword) {
+    return <NewPasswordScreen />;
+  }
+
   if (session && justConfirmedEmail) {
     return <EmailConfirmedScreen onDone={dismissEmailConfirmed} />;
   }
@@ -252,6 +276,7 @@ function LedgerApp() {
       <>
         <TenantProvider>
           <AppLayout>
+            <InvitationsPrompt />
             <ErrorBoundary key={activeView}>
               <Suspense fallback={viewFallback}>{emptyOrganizationView}</Suspense>
             </ErrorBoundary>
@@ -267,6 +292,7 @@ function LedgerApp() {
     <>
       <TenantProvider>
         <AppLayout>
+          <InvitationsPrompt />
           <ErrorBoundary key={activeView}>
             <Suspense fallback={viewFallback}>{renderContent()}</Suspense>
           </ErrorBoundary>

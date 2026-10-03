@@ -3,11 +3,13 @@ import { useQuery } from '@tanstack/react-query';
 import { format } from 'date-fns';
 import { Check, Copy } from 'lucide-react';
 import { useAppStore } from '../../store';
+import { todayIn } from '../../utils/dates';
 import { Amount } from '../ledger/Amount';
 import { Mark } from '../ledger/Mark';
 import { Dialog } from '../ledger/Dialog';
 import { RunningLedger, LedgerLine } from '../ledger/RunningLedger';
 import { buttonClass } from '../ledger/Page';
+import { DocumentPayments } from './DocumentPayments';
 
 export type DrillDownEntityType = 'ITEM' | 'VENDOR' | 'CUSTOMER' | 'EMPLOYEE' | 'ACCOUNT' | 'INVOICE' | 'BILL';
 
@@ -38,6 +40,12 @@ const NOUN: Record<DrillDownEntityType, string> = {
   ACCOUNT: 'Account',
   BILL: 'Bill',
   INVOICE: 'Invoice',
+};
+
+const MOVEMENT_LABEL: Record<string, string> = {
+  OPENING: 'Opening count',
+  ADJUSTMENT: 'Stock count adjustment',
+  SALES_ORDER: 'Sales order',
 };
 
 type Value = React.ReactNode | string | number | null | undefined;
@@ -81,6 +89,13 @@ export function EntityDrillDownModal({ isOpen, onClose, entityType, entityId, in
     queryKey: ['drilldown', entityType, entityId, currentOrgId],
     queryFn: async () => {
       if (!entityId) return initialData || null;
+      // Invoices and bills are read one at a time, with their payments.
+      if (entityType === 'INVOICE' || entityType === 'BILL') {
+        const res = await fetch(`${ENDPOINT[entityType].path}/${entityId}`);
+        if (!res.ok) return initialData || null;
+        const json = await res.json();
+        return (entityType === 'INVOICE' ? json.invoice : json.bill) || initialData;
+      }
       const { path, key } = ENDPOINT[entityType];
       const res = await fetch(path, { headers: { 'x-org-id': currentOrgId } });
       if (!res.ok) return initialData || null;
@@ -91,7 +106,7 @@ export function EntityDrillDownModal({ isOpen, onClose, entityType, entityId, in
     initialData,
   });
 
-  const hasTransactions = entityType === 'CUSTOMER' || entityType === 'VENDOR' || entityType === 'ACCOUNT';
+  const hasTransactions = entityType === 'CUSTOMER' || entityType === 'VENDOR' || entityType === 'ACCOUNT' || entityType === 'ITEM';
 
   const { data: transactionsData, isLoading: transactionsLoading } = useQuery({
     queryKey: ['drilldown-transactions', entityType, entityId, currentOrgId],
@@ -106,6 +121,11 @@ export function EntityDrillDownModal({ isOpen, onClose, entityType, entityId, in
         const res = await fetch('/api/bills', { headers: { 'x-org-id': currentOrgId } });
         if (!res.ok) throw new Error('Failed to fetch bills');
         return ((await res.json()).bills || []).filter((b: any) => b.vendorId === entityId);
+      }
+      if (entityType === 'ITEM') {
+        const res = await fetch(`/api/inventory/${entityId}/movements`);
+        if (!res.ok) throw new Error('Failed to fetch stock movements');
+        return (await res.json()).movements || [];
       }
       if (entityType === 'ACCOUNT') {
         const res = await fetch('/api/journal-entries', { headers: { 'x-org-id': currentOrgId } });
@@ -181,7 +201,7 @@ export function EntityDrillDownModal({ isOpen, onClose, entityType, entityId, in
   const standing = (status?: string, dueDate?: string) => {
     if (status === 'PAID') return <Mark kind="tick" label="Paid" />;
     if (status === 'VOID') return <span className="text-[12px] text-graphite-600">Void</span>;
-    if (dueDate && new Date(dueDate) < new Date()) return <Mark kind="circled" label="Overdue" />;
+    if (dueDate && dueDate < todayIn(activeCompany?.timeZone)) return <Mark kind="circled" label="Overdue" />;
     return <Mark kind="query" label={dueDate ? `Due ${dateText(dueDate)}` : titleCase(status) || 'Open'} />;
   };
 
@@ -331,6 +351,12 @@ export function EntityDrillDownModal({ isOpen, onClose, entityType, entityId, in
               <Line label="Total" value={money(data.totalCents)} />
               {data.currency && data.currency !== currency && <Line label={`In ${data.currency}`} value={data.foreignAmountCents ? <Amount cents={data.foreignAmountCents} currency={data.currency} tone="ink" /> : undefined} />}
             </Section>
+            {entityType === 'BILL' && data.supplierReference && (
+              <Section title="Supplier">
+                <Line label="Supplier's invoice number" value={data.supplierReference} figure />
+              </Section>
+            )}
+            {data.id && <DocumentPayments kind={entityType} document={data} />}
           </>
         );
     }
@@ -387,7 +413,7 @@ export function EntityDrillDownModal({ isOpen, onClose, entityType, entityId, in
         <div className="mb-4 flex gap-5 border-b border-feint text-[13px]" role="tablist" aria-label="Record sections">
           {[
             { id: 'details' as const, name: 'Details' },
-            { id: 'transactions' as const, name: entityType === 'ACCOUNT' ? 'Ledger' : entityType === 'CUSTOMER' ? 'Invoices' : 'Bills' },
+            { id: 'transactions' as const, name: entityType === 'ACCOUNT' ? 'Ledger' : entityType === 'ITEM' ? 'Stock movements' : entityType === 'CUSTOMER' ? 'Invoices' : 'Bills' },
           ].map((t) => (
             <button
               key={t.id}
@@ -409,6 +435,37 @@ export function EntityDrillDownModal({ isOpen, onClose, entityType, entityId, in
         <p className="py-6 text-[13.5px] text-graphite-600" role="status">
           Loading
         </p>
+      ) : entityType === 'ITEM' ? (
+        transactions.length === 0 ? (
+          <p className="py-6 text-[13.5px] text-graphite-600">No stock movements recorded.</p>
+        ) : (
+          <div className="relative overflow-x-auto">
+            <table className="w-full min-w-[30rem] text-[13.5px]">
+              <caption className="sr-only">Stock movements for {title}, newest first</caption>
+              <thead>
+                <tr>
+                  <th scope="col" className="pr-4 text-left">Date</th>
+                  <th scope="col" className="pr-4 text-left">Movement</th>
+                  <th scope="col" className="pr-4 text-right">Change</th>
+                  <th scope="col" className="text-right">On hand after</th>
+                </tr>
+              </thead>
+              <tbody>
+                {transactions.map((m: any) => (
+                  <tr key={m.id}>
+                    <td className="pr-4 whitespace-nowrap text-graphite-600">{dateText(m.createdAt)}</td>
+                    <td className="pr-4 text-ink-900">
+                      {MOVEMENT_LABEL[m.sourceType] || titleCase(m.sourceType)}
+                      {m.note && <span className="block text-[12.5px] text-graphite-600">{m.note}</span>}
+                    </td>
+                    <td className="pr-4 ll-figure text-right">{m.quantity > 0 ? `+${m.quantity}` : m.quantity}</td>
+                    <td className="ll-figure text-right">{m.quantityAfter}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )
       ) : entityType === 'ACCOUNT' ? (
         accountLines.length === 0 ? (
           <p className="py-6 text-[13.5px] text-graphite-600">Nothing is posted to this account yet.</p>

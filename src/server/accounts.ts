@@ -27,11 +27,13 @@ export interface AccountInput {
   parentId?: string | null;
   currency?: string;
   isBankAccount?: boolean;
+  description?: string;
 }
 
 export interface AccountUpdate {
   name?: string;
   subtype?: string | null;
+  description?: string | null;
   isActive?: boolean;
   isBankAccount?: boolean;
 }
@@ -96,6 +98,7 @@ export class AccountService {
         currency,
         is_active: true,
         is_bank_account: Boolean(input.isBankAccount),
+        description: input.description || null,
       })
       .select('id')
       .single();
@@ -129,6 +132,7 @@ export class AccountService {
     const updateData: Record<string, unknown> = {};
     if (input.name !== undefined) updateData.name = input.name;
     if (input.subtype !== undefined) updateData.subtype = input.subtype;
+    if (input.description !== undefined) updateData.description = input.description;
     if (input.isActive !== undefined) updateData.is_active = input.isActive;
     if (input.isBankAccount !== undefined) updateData.is_bank_account = input.isBankAccount;
     if (Object.keys(updateData).length === 0) return;
@@ -245,6 +249,7 @@ export class AccountService {
       name: row.name,
       type: row.type,
       subtype: row.subtype,
+      description: row.description ?? null,
       parentId: row.parent_id,
       isActive: row.is_active,
       isBankAccount: Boolean(row.is_bank_account),

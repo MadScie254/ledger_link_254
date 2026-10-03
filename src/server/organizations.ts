@@ -25,15 +25,17 @@ export interface Organization {
   approvalThresholdCents?: number | null;
   aiEnabled?: boolean;
   timeZone?: string;
+  /** The signed-in person's role here, on lists of their own organizations. */
+  role?: 'owner' | 'admin' | 'accountant' | 'member';
   createdAt?: any;
   updatedAt?: any;
 }
 
-export type OrganizationCreateInput = Omit<Organization, 'id' | 'createdAt' | 'updatedAt' | 'isDemo' | 'isDefault'> & {
+export type OrganizationCreateInput = Omit<Organization, 'id' | 'createdAt' | 'updatedAt' | 'isDemo' | 'isDefault' | 'role'> & {
   creationKey?: string;
 };
 
-export type OrganizationUpdateInput = Partial<Omit<Organization, 'id' | 'createdAt' | 'updatedAt' | 'isDemo' | 'isDefault'>>;
+export type OrganizationUpdateInput = Partial<Omit<Organization, 'id' | 'createdAt' | 'updatedAt' | 'isDemo' | 'isDefault' | 'role'>>;
 
 /** The standard chart every organization starts with. Codes 1000-1099 hold money. */
 export const STANDARD_ACCOUNTS = [
@@ -113,12 +115,13 @@ export class OrganizationService {
 
     const { data: memberships, error: membershipsError } = await supabase
       .from('memberships')
-      .select('org_id')
+      .select('org_id, role')
       .eq('user_id', userId);
 
     if (membershipsError) throw membershipsError;
 
-    const organizationIds = (memberships || []).map((membership) => membership.org_id);
+    const roles = new Map((memberships || []).map((membership) => [membership.org_id, membership.role]));
+    const organizationIds = [...roles.keys()];
     if (organizationIds.length === 0) return [];
 
     const { data, error } = await supabase
@@ -128,7 +131,7 @@ export class OrganizationService {
       .order('name');
 
     if (error) throw error;
-    return (data || []).map(mapOrganization);
+    return (data || []).map((row) => ({ ...mapOrganization(row), role: roles.get(row.id) }));
   }
 
   static async getOrganization(orgId: string): Promise<Organization | null> {

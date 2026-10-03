@@ -7,6 +7,7 @@ import { BulkActionBar } from '../common/BulkActionBar';
 import { Amount } from '../ledger/Amount';
 import { PageHeading, IndexTabs, PageNote, SkeletonRows, EmptyNote, LoadProblem, buttonClass } from '../ledger/Page';
 import { useConfirm } from '../../hooks/useConfirm';
+import { inParts } from '../../utils/apiRequest';
 
 type Tab = 'Customers' | 'Balances';
 
@@ -59,43 +60,49 @@ export function CustomerHubView() {
   const totalOwed = customers.reduce((sum, c) => sum + (c.balance || 0), 0);
   const byBalance = [...customers].filter((c) => (c.balance || 0) !== 0).sort((a, b) => (b.balance || 0) - (a.balance || 0));
 
+  // Sent in parts the API accepts. The database refuses to delete a
+  // customer with invoices or orders; mark those inactive instead.
   const bulkDeleteMutation = useMutation({
     mutationFn: async (ids: string[]) => {
-      const res = await fetch('/api/bulk/delete', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'x-org-id': currentOrgId },
-        body: JSON.stringify({ entityType: 'CUSTOMERS', ids }),
-      });
-      if (!res.ok) throw new Error('Failed to bulk delete');
-      return res.json();
+      let deleted = 0;
+      for (const part of inParts(ids)) {
+        const res = await fetch('/api/bulk/delete', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'x-org-id': currentOrgId },
+          body: JSON.stringify({ entityType: 'CUSTOMERS', ids: part }),
+        });
+        const body = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(`${deleted ? `${deleted} deleted. ` : ''}${body.error || 'Failed to bulk delete'}`);
+        deleted += body.count || 0;
+      }
+      return { count: deleted };
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['customers', currentOrgId] });
-      setSelectedCustomerIds([]);
-    },
+    onSuccess: () => setSelectedCustomerIds([]),
+    onSettled: () => queryClient.invalidateQueries({ queryKey: ['customers', currentOrgId] }),
   });
 
   const bulkStatusMutation = useMutation({
     mutationFn: async ({ ids, status }: { ids: string[]; status: string }) => {
-      const res = await fetch('/api/bulk/status-update', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'x-org-id': currentOrgId },
-        body: JSON.stringify({ entityType: 'CUSTOMERS', ids, status }),
-      });
-      if (!res.ok) throw new Error('Failed to update status');
-      return res.json();
+      for (const part of inParts(ids, 100)) {
+        const res = await fetch('/api/bulk/status-update', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'x-org-id': currentOrgId },
+          body: JSON.stringify({ entityType: 'CUSTOMERS', ids: part, status }),
+        });
+        const body = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(body.error || 'Failed to update status');
+      }
+      return { count: ids.length };
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['customers', currentOrgId] });
-      setSelectedCustomerIds([]);
-    },
+    onSuccess: () => setSelectedCustomerIds([]),
+    onSettled: () => queryClient.invalidateQueries({ queryKey: ['customers', currentOrgId] }),
   });
 
   const isAllSelected = customers.length > 0 && selectedCustomerIds.length === customers.length;
   const isIndeterminate = selectedCustomerIds.length > 0 && selectedCustomerIds.length < customers.length;
   const toggleOne = (id: string) =>
     setSelectedCustomerIds((prev) => (prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id]));
-  const standing = (c: any) => (c.status === 'INACTIVE' ? 'Inactive' : 'Active');
+  const standing = (c: any) => (c.isActive === false ? 'Inactive' : 'Active');
 
   return (
     <div className="pb-16 space-y-5">
@@ -268,6 +275,11 @@ export function CustomerHubView() {
         onStatusUpdate={(status) => bulkStatusMutation.mutate({ ids: selectedCustomerIds, status })}
         isLoading={bulkDeleteMutation.isPending || bulkStatusMutation.isPending}
       />
+      {(bulkDeleteMutation.error || bulkStatusMutation.error) && (
+        <p role="alert" className="text-[13.5px] text-ledger-red">
+          {(bulkDeleteMutation.error || bulkStatusMutation.error)!.message}
+        </p>
+      )}
 
       <DynamicQuickAddModal isOpen={isAddingCustomer} onClose={() => setIsAddingCustomer(false)} overrideType="CUSTOMER" />
 

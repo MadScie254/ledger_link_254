@@ -52,7 +52,11 @@ export function ReceiptScanner({ onScanComplete, onClose }: ReceiptScannerProps)
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ image: base64Data, mimeType }),
       });
-      if (!res.ok) throw new Error('The receipt could not be read. Try a sharper, well-lit photo.');
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        // 403 (AI features off) and 429 (limit reached) explain themselves.
+        throw new Error([403, 429].includes(res.status) && data.error ? data.error : 'The receipt could not be read. Try a sharper, well-lit photo.');
+      }
       onScanComplete(await res.json());
     } catch (err: any) {
       setError(err.message || 'The receipt could not be read.');

@@ -12,6 +12,7 @@ import { Mark } from '../ledger/Mark';
 import { Dialog, Field } from '../ledger/Dialog';
 import { PageHeading, IndexTabs, buttonClass } from '../ledger/Page';
 import { PostedStamp } from '../ledger/PostedStamp';
+import { AccountEditDialog, type EditableAccount } from './AccountEditDialog';
 import Papa from 'papaparse';
 
 const tabs = ['Chart of Accounts', 'Journal Entries', 'Budgets', 'Settings'];
@@ -20,6 +21,8 @@ export function AccountingView() {
   const [activeTab, setActiveTab] = useState('Chart of Accounts');
   const [isAddingAccount, setIsAddingAccount] = useState(false);
   const [selectedAccount, setSelectedAccount] = useState<any | null>(null);
+  const [editingAccount, setEditingAccount] = useState<EditableAccount | null>(null);
+  const [showInactive, setShowInactive] = useState(false);
   
   // CoA state
   const [searchQuery, setSearchQuery] = useState('');
@@ -108,21 +111,25 @@ export function AccountingView() {
             body: JSON.stringify({ accounts: formattedAccounts })
           });
           
-          if (!res.ok) throw new Error('Failed to import accounts');
+          if (!res.ok) {
+            const problem = await res.json().catch(() => ({}));
+            throw new Error(problem.error || 'Failed to import accounts');
+          }
           const data = await res.json();
           setImportNote({ ok: true, text: `${data.success} accounts imported${data.failed ? `, ${data.failed} skipped` : ''}.` });
           queryClient.invalidateQueries({ queryKey: ['accounts', currentOrgId] });
           
-          if (data.accountIds && data.accountIds.length > 0) {
+          if (data.batchId) {
             useAppStore.getState().pushUndoAction({
-              id: Math.random().toString(),
+              id: data.batchId,
               message: `Imported ${data.success} accounts`,
               revertEndpoint: '/api/accounts/undo-bulk',
-              data: { accountIds: data.accountIds }
+              data: { batchId: data.batchId }
             });
           }
         } catch (err) {
-          setImportNote({ ok: false, text: 'The file could not be imported. Check it has Code, Name and Type columns.' });
+          const reason = err instanceof Error && err.message !== 'Failed to import accounts' ? `${err.message} ` : '';
+          setImportNote({ ok: false, text: `The file could not be imported. ${reason}Check it has Code, Name and Type columns.` });
         } finally {
           if (fileInputRef.current) fileInputRef.current.value = '';
         }
@@ -167,11 +174,20 @@ export function AccountingView() {
   const accounts = accountsData?.accounts || [];
   const entries = journalsData?.entries || [];
 
+  const activeAccounts = accounts.filter((acc: any) => acc.isActive !== false);
+  const inactiveCount = accounts.length - activeAccounts.length;
   const filteredAccounts = accounts.filter((acc: any) => {
     const matchesSearch = acc.name.toLowerCase().includes(searchQuery.toLowerCase()) || acc.code.includes(searchQuery);
     const matchesType = typeFilter ? acc.type === typeFilter : true;
-    return matchesSearch && matchesType;
+    const matchesState = showInactive || acc.isActive !== false;
+    return matchesSearch && matchesType && matchesState;
   });
+  const accountMarks = (acc: any) => (
+    <>
+      {acc.isBankAccount && <span className="ml-2 text-[11.5px] text-graphite-600">money</span>}
+      {acc.isActive === false && <span className="ml-2 text-[11.5px] text-graphite-600">inactive</span>}
+    </>
+  );
 
   const handlePostJE = (e: React.FormEvent) => {
     e.preventDefault();
@@ -275,9 +291,16 @@ export function AccountingView() {
                 <option value="LIABILITY">Liabilities</option>
                 <option value="EQUITY">Equity</option>
                 <option value="INCOME">Income</option>
+                <option value="COGS">Cost of sales</option>
                 <option value="EXPENSE">Expenses</option>
               </select>
             </label>
+            {inactiveCount > 0 && (
+              <label className="flex h-9 items-center gap-2 text-[13px] text-ink-900">
+                <input type="checkbox" checked={showInactive} onChange={(e) => setShowInactive(e.target.checked)} />
+                Show {inactiveCount} inactive
+              </label>
+            )}
           </div>
 
           {isLoadingAccounts ? (
@@ -299,10 +322,14 @@ export function AccountingView() {
                         <span className="min-w-0">
                           <span className="ll-figure mr-2 font-semibold text-ink-900">{acc.code}</span>
                           <span className="text-[14px] text-ink-900">{acc.name}</span>
+                          {accountMarks(acc)}
                         </span>
                         <span className="shrink-0">{balanceWithSide(acc)}</span>
                       </span>
                       <span className="mt-0.5 block text-[12px] text-graphite-600">{typeName(acc.type)}</span>
+                    </button>
+                    <button type="button" onClick={() => setEditingAccount(acc)} className={`${buttonClass.quiet} mb-3`}>
+                      Edit account {acc.code}
                     </button>
                   </li>
                 ))}
@@ -315,7 +342,8 @@ export function AccountingView() {
                       <th scope="col" className="w-20 pr-4 text-left">Code</th>
                       <th scope="col" className="pr-4 text-left">Account</th>
                       <th scope="col" className="pr-4 text-left">Type</th>
-                      <th scope="col" className="text-right">Balance, {baseCurrency}</th>
+                      <th scope="col" className="pr-4 text-right">Balance, {baseCurrency}</th>
+                      <th scope="col" className="w-12"><span className="sr-only">Edit</span></th>
                     </tr>
                   </thead>
                   <tbody>
@@ -334,9 +362,22 @@ export function AccountingView() {
                             {acc.code}
                           </button>
                         </td>
-                        <td className="pr-4 text-ink-900">{acc.name}</td>
+                        <td className="pr-4 text-ink-900">{acc.name}{accountMarks(acc)}</td>
                         <td className="pr-4 text-graphite-600">{typeName(acc.type)}</td>
-                        <td className="text-right whitespace-nowrap">{balanceWithSide(acc)}</td>
+                        <td className="pr-4 text-right whitespace-nowrap">{balanceWithSide(acc)}</td>
+                        <td className="text-right">
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setEditingAccount(acc);
+                            }}
+                            aria-label={`Edit account ${acc.code} ${acc.name}`}
+                            className={buttonClass.quiet}
+                          >
+                            Edit
+                          </button>
+                        </td>
                       </tr>
                     ))}
                   </tbody>
@@ -484,7 +525,7 @@ export function AccountingView() {
                     <td className="pr-3">
                       <select aria-label={`Line ${index + 1} account`} required value={line.accountId} onChange={(e) => setJeLine(index, { accountId: e.target.value })} className="h-9 w-full border px-2">
                         <option value="">Choose an account</option>
-                        {accounts.map((acc: any) => (
+                        {activeAccounts.map((acc: any) => (
                           <option key={acc.id} value={acc.id}>{acc.code} · {acc.name}</option>
                         ))}
                       </select>
@@ -561,6 +602,8 @@ export function AccountingView() {
           </form>
         </div>
       </Dialog>
+
+      <AccountEditDialog account={editingAccount} orgId={currentOrgId} onClose={() => setEditingAccount(null)} />
 
       <DynamicQuickAddModal isOpen={isAddingAccount} onClose={() => setIsAddingAccount(false)} overrideType="ACCOUNT" />
 

@@ -13,6 +13,8 @@ import { Mark } from '../ledger/Mark';
 import { IndexTabs, PageHeading, PageNote, buttonClass } from '../ledger/Page';
 import { useConfirm } from '../../hooks/useConfirm';
 import { downloadCsv } from '../../utils/exportCsv';
+import { todayIn } from '../../utils/dates';
+import { inParts } from '../../utils/apiRequest';
 import { OrdersPanel } from './OrdersPanel';
 
 type SalesTab = 'Invoices' | 'Orders';
@@ -62,20 +64,26 @@ export function SalesView() {
     }
   });
 
-  // Bulk Delete Invoices
+  // Bulk void invoices, sent in parts the API accepts.
   const bulkDeleteMutation = useMutation({
     mutationFn: async (ids: string[]) => {
-      const res = await fetch('/api/bulk/delete', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'x-org-id': currentOrgId },
-        body: JSON.stringify({ entityType: 'INVOICES', ids })
-      });
-      const body = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(body.error || 'The invoices could not be voided.');
-      if (body.failed > 0) {
-        throw new Error(`${body.count} voided. ${body.failed} could not be voided: ${body.failures?.[0]?.message || 'see each invoice'}`);
+      let voided = 0;
+      const failures: Array<{ message: string }> = [];
+      for (const part of inParts(ids)) {
+        const res = await fetch('/api/bulk/delete', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'x-org-id': currentOrgId },
+          body: JSON.stringify({ entityType: 'INVOICES', ids: part })
+        });
+        const body = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(`${voided ? `${voided} voided. ` : ''}${body.error || 'The invoices could not be voided.'}`);
+        voided += body.count || 0;
+        failures.push(...(body.failures || []));
       }
-      return body;
+      if (failures.length > 0) {
+        throw new Error(`${voided} voided. ${failures.length} could not be voided: ${failures[0]?.message || 'see each invoice'}`);
+      }
+      return { count: voided };
     },
     onSuccess: () => setSelectedIds([]),
     // Some may have been voided even when others were refused.
@@ -145,7 +153,8 @@ export function SalesView() {
 
   const baseCurrency = activeCompany?.baseCurrency || 'KES';
   const invoices: any[] = invoicesData?.invoices || [];
-  const depositAccounts: any[] = (accountsData?.accounts || []).filter((account: any) => account.type === 'ASSET' && account.isActive !== false);
+  // Payments land only in money accounts: bank, cash or M-Pesa.
+  const depositAccounts: any[] = (accountsData?.accounts || []).filter((account: any) => account.isBankAccount && account.isActive !== false);
   const customerName = (id: string) => customersData?.customers?.find((c: any) => c.id === id)?.displayName;
   const invoiceTotal = invoices.reduce((sum, inv) => sum + (inv.totalCents || 0), 0);
   const overdueCount = invoices.filter((inv) => inv.status === 'OVERDUE').length;
@@ -154,7 +163,7 @@ export function SalesView() {
   const openPayment = (invoice: any) => {
     setPaymentInvoice(invoice);
     setPaymentAmount(((invoice.amountDueCents || 0) / 100).toFixed(2));
-    setPaymentDate(format(new Date(), 'yyyy-MM-dd'));
+    setPaymentDate(todayIn(activeCompany?.timeZone));
     setDepositAccountId(depositAccounts[0]?.id || '');
     setPaymentIdempotencyKey(crypto.randomUUID());
     setPaymentProblem('');
@@ -275,7 +284,7 @@ export function SalesView() {
         </p>
       ) : invoices.length === 0 ? (
         <div className="py-8 max-w-xl text-[14px] text-graphite-600">
-          <p>No invoices yet. Each invoice you issue is listed here with its customer, standing and eTIMS signature, largest totals carried to the foot.</p>
+          <p>No invoices yet. Each invoice you issue is listed here with its customer, standing and due date, the total carried to the foot.</p>
           <button type="button" onClick={() => setIsBuilding(true)} className={`${buttonClass.quiet} mt-2`}>Write the first invoice</button>
         </div>
       ) : (
@@ -310,7 +319,7 @@ export function SalesView() {
                       <button type="button" onClick={() => openPayment(inv)} className={buttonClass.quiet}>Receive payment</button>
                     )}
                   </span>
-                  <span className="text-[12px] text-graphite-600">{inv.etimsStatus === 'SUCCESS' ? `eTIMS signed ${inv.etimsControlCode}` : 'eTIMS queued'}</span>
+                  {inv.dueDate && <span className="text-[12px] text-graphite-600">Due {format(new Date(inv.dueDate), 'dd/MM/yyyy')}</span>}
                 </div>
               </li>
             ))}
@@ -337,7 +346,7 @@ export function SalesView() {
                   <th scope="col" className="pr-4 text-left">Invoice</th>
                   <th scope="col" className="pr-4 text-left">Customer</th>
                   <th scope="col" className="pr-4 text-left">Standing</th>
-                  <th scope="col" className="pr-4 text-left">eTIMS</th>
+                  <th scope="col" className="pr-4 text-left">Due</th>
                   <th scope="col" className="text-right">{baseCurrency}</th>
                 </tr>
               </thead>
@@ -384,15 +393,7 @@ export function SalesView() {
                         )}
                       </div>
                     </td>
-                    <td className="pr-4 whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
-                      {inv.etimsStatus === 'SUCCESS' ? (
-                        <a href={inv.etimsQrCodeUrl} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 text-[12px] text-ink-900 hover:underline">
-                          <Mark kind="tick" /> Signed {inv.etimsControlCode}
-                        </a>
-                      ) : (
-                        <span className="text-[12px] text-graphite-600">Queued</span>
-                      )}
-                    </td>
+                    <td className="pr-4 whitespace-nowrap text-graphite-600">{inv.dueDate ? format(new Date(inv.dueDate), 'dd/MM/yyyy') : '–'}</td>
                     <td className="text-right whitespace-nowrap">
                       <Amount cents={inv.totalCents || 0} currency={baseCurrency} />
                       {inv.currency && inv.currency !== baseCurrency && (
@@ -473,7 +474,7 @@ export function SalesView() {
           <Field label="Date received">
             <input type="date" required value={paymentDate} onChange={(event) => setPaymentDate(event.target.value)} />
           </Field>
-          <Field label="Deposit account" hint={depositAccounts.length === 0 ? 'Add an active bank or cash asset account before receiving payment.' : undefined}>
+          <Field label="Deposit account" hint={depositAccounts.length === 0 ? 'Mark a bank, cash or M-Pesa account as holding money (Accounting, Edit) before receiving payment.' : undefined}>
             <select required value={depositAccountId} onChange={(event) => setDepositAccountId(event.target.value)}>
               <option value="">Choose an account</option>
               {depositAccounts.map((account: any) => (

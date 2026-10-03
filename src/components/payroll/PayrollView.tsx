@@ -9,6 +9,7 @@ import { Amount } from '../ledger/Amount';
 import { Mark } from '../ledger/Mark';
 import { PageHeading, IndexTabs, PageNote, SkeletonRows, EmptyNote, buttonClass } from '../ledger/Page';
 import { payrollReturnsDue } from '../../utils/statutory';
+import { PayrollRunReversal } from './PayrollRunReversal';
 import { calculatePayslip, findRateTable, isIsoCalendarDate, UNSUPPORTED_EMPLOYEE_ADJUSTMENTS, type PayslipBreakdown, monthlyGrossCents, parsePayPeriod } from '../../utils/kenyaPayroll';
 
 const tabs = ['Employees', 'Run payroll', 'Payslips', 'Statutory filings (PAYE/NSSF/SHA)'];
@@ -411,11 +412,13 @@ export function PayrollView() {
               <select value={effectiveSelectedRunId || ''} onChange={(e) => setSelectedRunId(e.target.value)} className="h-9 border px-2.5 text-[14px] sm:w-80">
                 {runs.map((run: any) => (
                   <option key={run.id} value={run.id}>
-                    {run.period} · paid {format(new Date(run.payDate), 'dd/MM/yyyy')}
+                    {run.period} · paid {format(new Date(run.payDate), 'dd/MM/yyyy')}{run.reversedAt ? ' · reversed' : ''}
                   </option>
                 ))}
               </select>
             </label>
+
+            {selectedRun && <PayrollRunReversal run={selectedRun} />}
 
             {payslipsLoading ? (
               <SkeletonRows label="Loading payslips" />

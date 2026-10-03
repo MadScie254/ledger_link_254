@@ -192,7 +192,10 @@ BEGIN
   -- elsewhere is only removed.
   IF v_entry.source_type = 'BANK' AND v_entry.source_id = p_transaction_id THEN
     v_reversal_id := private.insert_journal_entry(
-      p_org_id, (now() AT TIME ZONE 'UTC')::DATE, 'Undo bank match: ' || v_tx.description, 'ADJUSTMENT',
+      p_org_id,
+      -- Today as the business sees it, in its own time zone.
+      (now() AT TIME ZONE COALESCE((SELECT org.time_zone FROM public.organizations AS org WHERE org.id = p_org_id), 'Africa/Nairobi'))::DATE,
+      'Undo bank match: ' || v_tx.description, 'ADJUSTMENT',
       NULL, NULL, p_actor, private.reversal_lines(p_org_id, v_entry.id, v_tx.description),
       'bank-unmatch:' || v_entry.id::TEXT
     );

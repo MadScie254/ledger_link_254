@@ -176,10 +176,12 @@ export const accountSchema = z.object({
   parentId: optionalUuid.nullable(),
   currency: currency.optional(),
   isBankAccount: z.boolean().optional(),
+  description: text(1000),
 });
 export const accountUpdateSchema = z.object({
   name: requiredText(200, 'An account name').optional(),
   subtype: text(60).nullable(),
+  description: text(1000).nullable(),
   isActive: z.boolean().optional(),
   isBankAccount: z.boolean().optional(),
 });

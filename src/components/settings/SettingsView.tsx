@@ -11,8 +11,9 @@ import { BookOpen } from 'lucide-react';
 import { useOnboarding } from '../onboarding/OnboardingProvider';
 import { BUSINESS_TYPES, type BusinessType } from '../../utils/businessTypes';
 import { THEME_ACCENTS, DEFAULT_THEME_ACCENT, type ThemeAccent } from '../../utils/themeAccents';
+import { ControlsPanel } from './ControlsPanel';
 
-type Tab = 'companies' | 'currencies' | 'accounting' | 'security';
+type Tab = 'companies' | 'controls' | 'currencies' | 'accounting' | 'security';
 
 const POSTING_ACCOUNTS = [
   { code: '1100', name: 'Accounts receivable', use: 'Every invoice posts its amount owed here' },
@@ -183,6 +184,7 @@ export function SettingsView() {
         onChange={(id) => setActiveTab(id as Tab)}
         tabs={[
           { id: 'companies', name: 'Companies', count: organizations.length },
+          { id: 'controls', name: 'Closing and controls' },
           { id: 'currencies', name: 'Currencies' },
           { id: 'accounting', name: 'Posting accounts' },
           { id: 'security', name: 'Security and export' },
@@ -268,6 +270,8 @@ export function SettingsView() {
           )}
         </div>
       )}
+
+      {activeTab === 'controls' && activeCompany && <ControlsPanel company={activeCompany} onSaved={() => refetchOrgs()} />}
 
       {activeTab === 'currencies' && (
         <div className="space-y-8">

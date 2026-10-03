@@ -49,6 +49,11 @@ const ORG = {
   country: 'Kenya',
   city: 'Nairobi',
   isDemo: true,
+  role: 'owner' as const,
+  timeZone: 'Africa/Nairobi',
+  booksClosedThrough: '2026-06-30',
+  approvalThresholdCents: 40_000_000,
+  aiEnabled: false,
 };
 
 const orderLine = (itemId: string | null, description: string, quantity: number, unitPriceCents: number, quantityOnHand: number | null) => {
@@ -173,9 +178,9 @@ const FIXTURES: Record<string, unknown> = {
   },
   '/api/bills': {
     bills: [
-      { id: 'b-1', billNumber: 'NSS-4471', vendorId: 'v-1', billDate: '2026-08-28', dueDate: '2026-09-27', totalCents: 50_000_000, status: 'OPEN' },
-      { id: 'b-2', billNumber: 'ARC-0913', vendorId: 'v-2', billDate: '2026-08-02', dueDate: '2026-09-01', totalCents: 30_000_000, status: 'OPEN' },
-      { id: 'b-3', billNumber: 'NSS-4402', vendorId: 'v-1', billDate: '2026-06-30', dueDate: '2026-07-30', totalCents: 18_500_000, status: 'PAID' },
+      { id: 'b-1', billNumber: 'BILL-2026-0021', billNo: 'BILL-2026-0021', supplierReference: 'NSS-4471', vendorId: 'v-1', billDate: '2026-08-28', dueDate: '2026-09-27', totalCents: 50_000_000, amountDueCents: 50_000_000, status: 'OPEN', approvedAt: null },
+      { id: 'b-2', billNumber: 'BILL-2026-0019', billNo: 'BILL-2026-0019', supplierReference: 'ARC-0913', vendorId: 'v-2', billDate: '2026-08-02', dueDate: '2026-09-01', totalCents: 30_000_000, amountDueCents: 30_000_000, status: 'OPEN', approvedAt: null },
+      { id: 'b-3', billNumber: 'BILL-2026-0012', billNo: 'BILL-2026-0012', supplierReference: 'NSS-4402', vendorId: 'v-1', billDate: '2026-06-30', dueDate: '2026-07-30', totalCents: 18_500_000, amountDueCents: 0, status: 'PAID', approvedAt: null },
     ],
   },
   '/api/employees': {
@@ -187,10 +192,11 @@ const FIXTURES: Record<string, unknown> = {
   },
   '/api/accounts': {
     accounts: [
-      { id: 'a-1000', code: '1000', name: 'Cash at Bank - KCB', type: 'ASSET', balanceCents: 94_975_000 },
-      { id: 'a-1010', code: '1010', name: 'M-Pesa Till', type: 'ASSET', balanceCents: 98_150_000 },
-      { id: 'a-1100', code: '1100', name: 'Accounts Receivable', type: 'ASSET', balanceCents: 54_000_000 },
-      { id: 'a-4000', code: '4000', name: 'Sales Revenue', type: 'INCOME', balanceCents: 230_000_000 },
+      { id: 'a-1000', code: '1000', name: 'Cash at Bank - KCB', type: 'ASSET', balanceCents: 94_975_000, isBankAccount: true, isActive: true, isSystem: true },
+      { id: 'a-1010', code: '1010', name: 'M-Pesa Till', type: 'ASSET', balanceCents: 98_150_000, isBankAccount: true, isActive: true, isSystem: false },
+      { id: 'a-1100', code: '1100', name: 'Accounts Receivable', type: 'ASSET', balanceCents: 54_000_000, isBankAccount: false, isActive: true, isSystem: true },
+      { id: 'a-1300', code: '1300', name: 'Staff advances (closed)', type: 'ASSET', balanceCents: 0, isBankAccount: false, isActive: false, isSystem: false },
+      { id: 'a-4000', code: '4000', name: 'Sales Revenue', type: 'INCOME', balanceCents: 230_000_000, isBankAccount: false, isActive: true, isSystem: false },
     ],
   },
   '/api/inventory': {
@@ -245,15 +251,50 @@ const FIXTURES: Record<string, unknown> = {
     members: [
       { id: 'm-1', userId: 'u-1', email: 'owner@riverside.example', role: 'owner', status: 'active', isYou: true },
       { id: 'm-2', userId: 'u-2', email: 'accounts@riverside.example', role: 'admin', status: 'active', isYou: false },
-      { id: 'm-3', userId: 'u-3', email: 'counter@riverside.example', role: 'member', status: 'invited', isYou: false },
+      { id: 'm-3', userId: 'u-3', email: 'counter@riverside.example', role: 'member', status: 'active', isYou: false },
     ],
+    invitations: [
+      { id: 'inv-m-4', email: 'stores@riverside.example', role: 'accountant', status: 'Invited', invitedAt: '2026-09-28T10:00:00Z' },
+    ],
+  },
+  '/api/invitations': { invitations: [] },
+  '/api/reports/control-check': {
+    receivables: { ledgerCents: 54_000_000, documentsCents: 54_000_000, differenceCents: 0 },
+    payables: { ledgerCents: 80_000_000, documentsCents: 80_000_000, differenceCents: 0 },
+    agrees: true,
+  },
+  '/api/inventory/i-4/movements': {
+    movements: [
+      { id: 'mv-3', quantity: -6, quantityAfter: 9, sourceType: 'SALES_ORDER', note: 'SO-2026-00005', createdAt: '2026-09-20T09:12:00Z' },
+      { id: 'mv-2', quantity: -1, quantityAfter: 15, sourceType: 'ADJUSTMENT', note: 'One tin dented in storage', createdAt: '2026-09-05T16:40:00Z' },
+      { id: 'mv-1', quantity: 16, quantityAfter: 16, sourceType: 'OPENING', note: 'Opening count', createdAt: '2026-08-01T08:00:00Z' },
+    ],
+  },
+  '/api/bills/b-1': {
+    bill: {
+      id: 'b-1', billNumber: 'BILL-2026-0021', billNo: 'BILL-2026-0021', supplierReference: 'NSS-4471', vendorId: 'v-1', billDate: '2026-08-28', dueDate: '2026-09-27',
+      subtotalCents: 43_103_448, taxCents: 6_896_552, totalCents: 50_000_000, amountDueCents: 50_000_000, status: 'OPEN', approvedAt: null,
+      payments: [],
+    },
+  },
+  '/api/invoices/inv-39': {
+    invoice: {
+      id: 'inv-39', invoiceNumber: 'INV-2026-0039', invoiceNo: 'INV-2026-0039', customerId: 'c-2', issueDate: '2026-03-10', dueDate: '2026-04-09',
+      subtotalCents: 103_448_276, taxCents: 16_551_724, totalCents: 120_000_000, amountDueCents: 0, status: 'PAID', currency: 'KES',
+      payments: [
+        { id: 'pay-1', amountCents: 20_000_000, paymentDate: '2026-03-28', accountId: 'a-1010', reversedAt: '2026-03-30T08:00:00Z', reversalReason: 'Cheque returned unpaid' },
+        { id: 'pay-2', amountCents: 120_000_000, paymentDate: '2026-04-30', accountId: 'a-1000', reversedAt: null, reversalReason: null },
+      ],
+    },
   },
   '/api/audit': {
     logs: [
-      { id: 'al-1', userId: 'u-2', action: 'CREATE', resourceType: 'JOURNAL_ENTRY', resourceId: 'je-12', details: { memo: 'Electricity and water', amountCents: 4650000 }, timestamp: '2026-09-16T09:42:00Z' },
-      { id: 'al-2', userId: 'u-1', action: 'CREATE', resourceType: 'TEAM_MEMBER', resourceId: 'm-3', details: { email: 'counter@riverside.example', role: 'member' }, timestamp: '2026-09-15T16:05:00Z' },
-      { id: 'al-3', userId: 'u-2', action: 'UPDATE', resourceType: 'ACCOUNT', resourceId: 'a-1010', details: { name: 'M-Pesa Till' }, timestamp: '2026-09-12T11:20:00Z' },
+      { id: 'al-4', userId: 'u-1', actorEmail: 'owner@riverside.example', action: 'UPDATE', resourceType: 'VENDOR', resourceId: 'v-1', details: { changes: { bank_account: { from: '0110 2233 44', to: '0110 9988 77' }, mpesa_number: { from: null, to: '0722 000 111' } } }, timestamp: '2026-09-17T08:15:00Z' },
+      { id: 'al-1', userId: 'u-2', actorEmail: 'accounts@riverside.example', action: 'CREATE', resourceType: 'JOURNAL_ENTRY', resourceId: 'je-12', details: { memo: 'Electricity and water', amountCents: 4650000 }, timestamp: '2026-09-16T09:42:00Z' },
+      { id: 'al-2', userId: 'u-1', actorEmail: 'owner@riverside.example', action: 'CREATE', resourceType: 'TEAM_MEMBER', resourceId: 'm-3', details: { values: { role: 'member' } }, timestamp: '2026-09-15T16:05:00Z' },
+      { id: 'al-3', userId: 'u-2', actorEmail: 'accounts@riverside.example', action: 'UPDATE', resourceType: 'ACCOUNT', resourceId: 'a-1010', details: { changes: { name: { from: 'Mpesa', to: 'M-Pesa Till' }, is_bank_account: { from: false, to: true } } }, timestamp: '2026-09-12T11:20:00Z' },
     ],
+    nextCursor: null,
   },
   '/api/budgets': {
     budgets: [
@@ -262,7 +303,10 @@ const FIXTURES: Record<string, unknown> = {
     ],
   },
   '/api/payroll/runs': {
-    runs: [{ id: 'run-8', period: 'August 2026', payDate: '2026-08-31', status: 'POSTED' }],
+    runs: [
+      { id: 'run-8', period: 'August 2026', payDate: '2026-08-31', status: 'POSTED', reversedAt: null, reversalReason: null },
+      { id: 'run-7', period: 'July 2026', payDate: '2026-07-31', status: 'POSTED', reversedAt: '2026-08-02T09:00:00Z', reversalReason: 'Housing allowance missed for two staff' },
+    ],
   },
   '/api/banking/rules': {
     rules: [{ id: 'r-1', matchText: 'SAFARICOM', targetAccountCode: '6200', targetAccountName: 'Office rent and utilities' }],
@@ -308,6 +352,9 @@ const PREVIEW_AUTH = {
   signIn: async () => ({ error: null }),
   signUp: async () => ({ error: null, needsEmailConfirmation: false }),
   resendConfirmation: async () => ({ error: null }),
+  requestPasswordReset: async () => ({ error: null }),
+  updatePassword: async () => ({ error: null }),
+  isRecoveringPassword: false,
   justConfirmedEmail: false,
   dismissEmailConfirmed: () => undefined,
 };
@@ -317,6 +364,11 @@ function previewWrite(pathname: string, rawBody: BodyInit | null | undefined) {
   const order = /^\/api\/sales-orders\/([^/]+)\/(status|invoice)$/.exec(pathname);
   const number = (id: string) => (FIXTURES['/api/sales-orders'] as any).orders.find((o: any) => o.id === id)?.orderNumber;
   if (pathname === '/api/sales-orders') return { id: 'so-8', orderNumber: 'SO-2026-00008', totalCents: 0 };
+  if (/^\/api\/inventory\/[^/]+\/adjustments$/.test(pathname)) {
+    const counted = JSON.parse(typeof rawBody === 'string' ? rawBody : '{}').countedQuantity;
+    return { quantity: counted - 9, quantityOnHand: counted };
+  }
+  if (/^\/api\/bills\/[^/]+\/approve$/.test(pathname)) return { billNumber: 'BILL-2026-0021', approvedAt: new Date().toISOString() };
   if (order?.[2] === 'invoice') return { invoiceId: 'inv-45', invoiceNumber: 'INV-2026-0045' };
   if (order?.[2] === 'status') {
     const status = JSON.parse(typeof rawBody === 'string' ? rawBody : '{}').status;

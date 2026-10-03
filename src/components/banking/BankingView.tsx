@@ -251,6 +251,35 @@ export function BankingView() {
     onError: (err: any) => setMatchProblem(err.message),
   });
 
+  // Undoing a match posts the reversing entry; a line that recorded an
+  // invoice or bill payment is undone by reversing that payment instead.
+  const unmatchMutation = useMutation({
+    mutationFn: async (tx: any) => {
+      const res = await fetch(`/api/banking/transactions/${tx.id}/unmatch`, { method: 'POST' });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || 'The match could not be undone.');
+      return data;
+    },
+    onSuccess: () => {
+      setAutoReconcileNote('Match undone. The line is unmatched and its entry reversed.');
+      queryClient.invalidateQueries({ queryKey: ['bank_transactions', currentOrgId] });
+      queryClient.invalidateQueries({ queryKey: ['banking_ai_matches', currentOrgId] });
+      queryClient.invalidateQueries({ queryKey: ['accounts', currentOrgId] });
+      queryClient.invalidateQueries({ queryKey: ['journal-entries', currentOrgId] });
+    },
+    onError: (err: any) => setAutoReconcileNote(err.message),
+  });
+  const undoMatch = (tx: any) =>
+    confirm(
+      {
+        title: 'Undo this match',
+        message: `Unmatch the line "${tx.description}"? If the match posted an entry, a reversing entry is posted today; an entry that was only linked stays as it is.`,
+        confirmText: 'Undo match',
+        isDestructive: true,
+      },
+      () => unmatchMutation.mutate(tx),
+    );
+
   // Auto-Reconcile All Mutation
   const autoReconcileMutation = useMutation({
     mutationFn: async (minConfidence: number = 85) => {
@@ -513,6 +542,11 @@ export function BankingView() {
                       ) : (
                         <span className="text-[12.5px] text-graphite-600">No suggestion</span>
                       )}
+                      {isMatched && (
+                        <button type="button" onClick={() => undoMatch(tx)} disabled={unmatchMutation.isPending} className={`${buttonClass.quiet} shrink-0 py-1`}>
+                          Undo match
+                        </button>
+                      )}
                       {!isMatched &&
                         (match && match.confidence >= 80 ? (
                           <button type="button" onClick={() => handleAcceptAIMatch(match)} disabled={matchMutation.isPending} className={`${buttonClass.quiet} shrink-0 py-1`}>
@@ -580,7 +614,11 @@ export function BankingView() {
                           )}
                         </td>
                         <td className="text-right whitespace-nowrap">
-                          {isMatched ? null : match && match.confidence >= 80 ? (
+                          {isMatched ? (
+                            <button type="button" onClick={() => undoMatch(tx)} disabled={unmatchMutation.isPending} className={buttonClass.quiet}>
+                              Undo match
+                            </button>
+                          ) : match && match.confidence >= 80 ? (
                             <button
                               type="button"
                               onClick={() => handleAcceptAIMatch(match)}
