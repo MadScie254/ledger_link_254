@@ -15,13 +15,17 @@ LedgerLink is a full-stack, multi-tenant accounting platform designed for small-
 enterprises operating across multiple currencies (KES, USD, EUR, GBP, UGX, TZS).
 
 **Key capabilities:**
-- 📊 **Double-entry ledger** — journal entries validated atomically in Postgres; `SUM(debit) = SUM(credit)` enforced server-side, never client-side
-- 🏦 **Banking & reconciliation** — AI-assisted transaction matching with full audit trail
-- 🧾 **Invoicing & bills** — full A/R and A/P workflow with multi-currency support
-- 💰 **Payroll** — employee management and payroll run processing
-- 📦 **Inventory** — stock tracking with COGS accounting
-- 🤖 **Receipt scanner** — AI-powered OCR via Gemini (vendor, amount, date extraction)
-- 📈 **Reports** — P&L, Balance Sheet, Cash Flow, Trial Balance, Tax Summary
+- 📊 **Double-entry ledger** — journal entries validated atomically in Postgres; `SUM(debit) = SUM(credit)` enforced server-side, never client-side; posted entries are permanent and corrected by dated reversals; a closing date locks past periods
+- 🧾 **Sales** — estimates, sales orders, invoices, sales receipts, credit notes and refunds, recurring invoices on a daily schedule, customer statements
+- 🛒 **Purchases** — purchase orders billed as goods arrive, multi-line bills with stock items, expenses paid on the spot, supplier credits, bill approval, recurring bills
+- 🏦 **Banking** — statement import (CSV with M-Pesa layouts, OFX, QFX) for every bank, cash and M-Pesa account, AI-assisted matching, transfers, and reconciliation to statement balances
+- 💰 **Payroll** — Kenyan PAYE, NSSF, SHA and Housing Levy, with reversible runs
+- 📦 **Inventory** — every stock change recorded as a movement; purchases, returns, sales and counts
+- 🏷️ **Classes and locations** — tag postings by line of business or branch and cut the P&L by either
+- 📎 **Attachments** — receipts, PDFs and documents on any record; a scanned receipt stays with its expense
+- 📥 **Imports** — customers, suppliers and stock items from a spreadsheet
+- 🤖 **Receipt scanner** — AI-powered OCR via Gemini (vendor, amount, date extraction), opt-in per organization
+- 📈 **Reports** — P&L (and by month, class or location), Balance Sheet, Cash Flow, Trial Balance, General Ledger, aging, sales by customer and item, spending by supplier, VAT and eTIMS summary
 - 🔐 **Email/password auth** — Supabase Auth with row-level security
 - 🌙 **Light/dark theme** — corporate light default, toggleable dark mode
 
@@ -134,11 +138,17 @@ npx wrangler secret put SUPABASE_SECRET_KEY
 npx wrangler secret put GEMINI_API_KEY
 ```
 
-### 3. Build and deploy
+### 3. Apply database migrations, then build and deploy
+
+Apply new migrations first, so the Worker never calls a function the database does not yet have:
 
 ```bash
+supabase db push
 npm run deploy
 ```
+
+`wrangler.jsonc` also registers a daily cron trigger (00:17 UTC) that posts recurring invoices and
+bills that have fallen due; it needs no extra setup.
 
 This runs `vite build` (produces `dist/client/` for static assets and bundles the Worker),
 then `wrangler deploy`. Wrangler prints the live `*.workers.dev` URL — update `ALLOWED_ORIGINS`
@@ -198,6 +208,10 @@ ledger_link/
 | `npm run preview` | Preview the production build locally |
 | `npm run deploy` | Build and deploy to Cloudflare Workers |
 | `npm run lint` | TypeScript type-check |
+| `npm test` | Unit tests |
+| `npm run test:db` | SQL tests, each on a freshly migrated local Postgres 16 |
+| `npm run test:integration` | Worker services against PostgREST and Postgres |
+| `npm run test:e2e` | Browser flows through the real Worker (workerd), PostgREST and Postgres |
 
 ---
 
