@@ -17,8 +17,10 @@ import { todayIn } from '../../utils/dates';
 import { inParts } from '../../utils/apiRequest';
 import { OrdersPanel } from './OrdersPanel';
 import { EstimatesPanel } from './EstimatesPanel';
+import { SalesDocumentBuilder } from './SalesDocumentBuilder';
+import { CashTransactionsPanel } from '../common/CashTransactionsPanel';
 
-type SalesTab = 'Invoices' | 'Estimates' | 'Orders';
+type SalesTab = 'Invoices' | 'Receipts' | 'Estimates' | 'Orders';
 
 export function SalesView() {
   useRenderTracker("SalesView");
@@ -27,6 +29,7 @@ export function SalesView() {
   const [isBuilding, setIsBuilding] = useState(false);
   const [isOrdering, setIsOrdering] = useState(false);
   const [isEstimating, setIsEstimating] = useState(false);
+  const [isSellingNow, setIsSellingNow] = useState(false);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [selectedInvoice, setSelectedInvoice] = useState<any | null>(null);
   const [paymentInvoice, setPaymentInvoice] = useState<any | null>(null);
@@ -55,6 +58,16 @@ export function SalesView() {
       if (!res.ok) throw new Error('Failed to fetch');
       return res.json();
     }
+  });
+
+  const { data: inventoryData } = useQuery({
+    queryKey: ['inventory', currentOrgId],
+    queryFn: async () => {
+      const res = await fetch('/api/inventory');
+      if (!res.ok) throw new Error('Failed to fetch stock items');
+      return res.json();
+    },
+    enabled: isSellingNow,
   });
 
   const { data: accountsData } = useQuery({
@@ -224,6 +237,8 @@ export function SalesView() {
             ? <>{invoices.length} invoices for {activeCompany?.name || 'this organization'} · Figures in {baseCurrency}</>
             : salesTab === 'Estimates'
               ? <>Quotes to customers, before they become invoices · Figures in {baseCurrency}</>
+              : salesTab === 'Receipts'
+                ? <>Sales paid on the spot, by cash, card or M-Pesa · Figures in {baseCurrency}</>
               : <>Orders customers have placed with {activeCompany?.name || 'this organization'} · Figures in {baseCurrency}</>
         }
         actions={
@@ -239,6 +254,10 @@ export function SalesView() {
           ) : salesTab === 'Estimates' ? (
             <button type="button" onClick={() => setIsEstimating(true)} className={buttonClass.primary}>
               New estimate
+            </button>
+          ) : salesTab === 'Receipts' ? (
+            <button type="button" onClick={() => setIsSellingNow(true)} className={buttonClass.primary}>
+              New sales receipt
             </button>
           ) : (
             <button type="button" onClick={() => setIsOrdering(true)} className={buttonClass.primary}>
@@ -257,12 +276,15 @@ export function SalesView() {
         }}
         tabs={[
           { id: 'Invoices', name: 'Invoices', count: invoices.length },
+          { id: 'Receipts', name: 'Sales receipts' },
           { id: 'Estimates', name: 'Estimates' },
           { id: 'Orders', name: 'Orders' },
         ]}
       />
 
-      {salesTab === 'Estimates' ? (
+      {salesTab === 'Receipts' ? (
+        <CashTransactionsPanel kind="SALES_RECEIPT" onCreate={() => setIsSellingNow(true)} />
+      ) : salesTab === 'Estimates' ? (
         <EstimatesPanel
           orgId={currentOrgId}
           baseCurrency={baseCurrency}
@@ -504,6 +526,25 @@ export function SalesView() {
           <p className="text-[12.5px] text-graphite-600">This posts cash or bank against accounts receivable. A smaller amount leaves the invoice part paid.</p>
         </div>
       </Dialog>
+
+      {isSellingNow && (
+        <SalesDocumentBuilder
+          kind="receipt"
+          orgId={currentOrgId}
+          baseCurrency={baseCurrency}
+          customers={(customersData?.customers || []).filter((c: any) => c.isActive !== false)}
+          incomeAccounts={(accountsData?.accounts || []).filter((a: any) => a.type === 'INCOME' && a.isActive !== false)}
+          items={(inventoryData?.items || []).filter((item: any) => (item.status || 'Active') === 'Active')}
+          moneyAccounts={depositAccounts}
+          onClose={() => setIsSellingNow(false)}
+          onRecorded={() => {
+            setIsSellingNow(false);
+            for (const key of ['cash-transactions', 'accounts', 'inventory', 'journal-entries', 'dashboard-metrics']) {
+              queryClient.invalidateQueries({ queryKey: [key, currentOrgId] });
+            }
+          }}
+        />
+      )}
 
       {/* Invoice Drill-down Overlay */}
       <EntityDrillDownModal

@@ -3,6 +3,7 @@ import { useState } from 'react';
 import { format } from 'date-fns';
 import { ReceiptScanner } from './ReceiptScanner';
 import { BillBuilder } from './BillBuilder';
+import { CashTransactionsPanel } from '../common/CashTransactionsPanel';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAppStore } from '../../store';
 import { DynamicQuickAddModal } from '../common/DynamicQuickAddModal';
@@ -32,6 +33,7 @@ export function ExpensesView() {
   const [isCreatingVendor, setIsCreatingVendor] = useState(false);
   const [isCreatingBill, setIsCreatingBill] = useState(false);
   const [isScanningReceipt, setIsScanningReceipt] = useState(false);
+  const [isRecordingExpense, setIsRecordingExpense] = useState(false);
   const [scannedData, setScannedData] = useState<{ vendor: string; amount: number; date: string } | null>(null);
   const [selectedEntity, setSelectedEntity] = useState<{ type: 'VENDOR' | 'BILL'; id: string; data: any } | null>(null);
   const [selectedBillIds, setSelectedBillIds] = useState<string[]>([]);
@@ -212,9 +214,15 @@ export function ExpensesView() {
             <button type="button" onClick={() => setIsCreatingVendor(true)} className={buttonClass.secondary}>
               Add vendor
             </button>
-            <button type="button" onClick={() => setIsCreatingBill(true)} className={buttonClass.primary}>
-              New bill
-            </button>
+            {activeTab === 'Expenses' ? (
+              <button type="button" onClick={() => setIsRecordingExpense(true)} className={buttonClass.primary}>
+                New expense
+              </button>
+            ) : (
+              <button type="button" onClick={() => setIsCreatingBill(true)} className={buttonClass.primary}>
+                New bill
+              </button>
+            )}
           </>
         }
       />
@@ -229,7 +237,7 @@ export function ExpensesView() {
         }}
         tabs={tabs.map((tab) => ({
           id: tab,
-          name: tab === 'Expenses' ? 'Receipts' : tab,
+          name: tab,
           count: tab === 'Bills' ? bills.length : tab === 'Vendors' ? vendors.length : undefined,
         }))}
       />
@@ -419,23 +427,21 @@ export function ExpensesView() {
       )}
 
       {activeTab === 'Expenses' && (
-        <div className="max-w-2xl space-y-4">
-          <p className="text-[14px] leading-relaxed text-ink-900">
-            A cash or card purchase is recorded as a bill from the supplier, then marked paid. Take a photo of the receipt and the supplier, amount and date are read from it for you to check.
-          </p>
-          {!activeCompany?.aiEnabled && (
-            <p className="text-[13px] text-graphite-600">
-              Reading receipts sends the photo to Google Gemini, so it is off until an owner or admin turns on AI features in Settings, Closing and controls.
+        <div className="space-y-4">
+          <div className="max-w-2xl space-y-2">
+            <p className="text-[14px] leading-relaxed text-ink-900">
+              A purchase paid on the spot, by cash, card or M-Pesa, is an expense: it posts against the account it was paid from, with nothing left owing. Take a photo of the receipt and the supplier, amount and date are read from it for you to check.
             </p>
-          )}
-          <div className="flex flex-wrap items-center gap-4">
+            {!activeCompany?.aiEnabled && (
+              <p className="text-[13px] text-graphite-600">
+                Reading receipts sends the photo to Google Gemini, so it is off until an owner or admin turns on AI features in Settings, Closing and controls.
+              </p>
+            )}
             <button type="button" onClick={() => setIsScanningReceipt(true)} disabled={!activeCompany?.aiEnabled} className={buttonClass.secondary}>
               Read a receipt
             </button>
-            <button type="button" onClick={() => setIsCreatingBill(true)} className={buttonClass.quiet}>
-              Enter it by hand
-            </button>
           </div>
+          <CashTransactionsPanel kind="EXPENSE" onCreate={() => setIsRecordingExpense(true)} />
         </div>
       )}
 
@@ -548,14 +554,21 @@ export function ExpensesView() {
         <ReceiptScanner
           onClose={() => setIsScanningReceipt(false)}
           onScanComplete={(data) => {
+            // A receipt is a purchase already paid: it opens as an expense.
             setScannedData(data);
             setIsScanningReceipt(false);
-            setIsCreatingBill(true);
+            setIsRecordingExpense(true);
           }}
         />
       )}
 
-      <BillBuilder open={isCreatingBill} onClose={closeBill} scanned={scannedData} />
+      <BillBuilder open={isCreatingBill} onClose={closeBill} />
+      <BillBuilder
+        mode="expense"
+        open={isRecordingExpense}
+        onClose={() => { setIsRecordingExpense(false); setScannedData(null); }}
+        scanned={scannedData}
+      />
 
       {confirmDialog}
     </div>

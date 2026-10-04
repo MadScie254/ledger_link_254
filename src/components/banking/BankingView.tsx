@@ -7,11 +7,13 @@ import { useAppStore } from '../../store';
 import { Amount } from '../ledger/Amount';
 import { Mark } from '../ledger/Mark';
 import { PageHeading, IndexTabs, PageNote, SkeletonRows, EmptyNote, buttonClass } from '../ledger/Page';
+import { CashTransactionsPanel } from '../common/CashTransactionsPanel';
+import { TransferDialog } from './TransferDialog';
 import { useConfirm } from '../../hooks/useConfirm';
 import { downloadCsv } from '../../utils/exportCsv';
 import { Dialog, Field } from '../ledger/Dialog';
 
-const tabs = ['Bank transactions', 'AI Match Assistant', 'Rules', 'Reconcile', 'Bank connections'];
+const tabs = ['Bank transactions', 'AI Match Assistant', 'Transfers', 'Rules', 'Reconcile', 'Bank connections'];
 
 /** What a statement line is matched to: exactly one target besides the line. */
 type MatchPayload = { transactionId: string } & (
@@ -24,6 +26,7 @@ type MatchPayload = { transactionId: string } & (
 export function BankingView() {
   useRenderTracker("BankingView");
   const [activeTab, setActiveTab] = useState('Bank transactions');
+  const [isTransferring, setIsTransferring] = useState(false);
   const [filterSearch, setFilterSearch] = useState('');
   const [filterDate, setFilterDate] = useState('');
   const [filterDirection, setFilterDirection] = useState('ALL');
@@ -404,6 +407,9 @@ export function BankingView() {
         note={<>Bank and M-Pesa statement lines, matched to the books · Figures in {baseCurrency}</>}
         actions={
           <>
+            <button type="button" onClick={() => setIsTransferring(true)} className={buttonClass.secondary}>
+              Transfer money
+            </button>
             <button type="button" onClick={handleExportCSV} className={buttonClass.secondary}>
               <Download className="h-4 w-4" aria-hidden="true" /> Export CSV
             </button>
@@ -432,6 +438,7 @@ export function BankingView() {
         tabs={[
           { id: 'Bank transactions', name: 'Statement lines', count: rawTx.length },
           { id: 'AI Match Assistant', name: 'Suggested matches', count: aiMatches.length },
+          { id: 'Transfers', name: 'Transfers' },
           { id: 'Rules', name: 'Rules' },
           { id: 'Reconcile', name: 'Reconcile' },
           { id: 'Bank connections', name: 'Connection requests' },
@@ -721,6 +728,8 @@ export function BankingView() {
           )}
         </div>
       )}
+
+      {activeTab === 'Transfers' && <CashTransactionsPanel kind="TRANSFER" onCreate={() => setIsTransferring(true)} createLabel="Record the first transfer" />}
 
       {activeTab === 'Rules' && (
         <div className="max-w-3xl space-y-4">
@@ -1041,6 +1050,8 @@ export function BankingView() {
           </div>
         )}
       </Dialog>
+
+      <TransferDialog open={isTransferring} onClose={() => setIsTransferring(false)} onDone={setAutoReconcileNote} />
 
       {confirmDialog}
     </div>

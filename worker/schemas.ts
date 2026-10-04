@@ -461,3 +461,42 @@ export const convertEstimateSchema = z.discriminatedUnion('target', [
 ]).refine((body) => body.target !== 'INVOICE' || body.dueDate >= body.date, {
   message: 'The due date cannot be before the issue date.',
 });
+
+// --- Sales receipts, expenses and transfers -----------------------------------
+
+const partyChoice = {
+  payeeName: text(200),
+  reference: text(100),
+  memo: text(4000),
+  idempotencyKey,
+};
+export const salesReceiptSchema = z.object({
+  customerId: optionalUuid,
+  date: isoDate,
+  depositAccountId: uuid,
+  lines: z.array(salesOrderLineSchema).min(1).max(200),
+  ...partyChoice,
+});
+export const expenseSchema = z.object({
+  vendorId: optionalUuid,
+  date: isoDate,
+  paidFromAccountId: uuid,
+  lines: z.array(z.object({
+    description: requiredText(500, 'A line description'),
+    accountId: uuid,
+    amountCents: positiveCents,
+    taxCents: cents.default(0),
+    inventoryItemId: optionalUuid,
+    quantity: z.number().positive().max(1_000_000_000).optional(),
+  })).min(1).max(200),
+  ...partyChoice,
+});
+export const transferSchema = z.object({
+  date: isoDate,
+  fromAccountId: uuid,
+  toAccountId: uuid,
+  amountCents: positiveCents,
+  memo: text(4000),
+  idempotencyKey,
+}).refine((transfer) => transfer.fromAccountId !== transfer.toAccountId, { message: 'Choose two different accounts to transfer between.' });
+export const voidSchema = z.object({ voidDate: isoDate, reason });

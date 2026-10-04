@@ -34,7 +34,7 @@ interface Checked {
   unitPriceCents: number | null;
 }
 
-export type SalesDocumentKind = 'order' | 'estimate';
+export type SalesDocumentKind = 'order' | 'estimate' | 'receipt';
 
 /** What differs between the documents this builder writes. */
 const KINDS: Record<SalesDocumentKind, {
@@ -44,7 +44,7 @@ const KINDS: Record<SalesDocumentKind, {
   note: string;
   dateLabel: string;
   dateKey: string;
-  secondDate: { label: string; key: string; hint: string };
+  secondDate: { label: string; key: string; hint: string } | null;
   linesHeading: string;
   totalLabel: string;
   submit: string;
@@ -53,6 +53,8 @@ const KINDS: Record<SalesDocumentKind, {
   stockNote: (onHand: number) => string;
   serviceNote: string;
   notesHint: string;
+  /** A sale paid on the spot: no customer needed, and the account the money went into. */
+  paidNow?: boolean;
 }> = {
   order: {
     endpoint: '/api/sales-orders',
@@ -88,6 +90,24 @@ const KINDS: Record<SalesDocumentKind, {
     serviceNote: 'A service, not counted as stock.',
     notesHint: 'Optional. Scope, terms or anything the customer should know.',
   },
+  receipt: {
+    endpoint: '/api/sales-receipts',
+    title: 'New sales receipt',
+    editTitle: 'Sales receipt',
+    note: 'A sale paid on the spot. Income, VAT and the money received post together, and stock items are counted out.',
+    dateLabel: 'Date',
+    dateKey: 'date',
+    secondDate: null,
+    linesHeading: 'What was sold',
+    totalLabel: 'Received',
+    submit: 'Post sales receipt',
+    pending: 'Posting',
+    failed: 'The sales receipt could not be posted.',
+    stockNote: (onHand) => `Only ${onHand} in stock. The sale can still be posted; the count goes below zero.`,
+    serviceNote: 'A service, not counted as stock.',
+    notesHint: 'Optional',
+    paidNow: true,
+  },
 };
 
 export interface SalesDocumentDraft {
@@ -112,6 +132,7 @@ export function SalesDocumentBuilder({
   customers,
   incomeAccounts,
   items,
+  moneyAccounts = [],
   initial,
   onClose,
   onRecorded,
@@ -122,6 +143,8 @@ export function SalesDocumentBuilder({
   customers: any[];
   incomeAccounts: any[];
   items: any[];
+  /** Bank, cash and M-Pesa accounts, for a sales receipt. */
+  moneyAccounts?: any[];
   initial?: SalesDocumentDraft | null;
   onClose: () => void;
   onRecorded: (document: any) => void;
@@ -133,6 +156,9 @@ export function SalesDocumentBuilder({
   const [orderDate, setOrderDate] = useState(initial?.date || format(new Date(), 'yyyy-MM-dd'));
   const [promisedDate, setPromisedDate] = useState(initial?.secondDate || '');
   const [notes, setNotes] = useState(initial?.notes || '');
+  const [payeeName, setPayeeName] = useState('');
+  const [depositAccountId, setDepositAccountId] = useState(moneyAccounts[0]?.id || '');
+  const [reference, setReference] = useState('');
   const [problem, setProblem] = useState('');
   const [lines, setLines] = useState<DraftLine[]>(() => initial?.lines.length
     ? initial.lines.map((line, index) => ({
@@ -196,10 +222,12 @@ export function SalesDocumentBuilder({
         method: initial ? 'PUT' : 'POST',
         headers: { 'Content-Type': 'application/json', 'x-org-id': orgId },
         body: JSON.stringify({
-          customerId,
+          customerId: customerId || undefined,
           [config.dateKey]: orderDate,
-          [config.secondDate.key]: promisedDate || undefined,
-          notes: notes.trim() || undefined,
+          ...(config.secondDate ? { [config.secondDate.key]: promisedDate || undefined } : {}),
+          ...(config.paidNow
+            ? { memo: notes.trim() || undefined, payeeName: customerId ? undefined : payeeName.trim() || undefined, depositAccountId, reference: reference.trim() || undefined }
+            : { notes: notes.trim() || undefined }),
           idempotencyKey,
           lines: checked.map(({ line, unitPriceCents }) => ({
             description: line.description.trim(),
@@ -221,9 +249,10 @@ export function SalesDocumentBuilder({
 
   const submit = () => {
     setProblem('');
-    if (!customerId) return setProblem(kind === 'order' ? 'Choose the customer who placed the order.' : 'Choose the customer.');
+    if (!customerId && !config.paidNow) return setProblem(kind === 'order' ? 'Choose the customer who placed the order.' : 'Choose the customer.');
     if (!orderDate) return setProblem(`Enter the ${config.dateLabel.toLowerCase()}.`);
-    if (promisedDate && promisedDate < orderDate) return setProblem(`${config.secondDate.label} cannot be before the ${config.dateLabel.toLowerCase()}.`);
+    if (config.secondDate && promisedDate && promisedDate < orderDate) return setProblem(`${config.secondDate.label} cannot be before the ${config.dateLabel.toLowerCase()}.`);
+    if (config.paidNow && !depositAccountId) return setProblem('Choose the account the money went into.');
     const firstBad = checked.findIndex((c) => c.problem);
     if (firstBad !== -1) return setProblem(`Line ${firstBad + 1}: ${checked[firstBad].problem}`);
     record.mutate();
@@ -247,20 +276,45 @@ export function SalesDocumentBuilder({
     >
       <div className="space-y-5">
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-          <Field label="Customer" hint={customers.length === 0 ? 'Add the customer under Customers first. For walk-in sales, add one called Walk-in.' : undefined}>
+          <Field
+            label="Customer"
+            hint={config.paidNow ? 'Optional for a walk-in sale.' : customers.length === 0 ? 'Add the customer under Customers first. For walk-in sales, add one called Walk-in.' : undefined}
+          >
             <select value={customerId} onChange={(e) => setCustomerId(e.target.value)}>
-              <option value="">Choose a customer</option>
+              <option value="">{config.paidNow ? 'Walk-in, no customer record' : 'Choose a customer'}</option>
               {customers.map((customer: any) => (
                 <option key={customer.id} value={customer.id}>{customer.displayName}</option>
               ))}
             </select>
           </Field>
+          {config.paidNow && !customerId && (
+            <Field label="Name on the receipt" hint="Optional">
+              <input maxLength={200} value={payeeName} onChange={(e) => setPayeeName(e.target.value)} />
+            </Field>
+          )}
           <Field label={config.dateLabel}>
             <input type="date" value={orderDate} onChange={(e) => setOrderDate(e.target.value)} />
           </Field>
-          <Field label={config.secondDate.label} hint={config.secondDate.hint}>
-            <input type="date" min={orderDate} value={promisedDate} onChange={(e) => setPromisedDate(e.target.value)} />
-          </Field>
+          {config.secondDate && (
+            <Field label={config.secondDate.label} hint={config.secondDate.hint}>
+              <input type="date" min={orderDate} value={promisedDate} onChange={(e) => setPromisedDate(e.target.value)} />
+            </Field>
+          )}
+          {config.paidNow && (
+            <>
+              <Field label="Received into" hint={moneyAccounts.length === 0 ? 'Mark a bank, cash or M-Pesa account as holding money (Accounting, Edit) first.' : undefined}>
+                <select value={depositAccountId} onChange={(e) => setDepositAccountId(e.target.value)}>
+                  <option value="">Choose an account</option>
+                  {moneyAccounts.map((account: any) => (
+                    <option key={account.id} value={account.id}>{account.code} · {account.name}</option>
+                  ))}
+                </select>
+              </Field>
+              <Field label="Reference" hint="Optional, such as the M-Pesa code">
+                <input maxLength={100} value={reference} onChange={(e) => setReference(e.target.value)} />
+              </Field>
+            </>
+          )}
         </div>
 
         <section aria-labelledby="order-lines">

@@ -216,7 +216,7 @@ export function AccountingView() {
   const isBalanced = debitCents > 0 && debitCents === creditCents;
 
   const baseCurrency = activeCompany?.baseCurrency || 'KES';
-  const typeName = (type: string) => (type ? type.charAt(0) + type.slice(1).toLowerCase() : '');
+  const typeName = (type: string) => (type ? (type.charAt(0) + type.slice(1).toLowerCase()).replace(/_/g, ' ') : '');
   // Balances arrive signed in each account's normal direction, so the side
   // comes from the type: debit for assets, expenses and cost of sales, credit
   // for liabilities, equity and income, flipped when the balance is negative.

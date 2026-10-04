@@ -30,12 +30,18 @@ const emptyLine = (key: number, accountId = ''): Line => ({ key, itemId: '', des
  * stock item and the quantity received, which the bill counts in. Saving
  * posts the expenses, the recoverable VAT and the amount owed in one entry.
  */
-export function BillBuilder({ open, onClose, scanned }: {
+export function BillBuilder({ open, onClose, scanned, mode = 'bill' }: {
   open: boolean;
   onClose: () => void;
   /** What the receipt reader found, for the person to check. */
   scanned?: { vendor: string; amount: number; date: string } | null;
+  /**
+   * 'bill': owed to the supplier, paid later. 'expense': paid on the spot
+   * from a bank, cash or M-Pesa account, with no amount left owing.
+   */
+  mode?: 'bill' | 'expense';
 }) {
+  const isExpense = mode === 'expense';
   const { currentOrgId, activeCompany, exchangeRates } = useAppStore();
   const queryClient = useQueryClient();
   const base = activeCompany?.baseCurrency || 'KES';
@@ -48,6 +54,8 @@ export function BillBuilder({ open, onClose, scanned }: {
   const [currency, setCurrency] = useState(base);
   const [rate, setRate] = useState('1');
   const [notes, setNotes] = useState('');
+  const [payeeName, setPayeeName] = useState('');
+  const [paidFromId, setPaidFromId] = useState('');
   const [lines, setLines] = useState<Line[]>([emptyLine(1)]);
   const [problem, setProblem] = useState('');
   const [posted, setPosted] = useState(false);
@@ -62,6 +70,7 @@ export function BillBuilder({ open, onClose, scanned }: {
   // than money, receivables and recoverable VAT (the database checks too).
   const lineAccounts: any[] = (accounts.data?.accounts || []).filter((a: any) =>
     a.isActive !== false && ['EXPENSE', 'COGS', 'ASSET'].includes(a.type) && !a.isBankAccount && !['1100', '1150'].includes(a.code));
+  const moneyAccounts: any[] = (accounts.data?.accounts || []).filter((a: any) => a.isBankAccount && a.isActive !== false);
   const items: any[] = (inventory.data?.items || []).filter((i: any) => i.status !== 'Inactive');
   const itemById = useMemo(() => new Map(items.map((i) => [i.id, i])), [items]);
   const vendor = vendorList.find((v) => v.id === vendorId);
@@ -81,6 +90,8 @@ export function BillBuilder({ open, onClose, scanned }: {
     setCurrency(base);
     setRate('1');
     setNotes('');
+    setPayeeName(scanned?.vendor || '');
+    setPaidFromId('');
     const match = (vendors.data?.vendors || []).find((v: any) => v.displayName === scanned?.vendor);
     setVendorId(match?.id || '');
     setLines([{
@@ -124,7 +135,25 @@ export function BillBuilder({ open, onClose, scanned }: {
   };
 
   const post = useMutation({
-    mutationFn: () => apiRequest<{ id: string }>('/api/bills', {
+    mutationFn: () => isExpense ? apiRequest<{ id: string }>('/api/expenses', {
+      body: {
+        vendorId: vendorId || undefined,
+        payeeName: vendorId ? undefined : payeeName.trim() || undefined,
+        date: billDate,
+        paidFromAccountId: paidFromId || moneyAccounts[0]?.id,
+        reference: supplierReference.trim() || undefined,
+        memo: notes.trim() || undefined,
+        idempotencyKey,
+        lines: lines.filter((l) => lineCents(l) > 0).map((l) => ({
+          description: l.description.trim(),
+          accountId: l.accountId,
+          amountCents: lineCents(l),
+          taxCents: baseTax(l),
+          ...(l.itemId ? { inventoryItemId: l.itemId, quantity: Number(l.quantity) } : {}),
+        })),
+      },
+      fallback: 'The expense could not be posted.',
+    }) : apiRequest<{ id: string }>('/api/bills', {
       body: {
         vendorId,
         billDate,
@@ -146,7 +175,7 @@ export function BillBuilder({ open, onClose, scanned }: {
       fallback: 'The bill could not be saved.',
     }),
     onSuccess: () => {
-      for (const key of ['bills', 'accounts', 'vendors', 'inventory', 'dashboard-metrics', 'journal-entries']) {
+      for (const key of ['bills', 'cash-transactions', 'accounts', 'vendors', 'inventory', 'dashboard-metrics', 'journal-entries']) {
         queryClient.invalidateQueries({ queryKey: [key, currentOrgId] });
       }
       setPosted(true);
@@ -170,7 +199,8 @@ export function BillBuilder({ open, onClose, scanned }: {
         if (isStocked(itemById.get(l.itemId)) && !Number.isInteger(quantity)) return setProblem(`Line ${index + 1}: stock is counted in whole units.`);
       }
     }
-    if (dueDate < billDate) return setProblem('The due date cannot be before the bill date.');
+    if (!isExpense && dueDate < billDate) return setProblem('The due date cannot be before the bill date.');
+    if (isExpense && !(paidFromId || moneyAccounts[0]?.id)) return setProblem('Choose the account it was paid from.');
     post.mutate();
   };
 
@@ -179,42 +209,65 @@ export function BillBuilder({ open, onClose, scanned }: {
       open={open}
       onClose={() => { if (!post.isPending) onClose(); }}
       width="xl"
-      title={scanned ? 'Check the receipt' : 'New bill'}
-      note={scanned ? 'Read from the photo. Correct anything misread before saving.' : 'Saving it posts the expenses and the amount owed to the supplier. Stock items on it are counted in.'}
+      title={scanned ? 'Check the receipt' : isExpense ? 'New expense' : 'New bill'}
+      note={scanned
+        ? 'Read from the photo. Correct anything misread before saving.'
+        : isExpense
+          ? 'Paid on the spot: the expenses and recoverable VAT post against the account it was paid from. Stock items on it are counted in.'
+          : 'Saving it posts the expenses and the amount owed to the supplier. Stock items on it are counted in.'}
       footer={
         <>
           {problem && <p role="alert" className="mr-auto text-[13px] text-ledger-red">{problem}</p>}
           <button type="button" onClick={onClose} disabled={post.isPending} className={buttonClass.secondary}>Cancel</button>
-          <button type="submit" form="bill-builder" disabled={post.isPending || !vendorId} className={buttonClass.primary}>
-            {post.isPending ? 'Saving' : 'Save bill'}
+          <button type="submit" form="bill-builder" disabled={post.isPending || (!isExpense && !vendorId)} className={buttonClass.primary}>
+            {post.isPending ? 'Saving' : isExpense ? 'Post expense' : 'Save bill'}
           </button>
         </>
       }
     >
       <div className="relative">
-        {posted && <PostedStamp label="Bill posted" />}
+        {posted && <PostedStamp label={isExpense ? 'Expense posted' : 'Bill posted'} />}
         <form id="bill-builder" onSubmit={submit} className="space-y-5">
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            <Field label="Supplier" hint={scanned?.vendor && !vendorId ? `The receipt names ${scanned.vendor}. Add them as a vendor if they are new.` : undefined}>
-              <select required name="vendorId" value={vendorId} onChange={(e) => setVendorId(e.target.value)}>
-                <option value="">Choose a vendor</option>
+            <Field
+              label={isExpense ? 'Paid to' : 'Supplier'}
+              hint={scanned?.vendor && !vendorId ? `The receipt names ${scanned.vendor}.${isExpense ? '' : ' Add them as a vendor if they are new.'}` : isExpense ? 'Optional' : undefined}
+            >
+              <select required={!isExpense} name="vendorId" value={vendorId} onChange={(e) => setVendorId(e.target.value)}>
+                <option value="">{isExpense ? 'No vendor record' : 'Choose a vendor'}</option>
                 {vendorList.map((v) => <option key={v.id} value={v.id}>{v.displayName}</option>)}
               </select>
             </Field>
-            <Field label="Bill date">
+            {isExpense && !vendorId && (
+              <Field label="Name on the receipt" hint="Optional">
+                <input name="payeeName" maxLength={200} value={payeeName} onChange={(e) => setPayeeName(e.target.value)} />
+              </Field>
+            )}
+            <Field label={isExpense ? 'Date' : 'Bill date'}>
               <input required type="date" name="billDate" value={billDate} onChange={(e) => setBillDate(e.target.value)} />
             </Field>
-            <Field label="Due">
-              <input required type="date" name="dueDate" value={dueDate} min={billDate} onChange={(e) => setDueDate(e.target.value)} />
-            </Field>
-            <Field label="Supplier's invoice number" hint="Optional. The same number cannot be entered twice for one supplier.">
+            {isExpense ? (
+              <Field label="Paid from" hint={moneyAccounts.length === 0 ? 'Mark a bank, cash or M-Pesa account as holding money (Accounting, Edit) first.' : undefined}>
+                <select required name="paidFromAccountId" value={paidFromId || moneyAccounts[0]?.id || ''} onChange={(e) => setPaidFromId(e.target.value)}>
+                  <option value="">Choose an account</option>
+                  {moneyAccounts.map((a) => <option key={a.id} value={a.id}>{a.code} · {a.name}</option>)}
+                </select>
+              </Field>
+            ) : (
+              <Field label="Due">
+                <input required type="date" name="dueDate" value={dueDate} min={billDate} onChange={(e) => setDueDate(e.target.value)} />
+              </Field>
+            )}
+            <Field label={isExpense ? 'Reference' : "Supplier's invoice number"} hint={isExpense ? 'Optional, such as the receipt or M-Pesa code' : 'Optional. The same number cannot be entered twice for one supplier.'}>
               <input name="supplierReference" maxLength={100} autoComplete="off" value={supplierReference} onChange={(e) => setSupplierReference(e.target.value)} />
             </Field>
-            <Field label="Currency">
-              <select value={currency} onChange={(e) => { setCurrency(e.target.value); setRate(e.target.value === base ? '1' : String(exchangeRates[e.target.value] || 1)); }}>
-                {SUPPORTED_CURRENCIES.map((c) => <option key={c.code} value={c.code}>{c.code} · {c.name}</option>)}
-              </select>
-            </Field>
+            {!isExpense && (
+              <Field label="Currency">
+                <select value={currency} onChange={(e) => { setCurrency(e.target.value); setRate(e.target.value === base ? '1' : String(exchangeRates[e.target.value] || 1)); }}>
+                  {SUPPORTED_CURRENCIES.map((c) => <option key={c.code} value={c.code}>{c.code} · {c.name}</option>)}
+                </select>
+              </Field>
+            )}
             {isForeign && (
               <Field label={`${currency} per 1 ${base}`}>
                 <input required type="number" min="0.00000001" step="any" inputMode="decimal" value={rate} onChange={(e) => setRate(e.target.value)} className="text-right tabular-currency" />

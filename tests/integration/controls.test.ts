@@ -216,3 +216,37 @@ test('a bill line for a stock item counts it in, and voiding the bill counts it 
     lines: [{ description: 'Half a bag', accountId: OPEX, amountCents: 36_000, inventoryItemId: CEMENT, quantity: 0.5 }],
   }), /whole units/);
 });
+
+import { CashTransactionService } from '../../src/server/cashTransactions';
+
+test('a sales receipt, an expense and a transfer post, list with their names, and void', async () => {
+  sql(`UPDATE public.organizations SET books_closed_through = NULL WHERE id = '${ORG}'`);
+  const till = sql(`INSERT INTO public.accounts (org_id, code, name, type, is_bank_account) VALUES ('${ORG}', '1050', 'M-Pesa Till', 'ASSET', true) RETURNING id`).split('\n')[0];
+  const receipt = await CashTransactionService.recordSalesReceipt({
+    orgId: ORG, payeeName: 'Walk-in', date: '2026-09-15', depositAccountId: till, reference: 'QJK7', actor: OWNER, idempotencyKey: uuid(),
+    lines: [{ description: 'Cement 50kg', accountId: SALES, inventoryItemId: CEMENT, quantity: 1, unitPriceCents: 75_000, taxRate: 16 }],
+  });
+  const expense = await CashTransactionService.recordExpense({
+    orgId: ORG, vendorId: VENDOR, date: '2026-09-16', paidFromAccountId: BANK, actor: OWNER, idempotencyKey: uuid(),
+    lines: [{ description: 'Tokens', accountId: OPEX, amountCents: 10_000, taxCents: 1_600 }],
+  });
+  const transfer = await CashTransactionService.recordTransfer({
+    orgId: ORG, date: '2026-09-17', fromAccountId: till, toAccountId: BANK, amountCents: 50_000, memo: 'Banking the till', actor: OWNER, idempotencyKey: uuid(),
+  });
+  assert.match(receipt.number, /^SR-2026-/);
+  assert.match(expense.number, /^EXP-2026-/);
+  assert.match(transfer.number, /^TRF-2026-/);
+
+  const all = await CashTransactionService.list(ORG);
+  const byId = new Map(all.map((t) => [t.id, t]));
+  assert.equal(byId.get(receipt.id)!.partyName, 'Walk-in');
+  assert.equal(byId.get(receipt.id)!.moneyAccountName, '1050 M-Pesa Till');
+  assert.equal(byId.get(receipt.id)!.lines[0].quantity, 1);
+  assert.equal(byId.get(expense.id)!.partyName, 'Kenya Power');
+  assert.equal(byId.get(transfer.id)!.toAccountName, '1000 Bank');
+  assert.deepEqual((await CashTransactionService.list(ORG, 'EXPENSE')).map((t) => t.id), [expense.id]);
+
+  await CashTransactionService.void(ORG, receipt.id, '2026-09-18', 'Rang up twice', OWNER);
+  assert.equal((await CashTransactionService.list(ORG, 'SALES_RECEIPT'))[0].status, 'VOID');
+  await refused(CashTransactionService.void(ORG, expense.id, '2026-09-10', 'Before it happened', OWNER), /on or after/);
+});
