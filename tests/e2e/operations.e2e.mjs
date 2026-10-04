@@ -33,6 +33,32 @@ test('a customer is added, then edited from its record', async () => {
   });
 });
 
+test('customers are imported from a spreadsheet, a bad row fixed by skipping it', async () => {
+  const session = await signedIn();
+  const { page, problems } = session;
+  await flow('customer-import', session, async () => {
+    await openView(page, 'Customers');
+    await page.getByRole('button', { name: 'Import from a spreadsheet' }).click();
+    const dialog = page.getByRole('dialog');
+    const csv = [
+      'Customer Name,Email,Phone,KRA PIN',
+      'Jamii Bakery,orders@jamii.example,0711 222 333,P051111111A',
+      'Upendo Salon,not-an-email,0722 444 555,',
+      'Acme,,,',
+    ].join('\n');
+    await dialog.locator('input[name="records"]').setInputFiles({ name: 'customers.csv', mimeType: 'text/csv', buffer: Buffer.from(csv) });
+    await dialog.getByText('3 rows to import').waitFor({ timeout: 10_000 });
+    await dialog.getByRole('button', { name: 'Import 3 rows' }).click();
+    await dialog.getByText('Rows to fix').waitFor({ timeout: 10_000 });
+    await dialog.getByText(/Row 3 · email/).waitFor({ timeout: 10_000 });
+    await dialog.getByRole('button', { name: 'Add the other 2' }).click();
+    await page.getByText(/1 customer added; 1 already in the books and skipped; 1 with problems left out/).waitFor({ timeout: 10_000 });
+    assert.equal(sql(`SELECT kra_pin FROM public.customers WHERE display_name = 'Jamii Bakery'`), 'P051111111A');
+    assert.equal(sql(`SELECT count(*) FROM public.customers WHERE display_name = 'Upendo Salon'`), '0');
+    assert.deepEqual(problems.filter((p) => !/422/.test(p)), []);
+  });
+});
+
 test('a stock count is recorded with its reason', async () => {
   const session = await signedIn();
   const { page, api, problems } = session;

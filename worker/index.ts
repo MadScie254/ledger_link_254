@@ -22,6 +22,7 @@ import { registerCashRoutes } from './routes/cash';
 import { registerCreditRoutes } from './routes/credits';
 import { registerPurchaseOrderRoutes } from './routes/purchaseOrders';
 import { registerRecurringRoutes } from './routes/recurring';
+import { registerImportRoutes } from './routes/imports';
 import { RecurringService } from '../src/server/recurring';
 
 const app = new Hono<{ Variables: Variables }>();
@@ -78,6 +79,7 @@ registerCashRoutes(api);
 registerCreditRoutes(api);
 registerPurchaseOrderRoutes(api);
 registerRecurringRoutes(api);
+registerImportRoutes(api);
 
 app.route('/api', api);
 

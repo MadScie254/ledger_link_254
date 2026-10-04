@@ -47,6 +47,25 @@ const COLUMNS: Record<Exclude<keyof ItemInput, 'quantityOnHand'>, string> = {
   status: 'status',
 };
 
+/** A new stock item's row, as one form or one imported line gives it; its starting count is recorded as the opening movement. */
+export function itemRow(orgId: string, input: ItemInput) {
+  const values: Record<string, unknown> = {
+    org_id: orgId,
+    type: 'Physical Product',
+    category: 'General',
+    unit_price_cents: 0,
+    cost_price_cents: 0,
+    quantity_on_hand: input.quantityOnHand || 0,
+    reorder_point: 0,
+    status: 'Active',
+  };
+  for (const [key, column] of Object.entries(COLUMNS) as Array<[keyof typeof COLUMNS, string]>) {
+    if (input[key] !== undefined) values[column] = input[key];
+  }
+  values.name = String(input.name).trim();
+  return values;
+}
+
 function mapItem(row: any) {
   return {
     id: row.id,
@@ -92,22 +111,9 @@ export class InventoryService {
   static async createItem(orgId: string, input: ItemInput) {
     const supabase = getSupabase();
     if (!input.name?.trim()) throw new UserError('A name is required.');
-    const values: Record<string, unknown> = {
-      org_id: orgId,
-      type: 'Physical Product',
-      category: 'General',
-      unit_price_cents: 0,
-      cost_price_cents: 0,
-      quantity_on_hand: input.quantityOnHand || 0,
-      reorder_point: 0,
-      status: 'Active',
-    };
-    for (const [key, column] of Object.entries(COLUMNS) as Array<[keyof typeof COLUMNS, string]>) {
-      if (input[key] !== undefined) values[column] = input[key];
-    }
     const { data, error } = await supabase
       .from('inventory_items')
-      .insert(values)
+      .insert(itemRow(orgId, input))
       .select('id')
       .single();
     if (error) throw error;

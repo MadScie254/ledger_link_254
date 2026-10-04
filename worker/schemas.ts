@@ -627,3 +627,13 @@ export const reconciliationStartSchema = z.object({
 });
 export const reconciliationLinesSchema = z.object({ journalLineIds: z.array(uuid).max(20000) });
 export const reconciliationUndoSchema = z.object({ reason: text(500) });
+
+// --- Spreadsheet imports of customers, suppliers and stock items ----------------
+
+export const recordImportSchema = z.object({
+  rows: z.array(z.object({
+    row: z.number().int().positive(),
+    values: z.record(z.string(), z.unknown()),
+  })).min(1).max(2000),
+  skipInvalid: z.boolean().default(false),
+});

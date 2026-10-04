@@ -368,3 +368,26 @@ test('a customer statement runs from the ledger and closes on what is owed; sale
   assert.equal(monthly.netTotalCents, sum(pnl.income) - sum(pnl.costOfSales) - sum(pnl.expenses), 'net agrees with the profit and loss');
   assert.equal(monthly.netMonths.reduce((a, b) => a + b, 0), monthly.netTotalCents);
 });
+
+import { RecordImportService } from '../../src/server/recordImports';
+import { customerSchema, itemSchema } from '../../worker/schemas';
+
+test('customers and stock items import from a sheet, skipping names already in the books', async () => {
+  const rows = [
+    { displayName: 'Acme' },
+    { displayName: 'Baraka Traders', email: 'pay@baraka.example', phone: '0712 000 111', kraPin: 'P051234567X' },
+    { displayName: '  baraka   traders ' },
+    { displayName: 'Chui Ltd', creditLimitCents: 5_000_000 },
+  ].map((values, i) => ({ row: i + 2, input: customerSchema.parse(values) as any }));
+  const result = await RecordImportService.importRecords(ORG, 'CUSTOMER', rows);
+  assert.equal(result.imported, 2);
+  assert.deepEqual(result.skipped.map((s) => s.row), [2, 4]);
+  assert.equal(sql(`SELECT kra_pin || ' ' || email FROM public.customers WHERE org_id = '${ORG}' AND display_name = 'Baraka Traders'`), 'P051234567X pay@baraka.example');
+  assert.equal(sql(`SELECT credit_limit_cents FROM public.customers WHERE display_name = 'Chui Ltd'`), '5000000');
+
+  const items = [{ name: 'Roofing nails 1kg', sku: 'RN-1', priceCents: 35_000, costCents: 22_000, quantityOnHand: 40, taxRate: 16 }]
+    .map((values, i) => ({ row: i + 2, input: itemSchema.parse(values) as any }));
+  assert.equal((await RecordImportService.importRecords(ORG, 'ITEM', items)).imported, 1);
+  assert.equal(sql(`SELECT m.quantity || ' ' || m.source_type FROM public.inventory_movements m JOIN public.inventory_items i ON i.id = m.item_id WHERE i.name = 'Roofing nails 1kg'`), '40 OPENING');
+  assert.equal(sql(`SELECT count(*) FROM public.audit_logs WHERE resource_type = 'CUSTOMER' AND action = 'CREATE' AND resource_id = (SELECT id FROM public.customers WHERE display_name = 'Chui Ltd')`), '1', 'each added row is audited');
+});

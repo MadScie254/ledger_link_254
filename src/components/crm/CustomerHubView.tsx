@@ -8,12 +8,15 @@ import { Amount } from '../ledger/Amount';
 import { PageHeading, IndexTabs, PageNote, SkeletonRows, EmptyNote, LoadProblem, buttonClass } from '../ledger/Page';
 import { useConfirm } from '../../hooks/useConfirm';
 import { inParts } from '../../utils/apiRequest';
+import { ImportRecordsDialog } from '../common/ImportRecordsDialog';
 
 type Tab = 'Customers' | 'Balances';
 
 export function CustomerHubView() {
   const [activeTab, setActiveTab] = useState<Tab>('Customers');
   const [isAddingCustomer, setIsAddingCustomer] = useState(false);
+  const [isImporting, setIsImporting] = useState(false);
+  const [importNotice, setImportNotice] = useState('');
   const [selectedCustomer, setSelectedCustomer] = useState<any | null>(null);
   const [selectedCustomerIds, setSelectedCustomerIds] = useState<string[]>([]);
 
@@ -111,11 +114,18 @@ export function CustomerHubView() {
         title="Customers"
         note={<>Who the business sells to and what each one owes · Figures in {baseCurrency}</>}
         actions={
-          <button type="button" onClick={() => setIsAddingCustomer(true)} className={buttonClass.primary}>
-            Add customer
-          </button>
+          <>
+            <button type="button" onClick={() => setIsImporting(true)} className={buttonClass.secondary}>
+              Import from a spreadsheet
+            </button>
+            <button type="button" onClick={() => setIsAddingCustomer(true)} className={buttonClass.primary}>
+              Add customer
+            </button>
+          </>
         }
       />
+      {importNotice && <p role="status" className="text-[13.5px] text-ink-900">{importNotice}</p>}
+      <ImportRecordsDialog target="customers" open={isImporting} onClose={() => setIsImporting(false)} onDone={setImportNotice} />
 
       <IndexTabs
         label="Customers"

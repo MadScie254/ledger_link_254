@@ -7,6 +7,7 @@ import { CashTransactionsPanel } from '../common/CashTransactionsPanel';
 import { CreditsPanel } from '../common/CreditsPanel';
 import { PurchaseOrdersPanel } from './PurchaseOrdersPanel';
 import { RecurringPanel } from '../common/RecurringPanel';
+import { ImportRecordsDialog } from '../common/ImportRecordsDialog';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAppStore } from '../../store';
 import { DynamicQuickAddModal } from '../common/DynamicQuickAddModal';
@@ -40,6 +41,8 @@ export function ExpensesView() {
   const [isRecordingCredit, setIsRecordingCredit] = useState(false);
   const [isOrdering, setIsOrdering] = useState(false);
   const [isScheduling, setIsScheduling] = useState(false);
+  const [isImportingVendors, setIsImportingVendors] = useState(false);
+  const [importNotice, setImportNotice] = useState('');
   const [scannedData, setScannedData] = useState<{ vendor: string; amount: number; date: string } | null>(null);
   const [selectedEntity, setSelectedEntity] = useState<{ type: 'VENDOR' | 'BILL'; id: string; data: any } | null>(null);
   const [selectedBillIds, setSelectedBillIds] = useState<string[]>([]);
@@ -217,6 +220,11 @@ export function ExpensesView() {
         note={<>What the business owes its suppliers · Figures in {baseCurrency}</>}
         actions={
           <>
+            {activeTab === 'Vendors' && (
+              <button type="button" onClick={() => setIsImportingVendors(true)} className={buttonClass.secondary}>
+                Import from a spreadsheet
+              </button>
+            )}
             <button type="button" onClick={() => setIsCreatingVendor(true)} className={buttonClass.secondary}>
               Add vendor
             </button>
@@ -244,6 +252,8 @@ export function ExpensesView() {
           </>
         }
       />
+
+      {importNotice && <p role="status" className="text-[13.5px] text-ink-900">{importNotice}</p>}
 
       <IndexTabs
         label="Bills and expenses"
@@ -593,6 +603,7 @@ export function ExpensesView() {
       )}
 
       <BillBuilder open={isCreatingBill} onClose={closeBill} />
+      <ImportRecordsDialog target="vendors" open={isImportingVendors} onClose={() => setIsImportingVendors(false)} onDone={setImportNotice} />
       <BillBuilder mode="credit" open={isRecordingCredit} onClose={() => setIsRecordingCredit(false)} />
       <BillBuilder
         mode="expense"

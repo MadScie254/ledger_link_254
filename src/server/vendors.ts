@@ -66,6 +66,20 @@ function columnsFor(input: VendorInput): Record<string, unknown> {
   return values;
 }
 
+/** A new supplier's row, as one form or one imported line gives it. */
+export function vendorRow(orgId: string, input: VendorInput) {
+  return {
+    org_id: orgId,
+    legal_name: input.legalName || input.displayName.trim(),
+    vendor_type: input.vendorType || 'Supplier',
+    payment_terms: input.paymentTerms || 'Net 30',
+    currency: input.currency || 'KES',
+    country: input.country || 'Kenya',
+    balance: 0,
+    ...columnsFor({ ...input, displayName: input.displayName.trim() }),
+  };
+}
+
 export class VendorService {
   static async getVendors(orgId: string) {
     const supabase = getSupabase();
@@ -121,16 +135,7 @@ export class VendorService {
     if (!input.displayName?.trim()) throw new UserError('A display name is required.');
     const { data, error } = await supabase
       .from('vendors')
-      .insert({
-        org_id: orgId,
-        legal_name: input.legalName || input.displayName,
-        vendor_type: input.vendorType || 'Supplier',
-        payment_terms: input.paymentTerms || 'Net 30',
-        currency: input.currency || 'KES',
-        country: input.country || 'Kenya',
-        balance: 0,
-        ...columnsFor(input),
-      })
+      .insert(vendorRow(orgId, input))
       .select('id')
       .single();
     if (error) throw error;

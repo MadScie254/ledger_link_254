@@ -10,12 +10,14 @@ import { PageHeading, IndexTabs, SkeletonRows, EmptyNote, LoadProblem, buttonCla
 import { useConfirm } from '../../hooks/useConfirm';
 import { inParts } from '../../utils/apiRequest';
 import { StockCountDialog } from './StockCountDialog';
+import { ImportRecordsDialog } from '../common/ImportRecordsDialog';
 
 type Tab = 'Items' | 'Reorder';
 
 export function InventoryView() {
   const [activeTab, setActiveTab] = useState<Tab>('Items');
   const [isAddingItem, setIsAddingItem] = useState(false);
+  const [isImporting, setIsImporting] = useState(false);
   const [selectedItem, setSelectedItem] = useState<any | null>(null);
   const [selectedItemIds, setSelectedItemIds] = useState<string[]>([]);
   const [countingItem, setCountingItem] = useState<any | null>(null);
@@ -85,11 +87,17 @@ export function InventoryView() {
         title="Inventory"
         note={<>Stock on hand, at cost and at selling price · Figures in {baseCurrency}</>}
         actions={
-          <button type="button" onClick={() => setIsAddingItem(true)} className={buttonClass.primary}>
-            Add stock item
-          </button>
+          <>
+            <button type="button" onClick={() => setIsImporting(true)} className={buttonClass.secondary}>
+              Import from a spreadsheet
+            </button>
+            <button type="button" onClick={() => setIsAddingItem(true)} className={buttonClass.primary}>
+              Add stock item
+            </button>
+          </>
         }
       />
+      <ImportRecordsDialog target="items" open={isImporting} onClose={() => setIsImporting(false)} onDone={setNotice} />
 
       {notice && <p role="status" className="text-[13.5px] text-ink-900">{notice}</p>}
       {bulkDeleteMutation.isError && (
