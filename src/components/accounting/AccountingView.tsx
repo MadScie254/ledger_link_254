@@ -1,4 +1,5 @@
 import React from 'react';
+import { NO_TAGS, TagFields, tagHeaders, type Tags } from '../common/TagFields';
 import { X } from 'lucide-react';
 import { useState, useRef } from 'react';
 import { useInfiniteQuery, useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
@@ -141,11 +142,12 @@ export function AccountingView() {
     });
   };
 
+  const [jeTags, setJeTags] = useState<Tags>(NO_TAGS);
   const addJeMutation = useMutation({
     mutationFn: async (payload: any) => {
       const res = await fetch('/api/journal-entries', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'x-org-id': currentOrgId },
+        headers: { 'Content-Type': 'application/json', 'x-org-id': currentOrgId, ...tagHeaders(jeTags) },
         body: JSON.stringify(payload)
       });
       if (!res.ok) {
@@ -517,6 +519,7 @@ export function AccountingView() {
             <Field label="Particulars" hint="Why this entry is being made by hand">
               <input required type="text" value={jeMemo} onChange={(e) => setJeMemo(e.target.value)} />
             </Field>
+            <TagFields value={jeTags} onChange={setJeTags} />
           </div>
 
           <div className="relative overflow-x-auto">

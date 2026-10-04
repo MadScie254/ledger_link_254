@@ -11,6 +11,7 @@ import { Dialog, Field } from '../ledger/Dialog';
 import { buttonClass } from '../ledger/Page';
 import { PostedStamp } from '../ledger/PostedStamp';
 import { attachFile } from '../common/AttachmentsPanel';
+import { NO_TAGS, TagFields, tagHeaders, type Tags } from '../common/TagFields';
 
 interface Line {
   key: number;
@@ -60,6 +61,7 @@ export function BillBuilder({ open, onClose, scanned, mode = 'bill' }: {
   const [payeeName, setPayeeName] = useState('');
   const [paidFromId, setPaidFromId] = useState('');
   const [againstBillId, setAgainstBillId] = useState('');
+  const [tags, setTags] = useState<Tags>(NO_TAGS);
   const [lines, setLines] = useState<Line[]>([emptyLine(1)]);
   const [problem, setProblem] = useState('');
   const [posted, setPosted] = useState(false);
@@ -103,6 +105,7 @@ export function BillBuilder({ open, onClose, scanned, mode = 'bill' }: {
     setPayeeName(scanned?.vendor || '');
     setPaidFromId('');
     setAgainstBillId('');
+    setTags(NO_TAGS);
     const match = (vendors.data?.vendors || []).find((v: any) => v.displayName === scanned?.vendor);
     setVendorId(match?.id || '');
     setLines([{
@@ -185,6 +188,7 @@ export function BillBuilder({ open, onClose, scanned, mode = 'bill' }: {
         })),
       },
       fallback: 'The supplier credit could not be recorded.',
+      headers: tagHeaders(tags),
     }) : isExpense ? apiRequest<{ id: string }>('/api/expenses', {
       body: {
         vendorId: vendorId || undefined,
@@ -203,6 +207,7 @@ export function BillBuilder({ open, onClose, scanned, mode = 'bill' }: {
         })),
       },
       fallback: 'The expense could not be posted.',
+      headers: tagHeaders(tags),
     }) : apiRequest<{ id: string }>('/api/bills', {
       body: {
         vendorId,
@@ -223,6 +228,7 @@ export function BillBuilder({ open, onClose, scanned, mode = 'bill' }: {
         })),
       },
       fallback: 'The bill could not be saved.',
+      headers: tagHeaders(tags),
     });
   }
 
@@ -325,6 +331,7 @@ export function BillBuilder({ open, onClose, scanned, mode = 'bill' }: {
                 </select>
               </Field>
             )}
+            <TagFields value={tags} onChange={setTags} />
             {isForeign && (
               <Field label={`${currency} per 1 ${base}`}>
                 <input required type="number" min="0.00000001" step="any" inputMode="decimal" value={rate} onChange={(e) => setRate(e.target.value)} className="text-right tabular-currency" />

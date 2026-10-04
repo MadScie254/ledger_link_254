@@ -92,6 +92,39 @@ test('closing date, approval limit and time zone are saved from Settings', async
   });
 });
 
+test('a class is added, an expense posted under it, and the profit and loss split by class', async () => {
+  const session = await signedIn();
+  const { page, api, problems } = session;
+  await flow('classes', session, async () => {
+    await openView(page, 'Settings');
+    await page.getByRole('tab', { name: 'Classes and locations' }).click();
+    await page.locator('input[name="new-class"]').fill('Contracts');
+    await page.getByRole('button', { name: 'Add class' }).click();
+    await page.getByText('Contracts', { exact: true }).waitFor({ timeout: 10_000 });
+
+    await openView(page, 'Bills and expenses');
+    await page.getByRole('tab', { name: 'Expenses' }).click();
+    await page.getByRole('button', { name: 'New expense' }).click();
+    const dialog = page.getByRole('dialog');
+    await dialog.locator('input[name="payeeName"]').fill('Site transporter');
+    await dialog.locator('select[name="paidFromAccountId"]').selectOption({ label: '1000 · Bank' });
+    await dialog.locator('select[name="classId"]').selectOption({ label: 'Contracts' });
+    await dialog.getByLabel('Line 1 particulars').fill('Haulage to site');
+    await dialog.getByLabel('Line 1 account').selectOption({ label: '6000 · Operating expenses' });
+    await dialog.getByLabel('Line 1 amount').fill('4,000');
+    await dialog.getByLabel('Line 1 VAT percentage').fill('0');
+    await dialog.getByRole('button', { name: 'Post expense' }).click();
+    await dialog.waitFor({ state: 'hidden', timeout: 10_000 });
+    assert.equal(sql(`SELECT t.name FROM public.journal_entries e JOIN public.tracking_categories t ON t.id = e.class_id JOIN public.cash_transactions c ON c.journal_entry_id = e.id WHERE c.payee_name = 'Site transporter'`), 'Contracts');
+
+    await openView(page, 'Reports');
+    await page.getByRole('button', { name: /^Profit and loss by class/ }).click();
+    await page.getByRole('columnheader', { name: 'Contracts' }).waitFor({ timeout: 10_000 });
+    assert.deepEqual(refusedWrites(api), []);
+    assert.deepEqual(problems, []);
+  });
+});
+
 test('an invitation is sent and withdrawn from Team', async () => {
   const session = await signedIn();
   const { page, api, problems } = session;

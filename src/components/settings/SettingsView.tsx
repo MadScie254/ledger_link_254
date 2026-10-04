@@ -11,9 +11,10 @@ import { BookOpen } from 'lucide-react';
 import { useOnboarding } from '../onboarding/OnboardingProvider';
 import { BUSINESS_TYPES, type BusinessType } from '../../utils/businessTypes';
 import { THEME_ACCENTS, DEFAULT_THEME_ACCENT, type ThemeAccent } from '../../utils/themeAccents';
+import { TrackingPanel } from './TrackingPanel';
 import { ControlsPanel } from './ControlsPanel';
 
-type Tab = 'companies' | 'controls' | 'currencies' | 'accounting' | 'security';
+type Tab = 'companies' | 'controls' | 'currencies' | 'accounting' | 'tracking' | 'security';
 
 const POSTING_ACCOUNTS = [
   { code: '1100', name: 'Accounts receivable', use: 'Every invoice posts its amount owed here' },
@@ -196,6 +197,7 @@ export function SettingsView() {
           { id: 'controls', name: 'Closing and controls' },
           { id: 'currencies', name: 'Currencies' },
           { id: 'accounting', name: 'Posting accounts' },
+          { id: 'tracking', name: 'Classes and locations' },
           { id: 'security', name: 'Security and export' },
         ]}
       />
@@ -281,6 +283,8 @@ export function SettingsView() {
       )}
 
       {activeTab === 'controls' && activeCompany && <ControlsPanel company={activeCompany} onSaved={() => refetchOrgs()} />}
+
+      {activeTab === 'tracking' && <TrackingPanel />}
 
       {activeTab === 'currencies' && (
         <div className="space-y-8">

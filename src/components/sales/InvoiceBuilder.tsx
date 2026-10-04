@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { NO_TAGS, TagFields, tagHeaders, type Tags } from '../common/TagFields';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { addDays, format } from 'date-fns';
 import { X } from 'lucide-react';
@@ -44,6 +45,7 @@ export function InvoiceBuilder({ onDone }: { onDone: () => void }) {
   const [isPosting, setIsPosting] = useState(false);
   const [justPosted, setJustPosted] = useState(false);
   const [idempotencyKey] = useState(() => crypto.randomUUID());
+  const [tags, setTags] = useState<Tags>(NO_TAGS);
 
   const customersQuery = useQuery({
     queryKey: ['customers', currentOrgId],
@@ -97,7 +99,7 @@ export function InvoiceBuilder({ onDone }: { onDone: () => void }) {
     try {
       const res = await fetch('/api/invoices', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'x-org-id': currentOrgId },
+        headers: { 'Content-Type': 'application/json', 'x-org-id': currentOrgId, ...tagHeaders(tags) },
         body: JSON.stringify({
           customerId,
           issueDate,
@@ -188,6 +190,7 @@ export function InvoiceBuilder({ onDone }: { onDone: () => void }) {
                 <input type="number" step="any" min="0" inputMode="decimal" required value={rate} onChange={(e) => setRate(e.target.value)} className="tabular-currency" />
               </Field>
             )}
+            <TagFields value={tags} onChange={setTags} />
           </div>
 
           <div>

@@ -637,3 +637,14 @@ export const recordImportSchema = z.object({
   })).min(1).max(2000),
   skipInvalid: z.boolean().default(false),
 });
+
+// --- Classes and locations ---------------------------------------------------------
+
+export const trackingCategorySchema = z.object({
+  kind: z.enum(['CLASS', 'LOCATION']),
+  name: requiredText(100, 'A name'),
+});
+export const trackingCategoryUpdateSchema = z.object({
+  name: requiredText(100, 'A name').optional(),
+  isActive: z.boolean().optional(),
+});

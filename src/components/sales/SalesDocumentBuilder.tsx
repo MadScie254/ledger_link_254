@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react';
 import { format } from 'date-fns';
 import { useMutation } from '@tanstack/react-query';
 import { Amount, figureText } from '../ledger/Amount';
+import { NO_TAGS, TagFields, tagHeaders, type Tags } from '../common/TagFields';
 import { Dialog, Field } from '../ledger/Dialog';
 import { buttonClass } from '../ledger/Page';
 import {
@@ -207,6 +208,7 @@ export function SalesDocumentBuilder({
   const [depositAccountId, setDepositAccountId] = useState(moneyAccounts[0]?.id || '');
   const [reference, setReference] = useState('');
   const [invoiceId, setInvoiceId] = useState('');
+  const [tags, setTags] = useState<Tags>(NO_TAGS);
   const [problem, setProblem] = useState('');
   const [lines, setLines] = useState<DraftLine[]>(() => initial?.lines.length
     ? initial.lines.map((line, index) => ({
@@ -270,7 +272,7 @@ export function SalesDocumentBuilder({
     mutationFn: async () => {
       const res = await fetch(initial ? `${config.endpoint}/${initial.id}` : config.endpoint, {
         method: initial ? 'PUT' : 'POST',
-        headers: { 'Content-Type': 'application/json', 'x-org-id': orgId },
+        headers: { 'Content-Type': 'application/json', 'x-org-id': orgId, ...((config.paidNow || config.credit) ? tagHeaders(tags) : {}) },
         body: JSON.stringify({
           [config.purchase ? 'vendorId' : 'customerId']: customerId || undefined,
           [config.dateKey]: orderDate,
@@ -361,6 +363,7 @@ export function SalesDocumentBuilder({
               </select>
             </Field>
           )}
+          {(config.paidNow || config.credit) && <TagFields value={tags} onChange={setTags} />}
           {config.secondDate && (
             <Field label={config.secondDate.label} hint={config.secondDate.hint}>
               <input type="date" min={orderDate} value={promisedDate} onChange={(e) => setPromisedDate(e.target.value)} />

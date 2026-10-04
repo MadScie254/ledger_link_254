@@ -6,12 +6,12 @@
  */
 export async function apiRequest<T = any>(
   path: string,
-  options: { method?: 'GET' | 'POST' | 'PATCH' | 'PUT' | 'DELETE'; body?: unknown; fallback?: string } = {},
+  options: { method?: 'GET' | 'POST' | 'PATCH' | 'PUT' | 'DELETE'; body?: unknown; fallback?: string; headers?: Record<string, string> } = {},
 ): Promise<T> {
   const hasBody = options.body !== undefined;
   const response = await fetch(path, {
     method: options.method || (hasBody ? 'POST' : 'GET'),
-    headers: hasBody ? { 'Content-Type': 'application/json' } : undefined,
+    headers: hasBody || options.headers ? { ...(hasBody ? { 'Content-Type': 'application/json' } : {}), ...(options.headers || {}) } : undefined,
     body: hasBody ? JSON.stringify(options.body) : undefined,
   });
   const data = await response.json().catch(() => ({}));

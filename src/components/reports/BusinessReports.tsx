@@ -409,3 +409,83 @@ export function PartyStatementView({ onBack, partyType }: { onBack: () => void; 
     </StatementPage>
   );
 }
+
+/** Profit and loss with a column for each class or location, and one for postings with none. */
+export function ProfitAndLossByTagView({ onBack, kind }: { onBack: () => void; kind: 'CLASS' | 'LOCATION' }) {
+  const { currentOrgId, activeCompany } = useAppStore();
+  const { currency, shown } = useStatementFigures();
+  const [dateRange, setDateRange] = useState('This Year-to-date');
+  const title = kind === 'CLASS' ? 'Profit and loss by class' : 'Profit and loss by location';
+  const report = useQuery({
+    queryKey: ['reports_pnl_by_tag', currentOrgId, kind, dateRange],
+    queryFn: () => apiRequest<any>(`/api/reports/pnl-by-tag?kind=${kind}&dateRange=${encodeURIComponent(dateRange)}`, { fallback: `Failed to fetch the ${title.toLowerCase()}` }),
+  });
+  const data = report.data;
+  const columns: Array<{ id: string | null; name: string }> = data?.columns || [];
+  const sections = data ? [
+    { title: 'Income', section: data.income },
+    { title: 'Cost of sales', section: data.costOfSales },
+    { title: 'Expenses', section: data.expenses },
+  ] : [];
+  const isEmpty = data && sections.every((s) => s.section.rows.length === 0);
+  const csvRows = data ? [
+    ['Account', ...columns.map((c) => c.name), 'Total'],
+    ...sections.flatMap(({ title: heading, section }) => [
+      [heading],
+      ...section.rows.map((r: any) => [`${r.code} ${r.name}`, ...r.amounts.map((m: number) => m / 100), r.totalCents / 100]),
+      [`Total ${heading.toLowerCase()}`, ...section.amounts.map((m: number) => m / 100), section.totalCents / 100],
+    ]),
+    ['Net profit', ...data.net.map((m: number) => m / 100), data.netTotalCents / 100],
+  ] : [];
+  const figureRow = (label: string, values: number[], total: number, strong = false, key?: string) => (
+    <tr key={key || label} className={strong ? 'font-semibold' : undefined}>
+      <th scope="row" className={`pr-4 text-left ${strong ? 'll-total text-ink-900' : 'font-normal text-ink-900'}`}>{label}</th>
+      {values.map((value, i) => (
+        <td key={columns[i]?.id || 'none'} className={`pl-3 text-right whitespace-nowrap ${strong ? 'll-total' : ''}`}><Amount cents={shown(value)} currency={currency} size="xs" tone={strong ? 'ink' : 'figure'} /></td>
+      ))}
+      <td className={`pl-3 text-right whitespace-nowrap ${strong ? 'll-total' : ''}`}><Amount cents={shown(total)} currency={currency} size="xs" tone="ink" /></td>
+    </tr>
+  );
+  return (
+    <StatementPage
+      title={title}
+      period={data ? rangeText(data.range) : dateRange}
+      onBack={onBack}
+      loading={report.isLoading}
+      problem={report.isError ? { what: title.toLowerCase(), path: '/api/reports/pnl-by-tag', onRetry: () => report.refetch() } : null}
+      controls={<PeriodSelect value={dateRange} onChange={setDateRange} />}
+      onCsv={() => downloadCsv(`${kind === 'CLASS' ? 'pnl_by_class' : 'pnl_by_location'}.csv`, csvRows)}
+      onPdf={() => FinancialPDFEngine.exportFinancialStatement(
+        { title, period: rangeText(data?.range), companyName: activeCompany?.legalName || activeCompany?.name, kraPin: activeCompany?.taxId, currency: 'KES', filename: `${kind === 'CLASS' ? 'pnl_by_class' : 'pnl_by_location'}.pdf` },
+        [{ headers: csvRows[0] as string[], rows: csvRows.slice(1).map((row) => row.map((value) => (typeof value === 'number' ? kes(Math.round(value * 100)) : value))) }],
+      )}
+    >
+      {columns.length <= 1 && data ? (
+        <EmptyNote>No {kind === 'CLASS' ? 'classes' : 'locations'} yet. Add them in Settings, Classes and locations; the forms that post then offer them.</EmptyNote>
+      ) : isEmpty ? (
+        <EmptyNote>Nothing is posted to income, cost of sales or expense accounts in this period.</EmptyNote>
+      ) : data ? (
+        <div className="relative overflow-x-auto">
+          <table className="w-full text-[13px]" style={{ minWidth: `${16 + columns.length * 8}rem` }}>
+            <caption className="sr-only">{title}, {rangeText(data.range)}, figures in {currency}</caption>
+            <thead>
+              <tr>
+                <th scope="col" className="pr-4 text-left">Account</th>
+                {columns.map((c) => <th key={c.id || 'none'} scope="col" className="pl-3 text-right">{c.name}</th>)}
+                <th scope="col" className="pl-3 text-right">Total</th>
+              </tr>
+            </thead>
+            {sections.map(({ title: heading, section }) => (
+              <tbody key={heading}>
+                <tr><th colSpan={columns.length + 2} scope="colgroup" className="pt-4 pb-1 text-left text-[12px] font-semibold uppercase tracking-wide text-graphite-600">{heading}</th></tr>
+                {section.rows.map((r: any) => figureRow(`${r.code} ${r.name}`, r.amounts, r.totalCents, false, r.accountId))}
+                {figureRow(`Total ${heading.toLowerCase()}`, section.amounts, section.totalCents, true)}
+              </tbody>
+            ))}
+            <tfoot>{figureRow('Net profit', data.net, data.netTotalCents, true)}</tfoot>
+          </table>
+        </div>
+      ) : null}
+    </StatementPage>
+  );
+}

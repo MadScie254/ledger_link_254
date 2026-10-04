@@ -12,6 +12,7 @@ import {
   ExpensesBySupplierView,
   MonthlyProfitAndLossView,
   PartyStatementView,
+  ProfitAndLossByTagView,
   SalesByCustomerView,
   SalesByItemView,
 } from './BusinessReports';
@@ -29,6 +30,8 @@ const CONTENTS = [
       { id: 'Balance Sheet', name: 'Balance sheet', desc: 'What the business owns, what it owes, and the equity between them.' },
       { id: 'Statement of Cash Flows', name: 'Cash flow statement', desc: 'Cash in and out across operating, investing and financing.' },
       { id: 'Profit & Loss by Month', name: 'Profit and loss by month', desc: 'Each income, cost and expense account, a column for every month.' },
+      { id: 'Profit & Loss by Class', name: 'Profit and loss by class', desc: 'A column for each line of business or department.' },
+      { id: 'Profit & Loss by Location', name: 'Profit and loss by location', desc: 'A column for each branch, shop or site.' },
     ],
   },
   {
@@ -88,6 +91,10 @@ export function ReportsView() {
       return <GeneralLedgerView onBack={back} />;
     case 'Profit & Loss by Month':
       return <MonthlyProfitAndLossView onBack={back} />;
+    case 'Profit & Loss by Class':
+      return <ProfitAndLossByTagView onBack={back} kind="CLASS" />;
+    case 'Profit & Loss by Location':
+      return <ProfitAndLossByTagView onBack={back} kind="LOCATION" />;
     case 'Sales by Customer':
       return <SalesByCustomerView onBack={back} />;
     case 'Sales by Item':

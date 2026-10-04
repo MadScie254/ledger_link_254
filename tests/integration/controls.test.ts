@@ -424,3 +424,32 @@ test('a file attaches to a record, downloads byte for byte, and is removed with 
   assert.equal(sql(`SELECT string_agg(action || ':' || COALESCE(user_id::text, '-'), ',' ORDER BY action) FROM public.audit_logs WHERE resource_type = 'INVOICE' AND resource_id = '${invoiceId}' AND action IN ('ATTACH', 'DETACH')`), `ATTACH:${OWNER},DETACH:${OWNER}`);
   assert.equal(sql(`SELECT count(*) FROM public.attachment_contents WHERE attachment_id = '${added.id}'`), '0', 'contents go with the file');
 });
+
+import { TrackingService } from '../../src/server/tracking';
+
+test('a document posted under a class and location is tagged, and the profit and loss splits by them', async () => {
+  const wholesale = await TrackingService.create(ORG, 'CLASS', 'Wholesale', OWNER);
+  const kisumu = await TrackingService.create(ORG, 'LOCATION', 'Kisumu', OWNER);
+  await refused(TrackingService.create(ORG, 'CLASS', ' wholesale ', OWNER), /already a class called/);
+
+  const invoiceId = await runWithRequestContext({ actorId: OWNER, classId: wholesale.id, locationId: kisumu.id }, () =>
+    InvoiceService.createInvoice({
+      orgId: ORG, customerId: CUSTOMER, issueDate: '2026-07-10', dueDate: '2026-08-10', currency: 'KES',
+      lines: [{ description: 'Bulk cement', accountId: SALES, amountCents: 900_000 }], idempotencyKey: uuid(), createdBy: OWNER,
+    }));
+  assert.equal(sql(`SELECT class_id || ' ' || location_id FROM public.journal_entries WHERE source_type = 'INVOICE' AND source_id = '${invoiceId}'`), `${wholesale.id} ${kisumu.id}`);
+
+  const byClass = await TrackingService.profitAndLossByTag(ORG, 'CLASS', 'Q3 2026');
+  const column = byClass.columns.findIndex((c) => c.id === wholesale.id);
+  assert.ok(column >= 0);
+  assert.equal(byClass.income.amounts[column], 900_000);
+  assert.equal(byClass.columns[byClass.columns.length - 1].name, 'No class');
+  assert.equal(byClass.net.reduce((a, b) => a + b, 0), byClass.netTotalCents);
+
+  await TrackingService.update(ORG, wholesale.id, { isActive: false });
+  await refused(runWithRequestContext({ actorId: OWNER, classId: wholesale.id }, () =>
+    InvoiceService.createInvoice({
+      orgId: ORG, customerId: CUSTOMER, issueDate: '2026-07-11', dueDate: '2026-08-10', currency: 'KES',
+      lines: [{ description: 'x', accountId: SALES, amountCents: 100 }], idempotencyKey: uuid(), createdBy: OWNER,
+    })), /not an active one/);
+});
