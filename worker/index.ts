@@ -21,6 +21,8 @@ import { registerCurrencyRoutes } from './routes/currency';
 import { registerCashRoutes } from './routes/cash';
 import { registerCreditRoutes } from './routes/credits';
 import { registerPurchaseOrderRoutes } from './routes/purchaseOrders';
+import { registerRecurringRoutes } from './routes/recurring';
+import { RecurringService } from '../src/server/recurring';
 
 const app = new Hono<{ Variables: Variables }>();
 
@@ -75,6 +77,7 @@ registerCurrencyRoutes(api);
 registerCashRoutes(api);
 registerCreditRoutes(api);
 registerPurchaseOrderRoutes(api);
+registerRecurringRoutes(api);
 
 app.route('/api', api);
 
@@ -83,4 +86,17 @@ app.onError((err, c) => {
   return c.json({ error: 'An unexpected error occurred. Please try again later.' }, 500);
 });
 
-export default app;
+/**
+ * The daily schedule (triggers.crons in wrangler.jsonc): posts recurring
+ * invoices and bills that have fallen due. A failing template records why on
+ * itself and the rest still run.
+ */
+async function scheduled(_controller: unknown, _env: unknown, ctx: { waitUntil(promise: Promise<unknown>): void }) {
+  ctx.waitUntil(
+    RecurringService.runDue()
+      .then((result) => console.log('[Schedule] Recurring documents:', result.posted, 'posted,', result.failed, 'failed'))
+      .catch((err) => logError('Recurring run failed', err)),
+  );
+}
+
+export default { fetch: app.fetch, scheduled };

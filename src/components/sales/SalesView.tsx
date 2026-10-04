@@ -20,8 +20,9 @@ import { EstimatesPanel } from './EstimatesPanel';
 import { SalesDocumentBuilder } from './SalesDocumentBuilder';
 import { CashTransactionsPanel } from '../common/CashTransactionsPanel';
 import { CreditsPanel } from '../common/CreditsPanel';
+import { RecurringPanel } from '../common/RecurringPanel';
 
-type SalesTab = 'Invoices' | 'Receipts' | 'Credits' | 'Estimates' | 'Orders';
+type SalesTab = 'Invoices' | 'Recurring' | 'Receipts' | 'Credits' | 'Estimates' | 'Orders';
 
 export function SalesView() {
   useRenderTracker("SalesView");
@@ -32,6 +33,7 @@ export function SalesView() {
   const [isEstimating, setIsEstimating] = useState(false);
   const [isSellingNow, setIsSellingNow] = useState(false);
   const [isCrediting, setIsCrediting] = useState(false);
+  const [isScheduling, setIsScheduling] = useState(false);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [selectedInvoice, setSelectedInvoice] = useState<any | null>(null);
   const [paymentInvoice, setPaymentInvoice] = useState<any | null>(null);
@@ -243,6 +245,8 @@ export function SalesView() {
                 ? <>Sales paid on the spot, by cash, card or M-Pesa · Figures in {baseCurrency}</>
               : salesTab === 'Credits'
                 ? <>What is owed back to customers, applied to invoices or refunded · Figures in {baseCurrency}</>
+              : salesTab === 'Recurring'
+                ? <>Invoices posted again on a schedule · Figures in {baseCurrency}</>
               : <>Orders customers have placed with {activeCompany?.name || 'this organization'} · Figures in {baseCurrency}</>
         }
         actions={
@@ -267,6 +271,10 @@ export function SalesView() {
             <button type="button" onClick={() => setIsCrediting(true)} className={buttonClass.primary}>
               New credit note
             </button>
+          ) : salesTab === 'Recurring' ? (
+            <button type="button" onClick={() => setIsScheduling(true)} className={buttonClass.primary}>
+              New recurring invoice
+            </button>
           ) : (
             <button type="button" onClick={() => setIsOrdering(true)} className={buttonClass.primary}>
               New order
@@ -284,6 +292,7 @@ export function SalesView() {
         }}
         tabs={[
           { id: 'Invoices', name: 'Invoices', count: invoices.length },
+          { id: 'Recurring', name: 'Recurring' },
           { id: 'Receipts', name: 'Sales receipts' },
           { id: 'Credits', name: 'Credit notes' },
           { id: 'Estimates', name: 'Estimates' },
@@ -295,6 +304,8 @@ export function SalesView() {
         <CashTransactionsPanel kind="SALES_RECEIPT" onCreate={() => setIsSellingNow(true)} />
       ) : salesTab === 'Credits' ? (
         <CreditsPanel kind="CUSTOMER" onCreate={() => setIsCrediting(true)} />
+      ) : salesTab === 'Recurring' ? (
+        <RecurringPanel kind="INVOICE" isCreating={isScheduling} onCreatingChange={setIsScheduling} />
       ) : salesTab === 'Estimates' ? (
         <EstimatesPanel
           orgId={currentOrgId}

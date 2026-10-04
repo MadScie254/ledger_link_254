@@ -6,6 +6,7 @@ import { BillBuilder } from './BillBuilder';
 import { CashTransactionsPanel } from '../common/CashTransactionsPanel';
 import { CreditsPanel } from '../common/CreditsPanel';
 import { PurchaseOrdersPanel } from './PurchaseOrdersPanel';
+import { RecurringPanel } from '../common/RecurringPanel';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAppStore } from '../../store';
 import { DynamicQuickAddModal } from '../common/DynamicQuickAddModal';
@@ -19,7 +20,7 @@ import { useConfirm } from '../../hooks/useConfirm';
 import { inParts } from '../../utils/apiRequest';
 import { todayIn } from '../../utils/dates';
 
-const tabs = ['Vendors', 'Bills', 'Purchase orders', 'Expenses', 'Supplier credits', 'Bill payments'];
+const tabs = ['Vendors', 'Bills', 'Recurring bills', 'Purchase orders', 'Expenses', 'Supplier credits', 'Bill payments'];
 
 /** A UUID-shaped key derived from text with SHA-256, the same every time for the same text. */
 async function stableUuid(text: string): Promise<string> {
@@ -38,6 +39,7 @@ export function ExpensesView() {
   const [isRecordingExpense, setIsRecordingExpense] = useState(false);
   const [isRecordingCredit, setIsRecordingCredit] = useState(false);
   const [isOrdering, setIsOrdering] = useState(false);
+  const [isScheduling, setIsScheduling] = useState(false);
   const [scannedData, setScannedData] = useState<{ vendor: string; amount: number; date: string } | null>(null);
   const [selectedEntity, setSelectedEntity] = useState<{ type: 'VENDOR' | 'BILL'; id: string; data: any } | null>(null);
   const [selectedBillIds, setSelectedBillIds] = useState<string[]>([]);
@@ -221,6 +223,10 @@ export function ExpensesView() {
             {activeTab === 'Expenses' ? (
               <button type="button" onClick={() => setIsRecordingExpense(true)} className={buttonClass.primary}>
                 New expense
+              </button>
+            ) : activeTab === 'Recurring bills' ? (
+              <button type="button" onClick={() => setIsScheduling(true)} className={buttonClass.primary}>
+                New recurring bill
               </button>
             ) : activeTab === 'Purchase orders' ? (
               <button type="button" onClick={() => setIsOrdering(true)} className={buttonClass.primary}>
@@ -455,6 +461,10 @@ export function ExpensesView() {
           </div>
           <CashTransactionsPanel kind="EXPENSE" onCreate={() => setIsRecordingExpense(true)} />
         </div>
+      )}
+
+      {activeTab === 'Recurring bills' && (
+        <RecurringPanel kind="BILL" isCreating={isScheduling} onCreatingChange={setIsScheduling} />
       )}
 
       {activeTab === 'Purchase orders' && (

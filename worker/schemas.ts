@@ -583,3 +583,25 @@ export const billPurchaseOrderSchema = z.object({
   })).max(200).optional(),
   idempotencyKey,
 }).refine((body) => body.dueDate >= body.billDate, { message: 'The due date cannot be before the bill date.' });
+
+// --- Recurring invoices and bills ------------------------------------------------
+
+const scheduleFields = {
+  name: text(200),
+  frequency: z.enum(['WEEKLY', 'MONTHLY', 'QUARTERLY', 'YEARLY']),
+  intervalCount: z.number().int().min(1).max(52).default(1),
+  startDate: isoDate,
+  endDate: isoDate.optional(),
+  maxOccurrences: z.number().int().min(1).max(1000).optional(),
+  daysUntilDue: z.number().int().min(0).max(365).default(30),
+};
+const scheduleRefine = (schedule: { startDate: string; endDate?: string }) => !schedule.endDate || schedule.endDate >= schedule.startDate;
+export const recurringCreateSchema = z.object({
+  ...scheduleFields,
+  kind: z.enum(['INVOICE', 'BILL']),
+  sourceDocumentId: uuid,
+}).refine(scheduleRefine, { message: 'The end date cannot be before the first date.' });
+export const recurringUpdateSchema = z.object(scheduleFields)
+  .refine(scheduleRefine, { message: 'The end date cannot be before the first date.' });
+export const recurringStatusSchema = z.object({ status: z.enum(['ACTIVE', 'PAUSED', 'ENDED']) });
+export const recurringRunSchema = z.object({ documentDate: isoDate });

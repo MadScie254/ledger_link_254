@@ -161,3 +161,31 @@ test('a purchase order is written, then billed for what arrived', async () => {
     assert.deepEqual(problems, []);
   });
 });
+
+test('an invoice is made recurring and the next one posted now', async () => {
+  const session = await signedIn();
+  const { page, api, problems } = session;
+  await flow('recurring-invoice', session, async () => {
+    const invoiceId = sql(`SELECT public.create_invoice_with_journal('00000000-0000-0000-0000-0000000000aa', '00000000-0000-0000-0000-0000000000c1',
+      CURRENT_DATE, CURRENT_DATE + 14, 'KES', 1, 'Retainer', '00000000-0000-0000-0000-000000000001',
+      jsonb_build_array(jsonb_build_object('description', 'Monthly bookkeeping', 'accountId', '00000000-0000-0000-0000-00000000a400', 'amountCents', 1500000)), 'e2e-recurring-source')`);
+    const invoiceNumber = sql(`SELECT invoice_number FROM public.invoices WHERE id = '${invoiceId}'`);
+    await openView(page, 'Sales');
+    await page.getByRole('tab', { name: 'Recurring' }).click();
+    await page.getByRole('button', { name: 'New recurring invoice' }).click();
+    const dialog = page.getByRole('dialog');
+    await dialog.locator('select').first().selectOption({ label: `${invoiceNumber} · Acme · 15,000.00` });
+    await dialog.getByLabel('Name').fill('Acme retainer');
+    await dialog.getByLabel('Due after, days').fill('7');
+    await dialog.getByRole('button', { name: 'Save schedule' }).click();
+    await dialog.waitFor({ state: 'hidden', timeout: 10_000 });
+    await page.getByText(/Every month from/).waitFor({ timeout: 10_000 });
+
+    await page.getByRole('button', { name: 'Post the next one now' }).click();
+    await page.getByText(/posted from Acme retainer/).waitFor({ timeout: 10_000 });
+    assert.deepEqual(refusedWrites(api), []);
+    assert.equal(sql(`SELECT occurrences || ' ' || days_until_due FROM public.recurring_templates WHERE name = 'Acme retainer'`), '1 7');
+    assert.equal(sql(`SELECT count(*) FROM public.invoices WHERE notes = 'Retainer'`), '2');
+    assert.deepEqual(problems, []);
+  });
+});

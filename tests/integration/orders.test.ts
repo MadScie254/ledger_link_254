@@ -223,3 +223,36 @@ test('a purchase order is billed in two parts, lists its bills, and a voided bil
   await refused(PurchaseOrderService.setStatus(ORG, po.id, 'CLOSED', ' ', OWNER), /reason/);
   assert.equal((await PurchaseOrderService.setStatus(ORG, po.id, 'CLOSED', 'Supplier out of stock', OWNER)).status, 'CLOSED');
 });
+
+import { RecurringService } from '../../src/server/recurring';
+
+test('a recurring invoice is made from an invoice, posted now and by the daily run, then ended', async () => {
+  const today = new Date().toISOString().slice(0, 10);
+  const source = await InvoiceService.createInvoice({
+    orgId: ORG, customerId: CUSTOMER, issueDate: '2026-09-01', dueDate: '2026-09-15', currency: 'KES', notes: 'Retainer',
+    lines: [{ description: 'Monthly bookkeeping', accountId: SALES, amountCents: 1_500_000, taxCents: 240_000 }], idempotencyKey: uuid(), createdBy: OWNER,
+  });
+  const saved = await RecurringService.save({
+    orgId: ORG, kind: 'INVOICE', sourceDocumentId: source, frequency: 'MONTHLY', intervalCount: 1,
+    startDate: '2026-01-31', daysUntilDue: 7, actor: OWNER,
+  });
+  assert.equal(saved.nextRunDate, '2026-01-31');
+
+  const now = await RecurringService.runNow(ORG, saved.id, today, OWNER);
+  assert.match(now.documentNumber, /^INV-/);
+  assert.equal(now.nextRunDate, '2026-02-28', 'month ends are kept');
+  const posted = (await InvoiceService.getInvoice(ORG, now.documentId))!;
+  assert.equal(posted.totalCents, 1_740_000);
+
+  // The daily run catches up the missed months to today.
+  const due = await RecurringService.runDue();
+  assert.ok(due.posted >= 1, 'the run posts what is due');
+  const [template] = (await RecurringService.list(ORG, 'INVOICE')).filter((t) => t.id === saved.id);
+  assert.equal(template.partyName, 'Acme');
+  assert.equal(template.occurrences, 1 + due.posted);
+  assert.ok(template.nextRunDate > today, 'nothing left due');
+  assert.equal(template.runs[0].occurrence, template.occurrences);
+
+  assert.equal((await RecurringService.setStatus(ORG, saved.id, 'ENDED', OWNER)).status, 'ENDED');
+  await refused(RecurringService.runNow(ORG, saved.id, today, OWNER), /has ended/);
+});

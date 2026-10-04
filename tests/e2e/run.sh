@@ -62,4 +62,18 @@ for _ in $(seq 1 120); do
   sleep 0.5
 done
 
-E2E_URL="http://127.0.0.1:$PORT" node --test --test-concurrency=1 "$HERE"/*.e2e.mjs
+status=0
+E2E_URL="http://127.0.0.1:$PORT" node --test --test-concurrency=1 "$HERE"/*.e2e.mjs || status=$?
+
+# The daily schedule runs through the same Worker: fire it once and look for its log line.
+curl -sf -o /dev/null "http://127.0.0.1:$PORT/cdn-cgi/handler/scheduled?cron=17+0+*+*+*" || true
+for _ in $(seq 1 20); do
+  grep -q '\[Schedule\] Recurring documents:' "$WORK/vite.log" && break
+  sleep 0.5
+done
+if grep -q '\[Schedule\] Recurring documents:' "$WORK/vite.log"; then
+  echo "ok   scheduled handler: $(grep -o '\[Schedule\] Recurring documents:.*' "$WORK/vite.log" | tail -1)"
+else
+  echo "FAIL scheduled handler did not run"; tail -20 "$WORK/vite.log"; status=1
+fi
+exit $status

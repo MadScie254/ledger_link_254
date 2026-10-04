@@ -12,6 +12,10 @@
   "observability": {
     "enabled": true
   },
+  // Daily at 00:17 UTC (03:17 in Nairobi): posts recurring invoices and bills that are due.
+  "triggers": {
+    "crons": ["17 0 * * *"]
+  },
   // Secrets (SUPABASE_SECRET_KEY, GEMINI_API_KEY) are set via
   // `wrangler secret put <NAME>` — never committed here. Non-secret vars
   // below are safe to keep in source control.
