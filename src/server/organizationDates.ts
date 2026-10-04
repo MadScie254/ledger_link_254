@@ -12,3 +12,12 @@ export async function organizationToday(orgId: string): Promise<string> {
   if (error) throw error;
   return todayIn(data?.time_zone);
 }
+
+/**
+ * The moment report periods are counted from: noon UTC on the
+ * organization's own today, so "this month" or "year to date" ends on the
+ * day it is where the business is, not the day it is in UTC.
+ */
+export async function organizationNow(orgId: string): Promise<Date> {
+  return new Date(`${await organizationToday(orgId)}T12:00:00Z`);
+}

@@ -1,4 +1,5 @@
 import { getSupabase } from './supabase';
+import { organizationNow } from './organizationDates';
 import { fetchAllRows } from './pagination';
 import { AccountService } from './accounts';
 import { addDaysIso } from '../utils/dates';
@@ -95,7 +96,7 @@ async function accountTotalLines(orgId: string, range: { from?: string; to?: str
 
 export class ReportsService {
   static async getProfitAndLoss(orgId: string, dateRange: string) {
-    const range = resolveReportDateRange(dateRange);
+    const range = resolveReportDateRange(dateRange, await organizationNow(orgId));
     return aggregateProfitAndLoss(await accountTotalLines(orgId, { from: range.start, to: range.end }));
   }
 
@@ -106,7 +107,7 @@ export class ReportsService {
 
   static async getCashFlow(orgId: string, dateRange: string) {
     const supabase = getSupabase();
-    const range = resolveReportDateRange(dateRange);
+    const range = resolveReportDateRange(dateRange, await organizationNow(orgId));
     const select = `
       id,
       debit,
@@ -152,7 +153,7 @@ export class ReportsService {
 
   static async getTaxSummary(orgId: string, period: string) {
     const supabase = getSupabase();
-    const range = resolveReportDateRange(period);
+    const range = resolveReportDateRange(period, await organizationNow(orgId));
 
     const [orgResult, invoices, bills, etimsSubmissions] = await Promise.all([
       supabase

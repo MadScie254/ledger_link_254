@@ -31,6 +31,8 @@ function mapTemplate(row: any) {
     status: row.status as 'ACTIVE' | 'PAUSED' | 'ENDED',
     lastRunAt: row.last_run_at,
     lastError: row.last_error,
+    classId: row.class_id ?? null,
+    locationId: row.location_id ?? null,
     runs: ((row.recurring_runs || []) as any[])
       .map((run) => ({ occurrence: run.occurrence, date: run.run_date, documentId: run.document_id, documentNumber: run.document_number }))
       .sort((a, b) => b.occurrence - a.occurrence)

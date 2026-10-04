@@ -7,6 +7,7 @@ import { todayIn } from '../../utils/dates';
 import { Amount, figureText } from '../ledger/Amount';
 import { Dialog, Field } from '../ledger/Dialog';
 import { EmptyNote, LoadProblem, SkeletonRows, buttonClass } from '../ledger/Page';
+import { useTrackingCategories } from './TagFields';
 
 export type RecurringKind = 'INVOICE' | 'BILL';
 type Frequency = 'WEEKLY' | 'MONTHLY' | 'QUARTERLY' | 'YEARLY';
@@ -78,6 +79,7 @@ export function RecurringPanel({ kind, isCreating, onCreatingChange }: { kind: R
   const [notice, setNotice] = useState('');
 
   const formOpen = isCreating || Boolean(editing);
+  const tagNames = new Map((useTrackingCategories().data?.categories || []).map((c) => [c.id, c.name]));
   const list = useQuery({
     queryKey: ['recurring', currentOrgId, kind],
     queryFn: () => apiRequest<{ templates: any[] }>(`/api/recurring?kind=${kind}`, { fallback: `Failed to fetch ${words.many}` }),
@@ -194,6 +196,7 @@ export function RecurringPanel({ kind, isCreating, onCreatingChange }: { kind: R
                     {' · '}
                     {t.status === 'ENDED' ? 'Ended' : t.status === 'PAUSED' ? 'Paused' : `Next on ${shortDate(t.nextRunDate)}`}
                     {t.occurrences > 0 ? ` · ${t.occurrences} posted` : ''}
+                    {[t.classId, t.locationId].map((id) => (id ? tagNames.get(id) : null)).filter(Boolean).map((tag) => ` · ${tag}`).join('')}
                   </p>
                   {t.lastError && t.status !== 'ENDED' && (
                     <p className="mt-0.5 text-[12.5px] text-ledger-red">The last run did not post: {t.lastError}</p>

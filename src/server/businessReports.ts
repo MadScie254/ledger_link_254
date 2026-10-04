@@ -1,4 +1,5 @@
 import { getSupabase } from './supabase';
+import { organizationNow } from './organizationDates';
 import { fetchAllRows } from './pagination';
 import { UserError } from './errors';
 import { resolveReportDateRange } from '../utils/reportCalculations';
@@ -99,7 +100,7 @@ export class BusinessReportService {
   }
 
   static async salesByCustomer(orgId: string, dateRange: string) {
-    const range = resolveReportDateRange(dateRange);
+    const range = resolveReportDateRange(dateRange, await organizationNow(orgId));
     const { data, error } = await getSupabase().rpc('sales_by_customer', { p_org_id: orgId, p_from: range.start, p_to: range.end });
     if (error) throw error;
     const rows = ((data || []) as any[]).map((r) => ({
@@ -115,7 +116,7 @@ export class BusinessReportService {
   }
 
   static async salesByItem(orgId: string, dateRange: string) {
-    const range = resolveReportDateRange(dateRange);
+    const range = resolveReportDateRange(dateRange, await organizationNow(orgId));
     const { data, error } = await getSupabase().rpc('sales_by_item', { p_org_id: orgId, p_from: range.start, p_to: range.end });
     if (error) throw error;
     const rows = ((data || []) as any[]).map((r) => ({
@@ -129,7 +130,7 @@ export class BusinessReportService {
   }
 
   static async expensesBySupplier(orgId: string, dateRange: string) {
-    const range = resolveReportDateRange(dateRange);
+    const range = resolveReportDateRange(dateRange, await organizationNow(orgId));
     const { data, error } = await getSupabase().rpc('expenses_by_supplier', { p_org_id: orgId, p_from: range.start, p_to: range.end });
     if (error) throw error;
     const rows = ((data || []) as any[]).map((r) => ({
@@ -146,7 +147,7 @@ export class BusinessReportService {
 
   /** Income, cost of sales and expenses for each month of a period, by account. */
   static async monthlyProfitAndLoss(orgId: string, dateRange: string) {
-    const range = resolveReportDateRange(dateRange);
+    const range = resolveReportDateRange(dateRange, await organizationNow(orgId));
     const supabase = getSupabase();
     const [{ data: totals, error }, accounts] = await Promise.all([
       supabase.rpc('account_monthly_totals', { p_org_id: orgId, p_from: range.start, p_to: range.end }),

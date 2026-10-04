@@ -1,4 +1,5 @@
 import { getSupabase } from './supabase';
+import { organizationNow } from './organizationDates';
 import { fetchAllRows } from './pagination';
 import { UserError } from './errors';
 import { resolveReportDateRange } from '../utils/reportCalculations';
@@ -59,7 +60,7 @@ export class TrackingService {
 
   /** Income, cost of sales and expenses by account, a column for each class or location. */
   static async profitAndLossByTag(orgId: string, kind: TagKind, dateRange: string) {
-    const range = resolveReportDateRange(dateRange);
+    const range = resolveReportDateRange(dateRange, await organizationNow(orgId));
     const supabase = getSupabase();
     const [{ data: totals, error }, tags, accounts] = await Promise.all([
       supabase.rpc('profit_and_loss_by_tag', { p_org_id: orgId, p_kind: kind, p_from: range.start, p_to: range.end }),
