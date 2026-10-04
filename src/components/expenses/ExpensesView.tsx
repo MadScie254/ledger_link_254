@@ -43,7 +43,7 @@ export function ExpensesView() {
   const [isScheduling, setIsScheduling] = useState(false);
   const [isImportingVendors, setIsImportingVendors] = useState(false);
   const [importNotice, setImportNotice] = useState('');
-  const [scannedData, setScannedData] = useState<{ vendor: string; amount: number; date: string } | null>(null);
+  const [scannedData, setScannedData] = useState<{ vendor: string; amount: number; date: string; receipt?: File } | null>(null);
   const [selectedEntity, setSelectedEntity] = useState<{ type: 'VENDOR' | 'BILL'; id: string; data: any } | null>(null);
   const [selectedBillIds, setSelectedBillIds] = useState<string[]>([]);
   const [selectedVendorIds, setSelectedVendorIds] = useState<string[]>([]);

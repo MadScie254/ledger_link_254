@@ -3,7 +3,8 @@ import { Dialog } from '../ledger/Dialog';
 import { buttonClass } from '../ledger/Page';
 
 interface ReceiptScannerProps {
-  onScanComplete: (data: { vendor: string; amount: number; date: string }) => void;
+  /** What was read, and the photo itself, to keep with the expense. */
+  onScanComplete: (data: { vendor: string; amount: number; date: string; receipt?: File }) => void;
   onClose: () => void;
 }
 
@@ -42,7 +43,7 @@ export function ReceiptScanner({ onScanComplete, onClose }: ReceiptScannerProps)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const processImage = async (base64Data: string, mimeType: string) => {
+  const processImage = async (base64Data: string, mimeType: string, original?: File) => {
     setIsScanning(true);
     setError('');
     stopCamera();
@@ -57,7 +58,9 @@ export function ReceiptScanner({ onScanComplete, onClose }: ReceiptScannerProps)
         // 403 (AI features off) and 429 (limit reached) explain themselves.
         throw new Error([403, 429].includes(res.status) && data.error ? data.error : 'The receipt could not be read. Try a sharper, well-lit photo.');
       }
-      onScanComplete(await res.json());
+      const bytes = Uint8Array.from(atob(base64Data), (char) => char.charCodeAt(0));
+      const receipt = original || new File([bytes], `receipt-${new Date().toISOString().slice(0, 10)}.jpg`, { type: mimeType });
+      onScanComplete({ ...(await res.json()), receipt });
     } catch (err: any) {
       setError(err.message || 'The receipt could not be read.');
       setIsScanning(false);
@@ -81,7 +84,7 @@ export function ReceiptScanner({ onScanComplete, onClose }: ReceiptScannerProps)
     const file = e.target.files?.[0];
     if (!file) return;
     const reader = new FileReader();
-    reader.onload = (event) => processImage((event.target?.result as string).split(',')[1], file.type || 'image/jpeg');
+    reader.onload = (event) => processImage((event.target?.result as string).split(',')[1], file.type || 'image/jpeg', file);
     reader.readAsDataURL(file);
   };
 

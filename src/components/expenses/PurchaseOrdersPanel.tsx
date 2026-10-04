@@ -8,6 +8,7 @@ import { Amount } from '../ledger/Amount';
 import { Dialog, Field } from '../ledger/Dialog';
 import { EmptyNote, LoadProblem, SkeletonRows, buttonClass } from '../ledger/Page';
 import { SalesDocumentBuilder, type SalesDocumentDraft } from '../sales/SalesDocumentBuilder';
+import { AttachmentsButton } from '../common/AttachmentsPanel';
 
 type Filter = 'OPEN' | 'BILLED' | 'CLOSED' | 'ALL';
 const FILTERS: { id: Filter; name: string }[] = [
@@ -171,6 +172,9 @@ export function PurchaseOrdersPanel({ isCreating, onCreatingChange }: { isCreati
                   </li>
                 ))}
               </ul>
+              <div className="mt-1.5 flex flex-wrap justify-end gap-x-3">
+                <AttachmentsButton recordType="PURCHASE_ORDER" recordId={po.id} title={po.number} />
+              </div>
               {canPost && (
                 <div className="mt-1.5 flex flex-wrap justify-end gap-x-3">
                   {po.status === 'OPEN' && !po.partlyBilled && (

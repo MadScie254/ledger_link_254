@@ -8,6 +8,7 @@ import { centsFromAmountText } from '../../utils/salesOrders';
 import { Amount, figureText } from '../ledger/Amount';
 import { Dialog, Field } from '../ledger/Dialog';
 import { EmptyNote, LoadProblem, SkeletonRows, buttonClass } from '../ledger/Page';
+import { AttachmentsButton } from './AttachmentsPanel';
 
 export type CreditKind = 'CUSTOMER' | 'SUPPLIER';
 
@@ -246,6 +247,9 @@ export function CreditsPanel({ kind, onCreate }: { kind: CreditKind; onCreate?: 
                     ))}
                   </ul>
                 )}
+                <div className="mt-1.5 flex flex-wrap justify-end gap-x-3">
+                  <AttachmentsButton recordType="CREDIT_NOTE" recordId={credit.id} title={credit.number} />
+                </div>
                 {canPost && credit.status !== 'VOID' && (
                   <div className="mt-1.5 flex flex-wrap justify-end gap-x-3">
                     {credit.status === 'OPEN' && (

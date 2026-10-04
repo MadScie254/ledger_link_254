@@ -52,6 +52,28 @@ test('an expense paid from the bank is posted', async () => {
   });
 });
 
+test('a receipt PDF is attached to an expense and downloaded again', async () => {
+  const session = await signedIn();
+  const { page, api, problems } = session;
+  await flow('attachment', session, async () => {
+    await openView(page, 'Bills and expenses');
+    await page.getByRole('tab', { name: 'Expenses' }).click();
+    await page.getByRole('button', { name: 'Files' }).first().click();
+    const dialog = page.getByRole('dialog');
+    const pdf = Buffer.from('%PDF-1.4\n1 0 obj << >> endobj\ntrailer << >>\n%%EOF\n');
+    await dialog.locator('input[name="attachment"]').setInputFiles({ name: 'naivas-receipt.pdf', mimeType: 'application/pdf', buffer: pdf });
+    await dialog.getByRole('button', { name: 'naivas-receipt.pdf', exact: true }).waitFor({ timeout: 10_000 });
+    const [download] = await Promise.all([
+      page.waitForEvent('download'),
+      dialog.getByRole('button', { name: 'naivas-receipt.pdf', exact: true }).click(),
+    ]);
+    assert.equal(download.suggestedFilename(), 'naivas-receipt.pdf');
+    assert.deepEqual(refusedWrites(api), []);
+    assert.equal(sql(`SELECT record_type || ' ' || content_type FROM public.attachments WHERE file_name = 'naivas-receipt.pdf'`), 'CASH_TRANSACTION application/pdf');
+    assert.deepEqual(problems, []);
+  });
+});
+
 test('money is transferred from the till to the bank, then the transfer voided', async () => {
   const session = await signedIn();
   const { page, api, problems } = session;

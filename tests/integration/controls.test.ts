@@ -391,3 +391,36 @@ test('customers and stock items import from a sheet, skipping names already in t
   assert.equal(sql(`SELECT m.quantity || ' ' || m.source_type FROM public.inventory_movements m JOIN public.inventory_items i ON i.id = m.item_id WHERE i.name = 'Roofing nails 1kg'`), '40 OPENING');
   assert.equal(sql(`SELECT count(*) FROM public.audit_logs WHERE resource_type = 'CUSTOMER' AND action = 'CREATE' AND resource_id = (SELECT id FROM public.customers WHERE display_name = 'Chui Ltd')`), '1', 'each added row is audited');
 });
+
+import { AttachmentService, sniffContentType } from '../../src/server/attachments';
+
+test('a file attaches to a record, downloads byte for byte, and is removed with an audit row', async () => {
+  const invoiceId = await InvoiceService.createInvoice({
+    orgId: ORG, customerId: CUSTOMER, issueDate: '2026-09-01', dueDate: '2026-09-30', currency: 'KES',
+    lines: [{ description: 'Delivery', accountId: SALES, amountCents: 10_000 }], idempotencyKey: uuid(), createdBy: OWNER,
+  });
+  const pdf = new TextEncoder().encode('%PDF-1.4\n1 0 obj << >> endobj\ntrailer << >>\n%%EOF\n');
+  const png = new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0, 0, 0, 13]);
+  assert.equal(sniffContentType(pdf, 'note.pdf'), 'application/pdf');
+  assert.equal(sniffContentType(png, 'photo.jpg'), 'image/png', 'the bytes decide, not the name');
+  assert.equal(sniffContentType(new TextEncoder().encode('<html><script>alert(1)</script>'), 'page.html'), null);
+  assert.equal(sniffContentType(new Uint8Array([0x50, 0x4b, 0x03, 0x04]), 'archive.zip'), null);
+
+  const added = await runWithRequestContext({ actorId: OWNER }, () =>
+    AttachmentService.upload(ORG, 'INVOICE', invoiceId, { name: 'Delivery note "signed".pdf', bytes: pdf }, OWNER));
+  assert.equal(added.contentType, 'application/pdf');
+  assert.equal(added.fileName, 'Delivery note _signed_.pdf');
+  const [listed] = await AttachmentService.list(ORG, 'INVOICE', invoiceId);
+  assert.equal(listed.sizeBytes, pdf.length);
+  const downloaded = await AttachmentService.download(ORG, added.id);
+  assert.deepEqual(Array.from(downloaded.bytes), Array.from(pdf));
+
+  await refused(AttachmentService.upload(ORG, 'INVOICE', invoiceId, { name: 'evil.html', bytes: new TextEncoder().encode('<script>') }, OWNER), /Attach a PDF/);
+  await refused(AttachmentService.upload(ORG, 'INVOICE', uuid(), { name: 'x.pdf', bytes: pdf }, OWNER), /not in this organization/);
+  await refused(AttachmentService.upload(ORG, 'INVOICE', invoiceId, { name: 'big.pdf', bytes: new Uint8Array(5 * 1024 * 1024 + 1).fill(0x25) }, OWNER), /5 MB or less/);
+
+  await runWithRequestContext({ actorId: OWNER }, () => AttachmentService.remove(ORG, added.id));
+  assert.deepEqual(await AttachmentService.list(ORG, 'INVOICE', invoiceId), []);
+  assert.equal(sql(`SELECT string_agg(action || ':' || COALESCE(user_id::text, '-'), ',' ORDER BY action) FROM public.audit_logs WHERE resource_type = 'INVOICE' AND resource_id = '${invoiceId}' AND action IN ('ATTACH', 'DETACH')`), `ATTACH:${OWNER},DETACH:${OWNER}`);
+  assert.equal(sql(`SELECT count(*) FROM public.attachment_contents WHERE attachment_id = '${added.id}'`), '0', 'contents go with the file');
+});

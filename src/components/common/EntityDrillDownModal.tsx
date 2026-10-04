@@ -11,6 +11,7 @@ import { RunningLedger, LedgerLine } from '../ledger/RunningLedger';
 import { buttonClass } from '../ledger/Page';
 import { DocumentPayments } from './DocumentPayments';
 import { DynamicQuickAddModal } from './DynamicQuickAddModal';
+import { AttachmentsPanel } from './AttachmentsPanel';
 
 export type DrillDownEntityType = 'ITEM' | 'VENDOR' | 'CUSTOMER' | 'EMPLOYEE' | 'ACCOUNT' | 'INVOICE' | 'BILL';
 
@@ -441,7 +442,14 @@ export function EntityDrillDownModal({ isOpen, onClose, entityType, entityId, in
       )}
 
       {activeTab === 'details' || !hasTransactions ? (
-        <div className="grid grid-cols-1 gap-x-8 gap-y-5 md:grid-cols-2">{details}</div>
+        <>
+          <div className="grid grid-cols-1 gap-x-8 gap-y-5 md:grid-cols-2">{details}</div>
+          {entityId && ['INVOICE', 'BILL', 'CUSTOMER', 'VENDOR'].includes(entityType) && (
+            <div className="mt-5 border-t border-feint pt-4">
+              <AttachmentsPanel recordType={entityType as 'INVOICE' | 'BILL' | 'CUSTOMER' | 'VENDOR'} recordId={entityId} />
+            </div>
+          )}
+        </>
       ) : transactionsLoading ? (
         <p className="py-6 text-[13.5px] text-graphite-600" role="status">
           Loading

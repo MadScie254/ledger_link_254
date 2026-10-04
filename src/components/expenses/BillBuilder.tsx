@@ -10,6 +10,7 @@ import { Amount, figureText } from '../ledger/Amount';
 import { Dialog, Field } from '../ledger/Dialog';
 import { buttonClass } from '../ledger/Page';
 import { PostedStamp } from '../ledger/PostedStamp';
+import { attachFile } from '../common/AttachmentsPanel';
 
 interface Line {
   key: number;
@@ -34,7 +35,7 @@ export function BillBuilder({ open, onClose, scanned, mode = 'bill' }: {
   open: boolean;
   onClose: () => void;
   /** What the receipt reader found, for the person to check. */
-  scanned?: { vendor: string; amount: number; date: string } | null;
+  scanned?: { vendor: string; amount: number; date: string; receipt?: File } | null;
   /**
    * 'bill': owed to the supplier, paid later. 'expense': paid on the spot
    * from a bank, cash or M-Pesa account, with no amount left owing.
@@ -145,7 +146,29 @@ export function BillBuilder({ open, onClose, scanned, mode = 'bill' }: {
   };
 
   const post = useMutation({
-    mutationFn: () => isCredit ? apiRequest<{ id: string }>('/api/supplier-credits', {
+    mutationFn: async () => {
+      const posted = await postDocument();
+      // The photo the receipt was read from stays with the expense. A retry
+      // posts nothing new (same key) and tries the photo again.
+      if (isExpense && scanned?.receipt && posted?.id) {
+        await attachFile('CASH_TRANSACTION', posted.id, scanned.receipt).catch((err: Error) => {
+          throw new Error(`The expense is posted, but the receipt photo was not attached: ${err.message} Press the button again to retry the photo.`);
+        });
+      }
+      return posted;
+    },
+    onSuccess: () => {
+      for (const key of ['bills', 'cash-transactions', 'credits', 'accounts', 'vendors', 'inventory', 'dashboard-metrics', 'journal-entries', 'attachments']) {
+        queryClient.invalidateQueries({ queryKey: [key, currentOrgId] });
+      }
+      setPosted(true);
+      window.setTimeout(onClose, 520);
+    },
+    onError: (err: Error) => setProblem(err.message),
+  });
+
+  function postDocument() {
+    return isCredit ? apiRequest<{ id: string }>('/api/supplier-credits', {
       body: {
         vendorId,
         billId: againstBillId || undefined,
@@ -200,16 +223,8 @@ export function BillBuilder({ open, onClose, scanned, mode = 'bill' }: {
         })),
       },
       fallback: 'The bill could not be saved.',
-    }),
-    onSuccess: () => {
-      for (const key of ['bills', 'cash-transactions', 'credits', 'accounts', 'vendors', 'inventory', 'dashboard-metrics', 'journal-entries']) {
-        queryClient.invalidateQueries({ queryKey: [key, currentOrgId] });
-      }
-      setPosted(true);
-      window.setTimeout(onClose, 520);
-    },
-    onError: (err: Error) => setProblem(err.message),
-  });
+    });
+  }
 
   const submit = (e: React.FormEvent) => {
     e.preventDefault();

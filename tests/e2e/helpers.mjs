@@ -26,7 +26,7 @@ export async function closeBrowser() {
  * so a test can assert the screens' requests were accepted.
  */
 export async function signedIn(email = 'owner@example.com', viewport = { width: 1280, height: 900 }) {
-  const context = await (await launch()).newContext({ viewport });
+  const context = await (await launch()).newContext({ viewport, acceptDownloads: true });
   const page = await context.newPage();
   const api = [];
   const problems = [];
