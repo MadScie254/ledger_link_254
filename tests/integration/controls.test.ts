@@ -333,3 +333,38 @@ test('a credit note lowers an invoice, an unused credit nets the balance, and re
     lines: [{ description: 'x', accountId: SALES, quantity: 1, unitPriceCents: 100, taxRate: 0 }],
   }), /owner|administrator|accountant|permission|not allowed|cannot/i);
 });
+
+import { BusinessReportService } from '../../src/server/businessReports';
+
+test('a customer statement runs from the ledger and closes on what is owed; sales and spending reports add up', async () => {
+  const statement = await BusinessReportService.partyStatement(ORG, 'CUSTOMER', CUSTOMER, '2026-01-01', '2026-12-31');
+  assert.equal(statement.party.name, 'Acme');
+  assert.equal(statement.openingBalanceCents, 0);
+  const owed = (await partyBalances(ORG, 'CUSTOMER')).get(CUSTOMER)!.openCents;
+  assert.equal(statement.closingBalanceCents, owed, 'closes on the open balance');
+  assert.ok(statement.lines.some((l) => l.kind === 'Credit note' && l.creditCents > 0));
+  assert.ok(statement.lines.some((l) => l.kind === 'Refund' && l.chargeCents > 0));
+  const last = statement.lines[statement.lines.length - 1];
+  assert.equal(last.balanceCents, statement.closingBalanceCents);
+  await refused(BusinessReportService.partyStatement(ORG, 'CUSTOMER', CUSTOMER, '2026-12-31', '2026-01-01'), /cannot be before/);
+
+  const supplier = await BusinessReportService.partyStatement(ORG, 'VENDOR', VENDOR, '2026-01-01', '2026-12-31');
+  assert.equal(supplier.closingBalanceCents, (await partyBalances(ORG, 'VENDOR')).get(VENDOR)!.openCents);
+
+  const sales = await BusinessReportService.salesByCustomer(ORG, 'Last Year');
+  assert.deepEqual(sales.rows, []);
+  const year = await BusinessReportService.salesByCustomer(ORG, '2026-09');
+  assert.equal(year.totalCents, year.rows.reduce((sum, r) => sum + r.invoicedCents + r.cashSalesCents - r.creditedCents, 0));
+  const items = await BusinessReportService.salesByItem(ORG, '2026-09');
+  assert.equal(items.totalCents, items.rows.reduce((sum, r) => sum + r.amountCents, 0));
+  const spending = await BusinessReportService.expensesBySupplier(ORG, '2026-09');
+  assert.ok(spending.rows.some((r) => r.name === 'Kenya Power' && r.netCents > 0));
+
+  const monthly = await BusinessReportService.monthlyProfitAndLoss(ORG, 'Q3 2026');
+  assert.deepEqual(monthly.months, ['2026-07', '2026-08', '2026-09']);
+  const pnl = await ReportsService.getProfitAndLoss(ORG, 'Q3 2026');
+  const sum = (rows: Array<{ amountCents: number }>) => rows.reduce((total, r) => total + r.amountCents, 0);
+  assert.equal(monthly.income.totalCents, sum(pnl.income), 'income agrees with the profit and loss');
+  assert.equal(monthly.netTotalCents, sum(pnl.income) - sum(pnl.costOfSales) - sum(pnl.expenses), 'net agrees with the profit and loss');
+  assert.equal(monthly.netMonths.reduce((a, b) => a + b, 0), monthly.netTotalCents);
+});

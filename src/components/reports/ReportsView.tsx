@@ -8,6 +8,13 @@ import { TrialBalanceView } from './TrialBalanceView';
 import { TaxSummaryView } from './TaxSummaryView';
 import { ARAgingView, APAgingView } from './ARAgingView';
 import { GeneralLedgerView } from './GeneralLedgerView';
+import {
+  ExpensesBySupplierView,
+  MonthlyProfitAndLossView,
+  PartyStatementView,
+  SalesByCustomerView,
+  SalesByItemView,
+} from './BusinessReports';
 import { PageHeading } from '../ledger/Page';
 
 /**
@@ -21,6 +28,15 @@ const CONTENTS = [
       { id: 'Profit & Loss', name: 'Profit and loss', desc: 'Income less cost of sales and expenses, down to net profit.' },
       { id: 'Balance Sheet', name: 'Balance sheet', desc: 'What the business owns, what it owes, and the equity between them.' },
       { id: 'Statement of Cash Flows', name: 'Cash flow statement', desc: 'Cash in and out across operating, investing and financing.' },
+      { id: 'Profit & Loss by Month', name: 'Profit and loss by month', desc: 'Each income, cost and expense account, a column for every month.' },
+    ],
+  },
+  {
+    section: 'Sales and spending',
+    reports: [
+      { id: 'Sales by Customer', name: 'Sales by customer', desc: 'Invoiced, paid on the spot and credited, for each customer.' },
+      { id: 'Sales by Item', name: 'Sales by item', desc: 'Quantity and value sold of each stock item, less returns.' },
+      { id: 'Expenses by Supplier', name: 'Spending by supplier', desc: 'Bills and expenses for each supplier, less their credits.' },
     ],
   },
   {
@@ -28,6 +44,8 @@ const CONTENTS = [
     reports: [
       { id: 'A/R Aging Summary', name: 'Receivables by age', desc: 'Unpaid customer invoices, grouped by days past due.' },
       { id: 'A/P Aging Summary', name: 'Payables by age', desc: 'Unpaid supplier bills, grouped by days past due.' },
+      { id: 'Customer Statement', name: 'Customer statement', desc: 'One customer’s account for a period, with a running balance, ready to send as a PDF.' },
+      { id: 'Supplier Statement', name: 'Supplier statement', desc: 'One supplier’s account for a period, to check against the statement they send.' },
     ],
   },
   {
@@ -68,6 +86,18 @@ export function ReportsView() {
       return <APAgingView onBack={back} />;
     case 'General Ledger':
       return <GeneralLedgerView onBack={back} />;
+    case 'Profit & Loss by Month':
+      return <MonthlyProfitAndLossView onBack={back} />;
+    case 'Sales by Customer':
+      return <SalesByCustomerView onBack={back} />;
+    case 'Sales by Item':
+      return <SalesByItemView onBack={back} />;
+    case 'Expenses by Supplier':
+      return <ExpensesBySupplierView onBack={back} />;
+    case 'Customer Statement':
+      return <PartyStatementView onBack={back} partyType="CUSTOMER" />;
+    case 'Supplier Statement':
+      return <PartyStatementView onBack={back} partyType="VENDOR" />;
   }
 
   return (

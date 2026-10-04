@@ -128,3 +128,23 @@ test('an estimate is written, sent, accepted and invoiced', async () => {
     assert.deepEqual(problems, []);
   });
 });
+
+test('the sales, spending, monthly and statement reports open with their figures', async () => {
+  const session = await signedIn();
+  const { page, problems } = session;
+  await flow('business-reports', session, async () => {
+    await openView(page, 'Reports');
+    const back = page.locator('button.no-print', { hasText: 'Reports' });
+    for (const name of ['Sales by customer', 'Sales by item', 'Spending by supplier', 'Profit and loss by month']) {
+      await page.getByRole('button', { name: new RegExp(`^${name}`) }).click();
+      await page.getByRole('heading', { name }).waitFor({ timeout: 10_000 });
+      await page.getByRole('table').first().waitFor({ timeout: 10_000 });
+      await back.click();
+    }
+    await page.getByRole('button', { name: /^Customer statement/ }).click();
+    await page.locator('select[name="statementParty"]').selectOption({ label: 'Acme' });
+    await page.locator('input[name="statementFrom"]').fill('2026-01-01');
+    await page.getByText(/Balance due at/).waitFor({ timeout: 10_000 });
+    assert.deepEqual(problems, []);
+  });
+});

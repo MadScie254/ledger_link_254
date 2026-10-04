@@ -1,10 +1,46 @@
 import { ReportsService } from '../../src/server/reports';
+import { BusinessReportService } from '../../src/server/businessReports';
 import { DashboardService } from '../../src/server/metrics';
 import { respondError, UserError } from '../http';
-import { uuid } from '../schemas';
+import { isoDate, uuid } from '../schemas';
 import type { Api } from './types';
 
 export function registerReportRoutes(api: Api) {
+  api.get('/reports/statement', async (c) => {
+    try {
+      const partyType = c.req.query('partyType');
+      if (partyType !== 'CUSTOMER' && partyType !== 'VENDOR') throw new UserError('Choose a customer or a supplier.');
+      return c.json(await BusinessReportService.partyStatement(
+        c.get('orgId'), partyType, uuid.parse(c.req.query('partyId')),
+        isoDate.parse(c.req.query('from')), isoDate.parse(c.req.query('to')),
+      ));
+    } catch (err) { return respondError(c, err); }
+  });
+
+  api.get('/reports/sales-by-customer', async (c) => {
+    try {
+      return c.json(await BusinessReportService.salesByCustomer(c.get('orgId'), c.req.query('dateRange') || 'This Year-to-date'));
+    } catch (err) { return respondError(c, err); }
+  });
+
+  api.get('/reports/sales-by-item', async (c) => {
+    try {
+      return c.json(await BusinessReportService.salesByItem(c.get('orgId'), c.req.query('dateRange') || 'This Year-to-date'));
+    } catch (err) { return respondError(c, err); }
+  });
+
+  api.get('/reports/expenses-by-supplier', async (c) => {
+    try {
+      return c.json(await BusinessReportService.expensesBySupplier(c.get('orgId'), c.req.query('dateRange') || 'This Year-to-date'));
+    } catch (err) { return respondError(c, err); }
+  });
+
+  api.get('/reports/pnl-monthly', async (c) => {
+    try {
+      return c.json(await BusinessReportService.monthlyProfitAndLoss(c.get('orgId'), c.req.query('dateRange') || 'This Year-to-date'));
+    } catch (err) { return respondError(c, err); }
+  });
+
   api.get('/reports/pnl', async (c) => {
     try {
       return c.json(await ReportsService.getProfitAndLoss(c.get('orgId'), c.req.query('dateRange') || 'This Year-to-date'));
