@@ -50,6 +50,8 @@ const MOVEMENT_LABEL: Record<string, string> = {
   BILL: 'Received on a bill',
   EXPENSE: 'Bought on an expense',
   SALES_RECEIPT: 'Sold on a sales receipt',
+  CREDIT_NOTE: 'Returned by a customer',
+  SUPPLIER_CREDIT: 'Returned to a supplier',
 };
 
 type Value = React.ReactNode | string | number | null | undefined;

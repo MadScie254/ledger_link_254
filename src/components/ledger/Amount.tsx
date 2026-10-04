@@ -47,6 +47,12 @@ export function splitCents(cents: number) {
   };
 }
 
+/** A figure as plain text, such as 1,250.00, for places a styled Amount cannot go (an option label). */
+export function figureText(cents: number) {
+  const parts = splitCents(cents);
+  return `${parts.negative ? '-' : ''}${parts.shillings}.${parts.cents}`;
+}
+
 export function Amount({ cents, currency = 'KES', size = 'md', tone = 'figure', className = '' }: AmountProps) {
   const parts = splitCents(cents);
   const spoken = parts.zero

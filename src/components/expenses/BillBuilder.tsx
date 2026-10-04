@@ -6,7 +6,7 @@ import { SUPPORTED_CURRENCIES } from '../../utils/currency';
 import { apiRequest, newIdempotencyKey } from '../../utils/apiRequest';
 import { addDaysIso, todayIn } from '../../utils/dates';
 import { centsFromAmountText } from '../../utils/salesOrders';
-import { Amount } from '../ledger/Amount';
+import { Amount, figureText } from '../ledger/Amount';
 import { Dialog, Field } from '../ledger/Dialog';
 import { buttonClass } from '../ledger/Page';
 import { PostedStamp } from '../ledger/PostedStamp';
@@ -38,10 +38,12 @@ export function BillBuilder({ open, onClose, scanned, mode = 'bill' }: {
   /**
    * 'bill': owed to the supplier, paid later. 'expense': paid on the spot
    * from a bank, cash or M-Pesa account, with no amount left owing.
+   * 'credit': owed back by the supplier, for goods returned or an overcharge.
    */
-  mode?: 'bill' | 'expense';
+  mode?: 'bill' | 'expense' | 'credit';
 }) {
   const isExpense = mode === 'expense';
+  const isCredit = mode === 'credit';
   const { currentOrgId, activeCompany, exchangeRates } = useAppStore();
   const queryClient = useQueryClient();
   const base = activeCompany?.baseCurrency || 'KES';
@@ -56,6 +58,7 @@ export function BillBuilder({ open, onClose, scanned, mode = 'bill' }: {
   const [notes, setNotes] = useState('');
   const [payeeName, setPayeeName] = useState('');
   const [paidFromId, setPaidFromId] = useState('');
+  const [againstBillId, setAgainstBillId] = useState('');
   const [lines, setLines] = useState<Line[]>([emptyLine(1)]);
   const [problem, setProblem] = useState('');
   const [posted, setPosted] = useState(false);
@@ -64,6 +67,12 @@ export function BillBuilder({ open, onClose, scanned, mode = 'bill' }: {
   const vendors = useQuery({ queryKey: ['vendors', currentOrgId], queryFn: () => apiRequest('/api/vendors'), enabled: open });
   const accounts = useQuery({ queryKey: ['accounts', currentOrgId], queryFn: () => apiRequest('/api/accounts'), enabled: open });
   const inventory = useQuery({ queryKey: ['inventory', currentOrgId], queryFn: () => apiRequest('/api/inventory'), enabled: open });
+  const vendorBills = useQuery({
+    queryKey: ['bills', currentOrgId, 'vendor', vendorId],
+    queryFn: () => apiRequest(`/api/bills?vendorId=${vendorId}`),
+    enabled: open && isCredit && Boolean(vendorId),
+  });
+  const creditableBills: any[] = (vendorBills.data?.bills || []).filter((b: any) => b.status !== 'VOID' && b.currency === base);
 
   const vendorList: any[] = (vendors.data?.vendors || []).filter((v: any) => v.isActive !== false || v.id === vendorId);
   // What a bill line may post to: expenses, cost of sales, and assets other
@@ -92,6 +101,7 @@ export function BillBuilder({ open, onClose, scanned, mode = 'bill' }: {
     setNotes('');
     setPayeeName(scanned?.vendor || '');
     setPaidFromId('');
+    setAgainstBillId('');
     const match = (vendors.data?.vendors || []).find((v: any) => v.displayName === scanned?.vendor);
     setVendorId(match?.id || '');
     setLines([{
@@ -135,7 +145,24 @@ export function BillBuilder({ open, onClose, scanned, mode = 'bill' }: {
   };
 
   const post = useMutation({
-    mutationFn: () => isExpense ? apiRequest<{ id: string }>('/api/expenses', {
+    mutationFn: () => isCredit ? apiRequest<{ id: string }>('/api/supplier-credits', {
+      body: {
+        vendorId,
+        billId: againstBillId || undefined,
+        date: billDate,
+        reference: supplierReference.trim() || undefined,
+        memo: notes.trim() || undefined,
+        idempotencyKey,
+        lines: lines.filter((l) => lineCents(l) > 0).map((l) => ({
+          description: l.description.trim(),
+          accountId: l.accountId,
+          amountCents: lineCents(l),
+          taxCents: baseTax(l),
+          ...(l.itemId ? { inventoryItemId: l.itemId, quantity: Number(l.quantity) } : {}),
+        })),
+      },
+      fallback: 'The supplier credit could not be recorded.',
+    }) : isExpense ? apiRequest<{ id: string }>('/api/expenses', {
       body: {
         vendorId: vendorId || undefined,
         payeeName: vendorId ? undefined : payeeName.trim() || undefined,
@@ -175,7 +202,7 @@ export function BillBuilder({ open, onClose, scanned, mode = 'bill' }: {
       fallback: 'The bill could not be saved.',
     }),
     onSuccess: () => {
-      for (const key of ['bills', 'cash-transactions', 'accounts', 'vendors', 'inventory', 'dashboard-metrics', 'journal-entries']) {
+      for (const key of ['bills', 'cash-transactions', 'credits', 'accounts', 'vendors', 'inventory', 'dashboard-metrics', 'journal-entries']) {
         queryClient.invalidateQueries({ queryKey: [key, currentOrgId] });
       }
       setPosted(true);
@@ -195,11 +222,12 @@ export function BillBuilder({ open, onClose, scanned, mode = 'bill' }: {
       if (!l.accountId) return setProblem(`Line ${index + 1}: choose the account.`);
       if (l.itemId) {
         const quantity = Number(l.quantity);
-        if (!(quantity > 0)) return setProblem(`Line ${index + 1}: enter the quantity received.`);
+        if (!(quantity > 0)) return setProblem(`Line ${index + 1}: enter the quantity ${isCredit ? 'returned' : 'received'}.`);
         if (isStocked(itemById.get(l.itemId)) && !Number.isInteger(quantity)) return setProblem(`Line ${index + 1}: stock is counted in whole units.`);
       }
     }
-    if (!isExpense && dueDate < billDate) return setProblem('The due date cannot be before the bill date.');
+    if (!isExpense && !isCredit && dueDate < billDate) return setProblem('The due date cannot be before the bill date.');
+    if (isCredit && !vendorId) return setProblem('Choose the supplier giving the credit.');
     if (isExpense && !(paidFromId || moneyAccounts[0]?.id)) return setProblem('Choose the account it was paid from.');
     post.mutate();
   };
@@ -209,10 +237,12 @@ export function BillBuilder({ open, onClose, scanned, mode = 'bill' }: {
       open={open}
       onClose={() => { if (!post.isPending) onClose(); }}
       width="xl"
-      title={scanned ? 'Check the receipt' : isExpense ? 'New expense' : 'New bill'}
+      title={scanned ? 'Check the receipt' : isCredit ? 'New supplier credit' : isExpense ? 'New expense' : 'New bill'}
       note={scanned
         ? 'Read from the photo. Correct anything misread before saving.'
-        : isExpense
+        : isCredit
+          ? 'What the supplier owes back, for goods returned or an overcharge. Payables go down, the lines and recoverable VAT are credited, and stock items on it leave stock. Choose a bill to apply it to that bill now.'
+          : isExpense
           ? 'Paid on the spot: the expenses and recoverable VAT post against the account it was paid from. Stock items on it are counted in.'
           : 'Saving it posts the expenses and the amount owed to the supplier. Stock items on it are counted in.'}
       footer={
@@ -220,20 +250,20 @@ export function BillBuilder({ open, onClose, scanned, mode = 'bill' }: {
           {problem && <p role="alert" className="mr-auto text-[13px] text-ledger-red">{problem}</p>}
           <button type="button" onClick={onClose} disabled={post.isPending} className={buttonClass.secondary}>Cancel</button>
           <button type="submit" form="bill-builder" disabled={post.isPending || (!isExpense && !vendorId)} className={buttonClass.primary}>
-            {post.isPending ? 'Saving' : isExpense ? 'Post expense' : 'Save bill'}
+            {post.isPending ? 'Saving' : isCredit ? 'Record supplier credit' : isExpense ? 'Post expense' : 'Save bill'}
           </button>
         </>
       }
     >
       <div className="relative">
-        {posted && <PostedStamp label={isExpense ? 'Expense posted' : 'Bill posted'} />}
+        {posted && <PostedStamp label={isCredit ? 'Credit recorded' : isExpense ? 'Expense posted' : 'Bill posted'} />}
         <form id="bill-builder" onSubmit={submit} className="space-y-5">
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
             <Field
               label={isExpense ? 'Paid to' : 'Supplier'}
               hint={scanned?.vendor && !vendorId ? `The receipt names ${scanned.vendor}.${isExpense ? '' : ' Add them as a vendor if they are new.'}` : isExpense ? 'Optional' : undefined}
             >
-              <select required={!isExpense} name="vendorId" value={vendorId} onChange={(e) => setVendorId(e.target.value)}>
+              <select required={!isExpense} name="vendorId" value={vendorId} onChange={(e) => { setVendorId(e.target.value); setAgainstBillId(''); }}>
                 <option value="">{isExpense ? 'No vendor record' : 'Choose a vendor'}</option>
                 {vendorList.map((v) => <option key={v.id} value={v.id}>{v.displayName}</option>)}
               </select>
@@ -243,7 +273,7 @@ export function BillBuilder({ open, onClose, scanned, mode = 'bill' }: {
                 <input name="payeeName" maxLength={200} value={payeeName} onChange={(e) => setPayeeName(e.target.value)} />
               </Field>
             )}
-            <Field label={isExpense ? 'Date' : 'Bill date'}>
+            <Field label={isExpense ? 'Date' : isCredit ? 'Credit date' : 'Bill date'}>
               <input required type="date" name="billDate" value={billDate} onChange={(e) => setBillDate(e.target.value)} />
             </Field>
             {isExpense ? (
@@ -253,15 +283,27 @@ export function BillBuilder({ open, onClose, scanned, mode = 'bill' }: {
                   {moneyAccounts.map((a) => <option key={a.id} value={a.id}>{a.code} · {a.name}</option>)}
                 </select>
               </Field>
+            ) : isCredit ? (
+              <Field label="Apply to bill" hint={vendorId ? 'Optional. Leave blank to keep it as credit for later.' : 'Choose the supplier first.'}>
+                <select name="billId" value={againstBillId} disabled={!vendorId} onChange={(e) => setAgainstBillId(e.target.value)}>
+                  <option value="">Keep as credit</option>
+                  {creditableBills.map((b) => (
+                    <option key={b.id} value={b.id}>{b.billNumber}{b.supplierReference ? ` (${b.supplierReference})` : ''} · {b.status === 'PAID' ? 'paid' : `${figureText(b.amountDueCents)} due`}</option>
+                  ))}
+                </select>
+              </Field>
             ) : (
               <Field label="Due">
                 <input required type="date" name="dueDate" value={dueDate} min={billDate} onChange={(e) => setDueDate(e.target.value)} />
               </Field>
             )}
-            <Field label={isExpense ? 'Reference' : "Supplier's invoice number"} hint={isExpense ? 'Optional, such as the receipt or M-Pesa code' : 'Optional. The same number cannot be entered twice for one supplier.'}>
+            <Field
+              label={isExpense ? 'Reference' : isCredit ? "Supplier's credit note number" : "Supplier's invoice number"}
+              hint={isExpense ? 'Optional, such as the receipt or M-Pesa code' : isCredit ? 'Optional' : 'Optional. The same number cannot be entered twice for one supplier.'}
+            >
               <input name="supplierReference" maxLength={100} autoComplete="off" value={supplierReference} onChange={(e) => setSupplierReference(e.target.value)} />
             </Field>
-            {!isExpense && (
+            {!isExpense && !isCredit && (
               <Field label="Currency">
                 <select value={currency} onChange={(e) => { setCurrency(e.target.value); setRate(e.target.value === base ? '1' : String(exchangeRates[e.target.value] || 1)); }}>
                   {SUPPORTED_CURRENCIES.map((c) => <option key={c.code} value={c.code}>{c.code} · {c.name}</option>)}
@@ -344,7 +386,7 @@ export function BillBuilder({ open, onClose, scanned, mode = 'bill' }: {
                 <Amount cents={shownTaxCents} currency={currency} size="xs" tone="ink" />
               </div>
               <div className="ll-total flex items-baseline justify-between py-2">
-                <span className="font-semibold text-ink-900">Total owed</span>
+                <span className="font-semibold text-ink-900">{isCredit ? 'Total credited' : 'Total owed'}</span>
                 <span className="font-semibold" aria-live="polite"><Amount cents={subtotalCents + shownTaxCents} currency={currency} tone="ink" /></span>
               </div>
             </div>

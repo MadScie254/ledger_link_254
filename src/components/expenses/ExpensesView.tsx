@@ -4,6 +4,7 @@ import { format } from 'date-fns';
 import { ReceiptScanner } from './ReceiptScanner';
 import { BillBuilder } from './BillBuilder';
 import { CashTransactionsPanel } from '../common/CashTransactionsPanel';
+import { CreditsPanel } from '../common/CreditsPanel';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAppStore } from '../../store';
 import { DynamicQuickAddModal } from '../common/DynamicQuickAddModal';
@@ -17,7 +18,7 @@ import { useConfirm } from '../../hooks/useConfirm';
 import { inParts } from '../../utils/apiRequest';
 import { todayIn } from '../../utils/dates';
 
-const tabs = ['Vendors', 'Bills', 'Expenses', 'Bill payments'];
+const tabs = ['Vendors', 'Bills', 'Expenses', 'Supplier credits', 'Bill payments'];
 
 /** A UUID-shaped key derived from text with SHA-256, the same every time for the same text. */
 async function stableUuid(text: string): Promise<string> {
@@ -34,6 +35,7 @@ export function ExpensesView() {
   const [isCreatingBill, setIsCreatingBill] = useState(false);
   const [isScanningReceipt, setIsScanningReceipt] = useState(false);
   const [isRecordingExpense, setIsRecordingExpense] = useState(false);
+  const [isRecordingCredit, setIsRecordingCredit] = useState(false);
   const [scannedData, setScannedData] = useState<{ vendor: string; amount: number; date: string } | null>(null);
   const [selectedEntity, setSelectedEntity] = useState<{ type: 'VENDOR' | 'BILL'; id: string; data: any } | null>(null);
   const [selectedBillIds, setSelectedBillIds] = useState<string[]>([]);
@@ -217,6 +219,10 @@ export function ExpensesView() {
             {activeTab === 'Expenses' ? (
               <button type="button" onClick={() => setIsRecordingExpense(true)} className={buttonClass.primary}>
                 New expense
+              </button>
+            ) : activeTab === 'Supplier credits' ? (
+              <button type="button" onClick={() => setIsRecordingCredit(true)} className={buttonClass.primary}>
+                New supplier credit
               </button>
             ) : (
               <button type="button" onClick={() => setIsCreatingBill(true)} className={buttonClass.primary}>
@@ -445,6 +451,10 @@ export function ExpensesView() {
         </div>
       )}
 
+      {activeTab === 'Supplier credits' && (
+        <CreditsPanel kind="SUPPLIER" onCreate={() => setIsRecordingCredit(true)} />
+      )}
+
       {activeTab === 'Bill payments' && (
         <div className="max-w-2xl space-y-4">
           <p className="text-[14px] leading-relaxed text-ink-900">
@@ -563,6 +573,7 @@ export function ExpensesView() {
       )}
 
       <BillBuilder open={isCreatingBill} onClose={closeBill} />
+      <BillBuilder mode="credit" open={isRecordingCredit} onClose={() => setIsRecordingCredit(false)} />
       <BillBuilder
         mode="expense"
         open={isRecordingExpense}

@@ -19,6 +19,7 @@ import { registerBulkRoutes } from './routes/bulk';
 import { registerAiRoutes } from './routes/ai';
 import { registerCurrencyRoutes } from './routes/currency';
 import { registerCashRoutes } from './routes/cash';
+import { registerCreditRoutes } from './routes/credits';
 
 const app = new Hono<{ Variables: Variables }>();
 
@@ -71,6 +72,7 @@ registerBulkRoutes(api);
 registerAiRoutes(api);
 registerCurrencyRoutes(api);
 registerCashRoutes(api);
+registerCreditRoutes(api);
 
 app.route('/api', api);
 

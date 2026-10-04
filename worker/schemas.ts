@@ -500,3 +500,48 @@ export const transferSchema = z.object({
   idempotencyKey,
 }).refine((transfer) => transfer.fromAccountId !== transfer.toAccountId, { message: 'Choose two different accounts to transfer between.' });
 export const voidSchema = z.object({ voidDate: isoDate, reason });
+
+// --- Credit notes, supplier credits and refunds ------------------------------
+
+const purchaseLineSchema = z.object({
+  description: requiredText(500, 'A line description'),
+  accountId: uuid,
+  amountCents: positiveCents,
+  taxCents: cents.default(0),
+  inventoryItemId: optionalUuid,
+  quantity: z.number().positive().max(1_000_000_000).optional(),
+});
+export const customerCreditSchema = z.object({
+  customerId: uuid,
+  invoiceId: optionalUuid,
+  date: isoDate,
+  memo: text(4000),
+  idempotencyKey,
+  lines: z.array(salesOrderLineSchema).min(1).max(200),
+});
+export const supplierCreditSchema = z.object({
+  vendorId: uuid,
+  billId: optionalUuid,
+  date: isoDate,
+  reference: text(100),
+  memo: text(4000),
+  idempotencyKey,
+  lines: z.array(purchaseLineSchema).min(1).max(200),
+});
+export const applyCreditSchema = z.object({
+  documentId: uuid,
+  amountCents: positiveCents,
+  date: isoDate,
+  idempotencyKey,
+});
+export const refundCreditSchema = z.object({
+  amountCents: positiveCents,
+  date: isoDate,
+  moneyAccountId: uuid,
+  reference: text(100),
+  idempotencyKey,
+});
+export const reverseCreditUseSchema = z.object({
+  reversalDate: isoDate.optional(),
+  reason,
+});

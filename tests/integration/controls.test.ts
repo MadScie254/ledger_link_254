@@ -250,3 +250,86 @@ test('a sales receipt, an expense and a transfer post, list with their names, an
   assert.equal((await CashTransactionService.list(ORG, 'SALES_RECEIPT'))[0].status, 'VOID');
   await refused(CashTransactionService.void(ORG, expense.id, '2026-09-10', 'Before it happened', OWNER), /on or after/);
 });
+
+import { CreditNoteService } from '../../src/server/creditNotes';
+import { partyBalances } from '../../src/server/partyBalances';
+
+test('a credit note lowers an invoice, an unused credit nets the balance, and refunds and voids post', async () => {
+  sql(`UPDATE public.organizations SET books_closed_through = NULL WHERE id = '${ORG}'`);
+  const invoiceId = await InvoiceService.createInvoice({
+    orgId: ORG, customerId: CUSTOMER, issueDate: '2026-09-01', dueDate: '2026-09-30', currency: 'KES',
+    lines: [{ description: 'Cement', accountId: SALES, amountCents: 150_000 }], idempotencyKey: uuid(), createdBy: OWNER,
+  });
+  const before = Number(sql(`SELECT quantity_on_hand FROM public.inventory_items WHERE id = '${CEMENT}'`));
+  const credit = await CreditNoteService.issueCustomerCredit({
+    orgId: ORG, customerId: CUSTOMER, invoiceId, date: '2026-09-03', memo: 'Bag split', actor: OWNER, idempotencyKey: uuid(),
+    lines: [{ description: 'Cement returned', accountId: SALES, inventoryItemId: CEMENT, quantity: 1, unitPriceCents: 75_000, taxRate: 0 }],
+  });
+  assert.match(credit.number, /^CN-2026-/);
+  assert.equal(credit.appliedCents, 75_000);
+  assert.equal((await InvoiceService.getInvoice(ORG, invoiceId))!.amountDueCents, 75_000);
+  assert.equal(Number(sql(`SELECT quantity_on_hand FROM public.inventory_items WHERE id = '${CEMENT}'`)), before + 1);
+
+  const goodwill = await CreditNoteService.issueCustomerCredit({
+    orgId: ORG, customerId: CUSTOMER, date: '2026-09-04', actor: OWNER, idempotencyKey: uuid(),
+    lines: [{ description: 'Late delivery', accountId: SALES, quantity: 1, unitPriceCents: 20_000, taxRate: 0 }],
+  });
+  const listed = await CreditNoteService.list(ORG, { kind: 'CUSTOMER' });
+  const first = listed.find((c) => c.id === credit.id)!;
+  assert.equal(first.partyName, 'Acme');
+  assert.equal(first.invoiceNumber, (await InvoiceService.getInvoice(ORG, invoiceId))!.invoiceNumber);
+  assert.equal(first.status, 'CLOSED');
+  assert.equal(first.uses[0].kind, 'APPLY');
+  assert.equal(first.uses[0].documentNumber, first.invoiceNumber);
+
+  // The unused credit counts against what the customer owes, and the ledger still agrees.
+  const balance = (await partyBalances(ORG, 'CUSTOMER')).get(CUSTOMER)!;
+  const openDue = Number(sql(`SELECT sum(amount_due_cents) FROM public.invoices WHERE customer_id = '${CUSTOMER}' AND status NOT IN ('PAID', 'VOID')`));
+  assert.equal(balance.openCents, openDue - 20_000);
+  assert.equal((await ReportsService.getControlCheck(ORG)).agrees, true);
+  const aging = await ReportsService.getARAging(ORG);
+  assert.ok(aging.rows.some((r: any) => r.referenceNo === goodwill.number && r.amountDueCents === -20_000), 'unused credit in the aging');
+
+  const refund = await CreditNoteService.refund({
+    orgId: ORG, creditId: goodwill.id, amountCents: 20_000, date: '2026-09-05', moneyAccountId: BANK, reference: 'QX1', actor: OWNER, idempotencyKey: uuid(),
+  });
+  assert.match(refund.number, /^RF-2026-/);
+  assert.equal(refund.remainingCents, 0);
+  const refunded = (await CreditNoteService.list(ORG, { customerId: CUSTOMER })).find((c) => c.id === goodwill.id)!;
+  assert.equal(refunded.uses[0].moneyAccountName, '1000 Bank');
+  await refused(CreditNoteService.void(ORG, goodwill.id, '2026-09-06', 'Issued in error', OWNER), /Undo those first/);
+  await refused(CreditNoteService.reverseUse(ORG, refunded.uses[0].id, '2026-09-06', ' ', OWNER), /reason/i);
+  await CreditNoteService.reverseUse(ORG, refunded.uses[0].id, '2026-09-06', 'Sent to the wrong number', OWNER);
+  await CreditNoteService.void(ORG, goodwill.id, '2026-09-06', 'Issued in error', OWNER);
+  assert.equal((await CreditNoteService.list(ORG, { kind: 'CUSTOMER' })).find((c) => c.id === goodwill.id)!.status, 'VOID');
+
+  // A supplier credit applied later to a bill.
+  const billId = await BillService.createBill({
+    orgId: ORG, vendorId: VENDOR, billDate: '2026-09-02', dueDate: '2026-10-02', currency: 'KES', idempotencyKey: uuid(), createdBy: OWNER,
+    lines: [{ description: 'Generator service', accountId: OPEX, amountCents: 30_000 }],
+  });
+  const supplierCredit = await CreditNoteService.recordSupplierCredit({
+    orgId: ORG, vendorId: VENDOR, date: '2026-09-04', reference: 'KPLC-CR-1', actor: OWNER, idempotencyKey: uuid(),
+    lines: [{ description: 'Overcharge', accountId: OPEX, amountCents: 5_000 }],
+  });
+  assert.match(supplierCredit.number, /^SC-2026-/);
+  await refused(CreditNoteService.apply({
+    orgId: ORG, creditId: supplierCredit.id, documentId: billId, amountCents: 6_000, date: '2026-09-05', actor: OWNER, idempotencyKey: uuid(),
+  }), /no more than that/);
+  const applied = await CreditNoteService.apply({
+    orgId: ORG, creditId: supplierCredit.id, documentId: billId, amountCents: 5_000, date: '2026-09-05', actor: OWNER, idempotencyKey: uuid(),
+  });
+  assert.equal(applied.amountDueCents, 25_000);
+  assert.equal((await CreditNoteService.list(ORG, { vendorId: VENDOR }))[0].uses[0].documentNumber,
+    (await BillService.getBill(ORG, billId))!.billNumber);
+  assert.equal((await ReportsService.getControlCheck(ORG)).agrees, true);
+
+  // A read-only member cannot post a credit; the database refuses as well as the Worker.
+  const reader = uuid();
+  sql(`INSERT INTO auth.users (id, email) VALUES ('${reader}', 'reader@example.com')`);
+  sql(`INSERT INTO public.memberships (org_id, user_id, role) VALUES ('${ORG}', '${reader}', 'member')`);
+  await refused(CreditNoteService.issueCustomerCredit({
+    orgId: ORG, customerId: CUSTOMER, date: '2026-09-04', actor: reader, idempotencyKey: uuid(),
+    lines: [{ description: 'x', accountId: SALES, quantity: 1, unitPriceCents: 100, taxRate: 0 }],
+  }), /owner|administrator|accountant|permission|not allowed|cannot/i);
+});

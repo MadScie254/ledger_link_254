@@ -232,13 +232,18 @@ export class ReportsService {
       .order('id')
       .range(from, to));
 
-    return this.bucketByDueDate(invoices.map((inv: any) => ({
-      id: inv.id,
-      referenceNo: inv.invoice_number,
-      partyName: inv.customers?.display_name || 'Unknown Customer',
-      dueDate: inv.due_date,
-      amountDueCents: inv.amount_due_cents
-    })));
+    const credits = await this.openCredits(orgId, 'CUSTOMER');
+
+    return this.bucketByDueDate([
+      ...invoices.map((inv: any) => ({
+        id: inv.id,
+        referenceNo: inv.invoice_number,
+        partyName: inv.customers?.display_name || 'Unknown Customer',
+        dueDate: inv.due_date,
+        amountDueCents: inv.amount_due_cents
+      })),
+      ...credits,
+    ]);
   }
 
   static async getAPAging(orgId: string) {
@@ -253,13 +258,38 @@ export class ReportsService {
       .order('id')
       .range(from, to));
 
-    return this.bucketByDueDate(bills.map((bill: any) => ({
-      id: bill.id,
-      referenceNo: bill.bill_number,
-      partyName: bill.vendors?.display_name || 'Unknown Vendor',
-      dueDate: bill.due_date,
-      amountDueCents: bill.amount_due_cents
-    })));
+    const credits = await this.openCredits(orgId, 'SUPPLIER');
+
+    return this.bucketByDueDate([
+      ...bills.map((bill: any) => ({
+        id: bill.id,
+        referenceNo: bill.bill_number,
+        partyName: bill.vendors?.display_name || 'Unknown Vendor',
+        dueDate: bill.due_date,
+        amountDueCents: bill.amount_due_cents
+      })),
+      ...credits,
+    ]);
+  }
+
+  /** Credits not yet used, as negative amounts in the current column. */
+  private static async openCredits(orgId: string, kind: 'CUSTOMER' | 'SUPPLIER') {
+    const supabase = getSupabase();
+    const credits = await fetchAllRows<any>((from, to) => supabase
+      .from('credit_notes')
+      .select('id, number, remaining_cents, customers(display_name), vendors(display_name)')
+      .eq('org_id', orgId)
+      .eq('kind', kind)
+      .eq('status', 'OPEN')
+      .order('id')
+      .range(from, to));
+    return credits.map((credit: any) => ({
+      id: credit.id,
+      referenceNo: credit.number,
+      partyName: (kind === 'CUSTOMER' ? credit.customers?.display_name : credit.vendors?.display_name) || 'Unknown',
+      dueDate: null,
+      amountDueCents: -(Number(credit.remaining_cents) || 0),
+    }));
   }
 
   private static bucketByDueDate(items: Array<{ id: string; referenceNo: string; partyName: string; dueDate: string | null; amountDueCents: number }>) {

@@ -19,8 +19,9 @@ import { OrdersPanel } from './OrdersPanel';
 import { EstimatesPanel } from './EstimatesPanel';
 import { SalesDocumentBuilder } from './SalesDocumentBuilder';
 import { CashTransactionsPanel } from '../common/CashTransactionsPanel';
+import { CreditsPanel } from '../common/CreditsPanel';
 
-type SalesTab = 'Invoices' | 'Receipts' | 'Estimates' | 'Orders';
+type SalesTab = 'Invoices' | 'Receipts' | 'Credits' | 'Estimates' | 'Orders';
 
 export function SalesView() {
   useRenderTracker("SalesView");
@@ -30,6 +31,7 @@ export function SalesView() {
   const [isOrdering, setIsOrdering] = useState(false);
   const [isEstimating, setIsEstimating] = useState(false);
   const [isSellingNow, setIsSellingNow] = useState(false);
+  const [isCrediting, setIsCrediting] = useState(false);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [selectedInvoice, setSelectedInvoice] = useState<any | null>(null);
   const [paymentInvoice, setPaymentInvoice] = useState<any | null>(null);
@@ -67,7 +69,7 @@ export function SalesView() {
       if (!res.ok) throw new Error('Failed to fetch stock items');
       return res.json();
     },
-    enabled: isSellingNow,
+    enabled: isSellingNow || isCrediting,
   });
 
   const { data: accountsData } = useQuery({
@@ -239,6 +241,8 @@ export function SalesView() {
               ? <>Quotes to customers, before they become invoices · Figures in {baseCurrency}</>
               : salesTab === 'Receipts'
                 ? <>Sales paid on the spot, by cash, card or M-Pesa · Figures in {baseCurrency}</>
+              : salesTab === 'Credits'
+                ? <>What is owed back to customers, applied to invoices or refunded · Figures in {baseCurrency}</>
               : <>Orders customers have placed with {activeCompany?.name || 'this organization'} · Figures in {baseCurrency}</>
         }
         actions={
@@ -259,6 +263,10 @@ export function SalesView() {
             <button type="button" onClick={() => setIsSellingNow(true)} className={buttonClass.primary}>
               New sales receipt
             </button>
+          ) : salesTab === 'Credits' ? (
+            <button type="button" onClick={() => setIsCrediting(true)} className={buttonClass.primary}>
+              New credit note
+            </button>
           ) : (
             <button type="button" onClick={() => setIsOrdering(true)} className={buttonClass.primary}>
               New order
@@ -277,6 +285,7 @@ export function SalesView() {
         tabs={[
           { id: 'Invoices', name: 'Invoices', count: invoices.length },
           { id: 'Receipts', name: 'Sales receipts' },
+          { id: 'Credits', name: 'Credit notes' },
           { id: 'Estimates', name: 'Estimates' },
           { id: 'Orders', name: 'Orders' },
         ]}
@@ -284,6 +293,8 @@ export function SalesView() {
 
       {salesTab === 'Receipts' ? (
         <CashTransactionsPanel kind="SALES_RECEIPT" onCreate={() => setIsSellingNow(true)} />
+      ) : salesTab === 'Credits' ? (
+        <CreditsPanel kind="CUSTOMER" onCreate={() => setIsCrediting(true)} />
       ) : salesTab === 'Estimates' ? (
         <EstimatesPanel
           orgId={currentOrgId}
@@ -540,6 +551,26 @@ export function SalesView() {
           onRecorded={() => {
             setIsSellingNow(false);
             for (const key of ['cash-transactions', 'accounts', 'inventory', 'journal-entries', 'dashboard-metrics']) {
+              queryClient.invalidateQueries({ queryKey: [key, currentOrgId] });
+            }
+          }}
+        />
+      )}
+
+      {isCrediting && (
+        <SalesDocumentBuilder
+          kind="credit"
+          orgId={currentOrgId}
+          baseCurrency={baseCurrency}
+          customers={(customersData?.customers || []).filter((c: any) => c.isActive !== false)}
+          incomeAccounts={(accountsData?.accounts || []).filter((a: any) => a.type === 'INCOME' && a.isActive !== false)}
+          items={(inventoryData?.items || []).filter((item: any) => (item.status || 'Active') === 'Active')}
+          invoices={invoices}
+          onClose={() => setIsCrediting(false)}
+          onRecorded={() => {
+            setIsCrediting(false);
+            setSalesTab('Credits');
+            for (const key of ['credits', 'invoices', 'customers', 'accounts', 'inventory', 'journal-entries', 'dashboard-metrics']) {
               queryClient.invalidateQueries({ queryKey: [key, currentOrgId] });
             }
           }}

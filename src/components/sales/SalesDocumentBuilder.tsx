@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
 import { format } from 'date-fns';
 import { useMutation } from '@tanstack/react-query';
-import { Amount } from '../ledger/Amount';
+import { Amount, figureText } from '../ledger/Amount';
 import { Dialog, Field } from '../ledger/Dialog';
 import { buttonClass } from '../ledger/Page';
 import {
@@ -34,7 +34,7 @@ interface Checked {
   unitPriceCents: number | null;
 }
 
-export type SalesDocumentKind = 'order' | 'estimate' | 'receipt';
+export type SalesDocumentKind = 'order' | 'estimate' | 'receipt' | 'credit';
 
 /** What differs between the documents this builder writes. */
 const KINDS: Record<SalesDocumentKind, {
@@ -55,6 +55,8 @@ const KINDS: Record<SalesDocumentKind, {
   notesHint: string;
   /** A sale paid on the spot: no customer needed, and the account the money went into. */
   paidNow?: boolean;
+  /** A credit note: goods come back into stock, and it can be applied to one of the customer's invoices. */
+  credit?: boolean;
 }> = {
   order: {
     endpoint: '/api/sales-orders',
@@ -108,6 +110,24 @@ const KINDS: Record<SalesDocumentKind, {
     notesHint: 'Optional',
     paidNow: true,
   },
+  credit: {
+    endpoint: '/api/credit-notes',
+    title: 'New credit note',
+    editTitle: 'Credit note',
+    note: 'What is owed back to the customer: goods returned, a price agreed down, a mistake. Income and VAT go down, stock items on it come back into stock, and choosing an invoice applies it there now.',
+    dateLabel: 'Date',
+    dateKey: 'date',
+    secondDate: null,
+    linesHeading: 'What is credited',
+    totalLabel: 'Credit total',
+    submit: 'Issue credit note',
+    pending: 'Issuing',
+    failed: 'The credit note could not be issued.',
+    stockNote: () => '',
+    serviceNote: 'A service, not counted as stock.',
+    notesHint: 'Optional. Why the credit was given.',
+    credit: true,
+  },
 };
 
 export interface SalesDocumentDraft {
@@ -133,6 +153,7 @@ export function SalesDocumentBuilder({
   incomeAccounts,
   items,
   moneyAccounts = [],
+  invoices = [],
   initial,
   onClose,
   onRecorded,
@@ -145,6 +166,8 @@ export function SalesDocumentBuilder({
   items: any[];
   /** Bank, cash and M-Pesa accounts, for a sales receipt. */
   moneyAccounts?: any[];
+  /** The organization's invoices, for a credit note to be applied to. */
+  invoices?: any[];
   initial?: SalesDocumentDraft | null;
   onClose: () => void;
   onRecorded: (document: any) => void;
@@ -159,6 +182,7 @@ export function SalesDocumentBuilder({
   const [payeeName, setPayeeName] = useState('');
   const [depositAccountId, setDepositAccountId] = useState(moneyAccounts[0]?.id || '');
   const [reference, setReference] = useState('');
+  const [invoiceId, setInvoiceId] = useState('');
   const [problem, setProblem] = useState('');
   const [lines, setLines] = useState<DraftLine[]>(() => initial?.lines.length
     ? initial.lines.map((line, index) => ({
@@ -215,6 +239,8 @@ export function SalesDocumentBuilder({
   }), [lines, items]);
 
   const totals = orderTotals(checked.filter((c) => !c.problem));
+  const customerInvoices = invoices.filter((invoice: any) =>
+    invoice.customerId === customerId && invoice.status !== 'VOID' && invoice.currency === baseCurrency);
 
   const record = useMutation({
     mutationFn: async () => {
@@ -227,7 +253,9 @@ export function SalesDocumentBuilder({
           ...(config.secondDate ? { [config.secondDate.key]: promisedDate || undefined } : {}),
           ...(config.paidNow
             ? { memo: notes.trim() || undefined, payeeName: customerId ? undefined : payeeName.trim() || undefined, depositAccountId, reference: reference.trim() || undefined }
-            : { notes: notes.trim() || undefined }),
+            : config.credit
+              ? { memo: notes.trim() || undefined, invoiceId: invoiceId || undefined }
+              : { notes: notes.trim() || undefined }),
           idempotencyKey,
           lines: checked.map(({ line, unitPriceCents }) => ({
             description: line.description.trim(),
@@ -249,7 +277,7 @@ export function SalesDocumentBuilder({
 
   const submit = () => {
     setProblem('');
-    if (!customerId && !config.paidNow) return setProblem(kind === 'order' ? 'Choose the customer who placed the order.' : 'Choose the customer.');
+    if (!customerId && !config.paidNow) return setProblem(kind === 'order' ? 'Choose the customer who placed the order.' : kind === 'credit' ? 'Choose the customer the credit is for.' : 'Choose the customer.');
     if (!orderDate) return setProblem(`Enter the ${config.dateLabel.toLowerCase()}.`);
     if (config.secondDate && promisedDate && promisedDate < orderDate) return setProblem(`${config.secondDate.label} cannot be before the ${config.dateLabel.toLowerCase()}.`);
     if (config.paidNow && !depositAccountId) return setProblem('Choose the account the money went into.');
@@ -280,7 +308,7 @@ export function SalesDocumentBuilder({
             label="Customer"
             hint={config.paidNow ? 'Optional for a walk-in sale.' : customers.length === 0 ? 'Add the customer under Customers first. For walk-in sales, add one called Walk-in.' : undefined}
           >
-            <select value={customerId} onChange={(e) => setCustomerId(e.target.value)}>
+            <select value={customerId} onChange={(e) => { setCustomerId(e.target.value); setInvoiceId(''); }}>
               <option value="">{config.paidNow ? 'Walk-in, no customer record' : 'Choose a customer'}</option>
               {customers.map((customer: any) => (
                 <option key={customer.id} value={customer.id}>{customer.displayName}</option>
@@ -295,6 +323,18 @@ export function SalesDocumentBuilder({
           <Field label={config.dateLabel}>
             <input type="date" value={orderDate} onChange={(e) => setOrderDate(e.target.value)} />
           </Field>
+          {config.credit && (
+            <Field label="Apply to invoice" hint={customerId ? 'Optional. Leave blank to keep it as credit for later.' : 'Choose the customer first.'}>
+              <select value={invoiceId} disabled={!customerId} onChange={(e) => setInvoiceId(e.target.value)}>
+                <option value="">Keep as credit</option>
+                {customerInvoices.map((invoice: any) => (
+                  <option key={invoice.id} value={invoice.id}>
+                    {invoice.invoiceNumber} · {invoice.status === 'PAID' ? 'paid' : `${figureText(invoice.amountDueCents)} due`}
+                  </option>
+                ))}
+              </select>
+            </Field>
+          )}
           {config.secondDate && (
             <Field label={config.secondDate.label} hint={config.secondDate.hint}>
               <input type="date" min={orderDate} value={promisedDate} onChange={(e) => setPromisedDate(e.target.value)} />
@@ -408,7 +448,7 @@ export function SalesDocumentBuilder({
                       <Amount cents={lineProblem ? 0 : amountCents} currency={baseCurrency} tone="ink" />
                     </div>
                   </div>
-                  {stocked && Number.isFinite(quantity) && quantity > onHand && (
+                  {stocked && !config.credit && Number.isFinite(quantity) && quantity > onHand && (
                     <p className="mt-1.5 text-[12.5px] text-graphite-600">{config.stockNote(onHand)}</p>
                   )}
                   {item && !stocked && (
