@@ -91,6 +91,7 @@ function mapBill(row: any) {
     totalCents: Number(row.total_cents) || 0,
     amountDueCents: Number(row.amount_due_cents) || 0,
     supplierReference: row.supplier_reference ?? null,
+    purchaseOrderId: row.purchase_order_id ?? null,
     approvedAt: row.approved_at ?? null,
     approvedBy: row.approved_by ?? null,
     status: row.status,

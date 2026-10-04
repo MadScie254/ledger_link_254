@@ -34,7 +34,7 @@ interface Checked {
   unitPriceCents: number | null;
 }
 
-export type SalesDocumentKind = 'order' | 'estimate' | 'receipt' | 'credit';
+export type SalesDocumentKind = 'order' | 'estimate' | 'receipt' | 'credit' | 'purchase';
 
 /** What differs between the documents this builder writes. */
 const KINDS: Record<SalesDocumentKind, {
@@ -57,6 +57,8 @@ const KINDS: Record<SalesDocumentKind, {
   paidNow?: boolean;
   /** A credit note: goods come back into stock, and it can be applied to one of the customer's invoices. */
   credit?: boolean;
+  /** An order to a supplier: a vendor, unit costs and purchase accounts in place of a customer, prices and income. */
+  purchase?: boolean;
 }> = {
   order: {
     endpoint: '/api/sales-orders',
@@ -128,6 +130,24 @@ const KINDS: Record<SalesDocumentKind, {
     notesHint: 'Optional. Why the credit was given.',
     credit: true,
   },
+  purchase: {
+    endpoint: '/api/purchase-orders',
+    title: 'New purchase order',
+    editTitle: 'Edit purchase order',
+    note: 'What you are ordering from a supplier. Nothing posts to the books until it is billed; billing it counts stock items in.',
+    dateLabel: 'Order date',
+    dateKey: 'orderDate',
+    secondDate: { label: 'Expected by', key: 'expectedDate', hint: 'Optional' },
+    linesHeading: 'What is ordered',
+    totalLabel: 'Order total',
+    submit: 'Save purchase order',
+    pending: 'Saving',
+    failed: 'The purchase order could not be saved.',
+    stockNote: () => '',
+    serviceNote: 'A service, not counted as stock.',
+    notesHint: 'Optional. Delivery address, terms, anything the supplier should know.',
+    purchase: true,
+  },
 };
 
 export interface SalesDocumentDraft {
@@ -173,6 +193,10 @@ export function SalesDocumentBuilder({
   onRecorded: (document: any) => void;
 }) {
   const config = KINDS[kind];
+  const words = useMemo(() => (config.purchase
+    ? { party: 'Supplier', choose: 'Choose a supplier', missing: 'Choose the supplier.', price: 'Unit cost', account: 'Account', accountMissing: 'Choose the account the purchase goes to.' }
+    : { party: 'Customer', choose: 'Choose a customer', missing: kind === 'order' ? 'Choose the customer who placed the order.' : kind === 'credit' ? 'Choose the customer the credit is for.' : 'Choose the customer.', price: 'Unit price', account: 'Income account', accountMissing: 'Choose the income account the sale goes to.' }
+  ), [kind, config.purchase]);
   // One key per opening of the form: pressing the button twice saves one document.
   const [idempotencyKey] = useState(() => crypto.randomUUID());
   const [customerId, setCustomerId] = useState(initial?.customerId || '');
@@ -205,13 +229,13 @@ export function SalesDocumentBuilder({
       setLine(key, { itemId: '' });
       return;
     }
-    const accountId = incomeAccounts.some((account: any) => account.id === item.incomeAccountId)
-      ? item.incomeAccountId
-      : undefined;
+    const itemAccountId = config.purchase ? item.cogsAccountId : item.incomeAccountId;
+    const accountId = incomeAccounts.some((account: any) => account.id === itemAccountId) ? itemAccountId : undefined;
+    const priceCents = config.purchase ? Number(item.costPriceCents ?? item.costCents ?? 0) : Number(item.unitPriceCents);
     setLine(key, {
       itemId,
       description: item.name || '',
-      unitPrice: ((Number(item.unitPriceCents) || 0) / 100).toFixed(2),
+      unitPrice: ((priceCents || 0) / 100).toFixed(2),
       ...(accountId ? { accountId } : {}),
     });
   };
@@ -224,9 +248,9 @@ export function SalesDocumentBuilder({
     if (!line.description.trim()) lineProblem = 'Describe what was ordered.';
     else if (line.description.trim().length > 500) lineProblem = 'Keep the description to 500 characters.';
     else lineProblem = quantityProblem(line.quantity, Boolean(item))
-      || (unitPriceCents === null ? 'Enter a unit price in shillings, such as 750 or 750.50.' : null)
+      || (unitPriceCents === null ? `Enter a ${words.price.toLowerCase()} in shillings, such as 750 or 750.50.` : null)
       || taxRateProblem(line.taxRate)
-      || (!line.accountId ? 'Choose the income account the sale goes to.' : null);
+      || (!line.accountId ? words.accountMissing : null);
 
     let amountCents = 0;
     let taxCents = 0;
@@ -236,7 +260,7 @@ export function SalesDocumentBuilder({
       else if (amountCents > MAX_LINE_CENTS) lineProblem = 'This line is too large to record.';
     }
     return { line, item, stocked, problem: lineProblem, amountCents, taxCents, unitPriceCents };
-  }), [lines, items]);
+  }), [lines, items, words]);
 
   const totals = orderTotals(checked.filter((c) => !c.problem));
   const customerInvoices = invoices.filter((invoice: any) =>
@@ -248,21 +272,23 @@ export function SalesDocumentBuilder({
         method: initial ? 'PUT' : 'POST',
         headers: { 'Content-Type': 'application/json', 'x-org-id': orgId },
         body: JSON.stringify({
-          customerId: customerId || undefined,
+          [config.purchase ? 'vendorId' : 'customerId']: customerId || undefined,
           [config.dateKey]: orderDate,
           ...(config.secondDate ? { [config.secondDate.key]: promisedDate || undefined } : {}),
           ...(config.paidNow
             ? { memo: notes.trim() || undefined, payeeName: customerId ? undefined : payeeName.trim() || undefined, depositAccountId, reference: reference.trim() || undefined }
             : config.credit
               ? { memo: notes.trim() || undefined, invoiceId: invoiceId || undefined }
-              : { notes: notes.trim() || undefined }),
+              : config.purchase
+                ? { memo: notes.trim() || undefined }
+                : { notes: notes.trim() || undefined }),
           idempotencyKey,
           lines: checked.map(({ line, unitPriceCents }) => ({
             description: line.description.trim(),
             accountId: line.accountId,
             inventoryItemId: line.itemId || undefined,
             quantity: Number(line.quantity.trim()),
-            unitPriceCents,
+            [config.purchase ? 'unitCostCents' : 'unitPriceCents']: unitPriceCents,
             taxRate: Number(line.taxRate.trim() || '0'),
           })),
         }),
@@ -277,7 +303,7 @@ export function SalesDocumentBuilder({
 
   const submit = () => {
     setProblem('');
-    if (!customerId && !config.paidNow) return setProblem(kind === 'order' ? 'Choose the customer who placed the order.' : kind === 'credit' ? 'Choose the customer the credit is for.' : 'Choose the customer.');
+    if (!customerId && !config.paidNow) return setProblem(words.missing);
     if (!orderDate) return setProblem(`Enter the ${config.dateLabel.toLowerCase()}.`);
     if (config.secondDate && promisedDate && promisedDate < orderDate) return setProblem(`${config.secondDate.label} cannot be before the ${config.dateLabel.toLowerCase()}.`);
     if (config.paidNow && !depositAccountId) return setProblem('Choose the account the money went into.');
@@ -305,11 +331,11 @@ export function SalesDocumentBuilder({
       <div className="space-y-5">
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
           <Field
-            label="Customer"
-            hint={config.paidNow ? 'Optional for a walk-in sale.' : customers.length === 0 ? 'Add the customer under Customers first. For walk-in sales, add one called Walk-in.' : undefined}
+            label={words.party}
+            hint={config.paidNow ? 'Optional for a walk-in sale.' : customers.length === 0 ? (config.purchase ? 'Add the supplier under Vendors first.' : 'Add the customer under Customers first. For walk-in sales, add one called Walk-in.') : undefined}
           >
             <select value={customerId} onChange={(e) => { setCustomerId(e.target.value); setInvoiceId(''); }}>
-              <option value="">{config.paidNow ? 'Walk-in, no customer record' : 'Choose a customer'}</option>
+              <option value="">{config.paidNow ? 'Walk-in, no customer record' : words.choose}</option>
               {customers.map((customer: any) => (
                 <option key={customer.id} value={customer.id}>{customer.displayName}</option>
               ))}
@@ -400,9 +426,9 @@ export function SalesDocumentBuilder({
                       />
                     </label>
                     <label className="block sm:col-span-2">
-                      <span className="block text-[12.5px] font-semibold text-ink-900">Unit price</span>
+                      <span className="block text-[12.5px] font-semibold text-ink-900">{words.price}</span>
                       <input
-                        aria-label={`Line ${index + 1} unit price, ${baseCurrency}`}
+                        aria-label={`Line ${index + 1} ${words.price.toLowerCase()}, ${baseCurrency}`}
                         inputMode="decimal"
                         value={line.unitPrice}
                         onChange={(e) => setLine(line.key, { unitPrice: e.target.value })}
@@ -420,9 +446,9 @@ export function SalesDocumentBuilder({
                       />
                     </label>
                     <label className="col-span-2 sm:col-span-6 block">
-                      <span className="block text-[12.5px] font-semibold text-ink-900">Income account</span>
+                      <span className="block text-[12.5px] font-semibold text-ink-900">{words.account}</span>
                       <select
-                        aria-label={`Line ${index + 1} income account`}
+                        aria-label={`Line ${index + 1} ${words.account.toLowerCase()}`}
                         value={line.accountId}
                         onChange={(e) => setLine(line.key, { accountId: e.target.value })}
                         className="mt-1 h-10 w-full border px-2.5 text-[14px]"
@@ -448,7 +474,7 @@ export function SalesDocumentBuilder({
                       <Amount cents={lineProblem ? 0 : amountCents} currency={baseCurrency} tone="ink" />
                     </div>
                   </div>
-                  {stocked && !config.credit && Number.isFinite(quantity) && quantity > onHand && (
+                  {stocked && !config.credit && !config.purchase && Number.isFinite(quantity) && quantity > onHand && (
                     <p className="mt-1.5 text-[12.5px] text-graphite-600">{config.stockNote(onHand)}</p>
                   )}
                   {item && !stocked && (

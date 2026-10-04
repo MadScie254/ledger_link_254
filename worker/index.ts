@@ -20,6 +20,7 @@ import { registerAiRoutes } from './routes/ai';
 import { registerCurrencyRoutes } from './routes/currency';
 import { registerCashRoutes } from './routes/cash';
 import { registerCreditRoutes } from './routes/credits';
+import { registerPurchaseOrderRoutes } from './routes/purchaseOrders';
 
 const app = new Hono<{ Variables: Variables }>();
 
@@ -73,6 +74,7 @@ registerAiRoutes(api);
 registerCurrencyRoutes(api);
 registerCashRoutes(api);
 registerCreditRoutes(api);
+registerPurchaseOrderRoutes(api);
 
 app.route('/api', api);
 

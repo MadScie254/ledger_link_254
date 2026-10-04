@@ -545,3 +545,41 @@ export const reverseCreditUseSchema = z.object({
   reversalDate: isoDate.optional(),
   reason,
 });
+
+// --- Purchase orders -------------------------------------------------------------
+
+const purchaseOrderLineSchema = z.object({
+  description: requiredText(500, 'A line description'),
+  accountId: uuid,
+  inventoryItemId: optionalUuid,
+  quantity: z.number().positive().max(1_000_000_000)
+    .refine((value) => decimals(value) <= 3, 'Use at most three decimals for a quantity.'),
+  unitCostCents: cents,
+  taxRate: z.number().min(0).max(100)
+    .refine((value) => decimals(value) <= 2, 'Use at most two decimals for a VAT rate.')
+    .default(0),
+});
+export const purchaseOrderSchema = z.object({
+  vendorId: uuid,
+  orderDate: isoDate,
+  expectedDate: isoDate.optional(),
+  memo: text(4000),
+  idempotencyKey: idempotencyKey.optional(),
+  lines: z.array(purchaseOrderLineSchema).min(1).max(200),
+}).refine((order) => !order.expectedDate || order.expectedDate >= order.orderDate, {
+  message: 'The expected date cannot be before the order date.',
+});
+export const purchaseOrderStatusSchema = z.object({
+  status: z.enum(['OPEN', 'CLOSED']),
+  reason: text(500),
+});
+export const billPurchaseOrderSchema = z.object({
+  billDate: isoDate,
+  dueDate: isoDate,
+  supplierReference: text(100),
+  quantities: z.array(z.object({
+    position: z.number().int().positive(),
+    quantity: z.number().min(0).max(1_000_000_000),
+  })).max(200).optional(),
+  idempotencyKey,
+}).refine((body) => body.dueDate >= body.billDate, { message: 'The due date cannot be before the bill date.' });

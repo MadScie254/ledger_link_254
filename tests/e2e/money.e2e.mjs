@@ -129,3 +129,35 @@ test('a supplier credit is recorded, then refunded into the bank', async () => {
     assert.deepEqual(problems, []);
   });
 });
+
+test('a purchase order is written, then billed for what arrived', async () => {
+  const session = await signedIn();
+  const { page, api, problems } = session;
+  await flow('purchase-order', session, async () => {
+    const before = Number(sql(`SELECT quantity_on_hand FROM public.inventory_items WHERE name = 'Cement 50kg'`));
+    await openView(page, 'Bills and expenses');
+    await page.getByRole('tab', { name: 'Purchase orders' }).click();
+    await page.getByRole('button', { name: 'New purchase order' }).click();
+    const dialog = page.getByRole('dialog');
+    await dialog.locator('select').first().selectOption({ label: 'Kenya Power' });
+    await dialog.getByLabel('Line 1 stock item').selectOption({ label: 'Cement 50kg' });
+    await dialog.getByLabel('Line 1 quantity').fill('10');
+    await dialog.getByLabel('Line 1 unit cost, KES').fill('700');
+    await dialog.getByLabel('Line 1 account').selectOption({ label: '6000 Operating expenses' });
+    await dialog.getByRole('button', { name: 'Save purchase order' }).click();
+    await dialog.waitFor({ state: 'hidden', timeout: 10_000 });
+    await page.getByText(/PO-\d{4}-00001/).first().waitFor({ timeout: 10_000 });
+    assert.equal(sql(`SELECT count(*) FROM public.journal_entries WHERE source_id = (SELECT id FROM public.purchase_orders LIMIT 1)`), '0');
+
+    await page.getByRole('button', { name: 'Make a bill' }).click();
+    const billing = page.getByRole('dialog');
+    await billing.getByLabel('Quantity to bill, Cement 50kg').fill('4');
+    await billing.getByRole('button', { name: 'Post bill' }).click();
+    await page.getByText(/The rest stays on the order/).waitFor({ timeout: 10_000 });
+    await page.getByText('Cement 50kg · 4 of 10 billed').waitFor({ timeout: 10_000 });
+    assert.deepEqual(refusedWrites(api), []);
+    assert.equal(sql(`SELECT total_cents FROM public.bills WHERE purchase_order_id IS NOT NULL`), '280000');
+    assert.equal(Number(sql(`SELECT quantity_on_hand FROM public.inventory_items WHERE name = 'Cement 50kg'`)), before + 4);
+    assert.deepEqual(problems, []);
+  });
+});

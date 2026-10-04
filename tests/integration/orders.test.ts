@@ -173,3 +173,53 @@ test('an estimate is saved, edited, accepted and converted through the service',
   assert.equal(estimate.invoiceNumber, converted.number);
   await assert.rejects(EstimateService.saveEstimate(input, saved.id), (err: any) => /converted/.test(err.message));
 });
+
+import { PurchaseOrderService } from '../../src/server/purchaseOrders';
+import { BillService } from '../../src/server/bills';
+import { VENDOR, OPEX, uuid, refused } from './helpers';
+
+test('a purchase order is billed in two parts, lists its bills, and a voided bill reopens it', async () => {
+  const before = stock(CEMENT);
+  const po = await PurchaseOrderService.save({
+    orgId: ORG, vendorId: VENDOR, orderDate: '2026-10-01', expectedDate: '2026-10-08', memo: 'To the yard', actor: OWNER, idempotencyKey: uuid(),
+    lines: [
+      { description: 'Cement 50kg', accountId: OPEX, inventoryItemId: CEMENT, quantity: 6, unitCostCents: 70_000, taxRate: 16 },
+      { description: 'Delivery', accountId: OPEX, quantity: 1, unitCostCents: 3_000 },
+    ],
+  });
+  assert.match(po.number, /^PO-2026-/);
+  assert.equal(po.totalCents, 420_000 + 67_200 + 3_000);
+
+  const first = await PurchaseOrderService.bill({
+    orgId: ORG, id: po.id, billDate: '2026-10-03', dueDate: '2026-11-02', supplierReference: 'KP-1001',
+    quantities: [{ position: 1, quantity: 2 }, { position: 2, quantity: 0 }], actor: OWNER, idempotencyKey: uuid(),
+  });
+  assert.equal(first.status, 'OPEN');
+  assert.equal(stock(CEMENT), before + 2);
+  await refused(PurchaseOrderService.save({
+    orgId: ORG, id: po.id, vendorId: VENDOR, orderDate: '2026-10-01', actor: OWNER,
+    lines: [{ description: 'x', accountId: OPEX, quantity: 1, unitCostCents: 100 }],
+  }), /can no longer be changed/);
+
+  const second = await PurchaseOrderService.bill({
+    orgId: ORG, id: po.id, billDate: '2026-10-05', dueDate: '2026-11-04', actor: OWNER, idempotencyKey: uuid(),
+  });
+  assert.equal(second.status, 'BILLED');
+  assert.equal(stock(CEMENT), before + 6);
+
+  const listed = (await PurchaseOrderService.list(ORG, { vendorId: VENDOR })).find((o) => o.id === po.id)!;
+  assert.equal(listed.vendorName, 'Kenya Power');
+  assert.equal(listed.status, 'BILLED');
+  assert.deepEqual(listed.lines.map((l) => [l.quantityBilled, l.quantity]), [[6, 6], [1, 1]]);
+  assert.deepEqual(listed.bills.map((b) => b.billNumber).sort(), [first.billNumber, second.billNumber].sort());
+  assert.equal((await BillService.getBill(ORG, second.billId))!.purchaseOrderId, po.id);
+
+  await BillService.voidBill(ORG, second.billId, OWNER, '2026-10-06');
+  const reopened = (await PurchaseOrderService.list(ORG)).find((o) => o.id === po.id)!;
+  assert.equal(reopened.status, 'OPEN');
+  assert.deepEqual(reopened.lines.map((l) => l.quantityBilled), [2, 0]);
+  assert.equal(stock(CEMENT), before + 2);
+
+  await refused(PurchaseOrderService.setStatus(ORG, po.id, 'CLOSED', ' ', OWNER), /reason/);
+  assert.equal((await PurchaseOrderService.setStatus(ORG, po.id, 'CLOSED', 'Supplier out of stock', OWNER)).status, 'CLOSED');
+});
