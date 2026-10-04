@@ -284,3 +284,53 @@ test('team members are listed in one query, and joining needs the invitee to acc
   assert.deepEqual(after.invitations, []);
   await assert.rejects(TeamService.respond(invitation.invitationId, MEMBER, true));
 });
+
+import { ReconciliationService } from '../../src/server/reconciliation';
+import { parseCsv, detectCsvLayout, linesFromCsv } from '../../src/utils/statementImport';
+
+test('an M-Pesa statement is imported once, matched against its own account, and reconciled', async () => {
+  const till = sql(`INSERT INTO public.accounts (org_id, code, name, type, is_bank_account) VALUES ('${ORG}', '1060', 'M-Pesa Paybill', 'ASSET', true) RETURNING id`).split('\n')[0];
+  const csv = [
+    'Receipt No.,Completion Time,Details,Transaction Status,Paid In,Withdrawn,Balance',
+    'RA11,2026-08-03 10:00:00,Customer Payment from ACME,Completed,"2,000.00",,2000.00',
+    'RA12,2026-08-05 12:00:00,Pay Bill to KPLC,Completed,,-450.00,1550.00',
+  ].join('\n');
+  const rows = parseCsv(csv);
+  const { headerRow, mapping } = detectCsvLayout(rows);
+  const { lines } = linesFromCsv(rows, headerRow, mapping!);
+
+  const first = await BankingService.importStatement(ORG, till, 'mpesa-aug.csv', lines, OWNER);
+  assert.deepEqual([first.imported, first.skipped], [2, 0]);
+  const again = await BankingService.importStatement(ORG, till, 'mpesa-aug.csv', lines, OWNER);
+  assert.deepEqual([again.imported, again.skipped], [0, 2]);
+  const onTill = await BankingService.getTransactions(ORG, till);
+  assert.deepEqual(onTill.map((t) => [t.reference, t.direction, t.amountCents]).sort(), [['RA11', 'IN', 200_000], ['RA12', 'OUT', 45_000]]);
+  assert.equal((await BankingService.getImports(ORG))[0].accountName, '1060 M-Pesa Paybill');
+
+  // Matching posts to the Paybill, and its candidates come from the Paybill.
+  const paidIn = onTill.find((t) => t.reference === 'RA11')!;
+  const paidOut = onTill.find((t) => t.reference === 'RA12')!;
+  await BankingService.matchTransaction(ORG, paidIn.id, { targetAccountId: SALES }, OWNER);
+  await BankingService.matchTransaction(ORG, paidOut.id, { targetAccountId: OPEX }, OWNER);
+  assert.equal((await AccountService.getAccountBalances(ORG)).get(till), 155_000);
+  assert.equal((await BankingService.getReconciliationSummary(ORG, till)).varianceCents, 0);
+
+  // Reconcile to 31 August at 1,550.00: the matched lines start ticked.
+  await refused(ReconciliationService.start(ORG, { accountId: SALES, statementDate: '2026-08-31', statementBalanceCents: 0 }, OWNER), /bank, cash or M-Pesa/);
+  const started = await ReconciliationService.start(ORG, { accountId: till, statementDate: '2026-08-31', statementBalanceCents: 155_000 }, OWNER);
+  const sheet = await ReconciliationService.worksheet(ORG, started.id);
+  assert.equal(sheet.lines.length, 2);
+  assert.ok(sheet.lines.every((l) => l.cleared && l.onStatement));
+  assert.equal(sheet.differenceCents, 0);
+  await ReconciliationService.setLines(ORG, started.id, [sheet.lines[0].journalLineId], OWNER);
+  await refused(ReconciliationService.complete(ORG, started.id, OWNER), /difference is/);
+  await ReconciliationService.setLines(ORG, started.id, sheet.lines.map((l) => l.journalLineId), OWNER);
+  assert.equal((await ReconciliationService.complete(ORG, started.id, OWNER)).status, 'COMPLETED');
+  const [latest] = await ReconciliationService.list(ORG, till);
+  assert.equal(latest.status, 'COMPLETED');
+  assert.equal(latest.accountName, '1060 M-Pesa Paybill');
+  assert.equal((await ReconciliationService.worksheet(ORG, started.id)).lines.length, 2, 'a finished one lists what it cleared');
+
+  await refused(ReconciliationService.undo(ORG, started.id, ' ', OWNER), /reason/i);
+  assert.equal((await ReconciliationService.undo(ORG, started.id, 'Wrong month', OWNER)).status, 'UNDONE');
+});

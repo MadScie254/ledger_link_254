@@ -48,6 +48,8 @@ function mapTransaction(row: any) {
     amountCents: Number(row.amount_cents) || 0,
     direction: row.direction,
     status: row.status,
+    bankAccountId: row.bank_account_id ?? null,
+    reference: row.reference ?? null,
     matchedJournalEntryId: row.matched_journal_entry_id ?? null,
     aiCategoryCode: row.ai_category_code,
     aiCategoryName: row.ai_category_name,
@@ -109,18 +111,83 @@ async function linkedEntryIds(orgId: string): Promise<Set<string>> {
   return new Set(rows.map((row) => row.matched_journal_entry_id).filter((id): id is string => Boolean(id)));
 }
 
+/** The account a statement line belongs to: its own, or account 1000 for a line from before lines had one. */
+async function statementAccountId(orgId: string, bankAccountId: string | null | undefined): Promise<string | null> {
+  if (bankAccountId) return bankAccountId;
+  return (await AccountService.getAccountByCode(orgId, BANK_ACCOUNT_CODE))?.id ?? null;
+}
+
+export interface StatementLineInput {
+  date: string;
+  description: string;
+  amountCents: number;
+  reference?: string;
+}
+
 export class BankingService {
-  static async getTransactions(orgId: string) {
+  static async getTransactions(orgId: string, accountId?: string) {
     const supabase = getSupabase();
-    const rows = await fetchAllRows<any>((from, to) => supabase
-      .from('bank_transactions')
-      .select('*')
-      .eq('org_id', orgId)
-      .order('date', { ascending: false })
-      .order('id')
-      .range(from, to));
+    const rows = await fetchAllRows<any>((from, to) => {
+      let query = supabase
+        .from('bank_transactions')
+        .select('*')
+        .eq('org_id', orgId);
+      if (accountId) query = query.eq('bank_account_id', accountId);
+      return query
+        .order('date', { ascending: false })
+        .order('id')
+        .range(from, to);
+    });
 
     return rows.map(mapTransaction);
+  }
+
+  /**
+   * Adds a statement's lines to a money account in one transaction
+   * (public.import_bank_statement). Lines the account already has, by the
+   * bank's reference or by date, amount and particulars, are skipped.
+   */
+  static async importStatement(orgId: string, accountId: string, fileName: string | undefined, lines: StatementLineInput[], actor: string) {
+    const { data, error } = await getSupabase().rpc('import_bank_statement', {
+      p_org_id: orgId,
+      p_bank_account_id: accountId,
+      p_file_name: fileName?.trim() || null,
+      p_lines: lines.map((line) => ({
+        date: line.date,
+        description: line.description.trim(),
+        amountCents: Math.trunc(line.amountCents),
+        reference: line.reference?.trim() || null,
+      })),
+      p_actor: actor,
+    });
+    if (error) throw error;
+    return data as { importId: string; lines: number; imported: number; skipped: number; firstDate: string | null; lastDate: string | null };
+  }
+
+  static async getImports(orgId: string) {
+    const supabase = getSupabase();
+    const { data, error } = await supabase
+      .from('bank_statement_imports')
+      .select('*, account:accounts!bank_statement_imports_account_fkey(code, name)')
+      .eq('org_id', orgId)
+      .order('created_at', { ascending: false })
+      .limit(50);
+    if (error) throw error;
+    return (data || []).map((row: any) => {
+      const account = Array.isArray(row.account) ? row.account[0] : row.account;
+      return {
+        id: row.id,
+        accountId: row.bank_account_id,
+        accountName: account ? `${account.code} ${account.name}` : null,
+        fileName: row.file_name,
+        lines: row.line_count,
+        imported: row.imported_count,
+        skipped: row.skipped_count,
+        firstDate: row.first_date,
+        lastDate: row.last_date,
+        createdAt: row.created_at,
+      };
+    });
   }
 
   /**
@@ -131,19 +198,19 @@ export class BankingService {
    */
   static async getEntryCandidates(orgId: string, transactionId: string) {
     const supabase = getSupabase();
-    const [{ data: tx, error: txError }, bankAccount, linked] = await Promise.all([
-      supabase.from('bank_transactions').select('id, amount_cents, direction').eq('org_id', orgId).eq('id', transactionId).maybeSingle(),
-      AccountService.getAccountByCode(orgId, BANK_ACCOUNT_CODE),
+    const [{ data: tx, error: txError }, linked] = await Promise.all([
+      supabase.from('bank_transactions').select('id, amount_cents, direction, bank_account_id').eq('org_id', orgId).eq('id', transactionId).maybeSingle(),
       linkedEntryIds(orgId),
     ]);
     if (txError) throw txError;
     if (!tx) throw new UserError('Statement line not found in this organization.', 404);
-    if (!bankAccount) return [];
+    const bankAccountId = await statementAccountId(orgId, tx.bank_account_id);
+    if (!bankAccountId) return [];
     const cents = Number(tx.amount_cents);
     const { data: lines, error } = await supabase
       .from('journal_lines')
       .select('journal_entry_id, debit, credit, journal_entry:journal_entries!inner(id, org_id, entry_date, memo, reference_no, source_type)')
-      .eq('account_id', bankAccount.id)
+      .eq('account_id', bankAccountId)
       .eq('journal_entries.org_id', orgId)
       .eq(tx.direction === 'IN' ? 'debit' : 'credit', cents)
       .order('journal_entry_id')
@@ -265,20 +332,19 @@ export class BankingService {
     }));
   }
 
-  static async getReconciliationSummary(orgId: string) {
-    const [transactions, bankAccount] = await Promise.all([
-      this.getTransactions(orgId),
-      AccountService.getAccountByCode(orgId, BANK_ACCOUNT_CODE),
-    ]);
+  /** Every statement line on one money account (1000 by default) against that account in the ledger. */
+  static async getReconciliationSummary(orgId: string, accountId?: string) {
+    const bankAccountId = await statementAccountId(orgId, accountId);
+    const transactions = bankAccountId ? await this.getTransactions(orgId, bankAccountId) : [];
     const statementBalanceCents = transactions.reduce(
       (sum, tx: any) => sum + (tx.direction === 'IN' ? tx.amountCents : -tx.amountCents),
       0
     );
 
     let glBalanceCents = 0;
-    if (bankAccount) {
+    if (bankAccountId) {
       const balances = await AccountService.getAccountBalances(orgId);
-      glBalanceCents = balances.get(bankAccount.id) || 0;
+      glBalanceCents = balances.get(bankAccountId) || 0;
     }
 
     return {
@@ -297,10 +363,10 @@ export class BankingService {
    */
   static async getAIMatches(orgId: string): Promise<BankMatchCandidate[]> {
     const supabase = getSupabase();
-    const [unmatchedRows, rules, accounts, bankAccount] = await Promise.all([
+    const [unmatchedRows, rules, accounts, defaultBank] = await Promise.all([
       fetchAllRows<any>((from, to) => supabase
         .from('bank_transactions')
-        .select('id, date, description, amount_cents, direction, status')
+        .select('id, date, description, amount_cents, direction, status, bank_account_id')
         .eq('org_id', orgId)
         .neq('status', 'MATCHED')
         .order('id')
@@ -324,8 +390,16 @@ export class BankingService {
     }));
     if (lines.length === 0) return [];
 
-    const dates = lines.map((line) => line.date.slice(0, 10)).sort();
-    const [invoiceRows, billRows, movements, linked] = await Promise.all([
+    // Lines are matched to entries on their own account: group them by it.
+    const accountOf = new Map<string, string | null>(unmatchedRows.map((row) => [row.id, row.bank_account_id || defaultBank?.id || null]));
+    const groups = new Map<string, BankLine[]>();
+    for (const line of lines) {
+      const accountId = accountOf.get(line.id);
+      if (!accountId) continue;
+      groups.set(accountId, [...(groups.get(accountId) || []), line]);
+    }
+
+    const [invoiceRows, billRows, movementsByAccount, linked] = await Promise.all([
       fetchAllRows<any>((from, to) => supabase
         .from('invoices')
         .select('id, invoice_number, amount_due_cents, customers(display_name)')
@@ -340,9 +414,10 @@ export class BankingService {
         .in('status', ['OPEN', 'PARTIALLY_PAID'])
         .order('id')
         .range(from, to)),
-      bankAccount
-        ? bankMovementsByEntry(orgId, bankAccount.id, { from: addDays(dates[0], -45), to: addDays(dates[dates.length - 1], 45) })
-        : Promise.resolve(new Map<string, BankEntry>()),
+      Promise.all([...groups.entries()].map(async ([accountId, group]) => {
+        const dates = group.map((line) => line.date.slice(0, 10)).sort();
+        return [accountId, await bankMovementsByEntry(orgId, accountId, { from: addDays(dates[0], -45), to: addDays(dates[dates.length - 1], 45) })] as const;
+      })),
       linkedEntryIds(orgId),
     ]);
 
@@ -353,9 +428,13 @@ export class BankingService {
     const openBills: OpenDocument[] = billRows.map((row) => ({
       id: row.id, number: row.bill_number, partyName: relationName(row.vendors), amountDueCents: Number(row.amount_due_cents) || 0,
     }));
-    const bankEntries = [...movements.values()].filter((entry) => !linked.has(entry.journalEntryId));
-
-    const suggestions = suggestBankMatches({ lines, rules, openInvoices, openBills, bankEntries });
+    const suggestions = movementsByAccount.flatMap(([accountId, movements]) => suggestBankMatches({
+      lines: groups.get(accountId) || [],
+      rules,
+      openInvoices,
+      openBills,
+      bankEntries: [...movements.values()].filter((entry) => !linked.has(entry.journalEntryId)),
+    }));
 
     // Resolve account guesses against this company's chart; a guess for an
     // account the company does not have, or has switched off, is dropped.

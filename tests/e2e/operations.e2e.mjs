@@ -135,6 +135,40 @@ test('a statement line is posted to an account, then the match undone', async ()
   });
 });
 
+test('an M-Pesa statement is imported, then the till reconciled to it', async () => {
+  const session = await signedIn();
+  const { page, api, problems } = session;
+  await flow('statement-import', session, async () => {
+    await openView(page, 'Banking');
+    await page.getByRole('button', { name: 'Import statement' }).click();
+    const dialog = page.getByRole('dialog');
+    await dialog.locator('select[name="accountId"]').selectOption({ label: '1050 · M-Pesa Till' });
+    const csv = [
+      'Receipt No.,Completion Time,Details,Transaction Status,Paid In,Withdrawn,Balance',
+      'SB71,2026-09-02 10:00:00,Customer Payment from ACME,Completed,"1,200.00",,1200.00',
+      'SB72,2026-09-03 11:30:00,Pay Bill to KPLC,Completed,,-300.00,900.00',
+    ].join('\n');
+    await dialog.locator('input[name="statement"]').setInputFiles({ name: 'mpesa-sep.csv', mimeType: 'text/csv', buffer: Buffer.from(csv) });
+    await dialog.getByText('2 lines read').waitFor({ timeout: 10_000 });
+    await dialog.getByRole('button', { name: 'Import 2 lines' }).click();
+    await page.getByText(/2 lines imported to M-Pesa Till/).waitFor({ timeout: 10_000 });
+    assert.equal(sql(`SELECT count(*) FROM public.bank_transactions WHERE reference IN ('SB71', 'SB72')`), '2');
+
+    // Reconcile the till to what the ledger holds today, every line ticked.
+    const balance = Number(sql(`SELECT COALESCE(sum(l.debit - l.credit), 0) FROM public.journal_lines l JOIN public.accounts a ON a.id = l.account_id WHERE a.org_id = '${ORG}' AND a.code = '1050'`));
+    await page.getByRole('tab', { name: 'Reconcile' }).click();
+    await page.locator('select[name="reconcileAccount"]').selectOption({ label: '1050 · M-Pesa Till' });
+    await page.locator('input[name="statementBalance"]').fill((balance / 100).toFixed(2));
+    await page.getByRole('button', { name: 'Start reconciling' }).click();
+    await page.getByRole('button', { name: 'Tick every line' }).click();
+    await page.getByRole('button', { name: 'Finish reconciliation' }).click();
+    await page.getByText(/M-Pesa Till reconciled to/).waitFor({ timeout: 10_000 });
+    assert.deepEqual(refusedWrites(api), []);
+    assert.equal(sql(`SELECT status FROM public.bank_reconciliations ORDER BY created_at DESC LIMIT 1`), 'COMPLETED');
+    assert.deepEqual(problems, []);
+  });
+});
+
 test('an employee is added, a month is paid and the run reversed', async () => {
   const session = await signedIn();
   const { page, api, problems } = session;

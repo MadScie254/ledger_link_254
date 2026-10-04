@@ -9,6 +9,8 @@ import { Mark } from '../ledger/Mark';
 import { PageHeading, IndexTabs, PageNote, SkeletonRows, EmptyNote, buttonClass } from '../ledger/Page';
 import { CashTransactionsPanel } from '../common/CashTransactionsPanel';
 import { TransferDialog } from './TransferDialog';
+import { ImportStatementDialog } from './ImportStatementDialog';
+import { ReconcilePanel } from './ReconcilePanel';
 import { useConfirm } from '../../hooks/useConfirm';
 import { downloadCsv } from '../../utils/exportCsv';
 import { Dialog, Field } from '../ledger/Dialog';
@@ -27,6 +29,8 @@ export function BankingView() {
   useRenderTracker("BankingView");
   const [activeTab, setActiveTab] = useState('Bank transactions');
   const [isTransferring, setIsTransferring] = useState(false);
+  const [isImporting, setIsImporting] = useState(false);
+  const [filterAccount, setFilterAccount] = useState('ALL');
   const [filterSearch, setFilterSearch] = useState('');
   const [filterDate, setFilterDate] = useState('');
   const [filterDirection, setFilterDirection] = useState('ALL');
@@ -92,6 +96,7 @@ export function BankingView() {
     if (filterDate && tx.date.substring(0, 10) !== filterDate) matches = false;
     if (filterDirection !== 'ALL' && tx.direction !== filterDirection) matches = false;
     if (filterStatus !== 'ALL' && tx.status !== filterStatus) matches = false;
+    if (filterAccount !== 'ALL' && tx.bankAccountId !== filterAccount) matches = false;
     return matches;
   });
 
@@ -140,16 +145,6 @@ export function BankingView() {
     }
   });
 
-  // Fetch Reconciliation Summary
-  const { data: reconciliationData, isLoading: reconciliationLoading } = useQuery({
-    queryKey: ['banking_reconciliation', currentOrgId],
-    queryFn: async () => {
-      const res = await fetch('/api/banking/reconciliation', { headers: { 'x-org-id': currentOrgId } });
-      if (!res.ok) throw new Error('Failed to fetch reconciliation summary');
-      return res.json();
-    },
-    enabled: activeTab === 'Reconcile'
-  });
 
   // Fetch Bank Connection Requests
   const { data: connectionsData, isLoading: connectionsLoading } = useQuery({
@@ -369,6 +364,8 @@ export function BankingView() {
     setManualAccountId('');
   };
   const allAccounts: any[] = accountsData?.accounts || [];
+  // Accounts that have statement lines, for the account filter.
+  const statementAccounts = allAccounts.filter((a: any) => rawTx.some((tx: any) => tx.bankAccountId === a.id));
   // Receivables and payables move only through invoices, bills and their
   // payments, and a bank line cannot post back to the bank.
   const postableAccounts = allAccounts.filter((a: any) => a.isActive !== false && !['1000', '1100', '2000'].includes(a.code));
@@ -407,6 +404,9 @@ export function BankingView() {
         note={<>Bank and M-Pesa statement lines, matched to the books · Figures in {baseCurrency}</>}
         actions={
           <>
+            <button type="button" onClick={() => setIsImporting(true)} className={buttonClass.secondary}>
+              Import statement
+            </button>
             <button type="button" onClick={() => setIsTransferring(true)} className={buttonClass.secondary}>
               Transfer money
             </button>
@@ -489,6 +489,15 @@ export function BankingView() {
                 <option value="MATCHED">Matched</option>
               </select>
             </label>
+            {statementAccounts.length > 1 && (
+              <label>
+                <span className="sr-only">Account</span>
+                <select value={filterAccount} onChange={(e) => setFilterAccount(e.target.value)} className="h-9 px-2.5 text-[13.5px] border">
+                  <option value="ALL">Every account</option>
+                  {statementAccounts.map((a: any) => <option key={a.id} value={a.id}>{a.code} · {a.name}</option>)}
+                </select>
+              </label>
+            )}
             <span className="text-[12.5px] text-graphite-600 pb-2">
               {filteredTx.length} of {rawTx.length} lines
             </span>
@@ -777,42 +786,7 @@ export function BankingView() {
         </div>
       )}
 
-      {activeTab === 'Reconcile' && (
-        <div className="max-w-3xl space-y-4">
-          <p className="text-[13.5px] text-graphite-600">The imported statement balance against the cash account (1000) in the ledger.</p>
-          {reconciliationLoading ? (
-            <SkeletonRows label="Working out the balances" rows={3} />
-          ) : (
-            <>
-              <div className="border-t border-feint-strong">
-                <div className="flex items-baseline justify-between gap-4 border-b border-feint py-2.5 text-[14px]">
-                  <span className="text-ink-900">Statement balance</span>
-                  <Amount cents={reconciliationData?.statementBalanceCents || 0} currency={baseCurrency} tone="ink" />
-                </div>
-                <div className="flex items-baseline justify-between gap-4 border-b border-feint py-2.5 text-[14px]">
-                  <span className="text-ink-900">Ledger balance, account 1000</span>
-                  <Amount cents={reconciliationData?.glBalanceCents || 0} currency={baseCurrency} tone="ink" />
-                </div>
-                <div className="ll-total flex items-baseline justify-between gap-4 py-2.5 text-[14px] font-semibold">
-                  <span className={reconciliationData?.varianceCents ? 'text-ledger-red' : 'text-ink-900'}>Difference</span>
-                  <Amount cents={Math.abs(reconciliationData?.varianceCents || 0)} currency={baseCurrency} tone={reconciliationData?.varianceCents ? 'alert' : 'ink'} />
-                </div>
-              </div>
-              {reconciliationData?.varianceCents === 0 ? (
-                <p className="text-[13.5px]"><Mark kind="tick" label="The statement and the ledger agree to the cent." /></p>
-              ) : (
-                <p className="text-[13.5px] text-ink-900">
-                  {(reconciliationData?.varianceCents || 0) > 0 ? 'Lines on the statement are not yet matched in the ledger.' : 'Entries in the ledger are not on the statement.'}{' '}
-                  <button type="button" onClick={() => setActiveTab('Bank transactions')} className={buttonClass.quiet}>
-                    See the unmatched lines
-                  </button>
-                </p>
-              )}
-              <p className="text-[12.5px] text-graphite-600">From {reconciliationData?.transactionCount || 0} imported statement lines.</p>
-            </>
-          )}
-        </div>
-      )}
+      {activeTab === 'Reconcile' && <ReconcilePanel />}
 
       {activeTab === 'Bank connections' && (
         <div className="max-w-3xl space-y-4">
@@ -1052,6 +1026,7 @@ export function BankingView() {
       </Dialog>
 
       <TransferDialog open={isTransferring} onClose={() => setIsTransferring(false)} onDone={setAutoReconcileNote} />
+      <ImportStatementDialog open={isImporting} onClose={() => setIsImporting(false)} onDone={(message) => { setAutoReconcileNote(message); setActiveTab('Bank transactions'); }} />
 
       {confirmDialog}
     </div>

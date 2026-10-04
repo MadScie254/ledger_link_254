@@ -605,3 +605,25 @@ export const recurringUpdateSchema = z.object(scheduleFields)
   .refine(scheduleRefine, { message: 'The end date cannot be before the first date.' });
 export const recurringStatusSchema = z.object({ status: z.enum(['ACTIVE', 'PAUSED', 'ENDED']) });
 export const recurringRunSchema = z.object({ documentDate: isoDate });
+
+// --- Statements and reconciliation -------------------------------------------------
+
+export const statementImportSchema = z.object({
+  accountId: uuid,
+  fileName: text(255),
+  lines: z.array(z.object({
+    date: isoDate,
+    description: z.string().trim().max(500).default(''),
+    amountCents: z.number().int().refine((value) => value !== 0, 'A line needs an amount.')
+      .refine((value) => Math.abs(value) <= Number.MAX_SAFE_INTEGER / 1000, 'The amount is too large.'),
+    reference: text(100),
+  })).min(1).max(5000),
+});
+export const reconciliationStartSchema = z.object({
+  accountId: uuid,
+  statementDate: isoDate,
+  statementBalanceCents: z.number().int().refine((value) => Math.abs(value) <= Number.MAX_SAFE_INTEGER / 1000, 'The balance is too large.'),
+  openingBalanceCents: z.number().int().refine((value) => Math.abs(value) <= Number.MAX_SAFE_INTEGER / 1000, 'The balance is too large.').optional(),
+});
+export const reconciliationLinesSchema = z.object({ journalLineIds: z.array(uuid).max(20000) });
+export const reconciliationUndoSchema = z.object({ reason: text(500) });
