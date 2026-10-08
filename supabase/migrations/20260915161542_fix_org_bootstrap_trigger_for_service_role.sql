@@ -1,0 +1,4 @@
+-- Historical Ledger-Link production migration 20260915161542_fix_org_bootstrap_trigger_for_service_role.
+-- The equivalent schema is created by supabase/migrations/20260915170000_fix_org_bootstrap_trigger_for_service_role.sql.
+-- This marker keeps production and repository migration versions in sync
+-- without replaying the same schema change twice.

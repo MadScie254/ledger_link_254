@@ -1,0 +1,4 @@
+-- Historical Ledger-Link production migration 20260928120613_add_accountant_membership_role.
+-- The equivalent schema is created by supabase/migrations/20260928150000_add_accountant_membership_role.sql.
+-- This marker keeps production and repository migration versions in sync
+-- without replaying the same schema change twice.

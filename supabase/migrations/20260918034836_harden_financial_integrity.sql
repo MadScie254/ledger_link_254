@@ -1,0 +1,4 @@
+-- Historical Ledger-Link production migration 20260918034836_harden_financial_integrity.
+-- The equivalent schema is created by supabase/migrations/20260917172744_harden_financial_integrity.sql.
+-- This marker keeps production and repository migration versions in sync
+-- without replaying the same schema change twice.

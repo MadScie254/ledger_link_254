@@ -113,6 +113,8 @@ The check compares every local migration version with the remote history and exi
 if either side has a migration the other lacks. Run it after applying migrations and before
 deploying the Worker. Review `supabase migration list` and resolve any history mismatch
 before running `supabase db push`; a missing history row does not prove its SQL is absent.
+See [the production migration history](docs/production-migration-history.md) for the
+legacy version aliases in this project.
 
 ### 4. Start the development server
 

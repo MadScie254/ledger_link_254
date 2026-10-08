@@ -1,0 +1,3 @@
+-- Historical Ledger-Link production migration 20260916210432_seed_demo_tenant_journal_entries.
+-- Production already has this fictional demo tenant data. Fresh local databases use
+-- scripts/seed-demo-org.ts when a demo tenant is wanted; do not seed it on every reset.

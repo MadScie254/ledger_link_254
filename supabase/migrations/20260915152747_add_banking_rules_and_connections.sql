@@ -1,0 +1,4 @@
+-- Historical Ledger-Link production migration 20260915152747_add_banking_rules_and_connections.
+-- The equivalent schema is created by supabase/migrations/20260915154500_add_banking_rules_and_connections.sql.
+-- This marker keeps production and repository migration versions in sync
+-- without replaying the same schema change twice.

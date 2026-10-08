@@ -1,0 +1,4 @@
+-- Historical Ledger-Link production migration 20260928102632_add_organization_theme_accent.
+-- The equivalent schema is created by supabase/migrations/20260928093000_add_organization_theme_accent.sql.
+-- This marker keeps production and repository migration versions in sync
+-- without replaying the same schema change twice.

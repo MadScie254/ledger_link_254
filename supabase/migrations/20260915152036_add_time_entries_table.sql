@@ -1,0 +1,4 @@
+-- Historical Ledger-Link production migration 20260915152036_add_time_entries_table.
+-- The equivalent schema is created by supabase/migrations/20260915153000_add_time_entries_table.sql.
+-- This marker keeps production and repository migration versions in sync
+-- without replaying the same schema change twice.

@@ -1,0 +1,4 @@
+-- Historical Ledger-Link production migration 20260915153714_add_payroll_runs_table.
+-- The equivalent schema is created by supabase/migrations/20260915160000_add_payroll_runs_table.sql.
+-- This marker keeps production and repository migration versions in sync
+-- without replaying the same schema change twice.

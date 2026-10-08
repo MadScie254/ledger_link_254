@@ -1,0 +1,4 @@
+-- Historical Ledger-Link production migration 20260928100824_add_organization_business_type.
+-- The equivalent schema is created by supabase/migrations/20260928090000_add_organization_business_type.sql.
+-- This marker keeps production and repository migration versions in sync
+-- without replaying the same schema change twice.
