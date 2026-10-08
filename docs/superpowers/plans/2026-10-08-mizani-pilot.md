@@ -17,9 +17,9 @@
 
 ## Task E2.2: client account functions
 
-- [ ] Write failing SQL tests for receipt, overdraw, void-invoice transfer, idempotency, and reconciliation.
-- [ ] Add a validated matter-tag trigger that runs when a dedicated client-money function calls the unchanged core journal function.
-- [ ] Add receipt, payment, transfer, office-disbursement, withholding payment, and balance functions with actor checks and per-matter locks.
+- [x] Write failing SQL tests for receipt, overdraw, void-invoice transfer, idempotency, and reconciliation.
+- [x] Add a validated matter-tag trigger that runs when a dedicated client-money function calls the unchanged core journal function.
+- [x] Add receipt, payment, transfer, office-disbursement, withholding payment, and balance functions with actor checks and per-matter locks.
 - [ ] Run checks, tag, commit, push, apply migration, and verify live grants and migration history.
 
 ## Task E2.3: fee notes
