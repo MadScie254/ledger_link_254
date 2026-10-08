@@ -42,9 +42,9 @@
 
 **Interfaces:** Produces `Edition`, `EditionDefinition`, `editionDefinition`, edition account lists, and localized sidebar groups.
 
-- [ ] Write tests for names, view keys, defaults, and account-code collisions; confirm failure.
-- [ ] Implement definitions and app view registry, then run tests, lint, and build.
-- [ ] Commit E1.2 and push.
+- [x] Write tests for names, view keys, defaults, and account-code collisions; confirm failure.
+- [x] Implement definitions and app view registry, then run tests, lint, and build.
+- [x] Commit E1.2 and push.
 
 ### Task 3: E1.3 organization and navigation wiring
 

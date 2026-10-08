@@ -1,4 +1,4 @@
-import { lazy, Suspense, useEffect, useState } from "react";
+import { lazy, Suspense, useEffect, useState, type ComponentType } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { AppLayout } from "./components/layout/AppLayout";
 import { useAppStore } from "./store";
@@ -16,6 +16,8 @@ import { LandingPage } from "./marketing/LandingPage";
 import { Mark } from "./components/ledger/Mark";
 import { InvitationsPrompt } from "./components/team/InvitationsPrompt";
 import { NewPasswordScreen } from "./components/layout/NewPasswordScreen";
+import { isPlannedEditionView, PLANNED_EDITION_VIEWS, PLANNED_SECTION_COPY, type BusinessView } from "./utils/views";
+export { KNOWN_VIEWS } from "./utils/views";
 
 /** A tab that has already gone past the landing page (signed in, or clicked
  * through) never sees it again this tab, including after a later sign-out:
@@ -72,6 +74,29 @@ const AuditLogView = lazy(() => import('./components/audit/AuditLogView').then((
 const SystemHealthView = lazy(() => import('./components/health/SystemHealthView').then((module) => ({ default: module.SystemHealthView })));
 const SettingsView = lazy(() => import('./components/settings/SettingsView').then((module) => ({ default: module.SettingsView })));
 const DocumentationView = lazy(() => import('./components/documentation/DocumentationView').then((module) => ({ default: module.DocumentationView })));
+
+// Every business view key has a real renderer. Edition pilot keys below show
+// an explicit unavailable state until their own feature tasks are complete.
+const BUSINESS_RENDERERS: Record<BusinessView, ComponentType> = {
+  'Home / Dashboard': DashboardView,
+  'Banking': BankingView,
+  'Sales': SalesView,
+  'Customer Hub': CustomerHubView,
+  'Expenses & Bills': ExpensesView,
+  'Accounting': AccountingView,
+  'Reports': ReportsView,
+  'Tax': TaxView,
+  'Payroll': PayrollView,
+  'Inventory': InventoryView,
+  'Projects': ProjectsView,
+  'Business Feed': BusinessFeedView,
+  'Team': TeamView,
+  'Apps / Integrations': AppsView,
+  'Audit Logs': AuditLogView,
+  'Documentation': DocumentationView,
+  'Settings': SettingsView,
+  'System Health': SystemHealthView,
+};
 
 const viewFallback = (
   <div className="flex min-h-64 items-center justify-center" role="status">
@@ -219,24 +244,18 @@ function LedgerApp() {
   }, [setActiveView, isLocked]);
 
   const renderContent = () => {
-    if (activeView === "Home / Dashboard") return <DashboardView />;
-    if (activeView === "Business Feed") return <BusinessFeedView />;
-    if (activeView === "Team") return <TeamView />;
-    if (activeView === "Apps / Integrations") return <AppsView />;
-    if (activeView === "Sales") return <SalesView />;
-    if (activeView === "Banking") return <BankingView />;
-    if (activeView === "Reports") return <ReportsView />;
-    if (activeView === "Expenses & Bills") return <ExpensesView />;
-    if (activeView === "Payroll") return <PayrollView />;
-    if (activeView === "Inventory") return <InventoryView />;
-    if (activeView === "Tax") return <TaxView />;
-    if (activeView === "Projects") return <ProjectsView />;
-    if (activeView === "Customer Hub") return <CustomerHubView />;
-    if (activeView === "Accounting") return <AccountingView />;
-    if (activeView === "Audit Logs") return <AuditLogView />;
-    if (activeView === "System Health") return <SystemHealthView />;
-    if (activeView === "Settings") return <SettingsView />;
-    if (activeView === "Documentation") return <DocumentationView />;
+    const BusinessRenderer = BUSINESS_RENDERERS[activeView as BusinessView];
+    if (BusinessRenderer) return <BusinessRenderer />;
+    if (isPlannedEditionView(activeView)) return (
+      <section className="mx-auto max-w-2xl px-5 py-12" aria-labelledby="planned-edition-heading">
+        <h1 id="planned-edition-heading" className="ll-heading text-2xl text-ink-900">
+          {PLANNED_EDITION_VIEWS[activeView]}
+        </h1>
+        <p className="mt-3 text-sm text-graphite-600">
+          {PLANNED_SECTION_COPY.en}
+        </p>
+      </section>
+    );
     // Default catch-all
     return <DashboardView />;
   };

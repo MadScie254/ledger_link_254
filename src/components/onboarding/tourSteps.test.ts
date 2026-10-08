@@ -4,6 +4,8 @@ import assert from 'node:assert/strict';
 import { readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { CHAPTERS, MAX_TOUR_STEPS, TOUR_STEPS, type Copy } from './tourSteps.ts';
+import { editionDefinition } from '../../utils/editions.ts';
+import { KNOWN_VIEWS } from '../../utils/views.ts';
 
 const SRC = join(import.meta.dirname, '..', '..');
 
@@ -23,10 +25,8 @@ const anchors = new Set(
   [...sources.matchAll(/(?:data-tour|tourId)=(?:\{)?["'`]([a-z-]+)["'`]/g)].map((match) => match[1]),
 );
 
-/** The pages App.tsx can actually render. */
-const views = new Set(
-  [...readFileSync(join(SRC, 'App.tsx'), 'utf8').matchAll(/activeView === ["']([^"']+)["']/g)].map((match) => match[1]),
-);
+/** The pages App.tsx registers for rendering. */
+const views = new Set<string>(KNOWN_VIEWS);
 
 const everyCopy = (step: (typeof TOUR_STEPS)[number]): Copy[] => [
   step.title,
@@ -45,7 +45,7 @@ test('step ids are unique', () => {
 });
 
 test('every step opens a page that exists', () => {
-  assert.ok(views.size > 10, 'could not read the page list from App.tsx');
+  assert.ok(views.size > 10, 'the app needs its business view registry');
   for (const step of TOUR_STEPS) {
     if (step.view) assert.ok(views.has(step.view), `${step.id}: "${step.view}" is not a page in App.tsx`);
   }
@@ -67,8 +67,7 @@ test('a step that names a target also names the page it lives on', () => {
 });
 
 test('every page in the sidebar is covered by a step', () => {
-  const sidebar = readFileSync(join(SRC, 'components', 'layout', 'Sidebar.tsx'), 'utf8');
-  const sidebarViews = [...sidebar.matchAll(/view: '([^']+)'/g)].map((match) => match[1]);
+  const sidebarViews = editionDefinition('business').sidebar.flatMap((group) => group.items.map((item) => item.view));
   assert.ok(sidebarViews.length >= 15, 'could not read the sidebar');
   const covered = new Set(TOUR_STEPS.map((step) => step.view));
   for (const view of sidebarViews) assert.ok(covered.has(view), `no tour step visits "${view}"`);

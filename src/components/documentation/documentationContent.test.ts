@@ -1,10 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
-import { join } from 'node:path';
 import { documentationSections, searchableSectionText } from './documentationContent.ts';
-
-const ROOT = process.cwd();
+import { KNOWN_VIEWS } from '../../utils/views.ts';
 
 test('documentation chapters have unique stable ids and complete metadata', () => {
   assert.ok(documentationSections.length >= 12, 'expected a substantial SaaS documentation set');
@@ -23,10 +20,7 @@ test('documentation chapters have unique stable ids and complete metadata', () =
 });
 
 test('documentation actions only link to implemented application views', () => {
-  const app = readFileSync(join(ROOT, 'src', 'App.tsx'), 'utf8');
-  const views = new Set(
-    [...app.matchAll(/activeView === ["']([^"']+)["']/g)].map((match) => match[1]),
-  );
+  const views = new Set<string>(KNOWN_VIEWS);
 
   for (const section of documentationSections) {
     if (section.openView) {
