@@ -248,7 +248,11 @@ const organizationFields = {
 };
 export const organizationCreateSchema = z.object({
   ...organizationFields,
+  edition: z.enum(['business', 'law', 'church']).default('business'),
   creationKey: uuid.optional(),
+}).refine((body) => body.edition !== 'church' || body.businessType !== 'nonprofit', {
+  path: ['businessType'],
+  message: 'The church edition cannot use the nonprofit business type because fund account codes overlap.',
 });
 export const organizationUpdateSchema = z.object(organizationFields).partial().extend({
   paymentDetails: z.preprocess((value) => (typeof value === 'string' && value.trim() === '' ? null : value), z.string().trim().max(1000).nullable().optional()),

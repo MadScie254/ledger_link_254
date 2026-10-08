@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import type { BusinessType } from './utils/businessTypes';
+import type { Edition } from './utils/editions';
 import { applyThemeAccent, type ThemeAccent } from './utils/themeAccents';
 
 const THEME_STORAGE_KEY = 'll-theme';
@@ -29,6 +30,7 @@ export interface OrganizationData {
   fiscalYearStart?: string;
   industry?: string;
   businessType?: BusinessType | null;
+  edition?: Edition;
   themeAccent?: ThemeAccent | null;
   address?: string;
   city?: string;

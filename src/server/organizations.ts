@@ -1,6 +1,9 @@
 import { getSupabase } from './supabase';
 import { UserError } from './errors';
-import { extraAccountsFor, type BusinessType } from '../utils/businessTypes';
+import type { BusinessType } from '../utils/businessTypes';
+import { chartFor } from '../utils/accountChart';
+export { chartFor, isMoneyAccountCode, STANDARD_ACCOUNTS } from '../utils/accountChart';
+import { businessTypeAllowedForEdition, type Edition } from '../utils/editions';
 import type { ThemeAccent } from '../utils/themeAccents';
 
 export interface Organization {
@@ -13,6 +16,7 @@ export interface Organization {
   fiscalYearStart?: string;
   industry?: string;
   businessType?: BusinessType | null;
+  edition?: Edition;
   themeAccent?: ThemeAccent;
   address?: string;
   city?: string;
@@ -39,51 +43,7 @@ export type OrganizationCreateInput = Omit<Organization, 'id' | 'createdAt' | 'u
   creationKey?: string;
 };
 
-export type OrganizationUpdateInput = Partial<Omit<Organization, 'id' | 'createdAt' | 'updatedAt' | 'isDemo' | 'isDefault' | 'role'>>;
-
-/** The standard chart every organization starts with. Codes 1000-1099 hold money. */
-export const STANDARD_ACCOUNTS = [
-  { code: '1000', name: 'Cash equivalents (Operating Account)', type: 'ASSET' as const },
-  { code: '1010', name: 'USD Bank Account (Foreign Holding)', type: 'ASSET' as const, currency: 'USD' },
-  { code: '1020', name: 'EUR Bank Account (Foreign Holding)', type: 'ASSET' as const, currency: 'EUR' },
-  { code: '1050', name: 'M-Pesa Business Till / Paybill', type: 'ASSET' as const },
-  { code: '1100', name: 'Accounts Receivable (A/R)', type: 'ASSET' as const },
-  { code: '1150', name: 'Recoverable VAT / Input Tax', type: 'ASSET' as const },
-  { code: '1200', name: 'Inventory Asset', type: 'ASSET' as const },
-  { code: '2000', name: 'Accounts Payable (A/P)', type: 'LIABILITY' as const },
-  { code: '2100', name: 'Output VAT Payable', type: 'LIABILITY' as const },
-  { code: '2110', name: 'PAYE Payable', type: 'LIABILITY' as const },
-  { code: '2120', name: 'NSSF Payable', type: 'LIABILITY' as const },
-  { code: '2130', name: 'SHA Payable', type: 'LIABILITY' as const },
-  { code: '2140', name: 'Affordable Housing Levy Payable', type: 'LIABILITY' as const },
-  { code: '3000', name: "Owner's Equity / Share Capital", type: 'EQUITY' as const },
-  { code: '3100', name: 'Retained Earnings', type: 'EQUITY' as const },
-  { code: '4000', name: 'Sales Revenue & Billing', type: 'INCOME' as const },
-  { code: '4100', name: 'Consulting & Service Income', type: 'INCOME' as const },
-  { code: '5000', name: 'Cost of Goods Sold (COGS)', type: 'COGS' as const },
-  { code: '6000', name: 'Operating Expenses', type: 'EXPENSE' as const },
-  { code: '6100', name: 'Salaries & Payroll Expense', type: 'EXPENSE' as const },
-  { code: '6110', name: 'Employer Payroll Contributions', type: 'EXPENSE' as const },
-  { code: '6200', name: 'Office Rent & Utilities', type: 'EXPENSE' as const },
-  { code: '8000', name: 'Unrealized FX Gain / Loss', type: 'INCOME' as const },
-  { code: '8100', name: 'Realized FX Gain / Loss', type: 'INCOME' as const },
-];
-
-/** Money accounts (bank, cash, M-Pesa) are 1000-1099 in the standard numbering. */
-export function isMoneyAccountCode(code: string): boolean {
-  return /^10\d\d$/.test(code);
-}
-
-/** The chart for a new organization: the standard accounts plus its business type's. */
-export function chartFor(businessType: BusinessType | null | undefined, baseCurrency: string) {
-  return [...STANDARD_ACCOUNTS, ...extraAccountsFor(businessType)].map((account) => ({
-    code: account.code,
-    name: account.name,
-    type: account.type,
-    currency: ('currency' in account && account.currency) || baseCurrency,
-    isBankAccount: account.type === 'ASSET' && isMoneyAccountCode(account.code),
-  }));
-}
+export type OrganizationUpdateInput = Partial<Omit<Organization, 'id' | 'createdAt' | 'updatedAt' | 'isDemo' | 'isDefault' | 'role' | 'edition'>>;
 
 function mapOrganization(d: any): Organization {
   return {
@@ -96,6 +56,7 @@ function mapOrganization(d: any): Organization {
     fiscalYearStart: d.fiscal_year_start,
     industry: d.industry,
     businessType: d.business_type,
+    edition: d.edition || 'business',
     themeAccent: d.theme_accent,
     address: d.address,
     city: d.city,
@@ -159,6 +120,10 @@ export class OrganizationService {
   static async createOrganization(data: OrganizationCreateInput, ownerId: string): Promise<string> {
     const supabase = getSupabase();
     const baseCurrency = String(data.baseCurrency || 'KES').trim().toUpperCase();
+    const edition = data.edition || 'business';
+    if (!businessTypeAllowedForEdition(edition, data.businessType)) {
+      throw new UserError('The church edition cannot use the nonprofit business type because fund account codes overlap.');
+    }
     const { data: orgId, error } = await supabase.rpc('create_organization', {
       p_owner: ownerId,
       p_organization: {
@@ -170,6 +135,7 @@ export class OrganizationService {
         fiscalYearStart: data.fiscalYearStart,
         industry: data.industry,
         businessType: data.businessType || null,
+        edition,
         themeAccent: data.themeAccent,
         address: data.address,
         city: data.city,
@@ -177,7 +143,7 @@ export class OrganizationService {
         email: data.email,
         website: data.website,
       },
-      p_accounts: chartFor(data.businessType || null, baseCurrency),
+      p_accounts: chartFor(data.businessType || null, baseCurrency, edition),
       p_creation_key: data.creationKey || null,
     });
     if (error) throw error;
@@ -186,6 +152,9 @@ export class OrganizationService {
 
   static async updateOrganization(orgId: string, data: OrganizationUpdateInput): Promise<void> {
     const supabase = getSupabase();
+    if (data.businessType === 'nonprofit' && (await this.getOrganization(orgId))?.edition === 'church') {
+      throw new UserError('The church edition cannot use the nonprofit business type because fund account codes overlap.');
+    }
     const columns: Record<keyof OrganizationUpdateInput, string> = {
       name: 'name',
       legalName: 'legal_name',
@@ -241,12 +210,14 @@ export class OrganizationService {
     return Boolean(data?.ai_enabled);
   }
 
-  /** Adds any standard (and business-type) accounts the organization is missing. */
-  static async seedDefaultAccounts(orgId: string, businessType: BusinessType | null = null): Promise<void> {
+  /** Adds any standard, business-type and edition accounts the organization is missing. */
+  static async seedDefaultAccounts(
+    orgId: string, businessType: BusinessType | null = null, edition: Edition | null = null,
+  ): Promise<void> {
     const supabase = getSupabase();
     const { data: organization, error } = await supabase
       .from('organizations')
-      .select('base_currency, business_type')
+      .select('base_currency, business_type, edition')
       .eq('id', orgId)
       .single();
     if (error) throw error;
@@ -258,7 +229,7 @@ export class OrganizationService {
     if (existingAccountsError) throw existingAccountsError;
     const existingCodes = new Set((existingAccounts || []).map((account) => account.code));
 
-    const newAccounts = chartFor(businessType || organization.business_type, baseCurrency)
+    const newAccounts = chartFor(businessType || organization.business_type, baseCurrency, edition || organization.edition)
       .filter((account) => !existingCodes.has(account.code));
     if (newAccounts.length === 0) return;
 

@@ -48,13 +48,13 @@
 
 ### Task 3: E1.3 organization and navigation wiring
 
-**Files:** Modify `src/server/organizations.ts`, `src/store.ts`, `worker/schemas.ts`, organization routes, `src/components/layout/Sidebar.tsx`, `src/components/layout/MobileTabBar.tsx`, `src/components/layout/CommandPalette.tsx`, and `src/App.tsx`; add focused tests.
+**Files:** Modify `src/server/organizations.ts`, `src/store.ts`, `worker/schemas.ts`, `src/components/layout/Sidebar.tsx`, `src/components/layout/MobileTabBar.tsx`, `src/components/layout/CommandPalette.tsx`, and `src/App.tsx`; create `supabase/migrations/*_create_edition_organizations.sql` and focused tests.
 
 **Interfaces:** `POST /api/organizations` accepts an edition; the creation RPC stores it and starts a trial subscription for law/church; navigation uses edition groups with Full books for privileged members.
 
-- [ ] Add failing tests for edition creation, account seeding, business fallback, and role-aware navigation.
-- [ ] Implement one account insert and edition-aware views, then run app, SQL, and build checks.
-- [ ] Commit E1.3 and push.
+- [x] Add failing tests for edition creation, account seeding, business fallback, and role-aware navigation.
+- [x] Implement one account insert and edition-aware views, then run app, SQL, and build checks.
+- [x] Commit E1.3 and push.
 
 ### Task 4: E1.4 public brand by host
 

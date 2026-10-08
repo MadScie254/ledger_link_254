@@ -6,6 +6,8 @@ import { NotificationDropdown } from './NotificationDropdown';
 import { DynamicQuickAddModal, getContextualEntityType } from '../common/DynamicQuickAddModal';
 import { EntityType } from '../../hooks/useEntityForm';
 import { CompanyMark } from '../ledger/CompanyMark';
+import { BrandMark } from '../ledger/BrandMark';
+import { editionDefinition } from '../../utils/editions';
 
 /** The plain name each view goes by in the drill path. */
 const SECTION_NAMES: Record<string, string> = {
@@ -57,7 +59,11 @@ export function Header() {
   const [isCompanyMenuOpen, setIsCompanyMenuOpen] = useState(false);
 
   const contextualType = addTypeFor(activeView);
-  const sectionName = SECTION_NAMES[activeView] || activeView;
+  const edition = editionDefinition(activeCompany?.edition);
+  const editionName = edition.sidebar.flatMap((group) => group.items)
+    .find((item) => item.view === activeView)?.name.en;
+  const sectionName = edition.id === 'business'
+    ? SECTION_NAMES[activeView] || activeView : editionName || activeView;
 
   const openAddEntity = () => {
     setModalEntityType(contextualType);
@@ -68,6 +74,7 @@ export function Header() {
     setActiveCompany(org);
     setCurrentOrgId(org.id);
     setDisplayCurrency(org.baseCurrency);
+    setActiveView(editionDefinition(org.edition).defaultView);
     setIsCompanyMenuOpen(false);
     queryClient.invalidateQueries();
   };
@@ -83,6 +90,8 @@ export function Header() {
         >
           <Menu className="h-5 w-5" />
         </button>
+
+        {edition.poweredBy && <BrandMark edition={edition.id} wordmark className="h-4 w-4" />}
 
         <nav data-tour="app-location" aria-label="Where you are" className="flex min-w-0 items-center gap-1.5 text-[13px]">
           <div className="relative min-w-0 hidden sm:block">
@@ -165,7 +174,7 @@ export function Header() {
             <Search className="h-4.5 w-4.5" />
           </button>
 
-          {HEADER_ADD[activeView] && (
+          {edition.id === 'business' && HEADER_ADD[activeView] && (
           <button
             type="button"
             onClick={openAddEntity}

@@ -204,7 +204,7 @@ export function OnboardingProvider({ children }: { children: ReactNode }) {
   // Asked once, before the welcome dialog: what a business type changes
   // (seeded accounts, which tour steps apply) should already be true by the
   // time anyone sees the tour.
-  const needsBusinessType = canTour && !activeCompany?.businessType;
+  const needsBusinessType = canTour && (activeCompany?.edition || 'business') === 'business' && !activeCompany?.businessType;
   const value = useMemo(
     () => ({ restartTutorial, isReady: Boolean(state) && Boolean(activeCompany) }),
     [activeCompany, restartTutorial, state],

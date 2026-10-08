@@ -1,4 +1,4 @@
-import { businessTypeDefinition, type BusinessType, type BusinessTypeAccount } from './businessTypes.ts';
+import { businessTypeDefinition, reorderByBusinessType, type BusinessType, type BusinessTypeAccount } from './businessTypes.ts';
 
 export type Edition = 'business' | 'law' | 'church';
 export interface LocalizedLabel { en: string; sw: 'TODO-SW' }
@@ -132,4 +132,19 @@ export function businessTypeAllowedForEdition(
   const editionCodes = new Set(editionDefinition(edition).extraAccounts.map((account) => account.code));
   return (businessTypeDefinition(businessType)?.extraAccounts || [])
     .every((account) => !editionCodes.has(account.code));
+}
+
+export function navigationGroupsFor(
+  edition: Edition | null | undefined,
+  businessType: BusinessType | null | undefined,
+  role: 'owner' | 'admin' | 'accountant' | 'member' | null | undefined,
+): SidebarGroup[] {
+  const definition = editionDefinition(edition);
+  if (definition.id === 'business') {
+    return definition.sidebar.map((group) => group.label.en === 'Books'
+      ? { ...group, items: reorderByBusinessType(group.items, businessType) }
+      : group);
+  }
+  return role && ['owner', 'admin', 'accountant'].includes(role)
+    ? [...definition.sidebar, FULL_BOOKS_GROUP] : definition.sidebar;
 }

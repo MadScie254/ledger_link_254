@@ -4,12 +4,25 @@
  * them. Colour comes from `currentColor`, so it always matches the text it
  * sits beside.
  */
-export function BrandMark({ className }: { className?: string }) {
-  return (
+import { editionDefinition, type Edition } from '../../utils/editions';
+
+export function BrandMark({ className, edition, wordmark = false }: {
+  className?: string; edition?: Edition; wordmark?: boolean;
+}) {
+  const definition = editionDefinition(edition);
+  const mark = (
     <svg viewBox="0 0 24 24" className={className} fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
       <path d="M12 5.5C9.7 4.1 6.8 3.6 4 4.3V18c2.8-0.7 5.7-0.2 8 1.2" />
       <path d="M12 5.5c2.3-1.4 5.2-1.9 8-1.2V18c-2.8-0.7-5.7-0.2-8 1.2" />
       <line x1="12" y1="5.5" x2="12" y2="19.2" />
     </svg>
   );
+  if (!wordmark) return mark;
+  return <span className="inline-flex shrink-0 items-center gap-1.5 text-ink-900">
+    {mark}
+    <span className="flex flex-col leading-none">
+      <span className="ll-printed text-[13px]">{definition.brandName}</span>
+      {definition.poweredBy && <span className="mt-1 text-[9px] text-graphite-600">powered by Ledger Link</span>}
+    </span>
+  </span>;
 }

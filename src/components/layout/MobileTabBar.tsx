@@ -1,5 +1,6 @@
-import { FileText, House, Landmark, Menu, ReceiptText } from 'lucide-react';
+import { FileText, House, Landmark, Menu, ReceiptText, Settings2, Users } from 'lucide-react';
 import { useAppStore } from '../../store';
+import { editionDefinition, navigationGroupsFor } from '../../utils/editions';
 
 const PRIMARY_DESTINATIONS = [
   { view: 'Home / Dashboard', label: 'Home', icon: House },
@@ -10,8 +11,22 @@ const PRIMARY_DESTINATIONS = [
 
 /** Thumb-reachable navigation for the four daily jobs; the full index stays in More. */
 export function MobileTabBar() {
-  const { activeView, setActiveView, setMobileSidebarOpen } = useAppStore();
-  const primaryIsActive = PRIMARY_DESTINATIONS.some(({ view }) => view === activeView);
+  const { activeView, setActiveView, setMobileSidebarOpen, activeCompany } = useAppStore();
+  const edition = editionDefinition(activeCompany?.edition);
+  const destinations = edition.id === 'business' ? PRIMARY_DESTINATIONS
+    : navigationGroupsFor(activeCompany?.edition, activeCompany?.businessType, activeCompany?.role)
+    .flatMap((group) => group.items)
+    .filter((entry) => entry.available !== false)
+    .slice(0, 4)
+    .map((entry) => ({
+      view: entry.view,
+      label: entry.name.en,
+      icon: entry.view === 'Home / Dashboard' ? House
+        : entry.view === 'Expenses & Bills' ? ReceiptText
+          : entry.view === 'Team' ? Users
+            : entry.view === 'Settings' ? Settings2 : FileText,
+    }));
+  const primaryIsActive = destinations.some(({ view }) => view === activeView);
 
   return (
     <nav
@@ -20,7 +35,7 @@ export function MobileTabBar() {
       className="fixed inset-x-0 bottom-0 z-40 border-t border-feint-strong bg-paper-100/95 pb-[env(safe-area-inset-bottom)] shadow-[0_-8px_28px_rgba(25,22,18,0.08)] backdrop-blur-md md:hidden"
     >
       <ul className="grid h-14 grid-cols-5">
-        {PRIMARY_DESTINATIONS.map(({ view, label, icon: Icon }) => {
+        {destinations.map(({ view, label, icon: Icon }) => {
           const selected = activeView === view;
           return (
             <li key={view}>

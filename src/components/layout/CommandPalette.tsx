@@ -3,6 +3,7 @@ import { Search } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import { useAppStore } from '../../store';
 import { Amount } from '../ledger/Amount';
+import { editionDefinition, navigationGroupsFor } from '../../utils/editions';
 
 type Section = 'Pages' | 'Reports' | 'Invoices' | 'Bills' | 'Customers' | 'Vendors' | 'Stock' | 'Accounts';
 
@@ -55,6 +56,10 @@ export function CommandPalette() {
   const [selectedIndex, setSelectedIndex] = useState(0);
   const { setActiveView, isCommandPaletteOpen, setCommandPaletteOpen, currentOrgId, activeCompany } = useAppStore();
   const baseCurrency = activeCompany?.baseCurrency || 'KES';
+  const edition = editionDefinition(activeCompany?.edition);
+  const visibleItems = navigationGroupsFor(activeCompany?.edition, activeCompany?.businessType, activeCompany?.role)
+    .flatMap((group) => group.items).filter((item) => item.available !== false);
+  const visibleViews = new Set(visibleItems.map((item) => item.view));
   const inputRef = useRef<HTMLInputElement>(null);
   const listRef = useRef<HTMLUListElement>(null);
 
@@ -78,22 +83,22 @@ export function CommandPalette() {
     }
   }, [isCommandPaletteOpen]);
 
-  const listQuery = (key: string, path: string, field: string) => ({
+  const listQuery = (key: string, path: string, field: string, view: string) => ({
     queryKey: [key, currentOrgId],
     queryFn: async () => {
       const res = await fetch(path, { headers: { 'x-org-id': currentOrgId } });
       if (!res.ok) return { [field]: [] };
       return res.json();
     },
-    enabled: isCommandPaletteOpen && Boolean(currentOrgId),
+    enabled: isCommandPaletteOpen && Boolean(currentOrgId) && visibleViews.has(view),
   });
 
-  const { data: invoicesData } = useQuery(listQuery('invoices', '/api/invoices', 'invoices'));
-  const { data: customersData } = useQuery(listQuery('customers', '/api/customers', 'customers'));
-  const { data: vendorsData } = useQuery(listQuery('vendors', '/api/vendors', 'vendors'));
-  const { data: itemsData } = useQuery(listQuery('inventory', '/api/inventory', 'items'));
-  const { data: billsData } = useQuery(listQuery('bills', '/api/bills', 'bills'));
-  const { data: accountsData } = useQuery(listQuery('accounts', '/api/accounts', 'accounts'));
+  const { data: invoicesData } = useQuery(listQuery('invoices', '/api/invoices', 'invoices', 'Sales'));
+  const { data: customersData } = useQuery(listQuery('customers', '/api/customers', 'customers', 'Customer Hub'));
+  const { data: vendorsData } = useQuery(listQuery('vendors', '/api/vendors', 'vendors', 'Expenses & Bills'));
+  const { data: itemsData } = useQuery(listQuery('inventory', '/api/inventory', 'items', 'Inventory'));
+  const { data: billsData } = useQuery(listQuery('bills', '/api/bills', 'bills', 'Expenses & Bills'));
+  const { data: accountsData } = useQuery(listQuery('accounts', '/api/accounts', 'accounts', 'Accounting'));
 
   const allItems: SearchItem[] = useMemo(() => {
     const go = (view: string) => () => {
@@ -103,9 +108,15 @@ export function CommandPalette() {
     const customerNames = new Map<string, string>((customersData?.customers || []).map((c: any) => [c.id, c.displayName || c.name]));
     const vendorNames = new Map<string, string>((vendorsData?.vendors || []).map((v: any) => [v.id, v.displayName || v.name]));
 
+    const pages = edition.id === 'business' ? PAGES : visibleItems.map((entry) => {
+      const businessPage = PAGES.find((page) => page.view === entry.view);
+      return { view: entry.view, title: entry.name.en,
+        subtitle: businessPage?.subtitle || `Open ${entry.name.en.toLowerCase()}`,
+        shortcut: businessPage?.shortcut };
+    });
     const items: SearchItem[] = [
-      ...PAGES.map((p) => ({ id: `page-${p.view}`, title: p.title, subtitle: p.subtitle, category: 'Pages' as const, shortcut: p.shortcut, action: go(p.view) })),
-      ...REPORTS.map((r) => ({ id: `report-${r.title}`, title: r.title, subtitle: r.subtitle, category: 'Reports' as const, action: go('Reports') })),
+      ...pages.map((p) => ({ id: `page-${p.view}`, title: p.title, subtitle: p.subtitle, category: 'Pages' as const, shortcut: p.shortcut, action: go(p.view) })),
+      ...(visibleViews.has('Reports') ? REPORTS.map((r) => ({ id: `report-${r.title}`, title: r.title, subtitle: r.subtitle, category: 'Reports' as const, action: go('Reports') })) : []),
     ];
 
     (invoicesData?.invoices || []).forEach((inv: any) => {
@@ -170,8 +181,15 @@ export function CommandPalette() {
       });
     });
 
-    return items;
-  }, [invoicesData, customersData, vendorsData, itemsData, billsData, accountsData, setActiveView, setCommandPaletteOpen]);
+    if (edition.id === 'business') return items;
+    const destination: Partial<Record<Section, string>> = {
+      Invoices: 'Sales', Bills: 'Expenses & Bills', Customers: 'Customer Hub',
+      Vendors: 'Expenses & Bills', Stock: 'Inventory', Accounts: 'Accounting',
+    };
+    return items.filter((item) => item.category === 'Pages' || visibleViews.has(destination[item.category] || ''));
+  }, [invoicesData, customersData, vendorsData, itemsData, billsData, accountsData,
+    setActiveView, setCommandPaletteOpen, activeCompany?.edition,
+    activeCompany?.businessType, activeCompany?.role]);
 
   const filteredItems = useMemo(() => {
     if (!query.trim()) return allItems.filter((i) => i.category === 'Pages');

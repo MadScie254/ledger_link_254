@@ -1,16 +1,11 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { BUSINESS_TYPES } from './businessTypes.ts';
+import { STANDARD_ACCOUNTS } from './accountChart.ts';
 import { KNOWN_VIEWS, PLANNED_SECTION_COPY } from './views.ts';
-import { businessTypeAllowedForEdition, editionDefinition, EDITIONS, type Edition } from './editions.ts';
+import { businessTypeAllowedForEdition, editionDefinition, EDITIONS, navigationGroupsFor, type Edition } from './editions.ts';
 
-// Keep this in step with STANDARD_ACCOUNTS in src/server/organizations.ts.
-const STANDARD_CODES = new Set([
-  '1000', '1010', '1020', '1050', '1100', '1150', '1200',
-  '2000', '2100', '2110', '2120', '2130', '2140',
-  '3000', '3100', '4000', '4100', '5000',
-  '6000', '6100', '6110', '6200', '8000', '8100',
-]);
+const STANDARD_CODES = new Set(STANDARD_ACCOUNTS.map((account) => account.code));
 
 test('an unset edition is the existing Ledger Link business edition', () => {
   const business = editionDefinition(undefined);
@@ -90,4 +85,20 @@ test('hostnames can be injected from environment without changing the shared def
   assert.deepEqual(editionDefinition('law', hosts).hostnames, ['mizani.example']);
   assert.deepEqual(editionDefinition('church', hosts).hostnames, ['kundi.example']);
   assert.deepEqual(editionDefinition('law').hostnames, []);
+});
+
+test('business book order still follows its business type', () => {
+  const books = navigationGroupsFor('business', 'services', 'member').find((group) => group.label.en === 'Books');
+  assert.equal(books?.items[0].view, 'Projects');
+  assert.equal(books?.items.length, 6);
+});
+
+test('Full books belongs only to privileged law and church members', () => {
+  for (const edition of ['law', 'church'] as const) {
+    assert.ok(!navigationGroupsFor(edition, null, 'member').some((group) => group.label.en === 'Full books'));
+    for (const role of ['owner', 'admin', 'accountant'] as const) {
+      const books = navigationGroupsFor(edition, null, role).find((group) => group.label.en === 'Full books');
+      assert.deepEqual(books?.items.map((item) => item.view), ['Accounting', 'Reports', 'Tax', 'Payroll']);
+    }
+  }
 });

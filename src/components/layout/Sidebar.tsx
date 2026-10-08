@@ -4,7 +4,7 @@ import { useAppStore } from '../../store';
 import { useAuth } from '../../context/AuthProvider';
 import { CompanyMark } from '../ledger/CompanyMark';
 import { BrandMark } from '../ledger/BrandMark';
-import { reorderByBusinessType } from '../../utils/businessTypes';
+import { editionDefinition, navigationGroupsFor } from '../../utils/editions';
 
 /**
  * The spine of the book. Sections read as a printed thumb index: plain words,
@@ -13,50 +13,14 @@ import { reorderByBusinessType } from '../../utils/businessTypes';
  * Keyboard shortcuts live in the command palette, not on the spine, where
  * stray digits read as unread counts.
  */
-const INDEX = [
-  {
-    label: 'Money',
-    items: [
-      { view: 'Home / Dashboard', name: 'Home' },
-      { view: 'Banking', name: 'Banking' },
-      { view: 'Sales', name: 'Sales' },
-      { view: 'Customer Hub', name: 'Customers' },
-      { view: 'Expenses & Bills', name: 'Bills and expenses' },
-    ],
-  },
-  {
-    label: 'Books',
-    items: [
-      { view: 'Accounting', name: 'Accounting' },
-      { view: 'Reports', name: 'Reports' },
-      { view: 'Tax', name: 'Tax' },
-      { view: 'Payroll', name: 'Payroll' },
-      { view: 'Inventory', name: 'Inventory' },
-      { view: 'Projects', name: 'Projects' },
-    ],
-  },
-  {
-    label: 'Office',
-    items: [
-      { view: 'Business Feed', name: 'Business feed' },
-      { view: 'Team', name: 'Team' },
-      { view: 'Apps / Integrations', name: 'Integrations' },
-      { view: 'Audit Logs', name: 'Audit log' },
-      { view: 'Documentation', name: 'Documentation' },
-      { view: 'Settings', name: 'Settings' },
-    ],
-  },
-];
-
 export function Sidebar() {
   const { activeView, setActiveView, activeCompany, isMobileSidebarOpen, setMobileSidebarOpen } = useAppStore();
   const { user, signOut } = useAuth();
 
-  // Every section stays; only the Books group's order responds to the
-  // business type, so the pages that matter most for this kind of work lead.
+  const edition = editionDefinition(activeCompany?.edition);
   const groups = useMemo(
-    () => INDEX.map((group) => (group.label === 'Books' ? { ...group, items: reorderByBusinessType(group.items, activeCompany?.businessType) } : group)),
-    [activeCompany?.businessType],
+    () => navigationGroupsFor(activeCompany?.edition, activeCompany?.businessType, activeCompany?.role),
+    [activeCompany?.edition, activeCompany?.businessType, activeCompany?.role],
   );
 
   const handleNavigate = (view: string) => {
@@ -72,13 +36,14 @@ export function Sidebar() {
             type="button"
             onClick={() => handleNavigate('Settings')}
             className="group block w-full text-left border border-[var(--spine-rule)] p-[3px] focus-visible:outline-sidebar-ink"
-            aria-label={`Ledger Link, book of ${activeCompany?.name || 'no organization'}. Open organization settings`}
+            aria-label={`${edition.brandName}, book of ${activeCompany?.name || 'no organization'}. Open organization settings`}
           >
             <span className="block border border-[var(--spine-rule)] px-3 py-2.5 group-hover:bg-sidebar-surface">
               <span className="flex items-center gap-1.5">
                 <BrandMark className="h-4 w-4 shrink-0" />
-                <span className="ll-printed text-[15px] tracking-[0.14em] text-sidebar-ink leading-none">Ledger Link</span>
+                <span className="ll-printed text-[15px] tracking-[0.14em] text-sidebar-ink leading-none">{edition.brandName}</span>
               </span>
+              {edition.poweredBy && <span className="mt-1 block text-[9px] text-sidebar-muted">powered by Ledger Link</span>}
               <span className="mt-2 flex items-center gap-2">
                 <CompanyMark name={activeCompany?.name} size="sm" />
                 <span className="min-w-0 flex-1 truncate text-[12px] leading-snug text-sidebar-muted">
@@ -100,13 +65,19 @@ export function Sidebar() {
 
       <nav data-tour="sidebar-index" aria-label="Sections" className="flex-1 overflow-y-auto pb-4">
         {groups.map((group) => (
-          <section key={group.label} className="mt-3 first:mt-1">
-            <h2 className="px-4 pb-1.5 ll-printed text-[10.5px] text-sidebar-muted">{group.label}</h2>
+          <section key={group.label.en} className="mt-3 first:mt-1">
+            <h2 className="px-4 pb-1.5 ll-printed text-[10.5px] text-sidebar-muted">{group.label.en}</h2>
             <ul>
               {group.items.map((item) => {
                 const isOpen = activeView === item.view;
                 return (
                   <li key={item.view}>
+                    {item.available === false ? (
+                      <span className="flex h-9 items-center justify-between pl-4 pr-3 text-[13.5px] text-sidebar-muted" aria-disabled="true">
+                        <span className="truncate">{item.name.en}</span>
+                        <span className="ml-2 text-[10px]">Planned</span>
+                      </span>
+                    ) : (
                     <button
                       type="button"
                       onClick={() => handleNavigate(item.view)}
@@ -117,8 +88,9 @@ export function Sidebar() {
                           : 'text-sidebar-ink/90 hover:bg-sidebar-surface hover:text-sidebar-ink'
                       }`}
                     >
-                      <span className="truncate">{item.name}</span>
+                      <span className="truncate">{item.name.en}</span>
                     </button>
+                    )}
                   </li>
                 );
               })}

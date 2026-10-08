@@ -10,6 +10,7 @@ import { PageHeading, IndexTabs, EmptyNote, buttonClass } from '../ledger/Page';
 import { BookOpen } from 'lucide-react';
 import { useOnboarding } from '../onboarding/OnboardingProvider';
 import { BUSINESS_TYPES, type BusinessType } from '../../utils/businessTypes';
+import { businessTypeAllowedForEdition, editionDefinition, type Edition } from '../../utils/editions';
 import { THEME_ACCENTS, DEFAULT_THEME_ACCENT, type ThemeAccent } from '../../utils/themeAccents';
 import { TrackingPanel } from './TrackingPanel';
 import { ControlsPanel } from './ControlsPanel';
@@ -27,7 +28,7 @@ const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 
 const looksLikeId = (s?: string) => !!s && /^[0-9a-f]{8}-[0-9a-f]{4}-/i.test(s);
 
 export function SettingsView() {
-  const { currentOrgId, setCurrentOrgId, organizations, setOrganizations, activeCompany, setActiveCompany, setDisplayCurrency, exchangeRates, setExchangeRates, rateMetadata } = useAppStore();
+  const { currentOrgId, setCurrentOrgId, organizations, setOrganizations, activeCompany, setActiveCompany, setActiveView, setDisplayCurrency, exchangeRates, setExchangeRates, rateMetadata } = useAppStore();
 
   const queryClient = useQueryClient();
   const [activeTab, setActiveTab] = useState<Tab>('companies');
@@ -86,6 +87,7 @@ export function SettingsView() {
   const handleSwitchCompany = (org: OrganizationData) => {
     setActiveCompany(org);
     setCurrentOrgId(org.id);
+    setActiveView(editionDefinition(org.edition).defaultView);
     setDisplayCurrency(org.baseCurrency);
     queryClient.invalidateQueries();
   };
@@ -461,9 +463,15 @@ export function SettingsView() {
         <CompanyModal
           initialData={editingOrg}
           onClose={() => setIsCompanyModalOpen(false)}
-          onSuccess={() => {
+          onSuccess={async (createdId) => {
             setIsCompanyModalOpen(false);
-            refetchOrgs();
+            const refreshed = await refetchOrgs();
+            const created = refreshed.data?.find((org) => org.id === createdId);
+            if (created) {
+              setActiveCompany(created);
+              setCurrentOrgId(created.id);
+              setActiveView(editionDefinition(created.edition).defaultView);
+            }
           }}
         />
       )}
@@ -471,7 +479,9 @@ export function SettingsView() {
   );
 }
 
-function CompanyModal({ initialData, onClose, onSuccess }: { initialData: OrganizationData | null; onClose: () => void; onSuccess: () => void }) {
+function CompanyModal({ initialData, onClose, onSuccess }: {
+  initialData: OrganizationData | null; onClose: () => void; onSuccess: (createdId?: string) => void | Promise<void>;
+}) {
   const [name, setName] = useState(initialData?.name || '');
   const [legalName, setLegalName] = useState(initialData?.legalName || '');
   const [baseCurrency, setBaseCurrency] = useState(initialData?.baseCurrency || 'KES');
@@ -480,6 +490,7 @@ function CompanyModal({ initialData, onClose, onSuccess }: { initialData: Organi
   const [fiscalYearStart, setFiscalYearStart] = useState(initialData?.fiscalYearStart || 'January');
   const [industry, setIndustry] = useState(initialData?.industry || '');
   const [businessType, setBusinessType] = useState<BusinessType | ''>(initialData?.businessType || '');
+  const [edition, setEdition] = useState<Edition>(initialData?.edition || 'business');
   const [themeAccent, setThemeAccent] = useState<ThemeAccent>(initialData?.themeAccent || DEFAULT_THEME_ACCENT);
   const [address, setAddress] = useState(initialData?.address || '');
   const [city, setCity] = useState(initialData?.city || 'Nairobi');
@@ -498,6 +509,7 @@ function CompanyModal({ initialData, onClose, onSuccess }: { initialData: Organi
     try {
       const payload = {
         name, legalName: legalName || name, baseCurrency, country, taxId, fiscalYearStart, industry, businessType: businessType || null,
+        ...(!initialData ? { edition } : {}),
         themeAccent, address, city, phone, email, website,
         // Printed on documents; only an existing company can carry them.
         ...(initialData ? { paymentDetails, documentFooter } : {}),
@@ -511,7 +523,8 @@ function CompanyModal({ initialData, onClose, onSuccess }: { initialData: Organi
         const errJson = await res.json().catch(() => ({}));
         throw new Error(errJson.error || 'The company could not be saved.');
       }
-      onSuccess();
+      const result = await res.json();
+      await onSuccess(initialData ? undefined : result.id);
     } catch (err: any) {
       setError(err.message);
     } finally {
@@ -546,6 +559,17 @@ function CompanyModal({ initialData, onClose, onSuccess }: { initialData: Organi
         <Field label="Trading name">
           <input type="text" required value={name} onChange={(e) => setName(e.target.value)} />
         </Field>
+        {!initialData && <Field label="Edition" hint="Mizani and Kundi pilot sections are being built. Available sections open now.">
+          <select value={edition} onChange={(e) => {
+            const next = e.target.value as Edition;
+            setEdition(next);
+            if (!businessTypeAllowedForEdition(next, businessType || null)) setBusinessType('');
+          }}>
+            <option value="business">Ledger Link · Business</option>
+            <option value="law">Mizani · Law</option>
+            <option value="church">Kundi · Church</option>
+          </select>
+        </Field>}
         <Field label="Registered name" hint="As on the certificate of incorporation">
           <input type="text" value={legalName} onChange={(e) => setLegalName(e.target.value)} />
         </Field>
@@ -575,7 +599,7 @@ function CompanyModal({ initialData, onClose, onSuccess }: { initialData: Organi
         <Field label="Business type" hint="Adds a few accounts for this kind of work and tailors the tour. Change it anytime.">
           <select value={businessType} onChange={(e) => setBusinessType(e.target.value as BusinessType | '')}>
             <option value="">Not set</option>
-            {BUSINESS_TYPES.filter((type) => type.id !== 'general').map((type) => (
+            {BUSINESS_TYPES.filter((type) => type.id !== 'general' && businessTypeAllowedForEdition(edition, type.id)).map((type) => (
               <option key={type.id} value={type.id}>{type.label}</option>
             ))}
             <option value="general">Something else</option>

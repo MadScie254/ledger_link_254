@@ -17,6 +17,7 @@ import { Mark } from "./components/ledger/Mark";
 import { InvitationsPrompt } from "./components/team/InvitationsPrompt";
 import { NewPasswordScreen } from "./components/layout/NewPasswordScreen";
 import { isPlannedEditionView, PLANNED_EDITION_VIEWS, PLANNED_SECTION_COPY, type BusinessView } from "./utils/views";
+import { editionDefinition } from "./utils/editions";
 export { KNOWN_VIEWS } from "./utils/views";
 
 /** A tab that has already gone past the landing page (signed in, or clicked
@@ -176,11 +177,15 @@ function LedgerApp() {
     const selectedOrganization = organizations.find((organization) => organization.id === currentOrgId)
       || organizations.find((organization) => organization.id === remembered)
       || organizations[0];
+    if (activeCompany?.id !== selectedOrganization.id) {
+      setActiveView(editionDefinition(selectedOrganization.edition).defaultView);
+    }
     setCurrentOrgId(selectedOrganization.id);
     setActiveCompany(selectedOrganization);
     setDisplayCurrency(selectedOrganization.baseCurrency);
     if (userId) rememberOrganization(userId, selectedOrganization.id);
-  }, [organizations, currentOrgId, userId, setActiveCompany, setCurrentOrgId, setDisplayCurrency, setOrganizations]);
+  }, [organizations, currentOrgId, userId, activeCompany?.id, setActiveView,
+    setActiveCompany, setCurrentOrgId, setDisplayCurrency, setOrganizations]);
 
   // Automated daily exchange rate sync on startup
   useEffect(() => {
