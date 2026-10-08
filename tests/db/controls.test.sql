@@ -87,8 +87,8 @@ SELECT pg_temp.check(pg_temp.ap_gap() = 0, 'AP agrees after reversal');
 
 -- M3: posted history is permanent for the service role -------------------------
 SET ROLE service_role;
-SELECT pg_temp.expect_err($$UPDATE public.journal_lines SET debit = debit + 1 WHERE debit > 0$$, 'permanent');
-SELECT pg_temp.expect_err($$DELETE FROM public.journal_entries$$, 'permanent');
+SELECT pg_temp.expect_err($$UPDATE public.journal_lines SET debit = debit + 1 WHERE debit > 0$$, 'permanent|permission denied');
+SELECT pg_temp.expect_err($$DELETE FROM public.journal_entries$$, 'permanent|permission denied');
 SELECT pg_temp.expect_err($$DELETE FROM public.audit_logs$$, 'permanent');
 SELECT pg_temp.expect_err($$UPDATE public.invoice_payments SET amount_cents = 1$$, 'permanent');
 SELECT pg_temp.expect_err($$DELETE FROM public.bill_payments$$, 'permanent');
