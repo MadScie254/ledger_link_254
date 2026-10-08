@@ -1,7 +1,8 @@
 import { getSupabase } from './supabase';
 import { fetchAllRows } from './pagination';
+import { UserError } from './errors';
 import {
-  candidateMemberNumbers, matchGiving, type GivingFund, type GivingMatch, type GivingMember, type GivingRule,
+  candidateMemberNumbers, matchGiving, suggestMembers, type GivingFund, type GivingMatch, type GivingMember, type GivingRule,
 } from '../utils/givingRules';
 
 /** A receipt as ingest_mpesa_receipts returns it. */
@@ -143,5 +144,109 @@ export class GivingService {
       }
     }
     return result;
+  }
+
+  /**
+   * The treasurer's queue: M-Pesa receipts the rules could not place, each
+   * with the reason, the fund its reference pointed at and members the
+   * treasurer may mean. Receipts set aside are listed after them.
+   */
+  static async queue(orgId: string) {
+    const supabase = getSupabase();
+    const [waiting, setAside, context, members] = await Promise.all([
+      fetchAllRows<any>((from, to) => supabase.from('mpesa_receipts')
+        .select('id,trans_id,trans_time,amount_cents,bill_ref_number,first_name,msisdn,source,status,created_at')
+        .eq('org_id', orgId).eq('status', 'UNMATCHED').order('trans_time').order('id').range(from, to)),
+      supabase.from('mpesa_receipts').select('id,trans_id,trans_time,amount_cents,bill_ref_number,first_name,ignored_reason')
+        .eq('org_id', orgId).eq('status', 'IGNORED').order('trans_time', { ascending: false }).limit(50),
+      GivingService.rulesAndFunds(orgId),
+      GivingService.allMembers(orgId),
+    ]);
+    if (setAside.error) throw setAside.error;
+    return {
+      waiting: waiting.map((receipt) => {
+        const match = matchGiving(receipt.bill_ref_number, context.rules, members, context.funds);
+        return {
+          id: receipt.id, transId: receipt.trans_id, transTime: receipt.trans_time, amountCents: Number(receipt.amount_cents),
+          billRefNumber: receipt.bill_ref_number, firstName: receipt.first_name, source: receipt.source,
+          reason: 'reason' in match ? match.reason : 'The giving rules place this receipt. Check the member and fund, then post it.',
+          suggestedFundId: 'reason' in match ? match.fundId ?? null : match.fundId,
+          suggestedMemberId: 'reason' in match ? null : match.memberId,
+          suggestions: suggestMembers({ billRefNumber: receipt.bill_ref_number, firstName: receipt.first_name }, members)
+            .map(({ member, why }) => ({ memberId: member.id, memberNumber: member.memberNumber, name: [member.firstName, member.lastName].filter(Boolean).join(' '), why })),
+        };
+      }),
+      setAside: (setAside.data ?? []).map((receipt) => ({
+        id: receipt.id, transId: receipt.trans_id, transTime: receipt.trans_time, amountCents: Number(receipt.amount_cents),
+        billRefNumber: receipt.bill_ref_number, firstName: receipt.first_name, reason: receipt.ignored_reason,
+      })),
+    };
+  }
+
+  /** A person places a waiting receipt: the member (or none) and the fund. */
+  static async assign(orgId: string, userId: string, receiptId: string, input: { memberId?: string | null; fundId: string; incomeAccountId?: string | null }) {
+    const { data: receipt, error } = await getSupabase().from('mpesa_receipts').select('trans_id,status')
+      .eq('org_id', orgId).eq('id', receiptId).maybeSingle();
+    if (error) throw error;
+    if (!receipt) throw new UserError('M-Pesa receipt not found in this church.', 404);
+    if (receipt.status !== 'UNMATCHED') {
+      throw new UserError(`M-Pesa receipt ${receipt.trans_id} is ${receipt.status === 'POSTED' ? 'already posted' : 'set aside'}.`, 409);
+    }
+    const [outcome] = await GivingService.postMatches(orgId, userId,
+      [{ receiptId, memberId: input.memberId || null, fundId: input.fundId, incomeAccountId: input.incomeAccountId || null }], 'QUEUE');
+    if (!outcome || outcome.error || !outcome.contribution_id) throw new UserError(outcome?.error || 'The gift was not posted.', 409);
+    return { contributionId: outcome.contribution_id, journalEntryId: outcome.journal_entry_id };
+  }
+
+  static async ignore(orgId: string, userId: string, receiptId: string, reason: string) {
+    const { error } = await getSupabase().rpc('ignore_mpesa_receipt', {
+      p_org_id: orgId, p_receipt_id: receiptId, p_reason: reason, p_created_by: userId,
+    });
+    if (error) throw error;
+  }
+
+  static async restore(orgId: string, userId: string, receiptId: string) {
+    const { error } = await getSupabase().rpc('restore_mpesa_receipt', {
+      p_org_id: orgId, p_receipt_id: receiptId, p_created_by: userId,
+    });
+    if (error) throw error;
+  }
+
+  /** A gift handed in or paid to the bank: cash, bank transfer or cheque. M-Pesa gifts come from receipts. */
+  static async recordGift(orgId: string, userId: string, input: {
+    memberId?: string | null; fundId: string; incomeAccountId?: string | null; amountCents: number;
+    method: 'CASH' | 'BANK' | 'CHEQUE'; receivedOn: string; idempotencyKey: string;
+  }) {
+    const { data, error } = await getSupabase().rpc('record_contribution', {
+      p_org_id: orgId, p_member_id: input.memberId || null, p_fund_id: input.fundId,
+      p_income_account_id: input.incomeAccountId || null, p_amount_cents: input.amountCents, p_method: input.method,
+      p_received_on: input.receivedOn, p_mpesa_receipt_id: null, p_idempotency_key: input.idempotencyKey, p_created_by: userId,
+    });
+    if (error) throw error;
+    return data as { id: string; journalEntryId: string };
+  }
+
+  /** Giving received on a day, by fund and by method. */
+  static async day(orgId: string, date: string) {
+    const supabase = getSupabase();
+    const rows = await fetchAllRows<any>((from, to) => supabase.from('contributions')
+      .select('id,amount_cents,method,received_on,reference,fund_id,member_id,journal_entry_id,collection_id,mpesa_receipt_id,funds(code,name),members(member_number,first_name,last_name)')
+      .eq('org_id', orgId).eq('received_on', date).order('created_at').order('id').range(from, to));
+    const byFund = new Map<string, { fundId: string; code: string; name: string; cents: number }>();
+    const byMethod: Record<string, number> = {};
+    for (const row of rows) {
+      const cents = Number(row.amount_cents);
+      const fund = byFund.get(row.fund_id) ?? { fundId: row.fund_id, code: row.funds?.code ?? '', name: row.funds?.name ?? '', cents: 0 };
+      fund.cents += cents;
+      byFund.set(row.fund_id, fund);
+      byMethod[row.method] = (byMethod[row.method] || 0) + cents;
+    }
+    return {
+      date,
+      totalCents: rows.reduce((sum, row) => sum + Number(row.amount_cents), 0),
+      byFund: [...byFund.values()].sort((a, b) => a.code.localeCompare(b.code)),
+      byMethod,
+      gifts: rows,
+    };
   }
 }

@@ -28,6 +28,7 @@ import { registerTrackingRoutes } from './routes/tracking';
 import { registerDocumentRoutes } from './routes/documents';
 import { registerLawRoutes } from './routes/law';
 import { registerMpesaPublicRoutes, registerMpesaRoutes } from './routes/mpesa';
+import { registerChurchRoutes } from './routes/church';
 import { CourtEventService } from '../src/server/courtEvents';
 import { RecurringService } from '../src/server/recurring';
 import { allowedOriginsForBrands, brandForHost, configuredBrandHosts } from '../src/utils/publicBrand';
@@ -106,6 +107,7 @@ registerTrackingRoutes(api);
 registerDocumentRoutes(api);
 registerLawRoutes(api);
 registerMpesaRoutes(api);
+registerChurchRoutes(api);
 
 app.route('/api', api);
 

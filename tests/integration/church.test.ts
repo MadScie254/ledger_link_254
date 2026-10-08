@@ -7,9 +7,18 @@ import { createServer, type Server } from 'node:http';
 import { OrganizationService } from '../../src/server/organizations';
 import { MpesaC2bService } from '../../src/server/mpesaC2b';
 import { assertChurchEdition } from '../../src/server/churchAccess';
+import { MembersService } from '../../src/server/members';
+import { FundsService } from '../../src/server/funds';
+import { GivingService } from '../../src/server/giving';
+import { CollectionsService } from '../../src/server/collections';
+import { ChurchReportService } from '../../src/server/churchReports';
+import { CashTransactionService } from '../../src/server/cashTransactions';
+import { runWithRequestContext } from '../../src/server/requestContext';
 import { readMpesaStatement, detectMpesaColumns } from '../../src/utils/mpesaStatement';
+import { detectMemberColumns, readMembers } from '../../src/utils/memberImport';
+import { countTotalCents } from '../../src/utils/cashCount';
 import confirmation from './fixtures/c2b-confirmation-1043.json';
-import { ORG, OWNER, MEMBER, sql, refused } from './helpers';
+import { ORG, OWNER, MEMBER, sql, uuid, refused } from './helpers';
 
 let church = '';
 let token = '';
@@ -176,4 +185,158 @@ test('an uploaded M-Pesa statement places gifts once and posts its charges once'
   assert.equal(balance('1050'), 250_000 + 100_000 - 1_000);
   // The ledger still balances.
   assert.equal(Number(sql(`SELECT COALESCE(sum(debit - credit), 0) FROM public.journal_lines WHERE org_id = '${church}'`)), 0);
+});
+
+test('the register takes members one at a time and fifty from a CSV, with consent for contact details', async () => {
+  await refused(MembersService.create(church, OWNER, { memberNumber: '3001', firstName: 'Simu', phone: '0700000301' }), /needs the member's consent/);
+  const id = await MembersService.create(church, OWNER, {
+    memberNumber: 'k-3001', firstName: 'Simu', lastName: 'Mfano', phone: '0700000301', consentMethod: 'Signed form',
+  });
+  const record = await MembersService.get(church, id);
+  assert.equal(record.member.member_number, 'K-3001', 'member numbers are kept upper case');
+  assert.ok(record.member.consent_given_at, 'consent is dated');
+  await refused(MembersService.create(church, OWNER, { memberNumber: 'K-3001', firstName: 'Rudia' }), /already in the register/);
+  await MembersService.update(church, id, { phone: null });
+  assert.equal((await MembersService.get(church, id)).member.consent_method, null, 'no contact details, no consent kept');
+
+  // Fifty members from a CSV, in households.
+  const header = ['Member No', 'First name', 'Surname', 'Phone', 'Consent', 'Status', 'Household'];
+  const rows = [header, ...Array.from({ length: 50 }, (_, i) => [
+    String(5001 + i), `Mshiriki${i + 1}`, 'Mfano', i % 2 ? '' : `07000${String(i).padStart(5, '0')}`, i % 2 ? '' : 'Signed form',
+    i % 10 === 0 ? 'Visitor' : 'Member', `Nyumba ${Math.floor(i / 5) + 1}`,
+  ])];
+  const existing = new Set((await MembersService.list(church)).map((m: any) => m.member_number));
+  const read = readMembers(rows, detectMemberColumns(header), existing);
+  assert.equal(read.members.length, 50);
+  assert.deepEqual(read.problems, []);
+  const result = await MembersService.importMany(church, OWNER, read.members);
+  assert.deepEqual(result, { imported: 50, householdsCreated: 10 });
+  assert.equal((await MembersService.list(church, { search: 'Mshiriki' })).length, 50);
+  assert.equal((await MembersService.list(church, { status: 'VISITOR' })).length, 5);
+  const households = await MembersService.households(church);
+  assert.equal(households.find((h: any) => h.name === 'Nyumba 1')?.memberCount, 5);
+  await refused(MembersService.importMany(church, OWNER, read.members.slice(0, 1)), /Already in the register: 5001/);
+
+  // The plan's member limit is named when reached.
+  sql(`UPDATE public.plans SET max_members = 10 WHERE id = (SELECT plan_id FROM public.organization_subscriptions WHERE org_id = '${church}')`);
+  await refused(MembersService.create(church, OWNER, { memberNumber: '9999', firstName: 'Mwingine' }), /plan includes 10 members/);
+  sql(`UPDATE public.plans SET max_members = NULL WHERE id = (SELECT plan_id FROM public.organization_subscriptions WHERE org_id = '${church}')`);
+});
+
+test('funds and giving rules are kept by the treasurer; the general fund stays open', async () => {
+  const youth = await FundsService.create(church, { code: 'youth', name: 'Youth fund', restricted: true,
+    incomeAccountId: sql(`SELECT id FROM public.accounts WHERE org_id = '${church}' AND code = '4030'`) });
+  await refused(FundsService.create(church, { code: 'YOUTH', name: 'Again', restricted: false,
+    incomeAccountId: sql(`SELECT id FROM public.accounts WHERE org_id = '${church}' AND code = '4030'`) }), /already has a fund coded YOUTH/);
+  await refused(FundsService.create(church, { code: 'BAD', name: 'Wrong account', restricted: false,
+    incomeAccountId: sql(`SELECT id FROM public.accounts WHERE org_id = '${church}' AND code = '1000'`) }), /active income account/);
+  await refused(FundsService.update(church, fund('GENERAL'), { isActive: false }), /general fund stays open/);
+  const rule = await FundsService.createRule(church, { priority: 40, matchType: 'PREFIX', pattern: 'yth', fundId: youth });
+  assert.equal((await FundsService.rules(church)).find((r: any) => r.id === rule)?.pattern, 'YTH');
+  // The new rule places a gift at once.
+  const outcome = await MpesaC2bService.receiveConfirmation(token, { ...confirmation, TransID: 'TJC0000001', BillRefNumber: 'YTH-1044', TransAmount: '700' });
+  if (outcome.status !== 'kept') throw new Error('not kept');
+  assert.equal((await outcome.process()).posted[0].explanation, 'Reference YTH-1044: member 1044, Youth fund.');
+});
+
+test('the queue shows why a receipt waits, takes an assignment, and sets aside what is not giving', async () => {
+  const queue = await GivingService.queue(church);
+  const harambee = queue.waiting.find((item: any) => item.transId === 'TJA1B2C3D5')!;
+  assert.equal(harambee.reason, 'No giving rule fits reference HARAMBEE.');
+  const forMember = queue.waiting.find((item: any) => item.transId === 'TJA1B2C3D6')!;
+  assert.equal(forMember.suggestedMemberId, sql(`SELECT id FROM public.members WHERE org_id = '${church}' AND member_number = '1044'`));
+  assert.ok(queue.waiting.some((item: any) => item.transId === 'TJB0000003'));
+
+  const member1043 = sql(`SELECT id FROM public.members WHERE org_id = '${church}' AND member_number = '1043'`);
+  const posted = await GivingService.assign(church, OWNER, harambee.id, { memberId: member1043, fundId: fund('BUILDING') });
+  assert.ok(posted.journalEntryId);
+  await refused(GivingService.assign(church, OWNER, harambee.id, { memberId: member1043, fundId: fund('BUILDING') }), /already posted/);
+  await GivingService.assign(church, OWNER, forMember.id, { memberId: forMember.suggestedMemberId, fundId: fund('GENERAL') });
+
+  const school = queue.waiting.find((item: any) => item.transId === 'TJB0000003')!;
+  await refused(GivingService.ignore(church, OWNER, school.id, 'no'), /Say why/);
+  await GivingService.ignore(church, OWNER, school.id, 'School fees paid to the church paybill by mistake');
+  let after = await GivingService.queue(church);
+  assert.equal(after.waiting.length, 0);
+  assert.deepEqual(after.setAside.map((item: any) => item.reason), ['School fees paid to the church paybill by mistake']);
+  await GivingService.restore(church, OWNER, school.id);
+  after = await GivingService.queue(church);
+  assert.equal(after.waiting.length, 1);
+  await GivingService.ignore(church, OWNER, school.id, 'School fees paid to the church paybill by mistake');
+});
+
+test('a Sunday cash count needs two people, and banking it short by KES 100 posts the shortfall', async () => {
+  sql(`INSERT INTO public.memberships (org_id, user_id, role) VALUES ('${church}', '00000000-0000-0000-0000-000000000004', 'accountant')
+    ON CONFLICT (org_id, user_id) DO UPDATE SET role = 'accountant'`);
+  const second = '00000000-0000-0000-0000-000000000004';
+  const counts = { 1000: 12, 500: 3, 100: 1 };
+  const total = countTotalCents(counts);
+  assert.equal(total, 1_360_000);
+  const started = await CollectionsService.start(church, OWNER, {
+    serviceDate: '2026-10-04', serviceName: 'Main service', counts, totalCents: total, fundId: fund('GENERAL'), idempotencyKey: uuid(),
+  });
+  assert.match(started.number, /^COL-2026-\d{4}$/);
+  await refused(CollectionsService.confirm(church, OWNER, started.id, { counts, idempotencyKey: uuid() }), /second person|first count|counted it/i);
+  await refused(CollectionsService.confirm(church, second, started.id, { counts: { ...counts, 100: 2 }, idempotencyKey: uuid() }),
+    /KES 13,600.00.*KES 13,500.00|KES 13,500.00.*KES 13,600.00|13,600|differ/);
+  assert.equal(balance('1040'), 0, 'nothing posts until the counts agree');
+  await CollectionsService.confirm(church, second, started.id, { counts, idempotencyKey: uuid() });
+  assert.equal(balance('1040'), 1_360_000);
+
+  const bank = sql(`SELECT id FROM public.accounts WHERE org_id = '${church}' AND code = '1000'`);
+  const banked = await CollectionsService.bank(church, OWNER, started.id, {
+    bankedCents: 1_350_000, bankedOn: '2026-10-05', bankAccountId: bank, bankReference: 'DEP-1', idempotencyKey: uuid(),
+  });
+  assert.equal(banked.varianceCents, -10_000);
+  assert.equal(balance('1040'), 0);
+  assert.equal(balance('1000'), 1_350_000);
+  assert.equal((await CollectionsService.list(church, { status: 'BANKED' })).length, 1);
+});
+
+test('gifts by bank or cheque post to their fund, and Bills and expenses post to the fund chosen', async () => {
+  await GivingService.recordGift(church, OWNER, {
+    memberId: null, fundId: fund('MISSIONS'), amountCents: 500_000, method: 'CHEQUE', receivedOn: '2026-10-04', idempotencyKey: uuid(),
+  });
+  const day = await GivingService.day(church, '2026-10-04');
+  assert.equal(day.byMethod.CHEQUE, 500_000);
+  assert.equal(day.byMethod.CASH, 1_360_000);
+  assert.ok(day.byFund.some((f: any) => f.code === 'MISSIONS' && f.cents === 500_000));
+
+  const vendor = sql(`INSERT INTO public.vendors (org_id, display_name) VALUES ('${church}', 'Mfano Hardware') RETURNING id`);
+  await runWithRequestContext({ actorId: OWNER, fundId: fund('BUILDING') }, () => CashTransactionService.recordExpense({
+    orgId: church, vendorId: vendor, date: '2026-10-06', paidFromAccountId: sql(`SELECT id FROM public.accounts WHERE org_id = '${church}' AND code = '1000'`),
+    lines: [{ description: 'Roofing sheets', accountId: sql(`SELECT id FROM public.accounts WHERE org_id = '${church}' AND code = '6310'`), amountCents: 300_000 }],
+    actor: OWNER, idempotencyKey: uuid(),
+  } as any));
+  const balances = await ChurchReportService.fundBalances(church, '2026-10-01', '2026-10-31');
+  assert.equal(balances.funds.find((f) => f.code === 'BUILDING')?.expenseCents, 300_000);
+});
+
+test("the treasurer's report and fund balances add up and reconcile to the trial balance", async () => {
+  const report = await ChurchReportService.treasurer(church, '2026-10');
+  assert.equal(report.from, '2026-10-01');
+  assert.equal(report.to, '2026-10-31');
+  const income = Number(sql(`SELECT COALESCE(sum(l.credit - l.debit), 0) FROM public.journal_lines l JOIN public.accounts a ON a.id = l.account_id
+    JOIN public.journal_entries e ON e.id = l.journal_entry_id WHERE a.org_id = '${church}' AND a.type = 'INCOME' AND e.entry_date BETWEEN '2026-10-01' AND '2026-10-31'`));
+  const spent = Number(sql(`SELECT COALESCE(sum(l.debit - l.credit), 0) FROM public.journal_lines l JOIN public.accounts a ON a.id = l.account_id
+    JOIN public.journal_entries e ON e.id = l.journal_entry_id WHERE a.org_id = '${church}' AND a.type IN ('EXPENSE','COGS') AND e.entry_date BETWEEN '2026-10-01' AND '2026-10-31'`));
+  assert.equal(report.incomeCents, income);
+  assert.equal(report.expenseCents, spent);
+  assert.equal(report.closingCents, report.openingCents + income - spent);
+  assert.ok(report.incomeByFund.some((section) => section.code === 'BUILDING' && section.restricted));
+  assert.equal(report.money.find((m) => m.code === '1050')?.balanceCents, balance('1050'));
+  assert.equal(report.unmatchedCount, 0, 'the queue was cleared');
+  assert.equal(report.cashNotBankedCents, 0);
+
+  const balances = await ChurchReportService.fundBalances(church, '2026-10-01', '2026-10-31');
+  assert.equal(balances.reconciliation.reconciles, true);
+  assert.equal(balances.reconciliation.fundsClosingCents, income - spent);
+  assert.equal(Number(sql(`SELECT COALESCE(sum(debit - credit), 0) FROM public.journal_lines WHERE org_id = '${church}'`)), 0, 'the trial balance balances');
+  await refused(ChurchReportService.treasurer(church, '2026-13'), /YYYY-MM/);
+
+  const home = await ChurchReportService.dashboard(church, '2026-10-08');
+  assert.equal(home.sunday, '2026-10-04');
+  assert.equal(home.sundayGivingCents, Number(sql(`SELECT sum(amount_cents) FROM public.contributions WHERE org_id = '${church}' AND received_on = '2026-10-04'`)));
+  assert.equal(home.unmatchedCount, 0);
+  assert.ok(home.monthByFund.some((f) => f.code === 'GENERAL' && f.givingCents > 0));
 });

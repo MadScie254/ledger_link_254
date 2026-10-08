@@ -60,14 +60,14 @@ export async function requireAuthenticationAndOrganization(c: Context<{ Variable
   c.set('userId', user.id);
 
   // Everything the request does from here on is attributed to this person,
-  // and anything it posts is tagged with the class and location it names
-  // (the database checks they are this organization's and active).
+  // and anything it posts is tagged with the class, location and church fund
+  // it names (the database checks they are this organization's and active).
   const tag = (name: string) => {
     const value = c.req.header(name)?.trim();
     return value && /^[0-9a-f-]{36}$/i.test(value) ? value : undefined;
   };
   return runWithRequestContext(
-    { actorId: user.id, classId: tag('x-ledger-class'), locationId: tag('x-ledger-location') },
+    { actorId: user.id, classId: tag('x-ledger-class'), locationId: tag('x-ledger-location'), fundId: tag('x-ledger-fund') },
     () => selectOrganization(c, next, user.id),
   );
 }
