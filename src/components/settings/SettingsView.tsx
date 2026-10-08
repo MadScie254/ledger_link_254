@@ -11,6 +11,7 @@ import { BookOpen } from 'lucide-react';
 import { useOnboarding } from '../onboarding/OnboardingProvider';
 import { BUSINESS_TYPES, type BusinessType } from '../../utils/businessTypes';
 import { businessTypeAllowedForEdition, editionDefinition, type Edition } from '../../utils/editions';
+import { usePublicBrand } from '../../hooks/usePublicBrand';
 import { THEME_ACCENTS, DEFAULT_THEME_ACCENT, type ThemeAccent } from '../../utils/themeAccents';
 import { TrackingPanel } from './TrackingPanel';
 import { ControlsPanel } from './ControlsPanel';
@@ -491,6 +492,9 @@ function CompanyModal({ initialData, onClose, onSuccess }: {
   const [industry, setIndustry] = useState(initialData?.industry || '');
   const [businessType, setBusinessType] = useState<BusinessType | ''>(initialData?.businessType || '');
   const [edition, setEdition] = useState<Edition>(initialData?.edition || 'business');
+  const { data: siteBrand, isError: brandError } = usePublicBrand();
+  const selectedEdition = !initialData && siteBrand?.edition !== 'business' && siteBrand?.edition
+    ? siteBrand.edition : edition;
   const [themeAccent, setThemeAccent] = useState<ThemeAccent>(initialData?.themeAccent || DEFAULT_THEME_ACCENT);
   const [address, setAddress] = useState(initialData?.address || '');
   const [city, setCity] = useState(initialData?.city || 'Nairobi');
@@ -502,14 +506,22 @@ function CompanyModal({ initialData, onClose, onSuccess }: {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  React.useEffect(() => {
+    if (!initialData && siteBrand?.edition && siteBrand.edition !== 'business') {
+      setEdition(siteBrand.edition);
+      if (!businessTypeAllowedForEdition(siteBrand.edition, businessType || null)) setBusinessType('');
+    }
+  }, [initialData, siteBrand?.edition, businessType]);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSubmitting(true);
     setError(null);
     try {
+      if (!initialData && !siteBrand) throw new Error('Could not identify this site. Reload and try again.');
       const payload = {
         name, legalName: legalName || name, baseCurrency, country, taxId, fiscalYearStart, industry, businessType: businessType || null,
-        ...(!initialData ? { edition } : {}),
+        ...(!initialData ? { edition: selectedEdition } : {}),
         themeAccent, address, city, phone, email, website,
         // Printed on documents; only an existing company can carry them.
         ...(initialData ? { paymentDetails, documentFooter } : {}),
@@ -538,18 +550,20 @@ function CompanyModal({ initialData, onClose, onSuccess }: {
       onClose={onClose}
       width="lg"
       title={initialData ? `Edit ${initialData.name}` : 'Add a company'}
-      note={initialData ? undefined : 'A new company starts with its own empty books and a standard chart of accounts.'}
+      note={initialData ? undefined : selectedEdition === 'business'
+        ? 'A new company starts with its own empty books and a standard chart of accounts.'
+        : 'A new organization starts with its own empty books and a chart of accounts for its edition.'}
       footer={
         <>
-          {error && (
+          {(error || (!initialData && brandError)) && (
             <p role="alert" className="mr-auto text-[13px] text-ledger-red">
-              {error}
+              {error || 'Could not identify this site. Reload and try again.'}
             </p>
           )}
           <button type="button" onClick={onClose} className={buttonClass.secondary}>
             Cancel
           </button>
-          <button type="submit" form="company-form" disabled={isSubmitting} className={buttonClass.primary}>
+          <button type="submit" form="company-form" disabled={isSubmitting || (!initialData && !siteBrand)} className={buttonClass.primary}>
             {isSubmitting ? 'Saving' : initialData ? 'Save changes' : 'Add company'}
           </button>
         </>
@@ -559,7 +573,9 @@ function CompanyModal({ initialData, onClose, onSuccess }: {
         <Field label="Trading name">
           <input type="text" required value={name} onChange={(e) => setName(e.target.value)} />
         </Field>
-        {!initialData && <Field label="Edition" hint="Mizani and Kundi pilot sections are being built. Available sections open now.">
+        {!initialData && siteBrand?.edition !== 'business' && siteBrand?.edition ? <Field label="Edition">
+          <p className="text-[14px] text-ink-900">{siteBrand.brandName} · {siteBrand.edition === 'law' ? 'Law' : 'Church'}</p>
+        </Field> : !initialData && <Field label="Edition" hint="Mizani and Kundi pilot sections are being built. Available sections open now.">
           <select value={edition} onChange={(e) => {
             const next = e.target.value as Edition;
             setEdition(next);
@@ -599,7 +615,7 @@ function CompanyModal({ initialData, onClose, onSuccess }: {
         <Field label="Business type" hint="Adds a few accounts for this kind of work and tailors the tour. Change it anytime.">
           <select value={businessType} onChange={(e) => setBusinessType(e.target.value as BusinessType | '')}>
             <option value="">Not set</option>
-            {BUSINESS_TYPES.filter((type) => type.id !== 'general' && businessTypeAllowedForEdition(edition, type.id)).map((type) => (
+            {BUSINESS_TYPES.filter((type) => type.id !== 'general' && businessTypeAllowedForEdition(selectedEdition, type.id)).map((type) => (
               <option key={type.id} value={type.id}>{type.label}</option>
             ))}
             <option value="general">Something else</option>

@@ -18,6 +18,7 @@ import { InvitationsPrompt } from "./components/team/InvitationsPrompt";
 import { NewPasswordScreen } from "./components/layout/NewPasswordScreen";
 import { isPlannedEditionView, PLANNED_EDITION_VIEWS, PLANNED_SECTION_COPY, type BusinessView } from "./utils/views";
 import { editionDefinition } from "./utils/editions";
+import { BUSINESS_BRAND, usePublicBrand } from "./hooks/usePublicBrand";
 export { KNOWN_VIEWS } from "./utils/views";
 
 /** A tab that has already gone past the landing page (signed in, or clicked
@@ -137,6 +138,7 @@ export default function App() {
 
 function LedgerApp() {
   const { session, signOut, justConfirmedEmail, dismissEmailConfirmed, isRecoveringPassword } = useAuth();
+  const { data: publicBrand } = usePublicBrand();
   const [showLanding, setShowLanding] = useState(() => !hasVisitedAuth());
   const [authMode, setAuthMode] = useState<'signIn' | 'signUp'>('signIn');
   const enterAuth = (mode: 'signIn' | 'signUp') => {
@@ -280,9 +282,9 @@ function LedgerApp() {
     // the entire sign-up funnel was unreachable. A slide transition here
     // is not worth that risk again.
     return showLanding ? (
-      <LandingPage onSignIn={() => enterAuth('signIn')} onSignUp={() => enterAuth('signUp')} />
+      <LandingPage brand={publicBrand || BUSINESS_BRAND} onSignIn={() => enterAuth('signIn')} onSignUp={() => enterAuth('signUp')} />
     ) : (
-      <LockScreen initialMode={authMode} onBack={() => setShowLanding(true)} />
+      <LockScreen brand={publicBrand || BUSINESS_BRAND} initialMode={authMode} onBack={() => setShowLanding(true)} />
     );
   }
 

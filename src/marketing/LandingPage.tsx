@@ -17,6 +17,8 @@ import {
   X,
 } from 'lucide-react';
 import { BrandMark } from '../components/ledger/BrandMark';
+import { BUSINESS_BRAND } from '../hooks/usePublicBrand';
+import type { PublicBrand } from '../utils/publicBrand';
 
 /**
  * Ledger Link's public face: what the product does, how it works, and how to
@@ -85,9 +87,10 @@ const FAQS = [
 interface LandingPageProps {
   onSignIn: () => void;
   onSignUp: () => void;
+  brand?: PublicBrand;
 }
 
-export function LandingPage({ onSignIn, onSignUp }: LandingPageProps) {
+export function LandingPage({ onSignIn, onSignUp, brand = BUSINESS_BRAND }: LandingPageProps) {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [openFaq, setOpenFaq] = useState<number | null>(0);
   const reducedMotion = useReducedMotion();
@@ -96,6 +99,49 @@ export function LandingPage({ onSignIn, onSignUp }: LandingPageProps) {
     setIsMenuOpen(false);
     document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
   };
+
+  if (brand.edition !== 'business') {
+    const audience = brand.edition === 'law' ? 'law firms' : 'churches';
+    const firstRecord = brand.edition === 'law' ? 'matters and client money' : 'members, giving and funds';
+    const startLabel = { en: 'Create account', sw: 'TODO-SW' };
+    const signInLabel = { en: 'Sign in', sw: 'TODO-SW' };
+    return <main className="min-h-screen ll-grain-bg text-ink-900">
+      <header className="border-b border-feint-strong bg-paper-50/95">
+        <div className="mx-auto flex h-16 max-w-6xl items-center justify-between px-5 sm:px-8">
+          <span className="flex items-center gap-2 ll-printed text-[16px]">
+            <BrandMark edition={brand.edition} className="h-5 w-5 text-oxblood" /> {brand.brandName}
+          </span>
+          <button type="button" onClick={onSignIn} className="text-[13.5px] font-semibold text-oxblood underline underline-offset-4">
+            {signInLabel.en}
+          </button>
+        </div>
+      </header>
+      <section className="mx-auto grid max-w-6xl gap-12 px-5 py-20 sm:px-8 md:grid-cols-[1.4fr_1fr] md:py-28">
+        <div>
+          <p className="ll-printed text-[12px] text-oxblood">{brand.brandName} · Pilot build</p>
+          <h1 className="mt-5 max-w-2xl ll-cover text-[44px] leading-[1.05] sm:text-[62px]">
+            One set of books for {audience}.
+          </h1>
+          <p className="mt-7 max-w-xl text-[16px] leading-relaxed text-graphite-600">
+            Start with a dedicated chart of accounts and team access. Workflows for {firstRecord} are being built for the pilot.
+          </p>
+          <button type="button" onClick={onSignUp}
+            className="mt-9 inline-flex h-11 items-center gap-2 rounded-sm bg-oxblood-fill px-5 text-[14px] font-semibold text-white hover:bg-[var(--oxblood-fill-hover)]">
+            {startLabel.en} <ArrowRight className="h-4 w-4" aria-hidden="true" />
+          </button>
+          <p className="mt-4 text-[12px] text-graphite-600">powered by Ledger Link</p>
+        </div>
+        <aside className="self-start border border-feint-strong bg-paper-50 p-8 ll-lift">
+          <p className="ll-printed text-[12px] text-graphite-600">What opens now</p>
+          <ul className="mt-5 space-y-4 text-[14px] leading-relaxed">
+            <li><strong>Accounts.</strong> An edition chart is created with the organization.</li>
+            <li><strong>Team.</strong> Invite people into the same books.</li>
+            <li><strong>Specialist sections.</strong> Marked as planned until each workflow is ready.</li>
+          </ul>
+        </aside>
+      </section>
+    </main>;
+  }
 
   return (
     <motion.div

@@ -27,10 +27,15 @@ import { registerAttachmentRoutes } from './routes/attachments';
 import { registerTrackingRoutes } from './routes/tracking';
 import { registerDocumentRoutes } from './routes/documents';
 import { RecurringService } from '../src/server/recurring';
+import { allowedOriginsForBrands, brandForHost, configuredBrandHosts } from '../src/utils/publicBrand';
 
 const app = new Hono<{ Variables: Variables }>();
 
-const ALLOWED_ORIGINS = (process.env.ALLOWED_ORIGINS || 'http://localhost:3000,http://127.0.0.1:3000,http://localhost:3001').split(',');
+const BRAND_HOSTS = configuredBrandHosts(process.env.MIZANI_HOSTS, process.env.KUNDI_HOSTS);
+const ALLOWED_ORIGINS = allowedOriginsForBrands(
+  process.env.ALLOWED_ORIGINS || 'http://localhost:3000,http://127.0.0.1:3000,http://localhost:3001',
+  BRAND_HOSTS,
+);
 
 // --- Security headers on API responses (static assets get public/_headers) ---
 app.use('*', async (c, next) => {
@@ -60,6 +65,7 @@ app.use(
 );
 
 const api = new Hono<{ Variables: Variables }>();
+app.get('/api/public/brand', (c) => c.json(brandForHost(c.req.header('host'), c.req.url, BRAND_HOSTS)));
 api.use('*', requireAuthenticationAndOrganization);
 // Employee and payroll records are personal data: not for the read-only member role.
 api.use('/employees', requirePayrollAccess);

@@ -4,6 +4,8 @@ import { motion, useReducedMotion } from 'motion/react';
 import { useAuth } from '../../context/AuthProvider';
 import { Mark } from '../ledger/Mark';
 import { BrandMark } from '../ledger/BrandMark';
+import { BUSINESS_BRAND } from '../../hooks/usePublicBrand';
+import type { PublicBrand } from '../../utils/publicBrand';
 
 type Mode = 'signIn' | 'signUp' | 'reset';
 
@@ -17,7 +19,9 @@ const fieldClass =
   'mt-1.5 block w-full h-11 rounded-sm border border-field bg-paper-100 px-3 text-[15px] text-ink-900 placeholder:text-graphite-500 focus:border-oxblood focus:shadow-[0_0_0_1px_var(--oxblood)] focus:outline-none';
 
 /** The cover of the book, and its first page. */
-export function LockScreen({ initialMode = 'signIn', onBack }: { initialMode?: 'signIn' | 'signUp'; onBack?: () => void } = {}) {
+export function LockScreen({ initialMode = 'signIn', onBack, brand = BUSINESS_BRAND }: {
+  initialMode?: 'signIn' | 'signUp'; onBack?: () => void; brand?: PublicBrand;
+} = {}) {
   const { signIn, signUp, resendConfirmation, requestPasswordReset } = useAuth();
   const reducedMotion = useReducedMotion();
   const [mode, setMode] = useState<Mode>(initialMode);
@@ -90,10 +94,14 @@ export function LockScreen({ initialMode = 'signIn', onBack }: { initialMode?: '
     <div className={`inline-block border border-[var(--spine-rule)] p-[3px] ${compact ? '' : 'w-full max-w-[20rem]'}`}>
       <div className={`border border-[var(--spine-rule)] ${compact ? 'px-3 py-2' : 'px-5 py-4'}`}>
         <span className="flex items-center gap-2">
-          <BrandMark className={compact ? 'h-3.5 w-3.5 shrink-0' : 'h-5 w-5 shrink-0'} />
-          <p className={`ll-printed tracking-[0.16em] text-sidebar-ink leading-none ${compact ? 'text-[14px]' : 'text-[19px]'}`}>Ledger Link</p>
+          <BrandMark edition={brand.edition} className={compact ? 'h-3.5 w-3.5 shrink-0' : 'h-5 w-5 shrink-0'} />
+          <p className={`ll-printed tracking-[0.16em] text-sidebar-ink leading-none ${compact ? 'text-[14px]' : 'text-[19px]'}`}>{brand.brandName}</p>
         </span>
-        {!compact && <p className="mt-2.5 text-[12.5px] text-sidebar-muted">Books of account for Kenyan business</p>}
+        {!compact && <p className="mt-2.5 text-[12.5px] text-sidebar-muted">
+          {brand.edition === 'business' ? 'Books of account for Kenyan business'
+            : brand.edition === 'law' ? 'Practice books for Kenyan law firms' : 'Church books for Kenyan congregations'}
+        </p>}
+        {brand.poweredBy && <p className="mt-1 text-[10px] text-sidebar-muted">powered by Ledger Link</p>}
       </div>
     </div>
   );
@@ -111,16 +119,24 @@ export function LockScreen({ initialMode = 'signIn', onBack }: { initialMode?: '
           {stampedLabel(false)}
 
           <div className="max-w-[26rem]">
-            <h1 className="ll-cover text-[40px] lg:text-[46px] leading-[1.02] text-sidebar-ink">Every invoice, bill and payment, posted to one ledger.</h1>
+            <h1 className="ll-cover text-[40px] lg:text-[46px] leading-[1.02] text-sidebar-ink">
+              {brand.edition === 'business' ? 'Every invoice, bill and payment, posted to one ledger.'
+                : brand.edition === 'law' ? 'Practice books for your firm.' : 'Books for your congregation.'}
+            </h1>
             <p className="mt-5 text-[15px] leading-relaxed text-sidebar-muted">
-              Day-to-day financial work stays tied to the ledger it affects.
+              {brand.edition === 'business' ? 'Day-to-day financial work stays tied to the ledger it affects.'
+                : 'The edition is in pilot build. Accounts and team access are available now; specialist workflows are being built.'}
             </p>
           </div>
 
           <div className="max-w-[26rem]">
             <p className="ll-printed text-[11px] text-sidebar-muted pb-2 border-b border-[var(--spine-rule)]">Contents</p>
             <ul>
-              {CONTENTS.map(([title, description]) => (
+              {(brand.edition === 'business' ? CONTENTS : [
+                ['Accounts', 'A chart of accounts for this edition is ready when you create your organization.'],
+                ['Team', 'Invite colleagues to work in the same books.'],
+                ['Pilot sections', 'Specialist records and reports are being built.'],
+              ]).map(([title, description]) => (
                 <li key={title} className="border-b border-[var(--spine-rule)] py-3">
                   <p className="text-[14px] font-semibold text-sidebar-ink">{title}</p>
                   <p className="mt-0.5 text-[13px] leading-snug text-sidebar-muted">{description}</p>
@@ -281,7 +297,7 @@ export function LockScreen({ initialMode = 'signIn', onBack }: { initialMode?: '
                   </form>
 
                   <p className="mt-8 border-t border-feint pt-5 text-[14px] text-graphite-600">
-                    {mode === 'signIn' ? 'New to Ledger Link? ' : mode === 'reset' ? 'Remembered it? ' : 'Already have an account? '}
+                    {mode === 'signIn' ? `New to ${brand.brandName}? ` : mode === 'reset' ? 'Remembered it? ' : 'Already have an account? '}
                     <button
                       type="button"
                       onClick={() => switchMode(mode === 'signIn' ? 'signUp' : 'signIn')}

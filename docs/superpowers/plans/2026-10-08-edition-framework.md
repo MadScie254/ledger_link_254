@@ -62,9 +62,9 @@
 
 **Interfaces:** `GET /api/public/brand` returns `{ edition, brandName, poweredBy }` from configured host lists before auth runs.
 
-- [ ] Write failing host-match and fallback tests, including an untrusted Host value.
-- [ ] Implement route, allowed origins, and auth-page branding; run tests, lint, and build.
-- [ ] Commit E1.4 and push.
+- [x] Write failing host-match and fallback tests, including an untrusted Host value.
+- [x] Implement route, allowed origins, and auth-page branding; run tests, lint, and build.
+- [x] Commit E1.4 and push.
 
 ### Task 5: E1.5 limits and plan settings
 
