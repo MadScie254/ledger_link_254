@@ -1,6 +1,7 @@
 import { getSupabase } from './supabase';
 import { UserError } from './errors';
 import type { OrganizationRole } from '../../worker/auth';
+import { PlanService } from './plans';
 
 type AssignableRole = 'admin' | 'member' | 'accountant';
 
@@ -96,7 +97,14 @@ export class TeamService {
       p_role: role,
       p_actor: invitedBy,
     });
-    if (error) throw error;
+    if (error) {
+      // The database guard closes a race between concurrent invitations.
+      // Re-read the count so the caller still gets the plan's next-step sentence.
+      if (error.code === '23514' && /Plan user limit reached/i.test(error.message)) {
+        await PlanService.ensureCanInvite(orgId, email);
+      }
+      throw error;
+    }
     const result = data as { invitationId: string; hasAccount: boolean };
 
     let emailed = false;

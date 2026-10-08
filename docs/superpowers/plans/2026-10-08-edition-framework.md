@@ -68,10 +68,10 @@
 
 ### Task 5: E1.5 limits and plan settings
 
-**Files:** Create `src/utils/planLimits.ts` and tests; modify team route and settings view; add service tests.
+**Files:** Create `src/utils/planLimits.ts` and tests, `src/server/plans.ts`, `src/components/settings/PlanPanel.tsx`, `supabase/migrations/*_enforce_edition_user_limits.sql`, and `supabase/tests/plan_users.sql`; modify team route and settings view.
 
 **Interfaces:** `canAddUser` and `canAddMember` check nullable limits; Worker rejects users over the edition's current plan and names the next plan; Settings shows subscription status and limits.
 
-- [ ] Write failing boundary tests for unlimited, at-limit, and next-plan messages.
-- [ ] Enforce server-side, render plan settings, run tests, lint, build, and database checks.
-- [ ] Verify E1 acceptance, commit E1.5, and push.
+- [x] Write failing boundary tests for unlimited, at-limit, and next-plan messages.
+- [x] Enforce server-side, render plan settings, run tests, lint, build, and database checks.
+- [x] Verify E1 acceptance, commit E1.5, and push.

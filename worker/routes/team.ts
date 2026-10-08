@@ -1,10 +1,18 @@
 import { TeamService } from '../../src/server/team';
+import { PlanService } from '../../src/server/plans';
 import { bodyOf, DAY, enforceRateLimits, respondError } from '../http';
 import { inviteSchema, roleSchema, uuid } from '../schemas';
 import { requireOrganizationAdministrator, requireOrganizationOwner } from '../auth';
 import type { Api } from './types';
 
 export function registerTeamRoutes(api: Api) {
+  api.get('/plan', async (c) => {
+    try {
+      const result = await PlanService.snapshot(c.get('orgId'));
+      return c.json({ subscription: result?.snapshot || null });
+    } catch (err) { return respondError(c, err); }
+  });
+
   api.get('/team', async (c) => {
     try {
       const team = await TeamService.getTeam(c.get('orgId'), c.get('userId'));
@@ -18,6 +26,7 @@ export function registerTeamRoutes(api: Api) {
   api.post('/team', requireOrganizationAdministrator, async (c) => {
     try {
       const body = inviteSchema.parse(await bodyOf(c));
+      await PlanService.ensureCanInvite(c.get('orgId'), body.email);
       await enforceRateLimits(
         [
           { key: `invite:org:${c.get('orgId')}`, limit: 30, windowSeconds: DAY },

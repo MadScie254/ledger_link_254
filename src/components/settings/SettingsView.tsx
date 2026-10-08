@@ -15,8 +15,9 @@ import { usePublicBrand } from '../../hooks/usePublicBrand';
 import { THEME_ACCENTS, DEFAULT_THEME_ACCENT, type ThemeAccent } from '../../utils/themeAccents';
 import { TrackingPanel } from './TrackingPanel';
 import { ControlsPanel } from './ControlsPanel';
+import { PlanPanel } from './PlanPanel';
 
-type Tab = 'companies' | 'controls' | 'currencies' | 'accounting' | 'tracking' | 'security';
+type Tab = 'companies' | 'plan' | 'controls' | 'currencies' | 'accounting' | 'tracking' | 'security';
 
 const POSTING_ACCOUNTS = [
   { code: '1100', name: 'Accounts receivable', use: 'Every invoice posts its amount owed here' },
@@ -42,6 +43,12 @@ export function SettingsView() {
   const [exportProblem, setExportProblem] = useState('');
   const base = activeCompany?.baseCurrency || 'KES';
   const { restartTutorial, isReady: isOnboardingReady } = useOnboarding();
+
+  React.useEffect(() => {
+    if (activeTab === 'plan' && (!activeCompany?.edition || activeCompany.edition === 'business')) {
+      setActiveTab('companies');
+    }
+  }, [activeTab, activeCompany?.edition]);
 
   const { data: orgsData, refetch: refetchOrgs, isLoading: orgsLoading } = useQuery({
     queryKey: ['organizations'],
@@ -197,6 +204,8 @@ export function SettingsView() {
         onChange={(id) => setActiveTab(id as Tab)}
         tabs={[
           { id: 'companies', name: 'Companies', count: organizations.length },
+          ...(activeCompany?.edition && activeCompany.edition !== 'business'
+            ? [{ id: 'plan', name: 'Plan' }] : []),
           { id: 'controls', name: 'Closing and controls' },
           { id: 'currencies', name: 'Currencies' },
           { id: 'accounting', name: 'Posting accounts' },
@@ -284,6 +293,8 @@ export function SettingsView() {
           )}
         </div>
       )}
+
+      {activeTab === 'plan' && activeCompany?.edition && activeCompany.edition !== 'business' && <PlanPanel orgId={currentOrgId} />}
 
       {activeTab === 'controls' && activeCompany && <ControlsPanel company={activeCompany} onSaved={() => refetchOrgs()} />}
 
