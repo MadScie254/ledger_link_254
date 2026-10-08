@@ -257,6 +257,7 @@ export const organizationCreateSchema = z.object({
 export const organizationUpdateSchema = z.object(organizationFields).partial().extend({
   paymentDetails: z.preprocess((value) => (typeof value === 'string' && value.trim() === '' ? null : value), z.string().trim().max(1000).nullable().optional()),
   documentFooter: z.preprocess((value) => (typeof value === 'string' && value.trim() === '' ? null : value), z.string().trim().max(500).nullable().optional()),
+  vatRegistered: z.boolean().optional(),
   booksClosedThrough: isoDate.nullable().optional(),
   approvalThresholdCents: cents.nullable().optional(),
   aiEnabled: z.boolean().optional(),

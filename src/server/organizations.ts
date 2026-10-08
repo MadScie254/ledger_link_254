@@ -27,6 +27,8 @@ export interface Organization {
   paymentDetails?: string | null;
   /** A short line printed at the foot of every document. */
   documentFooter?: string | null;
+  /** Registered for VAT with KRA; a law firm may then charge VAT on professional fees. */
+  vatRegistered?: boolean;
   isDefault?: boolean;
   isDemo?: boolean;
   booksClosedThrough?: string | null;
@@ -65,6 +67,7 @@ function mapOrganization(d: any): Organization {
     website: d.website,
     paymentDetails: d.payment_details ?? null,
     documentFooter: d.document_footer ?? null,
+    vatRegistered: Boolean(d.vat_registered),
     isDefault: d.is_default,
     isDemo: d.is_demo,
     booksClosedThrough: d.books_closed_through ?? null,
@@ -172,6 +175,7 @@ export class OrganizationService {
       website: 'website',
       paymentDetails: 'payment_details',
       documentFooter: 'document_footer',
+      vatRegistered: 'vat_registered',
       booksClosedThrough: 'books_closed_through',
       approvalThresholdCents: 'approval_threshold_cents',
       aiEnabled: 'ai_enabled',
@@ -185,6 +189,11 @@ export class OrganizationService {
       const baseCurrency = String(data.baseCurrency).trim().toUpperCase();
       if (!/^[A-Z]{3}$/.test(baseCurrency)) throw new UserError('Base currency must be a three-letter ISO code, such as KES.');
       updateData.base_currency = baseCurrency;
+    }
+    // VAT registration needs a KRA PIN (organizations_vat_pin_check).
+    if (data.vatRegistered === true) {
+      const pin = data.taxId !== undefined ? data.taxId : (await this.getOrganization(orgId))?.taxId;
+      if (!pin || !String(pin).trim()) throw new UserError('Enter the KRA PIN before marking the organization VAT registered.');
     }
 
     if (Object.keys(updateData).length > 0) {

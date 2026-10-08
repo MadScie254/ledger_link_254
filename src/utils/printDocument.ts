@@ -20,6 +20,8 @@ export interface PrintParty {
 }
 
 export interface PrintLine {
+  /** A heading the line sits under, such as "Professional fees" on a fee note. */
+  section?: string;
   description: string;
   quantity: number | null;
   unitPriceCents: number | null;

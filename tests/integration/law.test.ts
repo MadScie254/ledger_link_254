@@ -11,6 +11,8 @@ import { ClientAccountService } from '../../src/server/clientAccount';
 import { DisbursementService } from '../../src/server/disbursements';
 import { FeeNoteService } from '../../src/server/feeNotes';
 import { assertLawEdition } from '../../src/server/lawAccess';
+import { DocumentPrintService } from '../../src/server/documentPrint';
+import { buildDocumentPdf } from '../../src/utils/documentPdf';
 import { ORG, OWNER, sql, uuid, refused } from './helpers';
 
 let lawOrg = '';
@@ -120,6 +122,20 @@ test('client money is received, paid out, transferred to office against a fee no
   assert.equal(sql(`SELECT status || ' ' || amount_due_cents FROM public.invoices WHERE id = '${feeNote}'`), 'PAID 0');
   await FeeNoteService.recordEtims(lawOrg, OWNER, feeNote, 'KRAMW0120261008000123');
 
+  // The fee note prints with fees and disbursements apart, and the withholding.
+  const printed = await DocumentPrintService.printModel(lawOrg, 'invoice', feeNote);
+  assert.equal(printed.title, 'Fee note');
+  assert.deepEqual(printed.lines.map((line) => line.section), ['Professional fees', 'Disbursements']);
+  assert.ok(printed.facts.some((fact) => fact.label === 'Matter' && /^MAT-2026-/.test(fact.value)));
+  assert.ok(printed.facts.some((fact) => fact.label === 'KRA eTIMS invoice' && fact.value === 'KRAMW0120261008000123'));
+  assert.deepEqual(printed.totals.map((total) => [total.label, total.cents]), [
+    ['Professional fees', 3_750_000], ['Disbursements', 200_000], ['VAT on fees', 0], ['Total', 3_950_000],
+    ['Paid', -(3_950_000 - 187_500)], ['Withholding tax', -187_500], ['Balance due', 0],
+  ]);
+  assert.equal(printed.stamp, 'PAID');
+  const pdf = Buffer.from(buildDocumentPdf(printed).output('arraybuffer')).toString('latin1');
+  assert.ok(pdf.includes('(PROFESSIONAL FEES)') && pdf.includes('(DISBURSEMENTS)'), 'the PDF heads each section');
+
   // The client ledger and balances agree with the client accounts.
   const ledger = await ClientAccountService.entries(lawOrg, matter);
   assert.deepEqual(ledger.map((line) => [line.receivedCents, line.paidCents]), [[10_000_000, 0], [0, 500_000], [0, 1_000_000]]);
@@ -131,4 +147,8 @@ test('client money is received, paid out, transferred to office against a fee no
   assert.equal(balance('1100'), 0, 'the fee note is settled');
   assert.equal(balance('1170'), 187_500, 'withholding receivable');
   assert.equal(balance('1180'), 0, 'the disbursement is recovered through the fee note');
+  const position = await ClientAccountService.position(lawOrg, '2026-10-31');
+  assert.deepEqual(position, { asOf: '2026-10-31', clientBankCents: 8_500_000, clientHeldCents: 8_500_000, matterLedgersCents: 8_500_000, untaggedHeldCents: 0 });
+  const wip = await MatterService.workInProgress(lawOrg);
+  assert.equal(wip.timeCents + wip.disbursementCents, 0, 'everything billable was billed');
 });

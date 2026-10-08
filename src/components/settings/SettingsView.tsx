@@ -514,6 +514,7 @@ function CompanyModal({ initialData, onClose, onSuccess }: {
   const [website, setWebsite] = useState(initialData?.website || '');
   const [paymentDetails, setPaymentDetails] = useState(initialData?.paymentDetails || '');
   const [documentFooter, setDocumentFooter] = useState(initialData?.documentFooter || '');
+  const [vatRegistered, setVatRegistered] = useState(Boolean(initialData?.vatRegistered));
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -536,6 +537,8 @@ function CompanyModal({ initialData, onClose, onSuccess }: {
         themeAccent, address, city, phone, email, website,
         // Printed on documents; only an existing company can carry them.
         ...(initialData ? { paymentDetails, documentFooter } : {}),
+        // Only a law firm's fee notes read it today.
+        ...(initialData?.edition === 'law' ? { vatRegistered } : {}),
       };
       const res = await fetch(initialData ? `/api/organizations/${initialData.id}` : '/api/organizations', {
         method: initialData ? 'PUT' : 'POST',
@@ -681,6 +684,15 @@ function CompanyModal({ initialData, onClose, onSuccess }: {
                 <input type="text" name="documentFooter" maxLength={500} value={documentFooter} onChange={(e) => setDocumentFooter(e.target.value)} />
               </Field>
             </div>
+            {initialData.edition === 'law' && (
+              <label className="sm:col-span-2 flex items-start gap-2 text-[13.5px] text-ink-900">
+                <input type="checkbox" name="vatRegistered" className="mt-1" checked={vatRegistered} onChange={(e) => setVatRegistered(e.target.checked)} />
+                <span>
+                  Registered for VAT with KRA
+                  <span className="block text-[12.5px] text-graphite-600">Fee notes may then charge VAT on professional fees, never on disbursements. Needs the KRA PIN above.</span>
+                </span>
+              </label>
+            )}
           </>
         )}
       </form>

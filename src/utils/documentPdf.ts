@@ -151,14 +151,21 @@ export function buildDocumentPdf(model: PrintDocument): jsPDF {
     startY: y,
     margin: { left: MARGIN, right: MARGIN, bottom: FOOTER_SPACE, top: MARGIN },
     head: [['Description', 'Qty', model.priceLabel, 'VAT %', 'VAT', 'Amount'].map((heading) => heading.toUpperCase())],
-    body: model.lines.map((line) => [
-      latin1(line.description),
-      printedQuantity(line.quantity),
-      line.unitPriceCents == null ? '' : money(line.unitPriceCents),
-      line.taxRate == null ? '' : `${line.taxRate}%`,
-      money(line.taxCents),
-      money(line.amountCents),
-    ]),
+    // A line under a new heading (professional fees, disbursements) opens with that heading.
+    body: model.lines.flatMap((line, index) => {
+      const row = [
+        latin1(line.description),
+        printedQuantity(line.quantity),
+        line.unitPriceCents == null ? '' : money(line.unitPriceCents),
+        line.taxRate == null ? '' : `${line.taxRate}%`,
+        money(line.taxCents),
+        money(line.amountCents),
+      ];
+      const heading = line.section && line.section !== model.lines[index - 1]?.section
+        ? [[{ content: latin1(line.section).toUpperCase(), colSpan: 6, styles: { fontStyle: 'bold', fontSize: 7, textColor: GRAPHITE, cellPadding: { top: 3.5, bottom: 1.2, left: 1.5, right: 1.5 } } }]]
+        : [];
+      return [...heading, row] as any[];
+    }),
     theme: 'plain',
     styles: {
       font: 'helvetica',
