@@ -453,3 +453,30 @@ test('a document posted under a class and location is tagged, and the profit and
       lines: [{ description: 'x', accountId: SALES, amountCents: 100 }], idempotencyKey: uuid(), createdBy: OWNER,
     })), /not an active one/);
 });
+
+test('the VAT summary counts cash sales, expenses and credits, standard-rated and zero-rated apart', async () => {
+  sql(`UPDATE public.organizations SET books_closed_through = NULL WHERE id = '${ORG}'`);
+  await CashTransactionService.recordSalesReceipt({
+    orgId: ORG, payeeName: 'Walk-in', date: '2026-03-10', depositAccountId: BANK, actor: OWNER, idempotencyKey: uuid(),
+    lines: [
+      { description: 'Paint', accountId: SALES, quantity: 2, unitPriceCents: 50_000, taxRate: 16 },
+      { description: 'Exercise books', accountId: SALES, quantity: 10, unitPriceCents: 1_000, taxRate: 0 },
+    ],
+  });
+  await CashTransactionService.recordExpense({
+    orgId: ORG, payeeName: 'Hardware', date: '2026-03-11', paidFromAccountId: BANK, actor: OWNER, idempotencyKey: uuid(),
+    lines: [{ description: 'Brushes', accountId: OPEX, amountCents: 20_000, taxCents: 3_200 }],
+  });
+  await CreditNoteService.issueCustomerCredit({
+    orgId: ORG, customerId: CUSTOMER, date: '2026-03-12', actor: OWNER, idempotencyKey: uuid(),
+    lines: [{ description: 'Discount agreed', accountId: SALES, quantity: 1, unitPriceCents: 10_000, taxRate: 16 }],
+  });
+  const vat = await ReportsService.getTaxSummary(ORG, '2026-03');
+  assert.equal(vat.outputVat.standardRatedSalesCents, 100_000 - 10_000);
+  assert.equal(vat.outputVat.zeroRatedOrExemptSalesCents, 10_000);
+  assert.equal(vat.outputVat.taxAmountCents, 16_000 - 1_600);
+  assert.equal(vat.inputVat.claimablePurchasesCents, 20_000);
+  assert.equal(vat.inputVat.taxAmountCents, 3_200);
+  assert.equal(vat.netVatPayableCents, 16_000 - 1_600 - 3_200);
+  assert.deepEqual(vat.breakdown.map((row) => row.source).sort(), ['CREDIT_NOTE', 'EXPENSE', 'SALES_RECEIPT']);
+});

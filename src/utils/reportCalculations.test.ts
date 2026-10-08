@@ -4,7 +4,6 @@ import {
   aggregateBalanceSheet,
   aggregateCashFlow,
   aggregateProfitAndLoss,
-  aggregateTaxRows,
   isNonCurrentAsset,
   normalizeAsOfDate,
   resolveReportDateRange,
@@ -175,19 +174,4 @@ test('cash flow removes non-cash profit items and classifies only cash-bearing a
   ]);
   assert.deepEqual(result.investing, [{ name: 'Equipment', amountCents: 100 }]);
   assert.deepEqual(result.financing, []);
-});
-
-test('aggregates tax rows without losing numeric values returned as strings', () => {
-  assert.deepEqual(aggregateTaxRows(
-    [
-      { subtotal_cents: '10000', tax_cents: '1600' },
-      { subtotal_cents: 5_000, tax_cents: 800 },
-    ],
-    [{ subtotal_cents: '4000', tax_cents: '640' }],
-  ), {
-    standardRatedSalesCents: 15_000,
-    outputVatCents: 2_400,
-    claimablePurchasesCents: 4_000,
-    inputVatCents: 640,
-  });
 });

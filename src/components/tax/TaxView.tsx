@@ -3,6 +3,7 @@ import { format } from 'date-fns';
 import { useQuery } from '@tanstack/react-query';
 import { useAppStore } from '../../store';
 import { statutoryDeadlines, dueIn } from '../../utils/statutory';
+import { todayIn } from '../../utils/dates';
 import { Amount } from '../ledger/Amount';
 import { Mark } from '../ledger/Mark';
 import { Dialog } from '../ledger/Dialog';
@@ -16,7 +17,8 @@ export function TaxView() {
   const { currentOrgId, setActiveView, activeCompany } = useAppStore();
   const baseCurrency = activeCompany?.baseCurrency || 'KES';
 
-  const currentPeriod = new Date().toISOString().substring(0, 7);
+  // This month where the business is, not in UTC.
+  const currentPeriod = todayIn(activeCompany?.timeZone).slice(0, 7);
   const summary = useQuery({
     queryKey: ['reports_tax_summary', currentOrgId, currentPeriod],
     queryFn: async () => {
@@ -35,9 +37,10 @@ export function TaxView() {
   const etimsPending = data?.etimsPendingCount ?? 0;
   const kraPin = data?.kraPin || activeCompany?.taxId;
   const deadlines = statutoryDeadlines();
-  const monthName = format(new Date(), 'MMMM yyyy');
+  const monthName = format(new Date(`${currentPeriod}-01T12:00:00`), 'MMMM yyyy');
 
   const sales = data?.outputVat?.standardRatedSalesCents ?? 0;
+  const zeroRated = data?.outputVat?.zeroRatedOrExemptSalesCents ?? 0;
   const purchases = data?.inputVat?.claimablePurchasesCents ?? 0;
   const vatDue = deadlines.find((d) => d.id === 'vat');
 
@@ -94,8 +97,8 @@ export function TaxView() {
                 </tr>
               </thead>
               <tbody>
-                {vatLine('Output VAT on sales', <>Standard-rated sales <Amount cents={sales} currency={baseCurrency} size="xs" tone="ink" /> at 16%</>, outputVat, '')}
-                {vatLine('Input VAT on purchases', <>Claimable purchases <Amount cents={purchases} currency={baseCurrency} size="xs" tone="ink" /> at 16%</>, inputVat, 'Less')}
+                {vatLine('Output VAT on sales', <>Standard-rated sales <Amount cents={sales} currency={baseCurrency} size="xs" tone="ink" /> at 16%{zeroRated ? <>, and <Amount cents={zeroRated} currency={baseCurrency} size="xs" tone="ink" /> zero-rated or exempt</> : null}. Invoices and sales receipts, less credit notes.</>, outputVat, '')}
+                {vatLine('Input VAT on purchases', <>Claimable purchases <Amount cents={purchases} currency={baseCurrency} size="xs" tone="ink" /> at 16%. Bills and expenses, less supplier credits.</>, inputVat, 'Less')}
                 {withheld !== 0 && vatLine('VAT withheld by customers', 'Withholding VAT at 2%', withheld, 'Less')}
               </tbody>
               <tfoot>

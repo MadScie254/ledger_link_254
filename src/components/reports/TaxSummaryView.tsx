@@ -22,8 +22,18 @@ export function TaxSummaryView({ onBack }: { onBack: () => void }) {
   });
 
   const data = report.data;
-  const outputVat = data?.outputVat || { standardRatedSalesCents: 0, vatRatePercent: 16, taxAmountCents: 0 };
-  const inputVat = data?.inputVat || { claimablePurchasesCents: 0, vatRatePercent: 16, taxAmountCents: 0 };
+  const outputVat = data?.outputVat || { standardRatedSalesCents: 0, zeroRatedOrExemptSalesCents: 0, vatRatePercent: 16, taxAmountCents: 0 };
+  const inputVat = data?.inputVat || { claimablePurchasesCents: 0, purchasesWithoutVatCents: 0, vatRatePercent: 16, taxAmountCents: 0 };
+  const breakdown: Array<{ side: string; source: string; taxableCents: number; untaxedCents: number; taxCents: number; documents: number }> = data?.breakdown || [];
+  const vatFrom = (source: string) => breakdown.find((row) => row.source === source)?.taxCents ?? 0;
+  const SOURCE_LABEL: Record<string, string> = {
+    INVOICE: 'VAT on invoices',
+    SALES_RECEIPT: 'VAT on sales receipts',
+    CREDIT_NOTE: 'Less VAT on credit notes',
+    BILL: 'VAT on bills',
+    EXPENSE: 'VAT on expenses paid on the spot',
+    SUPPLIER_CREDIT: 'Less VAT on supplier credits',
+  };
   const withholdingTaxVat = data?.withholdingTaxVat || { withholdingRatePercent: 2, withheldAmountCents: 0 };
   const netVatPayableCents = data?.netVatPayableCents ?? outputVat.taxAmountCents - inputVat.taxAmountCents - withholdingTaxVat.withheldAmountCents;
   const etimsVerifiedCount = data?.etimsVerifiedCount ?? 0;
@@ -48,8 +58,8 @@ export function TaxSummaryView({ onBack }: { onBack: () => void }) {
           headers: ['Tax Bracket / Description', 'Taxable Base (KES)', 'Rate', 'Output VAT (KES)'],
           rows: [
             ['Standard Rated Supplies (16%)', FinancialPDFEngine.formatKES(outputVat.standardRatedSalesCents), '16%', FinancialPDFEngine.formatKES(outputVat.taxAmountCents)],
-            ['Zero Rated Supplies (0%)', FinancialPDFEngine.formatKES(0), '0%', FinancialPDFEngine.formatKES(0)],
-            ['Exempt Supplies', FinancialPDFEngine.formatKES(0), '0%', FinancialPDFEngine.formatKES(0)],
+            ['Zero-rated or exempt supplies', FinancialPDFEngine.formatKES(outputVat.zeroRatedOrExemptSalesCents), '0%', FinancialPDFEngine.formatKES(0)],
+            ...['INVOICE', 'SALES_RECEIPT', 'CREDIT_NOTE'].map((source) => [`  ${SOURCE_LABEL[source]}`, '', '', FinancialPDFEngine.formatKES(vatFrom(source))]),
             ['TOTAL OUTPUT TAX (A)', '', '', FinancialPDFEngine.formatKES(outputVat.taxAmountCents)],
           ],
           columnStyles: { 0: { cellWidth: 'auto' }, 1: { halign: 'right' }, 2: { halign: 'center' }, 3: { halign: 'right', fontStyle: 'bold' } },
@@ -59,6 +69,7 @@ export function TaxSummaryView({ onBack }: { onBack: () => void }) {
           headers: ['Tax Bracket / Description', 'Claimable Base (KES)', 'Rate', 'Input VAT (KES)'],
           rows: [
             ['Standard Rated Local Purchases', FinancialPDFEngine.formatKES(inputVat.claimablePurchasesCents), '16%', FinancialPDFEngine.formatKES(inputVat.taxAmountCents)],
+            ...['BILL', 'EXPENSE', 'SUPPLIER_CREDIT'].map((source) => [`  ${SOURCE_LABEL[source]}`, '', '', FinancialPDFEngine.formatKES(vatFrom(source))]),
             ['Withholding VAT Deductions (2%)', '', '2%', FinancialPDFEngine.formatKES(withholdingTaxVat.withheldAmountCents)],
             ['TOTAL INPUT TAX & DEDUCTIONS (B)', '', '', FinancialPDFEngine.formatKES(totalDeductions)],
           ],
@@ -81,7 +92,10 @@ export function TaxSummaryView({ onBack }: { onBack: () => void }) {
     const excelRows = [
       ['Tax Section', 'Base Amount (KES)', 'Tax Rate', 'Tax Amount (KES)'],
       ['Standard Rated Sales (Output VAT)', outputVat.standardRatedSalesCents / 100, '16%', outputVat.taxAmountCents / 100],
+      ['Zero-rated or exempt sales', outputVat.zeroRatedOrExemptSalesCents / 100, '0%', 0],
+      ...breakdown.map((row) => [SOURCE_LABEL[row.source] || row.source, row.taxableCents / 100, '', row.taxCents / 100]),
       ['Standard Rated Purchases (Input VAT)', inputVat.claimablePurchasesCents / 100, '16%', inputVat.taxAmountCents / 100],
+      ['Purchases without VAT', inputVat.purchasesWithoutVatCents / 100, '', 0],
       ['Withholding VAT (WHVAT 2%)', '', '2%', withholdingTaxVat.withheldAmountCents / 100],
       ['NET VAT PAYABLE TO KRA', '', '', netVatPayableCents / 100],
     ];
@@ -120,12 +134,20 @@ export function TaxSummaryView({ onBack }: { onBack: () => void }) {
 
       <StatementSection title="Output tax on sales">
         <StatementLine label="Standard-rated sales" cents={outputVat.standardRatedSalesCents} muted />
-        <StatementSubtotal label="Output VAT at 16%" cents={outputVat.taxAmountCents} />
+        <StatementLine label="Zero-rated or exempt sales" cents={outputVat.zeroRatedOrExemptSalesCents} muted />
+        {['INVOICE', 'SALES_RECEIPT', 'CREDIT_NOTE'].filter((source) => vatFrom(source) !== 0).map((source) => (
+          <StatementLine key={source} label={SOURCE_LABEL[source]} cents={vatFrom(source)} />
+        ))}
+        <StatementSubtotal label="Output VAT" cents={outputVat.taxAmountCents} />
       </StatementSection>
 
       <StatementSection title="Input tax on purchases">
         <StatementLine label="Claimable local purchases" cents={inputVat.claimablePurchasesCents} muted />
-        <StatementLine label="Input VAT at 16%" cents={inputVat.taxAmountCents} />
+        <StatementLine label="Purchases without VAT" cents={inputVat.purchasesWithoutVatCents} muted />
+        {['BILL', 'EXPENSE', 'SUPPLIER_CREDIT'].filter((source) => vatFrom(source) !== 0).map((source) => (
+          <StatementLine key={source} label={SOURCE_LABEL[source]} cents={vatFrom(source)} />
+        ))}
+        <StatementLine label="Input VAT" cents={inputVat.taxAmountCents} />
         <StatementLine label="Withholding VAT credit at 2%" cents={withholdingTaxVat.withheldAmountCents} />
         <StatementSubtotal label="Total deductions" cents={totalDeductions} />
       </StatementSection>

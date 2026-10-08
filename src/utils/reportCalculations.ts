@@ -396,20 +396,3 @@ export function aggregateCashFlow(
     beginningCashCents,
   };
 }
-
-export function aggregateTaxRows(
-  invoices: Array<{ subtotal_cents: number | string | null; tax_cents: number | string | null }>,
-  bills: Array<{ subtotal_cents: number | string | null; tax_cents: number | string | null }>,
-): {
-  standardRatedSalesCents: number;
-  outputVatCents: number;
-  claimablePurchasesCents: number;
-  inputVatCents: number;
-} {
-  return {
-    standardRatedSalesCents: rounded(invoices.reduce((sum, row) => sum + cents(row.subtotal_cents), 0)),
-    outputVatCents: rounded(invoices.reduce((sum, row) => sum + cents(row.tax_cents), 0)),
-    claimablePurchasesCents: rounded(bills.reduce((sum, row) => sum + cents(row.subtotal_cents), 0)),
-    inputVatCents: rounded(bills.reduce((sum, row) => sum + cents(row.tax_cents), 0)),
-  };
-}

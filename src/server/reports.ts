@@ -7,7 +7,6 @@ import {
   aggregateBalanceSheet,
   aggregateCashFlow,
   aggregateProfitAndLoss,
-  aggregateTaxRows,
   normalizeAsOfDate,
   resolveReportDateRange,
   type ReportAccount,
@@ -151,34 +150,23 @@ export class ReportsService {
     return { rows };
   }
 
+  /**
+   * The VAT position for a period: output VAT on invoices and sales receipts
+   * less credit notes, input VAT on bills and expenses less supplier credits
+   * (public.vat_summary), each split into standard-rated and zero-rated or
+   * exempt by line, with the eTIMS queue.
+   */
   static async getTaxSummary(orgId: string, period: string) {
     const supabase = getSupabase();
     const range = resolveReportDateRange(period, await organizationNow(orgId));
 
-    const [orgResult, invoices, bills, etimsSubmissions] = await Promise.all([
+    const [orgResult, vat, etimsSubmissions] = await Promise.all([
       supabase
         .from('organizations')
         .select('tax_id')
         .eq('id', orgId)
         .maybeSingle(),
-      fetchAllRows<{ subtotal_cents: number | string | null; tax_cents: number | string | null }>((from, to) => supabase
-        .from('invoices')
-        .select('subtotal_cents, tax_cents')
-        .eq('org_id', orgId)
-        .neq('status', 'VOID')
-        .gte('date', range.start)
-        .lte('date', range.end)
-        .order('id')
-        .range(from, to)),
-      fetchAllRows<{ subtotal_cents: number | string | null; tax_cents: number | string | null }>((from, to) => supabase
-        .from('bills')
-        .select('subtotal_cents, tax_cents')
-        .eq('org_id', orgId)
-        .neq('status', 'VOID')
-        .gte('date', range.start)
-        .lte('date', range.end)
-        .order('id')
-        .range(from, to)),
+      supabase.rpc('vat_summary', { p_org_id: orgId, p_from: range.start, p_to: range.end }),
       fetchAllRows<{ status: string }>((from, to) => supabase
         .from('etims_submissions')
         .select('status, invoice:invoices!inner(org_id, date)')
@@ -191,33 +179,49 @@ export class ReportsService {
     ]);
 
     if (orgResult.error) throw orgResult.error;
+    if (vat.error) throw vat.error;
 
-    const tax = aggregateTaxRows(invoices, bills);
+    const rows = ((vat.data || []) as any[]).map((row) => ({
+      side: row.side as 'OUTPUT' | 'INPUT',
+      source: row.source as string,
+      taxableCents: Number(row.taxable_cents) || 0,
+      untaxedCents: Number(row.untaxed_cents) || 0,
+      taxCents: Number(row.tax_cents) || 0,
+      documents: Number(row.documents) || 0,
+    }));
+    const total = (side: 'OUTPUT' | 'INPUT', key: 'taxableCents' | 'untaxedCents' | 'taxCents') =>
+      rows.filter((row) => row.side === side).reduce((sum, row) => sum + row[key], 0);
     const etimsVerifiedCount = etimsSubmissions.filter((submission) =>
       submission.status === 'VERIFIED' || submission.status === 'SUCCESS',
     ).length;
     const etimsPendingCount = etimsSubmissions.length - etimsVerifiedCount;
+    const outputVatCents = total('OUTPUT', 'taxCents');
+    const inputVatCents = total('INPUT', 'taxCents');
 
     return {
       period,
+      range,
       kraPin: orgResult.data?.tax_id || null,
       outputVat: {
-        standardRatedSalesCents: tax.standardRatedSalesCents,
+        standardRatedSalesCents: total('OUTPUT', 'taxableCents'),
+        zeroRatedOrExemptSalesCents: total('OUTPUT', 'untaxedCents'),
         vatRatePercent: 16,
-        taxAmountCents: tax.outputVatCents
+        taxAmountCents: outputVatCents,
       },
       inputVat: {
-        claimablePurchasesCents: tax.claimablePurchasesCents,
+        claimablePurchasesCents: total('INPUT', 'taxableCents'),
+        purchasesWithoutVatCents: total('INPUT', 'untaxedCents'),
         vatRatePercent: 16,
-        taxAmountCents: tax.inputVatCents
+        taxAmountCents: inputVatCents,
       },
+      breakdown: rows,
       withholdingTaxVat: {
         withholdingRatePercent: 2,
-        withheldAmountCents: 0
+        withheldAmountCents: 0,
       },
-      netVatPayableCents: tax.outputVatCents - tax.inputVatCents,
+      netVatPayableCents: outputVatCents - inputVatCents,
       etimsVerifiedCount,
-      etimsPendingCount
+      etimsPendingCount,
     };
   }
 
