@@ -5,7 +5,7 @@ import {
   requirePayrollAccess,
   type Variables,
 } from './auth';
-import { logError } from './http';
+import { logError, respondError } from './http';
 import { registerOrganizationRoutes } from './routes/organizations';
 import { registerTeamRoutes } from './routes/team';
 import { registerAccountingRoutes } from './routes/accounting';
@@ -26,6 +26,8 @@ import { registerImportRoutes } from './routes/imports';
 import { registerAttachmentRoutes } from './routes/attachments';
 import { registerTrackingRoutes } from './routes/tracking';
 import { registerDocumentRoutes } from './routes/documents';
+import { registerLawRoutes } from './routes/law';
+import { CourtEventService } from '../src/server/courtEvents';
 import { RecurringService } from '../src/server/recurring';
 import { allowedOriginsForBrands, brandForHost, configuredBrandHosts } from '../src/utils/publicBrand';
 
@@ -66,6 +68,13 @@ app.use(
 
 const api = new Hono<{ Variables: Variables }>();
 app.get('/api/public/brand', (c) => c.json(brandForHost(c.req.header('host'), c.req.url, BRAND_HOSTS)));
+app.get('/api/court-events/calendar.ics', async (c) => {
+  try {
+    const feed = await CourtEventService.calendarForToken(c.req.query('token') || '');
+    if (feed === null) return c.text('Calendar feed not found.', 404);
+    return c.text(feed, 200, { 'Content-Type': 'text/calendar; charset=utf-8' });
+  } catch (err) { return respondError(c, err); }
+});
 api.use('*', requireAuthenticationAndOrganization);
 // Employee and payroll records are personal data: not for the read-only member role.
 api.use('/employees', requirePayrollAccess);
@@ -92,6 +101,7 @@ registerImportRoutes(api);
 registerAttachmentRoutes(api);
 registerTrackingRoutes(api);
 registerDocumentRoutes(api);
+registerLawRoutes(api);
 
 app.route('/api', api);
 

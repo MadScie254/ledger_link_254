@@ -1,7 +1,10 @@
 import { InventoryService, type ItemInput } from '../../src/server/inventory';
 import { ProjectService } from '../../src/server/projects';
+import { MatterService } from '../../src/server/matters';
+import { assertLawEdition } from '../../src/server/lawAccess';
 import { bodyOf, respondError } from '../http';
 import { itemSchema, itemUpdateSchema, projectSchema, projectUpdateSchema, stockAdjustmentSchema, timeEntrySchema, uuid } from '../schemas';
+import { lawTimeSchema } from '../lawSchemas';
 import type { Api } from './types';
 
 /** Stock items, projects and time. */
@@ -76,7 +79,15 @@ export function registerOperationsRoutes(api: Api) {
 
   api.post('/time-entries', async (c) => {
     try {
-      const body = timeEntrySchema.parse(await bodyOf(c));
+      const raw = await bodyOf(c);
+      if (raw.matterId !== undefined) {
+        await assertLawEdition(c.get('orgId'));
+        const body = lawTimeSchema.parse(raw);
+        return c.json({ id: await MatterService.logTime(
+          c.get('orgId'), body.matterId, c.get('userId'), body,
+        ) });
+      }
+      const body = timeEntrySchema.parse(raw);
       return c.json({ id: await ProjectService.submitTimeEntry(c.get('orgId'), c.get('userId'), body as { projectId: string; entryDate: string; hours: number; description?: string }) });
     } catch (err) { return respondError(c, err); }
   });
