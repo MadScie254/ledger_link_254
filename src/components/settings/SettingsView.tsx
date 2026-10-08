@@ -16,8 +16,9 @@ import { THEME_ACCENTS, DEFAULT_THEME_ACCENT, type ThemeAccent } from '../../uti
 import { TrackingPanel } from './TrackingPanel';
 import { ControlsPanel } from './ControlsPanel';
 import { PlanPanel } from './PlanPanel';
+import { IntegrationsPanel } from './IntegrationsPanel';
 
-type Tab = 'companies' | 'plan' | 'controls' | 'currencies' | 'accounting' | 'tracking' | 'security';
+type Tab = 'companies' | 'plan' | 'integrations' | 'controls' | 'currencies' | 'accounting' | 'tracking' | 'security';
 
 const POSTING_ACCOUNTS = [
   { code: '1100', name: 'Accounts receivable', use: 'Every invoice posts its amount owed here' },
@@ -42,13 +43,15 @@ export function SettingsView() {
   const [customRateValue, setCustomRateValue] = useState('');
   const [exportProblem, setExportProblem] = useState('');
   const base = activeCompany?.baseCurrency || 'KES';
+  const canManageIntegrations = activeCompany?.edition === 'church' && (activeCompany.role === 'owner' || activeCompany.role === 'admin');
   const { restartTutorial, isReady: isOnboardingReady } = useOnboarding();
 
   React.useEffect(() => {
-    if (activeTab === 'plan' && (!activeCompany?.edition || activeCompany.edition === 'business')) {
+    if ((activeTab === 'plan' && (!activeCompany?.edition || activeCompany.edition === 'business'))
+      || (activeTab === 'integrations' && !canManageIntegrations)) {
       setActiveTab('companies');
     }
-  }, [activeTab, activeCompany?.edition]);
+  }, [activeTab, activeCompany?.edition, canManageIntegrations]);
 
   const { data: orgsData, refetch: refetchOrgs, isLoading: orgsLoading } = useQuery({
     queryKey: ['organizations'],
@@ -206,6 +209,7 @@ export function SettingsView() {
           { id: 'companies', name: 'Companies', count: organizations.length },
           ...(activeCompany?.edition && activeCompany.edition !== 'business'
             ? [{ id: 'plan', name: 'Plan' }] : []),
+          ...(canManageIntegrations ? [{ id: 'integrations', name: 'Integrations' }] : []),
           { id: 'controls', name: 'Closing and controls' },
           { id: 'currencies', name: 'Currencies' },
           { id: 'accounting', name: 'Posting accounts' },
@@ -295,6 +299,8 @@ export function SettingsView() {
       )}
 
       {activeTab === 'plan' && activeCompany?.edition && activeCompany.edition !== 'business' && <PlanPanel orgId={currentOrgId} />}
+
+      {activeTab === 'integrations' && canManageIntegrations && <IntegrationsPanel orgId={currentOrgId} />}
 
       {activeTab === 'controls' && activeCompany && <ControlsPanel company={activeCompany} onSaved={() => refetchOrgs()} />}
 

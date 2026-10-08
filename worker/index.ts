@@ -27,6 +27,7 @@ import { registerAttachmentRoutes } from './routes/attachments';
 import { registerTrackingRoutes } from './routes/tracking';
 import { registerDocumentRoutes } from './routes/documents';
 import { registerLawRoutes } from './routes/law';
+import { registerMpesaPublicRoutes, registerMpesaRoutes } from './routes/mpesa';
 import { CourtEventService } from '../src/server/courtEvents';
 import { RecurringService } from '../src/server/recurring';
 import { allowedOriginsForBrands, brandForHost, configuredBrandHosts } from '../src/utils/publicBrand';
@@ -75,6 +76,8 @@ app.get('/api/court-events/calendar.ics', async (c) => {
     return c.text(feed, 200, { 'Content-Type': 'text/calendar; charset=utf-8' });
   } catch (err) { return respondError(c, err); }
 });
+// Safaricom's C2B callbacks carry their own token and are answered outside sign-in.
+registerMpesaPublicRoutes(app);
 api.use('*', requireAuthenticationAndOrganization);
 // Employee and payroll records are personal data: not for the read-only member role.
 api.use('/employees', requirePayrollAccess);
@@ -102,6 +105,7 @@ registerAttachmentRoutes(api);
 registerTrackingRoutes(api);
 registerDocumentRoutes(api);
 registerLawRoutes(api);
+registerMpesaRoutes(api);
 
 app.route('/api', api);
 
