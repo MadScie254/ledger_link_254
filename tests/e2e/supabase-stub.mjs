@@ -11,6 +11,7 @@ const PASSWORD = 'e2e-password';
 const USERS = {
   'owner@example.com': '00000000-0000-0000-0000-000000000001',
   'member@example.com': '00000000-0000-0000-0000-000000000004',
+  'advocate@example.com': '00000000-0000-0000-0000-000000000007',
 };
 
 const b64 = (value) => Buffer.from(JSON.stringify(value)).toString('base64url');

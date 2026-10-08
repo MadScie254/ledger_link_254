@@ -7,14 +7,14 @@ export const BUSINESS_VIEWS = [
 ] as const;
 export type BusinessView = (typeof BUSINESS_VIEWS)[number];
 
+/** Mizani law views, rendered by src/components/law. */
+export const LAW_VIEWS = [
+  'Law / Matters', 'Law / Court diary', 'Law / Time', 'Law / Fee notes', 'Law / Client account', 'Law / Disbursements',
+] as const;
+export type LawView = (typeof LAW_VIEWS)[number];
+
 /** Pilot sections are registered with an honest unavailable view until built. */
 export const PLANNED_EDITION_VIEWS = {
-  'Law / Matters': 'Matters',
-  'Law / Court diary': 'Court diary',
-  'Law / Time': 'Time',
-  'Law / Fee notes': 'Fee notes',
-  'Law / Client account': 'Client account',
-  'Law / Disbursements': 'Disbursements',
   'Church / Members': 'Members',
   'Church / Households': 'Households',
   'Church / Giving': 'Giving',
@@ -25,7 +25,7 @@ export const PLANNED_EDITION_VIEWS = {
 } as const;
 
 export type PlannedEditionView = keyof typeof PLANNED_EDITION_VIEWS;
-export const KNOWN_VIEWS = [...BUSINESS_VIEWS, ...Object.keys(PLANNED_EDITION_VIEWS) as PlannedEditionView[]] as const;
+export const KNOWN_VIEWS = [...BUSINESS_VIEWS, ...LAW_VIEWS, ...Object.keys(PLANNED_EDITION_VIEWS) as PlannedEditionView[]] as const;
 export const PLANNED_SECTION_COPY = {
   en: 'This section is not available yet. The team is building it for the edition pilot.',
   sw: 'TODO-SW',

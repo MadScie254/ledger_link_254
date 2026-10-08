@@ -39,11 +39,11 @@ test('each edition has a distinct brand and the prescribed navigation groups', (
     'Church / Giving', 'Church / Funds', 'Church / Cash count', 'Expenses & Bills',
     "Church / Treasurer's report", 'Church / Fund balances', 'Team', 'Settings',
   ]);
-  for (const edition of [editionDefinition('law'), editionDefinition('church')]) {
-    assert.ok(edition.sidebar.flatMap((group) => group.items)
-      .filter((item) => item.view.startsWith('Law /') || item.view.startsWith('Church /'))
-      .every((item) => item.available === false), 'pilot pages stay disabled until built');
-  }
+  // Law pages are built and open; church pages stay disabled until built.
+  assert.ok(editionDefinition('law').sidebar.flatMap((group) => group.items).every((item) => item.available !== false), 'law pages are open');
+  assert.ok(editionDefinition('church').sidebar.flatMap((group) => group.items)
+    .filter((item) => item.view.startsWith('Church /'))
+    .every((item) => item.available === false), 'church pages stay disabled until built');
 });
 
 test('all sidebar labels have Swahili placeholders and every view has a renderer key', () => {
