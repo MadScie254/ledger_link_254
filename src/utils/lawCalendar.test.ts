@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { renderLawCalendar } from './lawCalendar';
+import { renderLawCalendar } from './lawCalendar.ts';
 
 test('court feed uses UTC timestamps and escapes matter and court text', () => {
   const feed = renderLawCalendar([{

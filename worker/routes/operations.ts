@@ -84,7 +84,7 @@ export function registerOperationsRoutes(api: Api) {
         await assertLawEdition(c.get('orgId'));
         const body = lawTimeSchema.parse(raw);
         return c.json({ id: await MatterService.logTime(
-          c.get('orgId'), body.matterId, c.get('userId'), body,
+          c.get('orgId'), body.matterId, c.get('userId'), body as Parameters<typeof MatterService.logTime>[3],
         ) });
       }
       const body = timeEntrySchema.parse(raw);

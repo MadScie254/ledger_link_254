@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { lawTimeAmountCents } from './lawTime';
+import { lawTimeAmountCents } from './lawTime.ts';
 
 test('time amounts round once to whole cents', () => {
   assert.equal(lawTimeAmountCents(1.25, 10_001), 12_501);

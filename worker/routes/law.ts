@@ -21,6 +21,11 @@ async function requireLawEdition(c: Context<{ Variables: Variables }>, next: Nex
   await next();
 }
 
+// The project compiles without strictNullChecks, so Zod's parsed types come
+// out all-optional; the schema has already enforced what the service needs.
+type Input<F extends (...args: any[]) => any, N extends number> = Parameters<F>[N];
+type PartyInput = Input<typeof MatterService.addParty, 3>;
+
 export function registerLawRoutes(api: Api) {
   api.use('/matters', requireLawEdition);
   api.use('/matters/*', requireLawEdition);
@@ -68,7 +73,7 @@ export function registerLawRoutes(api: Api) {
     try {
       const body = matterPartySchema.parse(await bodyOf(c));
       return c.json({ id: await MatterService.addParty(c.get('orgId'),
-        uuid.parse(c.req.param('id')), c.get('userId'), body) }, 201);
+        uuid.parse(c.req.param('id')), c.get('userId'), body as PartyInput) }, 201);
     } catch (err) { return respondError(c, err); }
   });
   api.get('/matters/:id/unbilled', async (c) => {
@@ -92,7 +97,7 @@ export function registerLawRoutes(api: Api) {
   api.post('/court-events', async (c) => {
     try {
       return c.json({ id: await CourtEventService.create(c.get('orgId'), c.get('userId'),
-        courtEventSchema.parse(await bodyOf(c))) }, 201);
+        courtEventSchema.parse(await bodyOf(c)) as Input<typeof CourtEventService.create, 2>) }, 201);
     } catch (err) { return respondError(c, err); }
   });
   api.patch('/court-events/:id', async (c) => {
@@ -123,17 +128,17 @@ export function registerLawRoutes(api: Api) {
   });
   api.post('/client-account/receipts', async (c) => {
     try { return c.json({ journalEntryId: await ClientAccountService.receipt(c.get('orgId'),
-      c.get('userId'), clientReceiptSchema.parse(await bodyOf(c))) }, 201); }
+      c.get('userId'), clientReceiptSchema.parse(await bodyOf(c)) as Input<typeof ClientAccountService.receipt, 2>) }, 201); }
     catch (err) { return respondError(c, err); }
   });
   api.post('/client-account/payments', async (c) => {
     try { return c.json({ journalEntryId: await ClientAccountService.payment(c.get('orgId'),
-      c.get('userId'), clientPaymentSchema.parse(await bodyOf(c))) }, 201); }
+      c.get('userId'), clientPaymentSchema.parse(await bodyOf(c)) as Input<typeof ClientAccountService.payment, 2>) }, 201); }
     catch (err) { return respondError(c, err); }
   });
   api.post('/client-account/transfers', async (c) => {
     try { return c.json({ journalEntryId: await ClientAccountService.transfer(c.get('orgId'),
-      c.get('userId'), clientTransferSchema.parse(await bodyOf(c))) }, 201); }
+      c.get('userId'), clientTransferSchema.parse(await bodyOf(c)) as Input<typeof ClientAccountService.transfer, 2>) }, 201); }
     catch (err) { return respondError(c, err); }
   });
 
@@ -146,7 +151,7 @@ export function registerLawRoutes(api: Api) {
   });
   api.post('/disbursements', async (c) => {
     try { return c.json({ journalEntryId: await DisbursementService.recordOffice(c.get('orgId'),
-      c.get('userId'), officeDisbursementSchema.parse(await bodyOf(c))) }, 201); }
+      c.get('userId'), officeDisbursementSchema.parse(await bodyOf(c)) as Input<typeof DisbursementService.recordOffice, 2>) }, 201); }
     catch (err) { return respondError(c, err); }
   });
 
@@ -163,13 +168,13 @@ export function registerLawRoutes(api: Api) {
   });
   api.post('/fee-notes', async (c) => {
     try { return c.json({ id: await FeeNoteService.create(c.get('orgId'), c.get('userId'),
-      feeNoteSchema.parse(await bodyOf(c))) }, 201); }
+      feeNoteSchema.parse(await bodyOf(c)) as Input<typeof FeeNoteService.create, 2>) }, 201); }
     catch (err) { return respondError(c, err); }
   });
   api.post('/fee-notes/:id/payments', async (c) => {
     try { return c.json({ journalEntryId: await FeeNoteService.payment(c.get('orgId'),
       c.get('userId'), uuid.parse(c.req.param('id')),
-      feeNotePaymentSchema.parse(await bodyOf(c))) }, 201); }
+      feeNotePaymentSchema.parse(await bodyOf(c)) as Input<typeof FeeNoteService.payment, 3>) }, 201); }
     catch (err) { return respondError(c, err); }
   });
   api.post('/fee-notes/:id/etims', async (c) => {
