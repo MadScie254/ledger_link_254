@@ -7,6 +7,7 @@ import { Mark } from '../ledger/Mark';
 import { EmptyNote, LoadProblem, PageNote, SkeletonRows, buttonClass } from '../ledger/Page';
 import { useConfirm } from '../../hooks/useConfirm';
 import { OrderBuilder } from './SalesDocumentBuilder';
+import { PrintButton } from '../common/PrintButton';
 import {
   cancelBlockedByInvoice,
   nextStatuses,
@@ -211,6 +212,7 @@ export function OrdersPanel({
     const canInvoice = (!order.invoiceId || order.invoiceStatus === 'VOID') && order.status !== 'CANCELLED';
     return (
       <span className="flex flex-wrap items-center gap-x-3 gap-y-1">
+        <PrintButton kind="sales-order" id={order.id} number={order.orderNumber} />
         {order.status === 'OPEN' && next.includes('IN_PROGRESS') && (
           <button type="button" disabled={busy} onClick={() => statusMutation.mutate({ order, status: 'IN_PROGRESS' })} className={buttonClass.quiet}>Start</button>
         )}

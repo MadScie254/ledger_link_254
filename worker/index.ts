@@ -25,6 +25,7 @@ import { registerRecurringRoutes } from './routes/recurring';
 import { registerImportRoutes } from './routes/imports';
 import { registerAttachmentRoutes } from './routes/attachments';
 import { registerTrackingRoutes } from './routes/tracking';
+import { registerDocumentRoutes } from './routes/documents';
 import { RecurringService } from '../src/server/recurring';
 
 const app = new Hono<{ Variables: Variables }>();
@@ -84,6 +85,7 @@ registerRecurringRoutes(api);
 registerImportRoutes(api);
 registerAttachmentRoutes(api);
 registerTrackingRoutes(api);
+registerDocumentRoutes(api);
 
 app.route('/api', api);
 

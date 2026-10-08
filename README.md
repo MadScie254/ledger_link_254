@@ -23,6 +23,7 @@ enterprises operating across multiple currencies (KES, USD, EUR, GBP, UGX, TZS).
 - 📦 **Inventory** — every stock change recorded as a movement; purchases, returns, sales and counts
 - 🏷️ **Classes and locations** — tag postings by line of business or branch and cut the P&L by either
 - 📎 **Attachments** — receipts, PDFs and documents on any record; a scanned receipt stays with its expense
+- 🖨️ **Printable documents** — invoices, credit notes, estimates, sales receipts, sales orders and purchase orders saved as PDFs, carrying the company's KRA PIN, how to pay (bank or M-Pesa) and its own footer; a foreign-currency invoice prints in its own currency
 - 📥 **Imports** — customers, suppliers and stock items from a spreadsheet
 - 🤖 **Receipt scanner** — AI-powered OCR via Gemini (vendor, amount, date extraction), opt-in per organization
 - 📈 **Reports** — P&L (and by month, class or location), Balance Sheet, Cash Flow, Trial Balance, General Ledger, aging, sales by customer and item, spending by supplier, VAT and eTIMS summary

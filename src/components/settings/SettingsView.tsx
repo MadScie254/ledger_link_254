@@ -485,6 +485,9 @@ function CompanyModal({ initialData, onClose, onSuccess }: { initialData: Organi
   const [city, setCity] = useState(initialData?.city || 'Nairobi');
   const [phone, setPhone] = useState(initialData?.phone || '');
   const [email, setEmail] = useState(initialData?.email || '');
+  const [website, setWebsite] = useState(initialData?.website || '');
+  const [paymentDetails, setPaymentDetails] = useState(initialData?.paymentDetails || '');
+  const [documentFooter, setDocumentFooter] = useState(initialData?.documentFooter || '');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -493,7 +496,12 @@ function CompanyModal({ initialData, onClose, onSuccess }: { initialData: Organi
     setIsSubmitting(true);
     setError(null);
     try {
-      const payload = { name, legalName: legalName || name, baseCurrency, country, taxId, fiscalYearStart, industry, businessType: businessType || null, themeAccent, address, city, phone, email };
+      const payload = {
+        name, legalName: legalName || name, baseCurrency, country, taxId, fiscalYearStart, industry, businessType: businessType || null,
+        themeAccent, address, city, phone, email, website,
+        // Printed on documents; only an existing company can carry them.
+        ...(initialData ? { paymentDetails, documentFooter } : {}),
+      };
       const res = await fetch(initialData ? `/api/organizations/${initialData.id}` : '/api/organizations', {
         method: initialData ? 'PUT' : 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -607,6 +615,23 @@ function CompanyModal({ initialData, onClose, onSuccess }: { initialData: Organi
         <Field label="Phone">
           <input type="tel" value={phone} onChange={(e) => setPhone(e.target.value)} />
         </Field>
+        <Field label="Website" hint="Optional">
+          <input type="text" name="website" value={website} onChange={(e) => setWebsite(e.target.value)} />
+        </Field>
+        {initialData && (
+          <>
+            <div className="sm:col-span-2">
+              <Field label="How to pay, printed on invoices" hint="For example: Equity Bank, account 0123456789, Westlands branch. M-Pesa paybill 247247, account your invoice number.">
+                <textarea name="paymentDetails" rows={3} maxLength={1000} value={paymentDetails} onChange={(e) => setPaymentDetails(e.target.value)} />
+              </Field>
+            </div>
+            <div className="sm:col-span-2">
+              <Field label="Footer on every document" hint="Optional. A thank-you, terms, or registration numbers.">
+                <input type="text" name="documentFooter" maxLength={500} value={documentFooter} onChange={(e) => setDocumentFooter(e.target.value)} />
+              </Field>
+            </div>
+          </>
+        )}
       </form>
     </Dialog>
   );

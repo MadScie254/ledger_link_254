@@ -35,6 +35,10 @@ export interface OrganizationData {
   phone?: string;
   email?: string;
   website?: string;
+  /** How to pay, printed on invoices. */
+  paymentDetails?: string | null;
+  /** A short line at the foot of every printed document. */
+  documentFooter?: string | null;
   isDefault?: boolean;
   isDemo?: boolean;
   /** No entry may be dated on or before this day (YYYY-MM-DD). */

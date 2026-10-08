@@ -19,6 +19,10 @@ export interface Organization {
   phone?: string;
   email?: string;
   website?: string;
+  /** How to pay, printed on invoices: bank account, M-Pesa paybill or till. */
+  paymentDetails?: string | null;
+  /** A short line printed at the foot of every document. */
+  documentFooter?: string | null;
   isDefault?: boolean;
   isDemo?: boolean;
   booksClosedThrough?: string | null;
@@ -98,6 +102,8 @@ function mapOrganization(d: any): Organization {
     phone: d.phone,
     email: d.email,
     website: d.website,
+    paymentDetails: d.payment_details ?? null,
+    documentFooter: d.document_footer ?? null,
     isDefault: d.is_default,
     isDemo: d.is_demo,
     booksClosedThrough: d.books_closed_through ?? null,
@@ -195,6 +201,8 @@ export class OrganizationService {
       phone: 'phone',
       email: 'email',
       website: 'website',
+      paymentDetails: 'payment_details',
+      documentFooter: 'document_footer',
       booksClosedThrough: 'books_closed_through',
       approvalThresholdCents: 'approval_threshold_cents',
       aiEnabled: 'ai_enabled',

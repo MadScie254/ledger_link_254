@@ -9,6 +9,7 @@ import { Dialog, Field } from '../ledger/Dialog';
 import { EmptyNote, LoadProblem, SkeletonRows, buttonClass } from '../ledger/Page';
 import { SalesDocumentBuilder, type SalesDocumentDraft } from '../sales/SalesDocumentBuilder';
 import { AttachmentsButton } from '../common/AttachmentsPanel';
+import { PrintButton } from '../common/PrintButton';
 
 type Filter = 'OPEN' | 'BILLED' | 'CLOSED' | 'ALL';
 const FILTERS: { id: Filter; name: string }[] = [
@@ -173,6 +174,7 @@ export function PurchaseOrdersPanel({ isCreating, onCreatingChange }: { isCreati
                 ))}
               </ul>
               <div className="mt-1.5 flex flex-wrap justify-end gap-x-3">
+                <PrintButton kind="purchase-order" id={po.id} number={po.number} />
                 <AttachmentsButton recordType="PURCHASE_ORDER" recordId={po.id} title={po.number} />
               </div>
               {canPost && (

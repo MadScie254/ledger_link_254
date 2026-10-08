@@ -10,6 +10,7 @@ import { Mark } from '../ledger/Mark';
 import { EmptyNote, LoadProblem, SkeletonRows, buttonClass } from '../ledger/Page';
 import { useConfirm } from '../../hooks/useConfirm';
 import { SalesDocumentBuilder, type SalesDocumentDraft } from './SalesDocumentBuilder';
+import { PrintButton } from '../common/PrintButton';
 
 type Filter = 'OPEN' | 'ACCEPTED' | 'CONVERTED' | 'DECLINED' | 'ALL';
 const FILTERS: { id: Filter; name: string }[] = [
@@ -123,10 +124,12 @@ export function EstimatesPanel({
   };
 
   const actions = (e: any) => {
-    if (!canPost) return null;
+    const print = <PrintButton kind="estimate" id={e.id} number={e.estimateNumber} />;
+    if (!canPost) return <span className="flex flex-wrap items-center gap-x-3 gap-y-1">{print}</span>;
     const open = e.status !== 'CONVERTED';
     return (
       <span className="flex flex-wrap items-center gap-x-3 gap-y-1">
+        {print}
         {open && (
           <button type="button" disabled={busy} className={buttonClass.quiet} onClick={() => setEditing({
             id: e.id, customerId: e.customerId, date: e.estimateDate, secondDate: e.expiryDate, notes: e.notes, lines: e.lines,

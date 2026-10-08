@@ -9,6 +9,7 @@ import { Amount, figureText } from '../ledger/Amount';
 import { Dialog, Field } from '../ledger/Dialog';
 import { EmptyNote, LoadProblem, SkeletonRows, buttonClass } from '../ledger/Page';
 import { AttachmentsButton } from './AttachmentsPanel';
+import { PrintButton } from './PrintButton';
 
 export type CreditKind = 'CUSTOMER' | 'SUPPLIER';
 
@@ -248,6 +249,7 @@ export function CreditsPanel({ kind, onCreate }: { kind: CreditKind; onCreate?: 
                   </ul>
                 )}
                 <div className="mt-1.5 flex flex-wrap justify-end gap-x-3">
+                  {kind === 'CUSTOMER' && <PrintButton kind="credit-note" id={credit.id} number={credit.number} />}
                   <AttachmentsButton recordType="CREDIT_NOTE" recordId={credit.id} title={credit.number} />
                 </div>
                 {canPost && credit.status !== 'VOID' && (

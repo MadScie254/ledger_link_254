@@ -9,6 +9,7 @@ import { Dialog, Field } from '../ledger/Dialog';
 import { Mark } from '../ledger/Mark';
 import { EmptyNote, LoadProblem, SkeletonRows, buttonClass } from '../ledger/Page';
 import { AttachmentsButton } from './AttachmentsPanel';
+import { PrintButton } from './PrintButton';
 
 export type CashKind = 'SALES_RECEIPT' | 'EXPENSE' | 'TRANSFER';
 
@@ -94,6 +95,7 @@ export function CashTransactionsPanel({ kind, onCreate, createLabel }: { kind: C
               </div>
               <div className="flex flex-col items-end gap-1">
                 <Amount cents={t.totalCents} currency={currency} tone="ink" />
+                {kind === 'SALES_RECEIPT' && <PrintButton kind="sales-receipt" id={t.id} number={t.number} />}
                 <AttachmentsButton recordType="CASH_TRANSACTION" recordId={t.id} title={t.number} />
                 {t.status !== 'VOID' && canPost && (
                   <button

@@ -42,6 +42,37 @@ test('an invoice is written, posted, paid and the payment reversed', async () =>
   assert.deepEqual(problems, []);
 });
 
+test('how to pay is set once in Settings and printed on the invoice PDF', async () => {
+  const session = await signedIn();
+  const { page, api, problems } = session;
+  await flow('invoice-pdf', session, async () => {
+    await openView(page, 'Settings');
+    await page.getByRole('button', { name: 'Edit details' }).first().click();
+    const dialog = page.getByRole('dialog');
+    await dialog.locator('textarea[name="paymentDetails"]').fill('M-Pesa paybill 247247, account your invoice number.');
+    await dialog.locator('input[name="documentFooter"]').fill('Asante sana.');
+    await dialog.getByRole('button', { name: 'Save changes' }).click();
+    await dialog.waitFor({ state: 'hidden', timeout: 10_000 });
+    assert.deepEqual(refusedWrites(api), []);
+    assert.equal(sql(`SELECT payment_details || '|' || document_footer FROM public.organizations WHERE id = '${ORG}'`), 'M-Pesa paybill 247247, account your invoice number.|Asante sana.');
+
+    await openView(page, 'Sales');
+    const number = sql(`SELECT invoice_number FROM public.invoices WHERE org_id = '${ORG}' ORDER BY created_at DESC LIMIT 1`);
+    const [download] = await Promise.all([
+      page.waitForEvent('download'),
+      page.locator(`button[aria-label="Save ${number} as a PDF"] >> visible=true`).first().click(),
+    ]);
+    assert.equal(download.suggestedFilename(), `Invoice-${number}.pdf`);
+    const { readFile } = await import('node:fs/promises');
+    const pdf = (await readFile(await download.path())).toString('latin1');
+    assert.ok(pdf.startsWith('%PDF-'), 'a PDF');
+    for (const expected of [`(${number})`, '(Acme)', '(Cement, 10 bags)', '(M-Pesa paybill 247247, account your invoice number.)', '(Asante sana.)', '(KES 9,860.00)']) {
+      assert.ok(pdf.includes(expected), `the PDF carries ${expected}`);
+    }
+    assert.deepEqual(problems, []);
+  });
+});
+
 test('a bill with a supplier reference is entered and paid', async () => {
   const session = await signedIn();
   const { page, api, problems } = session;

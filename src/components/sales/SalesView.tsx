@@ -5,6 +5,7 @@ import { format } from 'date-fns';
 import { Download } from 'lucide-react';
 import { InvoiceBuilder } from './InvoiceBuilder';
 import { EntityDrillDownModal } from '../common/EntityDrillDownModal';
+import { PrintButton } from '../common/PrintButton';
 import { BulkActionBar } from '../common/BulkActionBar';
 import { useAppStore } from '../../store';
 import { Amount } from '../ledger/Amount';
@@ -375,11 +376,12 @@ export function SalesView() {
                   )}
                 </div>
                 <div className="mt-1.5 flex items-center justify-between gap-3">
-                  <span className="flex items-center gap-2">
+                  <span className="flex flex-wrap items-center gap-2">
                     {standing(inv.status)}
                     {Number(inv.amountDueCents || 0) > 0 && inv.status !== 'VOID' && (
                       <button type="button" onClick={() => openPayment(inv)} className={buttonClass.quiet}>Receive payment</button>
                     )}
+                    <PrintButton kind="invoice" id={inv.id} number={inv.invoiceNo} />
                   </span>
                   {inv.dueDate && <span className="text-[12px] text-graphite-600">Due {format(new Date(inv.dueDate), 'dd/MM/yyyy')}</span>}
                 </div>
@@ -453,6 +455,7 @@ export function SalesView() {
                             Receive payment
                           </button>
                         )}
+                        <PrintButton kind="invoice" id={inv.id} number={inv.invoiceNo} />
                       </div>
                     </td>
                     <td className="pr-4 whitespace-nowrap text-graphite-600">{inv.dueDate ? format(new Date(inv.dueDate), 'dd/MM/yyyy') : '–'}</td>

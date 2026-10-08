@@ -251,6 +251,8 @@ export const organizationCreateSchema = z.object({
   creationKey: uuid.optional(),
 });
 export const organizationUpdateSchema = z.object(organizationFields).partial().extend({
+  paymentDetails: z.preprocess((value) => (typeof value === 'string' && value.trim() === '' ? null : value), z.string().trim().max(1000).nullable().optional()),
+  documentFooter: z.preprocess((value) => (typeof value === 'string' && value.trim() === '' ? null : value), z.string().trim().max(500).nullable().optional()),
   booksClosedThrough: isoDate.nullable().optional(),
   approvalThresholdCents: cents.nullable().optional(),
   aiEnabled: z.boolean().optional(),

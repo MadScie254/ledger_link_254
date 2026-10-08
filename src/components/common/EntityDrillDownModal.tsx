@@ -12,6 +12,7 @@ import { buttonClass } from '../ledger/Page';
 import { DocumentPayments } from './DocumentPayments';
 import { DynamicQuickAddModal } from './DynamicQuickAddModal';
 import { AttachmentsPanel } from './AttachmentsPanel';
+import { PrintButton } from './PrintButton';
 
 export type DrillDownEntityType = 'ITEM' | 'VENDOR' | 'CUSTOMER' | 'EMPLOYEE' | 'ACCOUNT' | 'INVOICE' | 'BILL';
 
@@ -389,6 +390,9 @@ export function EntityDrillDownModal({ isOpen, onClose, entityType, entityId, in
       note={NOUN[entityType]}
       footer={
         <>
+          {entityType === 'INVOICE' && entityId && (
+            <PrintButton kind="invoice" id={entityId} number={data.invoiceNumber || data.invoiceNo || 'this invoice'} variant="secondary" />
+          )}
           {canEdit && !onEdit && (
             <button type="button" onClick={() => setIsEditing(true)} className={buttonClass.secondary}>
               Edit
