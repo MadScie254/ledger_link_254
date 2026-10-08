@@ -102,10 +102,17 @@ Apply the Supabase schema migrations via the Supabase CLI or MCP:
 
 ```bash
 # Using Supabase CLI (if installed)
+supabase migration list
+# Review and resolve history mismatches before pushing.
 supabase db push
+supabase migration list | node scripts/check-migrations.ts
 ```
 
 Or apply them manually from the `supabase/migrations/` directory in the Supabase dashboard.
+The check compares every local migration version with the remote history and exits non-zero
+if either side has a migration the other lacks. Run it after applying migrations and before
+deploying the Worker. Review `supabase migration list` and resolve any history mismatch
+before running `supabase db push`; a missing history row does not prove its SQL is absent.
 
 ### 4. Start the development server
 
