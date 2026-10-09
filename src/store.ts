@@ -107,6 +107,7 @@ export const useAppStore = create<AppState>((set) => ({
   activeCompany: null,
   setActiveCompany: (company) => {
     applyThemeAccent(company?.themeAccent);
+    if (typeof document !== 'undefined') document.documentElement.setAttribute('data-edition', company?.edition || 'business');
     set({
       activeCompany: company,
       currentOrgId: company?.id || '',

@@ -194,11 +194,11 @@ export function ExpensesView() {
   const vendorsTotal = vendors.reduce((sum: number, v: any) => sum + (v.balance || 0), 0);
   const today = todayIn(activeCompany?.timeZone);
   const billStanding = (bill: any) => {
-    if (bill.status === 'VOID') return <Mark kind="circled" label="Void" />;
+    if (bill.status === 'VOID') return <Mark kind="query" label="Void" />;
     if (bill.status === 'PAID') return <Mark kind="tick" label="Paid" />;
     if (needsApproval(bill)) return <Mark kind="query" label="Needs approval" />;
     if (bill.status === 'OVERDUE' || (bill.dueDate && bill.dueDate < today)) return <Mark kind="circled" label="Overdue" />;
-    return <Mark kind="query" label={bill.dueDate ? `Due ${format(new Date(bill.dueDate), 'dd/MM/yyyy')}` : 'To pay'} />;
+    return <Mark kind="query" label={bill.dueDate ? 'Not due' : 'To pay'} />;
   };
   const skeleton = (label: string) => (
     <div aria-busy="true" aria-label={label} className="mt-2">

@@ -1,17 +1,10 @@
-/**
- * A figure as it is written into a counter book: shillings, a printed red
- * rule, cents. Negatives are bracketed, zero is a dash, and the currency is
- * never repeated on the figure itself; the column or label above carries it.
- *
- * Amounts are shown in the cents they arrive in. Nothing here converts
- * currency, so a figure never silently changes value with a display setting.
- */
+/** Amounts retain their cents and currency; negative figures use red brackets. */
 const SIZE_CLASSES = {
   xs: 'text-[11px]',
   sm: 'text-[13px]',
   md: 'text-[15px]',
-  lg: 'text-[20px] sm:text-[22px]',
-  xl: 'text-[21px] sm:text-[26px] xl:text-[32px]',
+  lg: 'text-[24px] leading-7 font-bold',
+  xl: 'text-[24px] leading-7 font-bold sm:text-[28px] sm:leading-[34px] sm:font-extrabold',
 } as const;
 
 type Tone =
@@ -59,20 +52,11 @@ export function Amount({ cents, currency = 'KES', size = 'md', tone = 'figure', 
     ? `${currency} nil`
     : `${parts.negative ? 'minus ' : ''}${currency} ${parts.shillings}.${parts.cents}`;
 
-  const color =
-    tone === 'ink'
-      ? 'text-ink-900'
-      : tone === 'alert'
-        ? 'text-ledger-red'
-      : tone === 'result' && parts.negative
-        ? 'text-ledger-red'
-        : tone === 'result'
-          ? 'text-ink-900'
-          : 'text-ink-blue';
+  const color = parts.negative || tone === 'alert' ? 'text-negative' : 'text-text';
 
   if (parts.zero) {
     return (
-      <span className={`ll-figure ${SIZE_CLASSES[size]} text-graphite-500 ${className}`}>
+      <span className={`ll-figure inline-block text-right ${SIZE_CLASSES[size]} text-text-3 ${className}`}>
         <span aria-hidden="true">–</span>
         <span className="sr-only">{spoken}</span>
       </span>
@@ -80,12 +64,12 @@ export function Amount({ cents, currency = 'KES', size = 'md', tone = 'figure', 
   }
 
   return (
-    <span className={`ll-figure inline-flex items-baseline whitespace-nowrap leading-none ${SIZE_CLASSES[size]} ${color} ${className}`}>
+    <span className={`ll-figure inline-flex items-baseline justify-end whitespace-nowrap ${SIZE_CLASSES[size]} ${color} ${className}`}>
       <span aria-hidden="true" className="inline-flex items-baseline">
         {parts.negative && <span className="mr-[0.08em]">(</span>}
         <span>{parts.shillings}</span>
-        <span className="ml-[0.14em] self-stretch w-px bg-ledger-red opacity-80" />
-        <span className="ml-[0.16em]">{parts.cents}</span>
+        <span>.</span>
+        <span>{parts.cents}</span>
         {parts.negative && <span className="ml-[0.08em]">)</span>}
       </span>
       <span className="sr-only">{spoken}</span>

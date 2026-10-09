@@ -220,12 +220,12 @@ export function SalesView() {
       case 'OVERDUE':
         return <Mark kind="circled" label="Overdue" />;
       case 'SENT':
-        return <Mark kind="query" label="Awaiting payment" />;
+        return <Mark kind="query" label="Not due" />;
       case 'PARTIAL':
       case 'PARTIALLY_PAID':
         return <Mark kind="query" label="Part paid" />;
       case 'VOID':
-        return <Mark kind="circled" label="Void" />;
+        return <Mark kind="query" label="Void" />;
       case 'DRAFT':
         return <span className="text-[12px] text-graphite-600">Draft, not sent</span>;
       default:

@@ -571,7 +571,7 @@ export function BankingView() {
                 <span className="font-semibold text-ink-900">Out</span>
                 <Amount cents={totalOut} currency={baseCurrency} tone="ink" className="font-semibold" />
               </li>
-              <li className="flex items-baseline justify-between gap-3 border-b-[3px] border-double border-ledger-red py-2 text-[13.5px]">
+              <li className="flex items-baseline justify-between gap-3 border-b border-border-strong py-2 text-[13.5px]">
                 <span className="font-semibold text-ink-900">In</span>
                 <Amount cents={totalIn} currency={baseCurrency} tone="ink" className="font-semibold" />
               </li>

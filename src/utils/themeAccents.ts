@@ -1,10 +1,4 @@
-/**
- * A company's own accent color, in place of the default oxblood. Only the
- * brand accent changes (the primary button, the sidebar spine, focus rings);
- * entered-figure blue, loss and error red, and the tick green are the same on
- * every accent (see index.css). `swatch` is the colour actually shown for
- * each option's button, matched to what that accent looks like on paper.
- */
+/** Persisted accent IDs stay stable while their presentation follows the new palette. */
 
 export type ThemeAccent = 'oxblood' | 'forest' | 'navy' | 'plum' | 'slate';
 
@@ -15,11 +9,11 @@ export interface ThemeAccentDefinition {
 }
 
 export const THEME_ACCENTS: ThemeAccentDefinition[] = [
-  { id: 'oxblood', label: 'Oxblood', swatch: '#5A1A1F' },
-  { id: 'forest', label: 'Forest', swatch: '#1F4B3A' },
-  { id: 'navy', label: 'Navy', swatch: '#1E2A52' },
-  { id: 'plum', label: 'Plum', swatch: '#4A1F4E' },
-  { id: 'slate', label: 'Slate', swatch: '#2B3542' },
+  { id: 'oxblood', label: 'Evergreen', swatch: '#0E7A5B' },
+  { id: 'forest', label: 'Pine', swatch: '#25735D' },
+  { id: 'navy', label: 'Indigo', swatch: '#2457C5' },
+  { id: 'plum', label: 'Plum', swatch: '#7A3A86' },
+  { id: 'slate', label: 'Slate', swatch: '#465467' },
 ];
 
 export const DEFAULT_THEME_ACCENT: ThemeAccent = 'oxblood';

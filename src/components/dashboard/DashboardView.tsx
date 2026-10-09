@@ -645,7 +645,7 @@ export function DashboardView() {
           <button
             type="button"
             onClick={() => setActiveView('Accounting')}
-            className="inline-flex items-center justify-center h-9 px-3.5 rounded-sm bg-oxblood-fill text-white text-[13.5px] font-semibold hover:bg-[var(--oxblood-fill-hover)]"
+            className="inline-flex items-center justify-center h-9 px-4 rounded-md bg-primary text-on-primary text-[14px] font-semibold hover:bg-primary-hover"
           >
             Post an entry
           </button>

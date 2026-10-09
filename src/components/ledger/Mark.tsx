@@ -1,19 +1,10 @@
-/**
- * The marks an auditor makes in the margin, drawn as pen strokes.
- *
- *   tick     green  agreed: reconciled, paid, verified
- *   query    pencil waiting on someone: needs attention
- *   circled  red    an exception: overdue, failed, out of balance
- *
- * A mark never stands alone as the only signal; pass `label` to print the
- * word beside it, or keep the word in the surrounding row.
- */
+/** Compact status marks with text and colour. */
 type MarkKind = 'tick' | 'query' | 'circled';
 
 const TONE: Record<MarkKind, string> = {
-  tick: 'text-auditor-green',
-  query: 'text-graphite-600',
-  circled: 'text-ledger-red',
+  tick: 'bg-positive-soft text-positive',
+  query: 'bg-neutral-soft text-text-2',
+  circled: 'bg-negative-soft text-negative',
 };
 
 interface MarkProps {
@@ -33,9 +24,14 @@ const SPOKEN: Record<MarkKind, string> = {
 
 export function Mark({ kind, label, draw = false, className = '' }: MarkProps) {
   const stroke = draw ? 'll-pen' : '';
+  const statusTone = label === 'Part paid' ? 'bg-info-soft text-info'
+    : label === 'Overdue' ? 'bg-warning-soft text-warning'
+    : label === 'Void' ? 'bg-neutral-soft text-text-3 line-through'
+    : label === 'Not due' ? 'bg-neutral-soft text-text-2'
+    : TONE[kind];
 
   return (
-    <span className={`inline-flex items-center gap-1.5 ${TONE[kind]} ${className}`}>
+    <span className={`inline-flex items-center gap-1.5 ${label ? 'rounded-full px-2.5 py-1 text-[12.5px] font-medium' : ''} ${statusTone} ${className}`}>
       <svg
         viewBox="0 0 16 16"
         width="16"
@@ -59,7 +55,7 @@ export function Mark({ kind, label, draw = false, className = '' }: MarkProps) {
         )}
         {kind === 'circled' && <path className={stroke} pathLength={1} d="M13.4 5.2 C12.3 2.9 9.9 1.9 7.4 2.3 C4.3 2.8 2.2 5.5 2.6 8.6 C3 11.6 5.8 13.8 8.8 13.4 C11.8 13 13.9 10.3 13.5 7.3" />}
       </svg>
-      {label && <span className="text-[12px] leading-tight">{label}</span>}
+      {label && <span className="leading-4">{label}</span>}
     </span>
   );
 }

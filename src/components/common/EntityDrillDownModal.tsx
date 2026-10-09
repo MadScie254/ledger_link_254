@@ -212,7 +212,7 @@ export function EntityDrillDownModal({ isOpen, onClose, entityType, entityId, in
 
   const standing = (status?: string, dueDate?: string) => {
     if (status === 'PAID') return <Mark kind="tick" label="Paid" />;
-    if (status === 'VOID') return <span className="text-[12px] text-graphite-600">Void</span>;
+    if (status === 'VOID') return <Mark kind="query" label="Void" />;
     if (dueDate && dueDate < todayIn(activeCompany?.timeZone)) return <Mark kind="circled" label="Overdue" />;
     return <Mark kind="query" label={dueDate ? `Due ${dateText(dueDate)}` : titleCase(status) || 'Open'} />;
   };

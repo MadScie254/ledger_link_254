@@ -169,7 +169,7 @@ export function RunningLedger({ lines, currency, accountLabel }: { lines: Ledger
               {atEnd ? 'Closing balance' : `Carried forward from ${format(new Date(rows[view.last].date), 'dd/MM/yyyy')}`}
             </th>
             <td className={`${pinnedCell} bottom-0 pr-1 text-right border-t border-ledger-red`}>
-              <span className="inline-block border-b-[3px] border-double border-ledger-red pb-0.5 font-semibold">
+              <span className="inline-block border-b border-border-strong pb-0.5 font-semibold">
                 <Balance cents={carriedForward} currency={currency} />
               </span>
             </td>
