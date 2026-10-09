@@ -4,6 +4,8 @@ import { useMutation } from '@tanstack/react-query';
 import { Amount, figureText } from '../ledger/Amount';
 import { NO_TAGS, TagFields, tagHeaders, type Tags } from '../common/TagFields';
 import { Dialog, Field } from '../ledger/Dialog';
+import { Combobox } from '../ledger/Combobox';
+import { DocumentReview } from '../ledger/DocumentReview';
 import { buttonClass } from '../ledger/Page';
 import {
   centsFromAmountText,
@@ -319,6 +321,7 @@ export function SalesDocumentBuilder({
       open
       onClose={() => { if (!record.isPending) onClose(); }}
       width="lg"
+      placement="page"
       title={initial ? config.editTitle : config.title}
       note={config.note}
       footer={
@@ -330,18 +333,16 @@ export function SalesDocumentBuilder({
         </>
       }
     >
+      <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_20rem]">
       <div className="space-y-5">
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
           <Field
             label={words.party}
             hint={config.paidNow ? 'Optional for a walk-in sale.' : customers.length === 0 ? (config.purchase ? 'Add the supplier under Vendors first.' : 'Add the customer under Customers first. For walk-in sales, add one called Walk-in.') : undefined}
           >
-            <select value={customerId} onChange={(e) => { setCustomerId(e.target.value); setInvoiceId(''); }}>
-              <option value="">{config.paidNow ? 'Walk-in, no customer record' : words.choose}</option>
-              {customers.map((customer: any) => (
-                <option key={customer.id} value={customer.id}>{customer.displayName}</option>
-              ))}
-            </select>
+            <Combobox value={customerId} onChange={(next) => { setCustomerId(next); setInvoiceId(''); }}
+              placeholder={config.paidNow ? 'Walk-in, no customer record' : words.choose}
+              options={customers.map((customer: any) => ({ value: customer.id, label: customer.displayName }))} />
           </Field>
           {config.paidNow && !customerId && (
             <Field label="Name on the receipt" hint="Optional">
@@ -372,12 +373,8 @@ export function SalesDocumentBuilder({
           {config.paidNow && (
             <>
               <Field label="Received into" hint={moneyAccounts.length === 0 ? 'Mark a bank, cash or M-Pesa account as holding money (Accounting, Edit) first.' : undefined}>
-                <select value={depositAccountId} onChange={(e) => setDepositAccountId(e.target.value)}>
-                  <option value="">Choose an account</option>
-                  {moneyAccounts.map((account: any) => (
-                    <option key={account.id} value={account.id}>{account.code} · {account.name}</option>
-                  ))}
-                </select>
+                <Combobox value={depositAccountId} onChange={setDepositAccountId} placeholder="Choose an account"
+                  options={moneyAccounts.map((account: any) => ({ value: account.id, label: `${account.code} · ${account.name}` }))} />
               </Field>
               <Field label="Reference" hint="Optional, such as the M-Pesa code">
                 <input maxLength={100} value={reference} onChange={(e) => setReference(e.target.value)} />
@@ -397,17 +394,9 @@ export function SalesDocumentBuilder({
                   <div className="grid grid-cols-2 gap-3 sm:grid-cols-12 sm:items-end">
                     <label className="col-span-2 sm:col-span-3 block">
                       <span className="block text-[12.5px] font-semibold text-ink-900">Stock item</span>
-                      <select
-                        aria-label={`Line ${index + 1} stock item`}
-                        value={line.itemId}
-                        onChange={(e) => chooseItem(line.key, e.target.value)}
-                        className="mt-1 h-10 w-full border px-2.5 text-[14px]"
-                      >
-                        <option value="">None, describe it</option>
-                        {items.map((candidate: any) => (
-                          <option key={candidate.id} value={candidate.id}>{candidate.name}</option>
-                        ))}
-                      </select>
+                      <Combobox aria-label={`Line ${index + 1} stock item`} value={line.itemId}
+                        onChange={(next) => chooseItem(line.key, next)} placeholder="None, describe it"
+                        options={items.map((candidate: any) => ({ value: candidate.id, label: candidate.name }))} className="mt-1" />
                     </label>
                     <label className="col-span-2 sm:col-span-3 block">
                       <span className="block text-[12.5px] font-semibold text-ink-900">Description</span>
@@ -450,17 +439,9 @@ export function SalesDocumentBuilder({
                     </label>
                     <label className="col-span-2 sm:col-span-6 block">
                       <span className="block text-[12.5px] font-semibold text-ink-900">{words.account}</span>
-                      <select
-                        aria-label={`Line ${index + 1} ${words.account.toLowerCase()}`}
-                        value={line.accountId}
-                        onChange={(e) => setLine(line.key, { accountId: e.target.value })}
-                        className="mt-1 h-10 w-full border px-2.5 text-[14px]"
-                      >
-                        <option value="">Choose an account</option>
-                        {incomeAccounts.map((account: any) => (
-                          <option key={account.id} value={account.id}>{account.code} {account.name}</option>
-                        ))}
-                      </select>
+                      <Combobox aria-label={`Line ${index + 1} ${words.account.toLowerCase()}`} value={line.accountId}
+                        onChange={(next) => setLine(line.key, { accountId: next })} placeholder="Choose an account"
+                        options={incomeAccounts.map((account: any) => ({ value: account.id, label: `${account.code} ${account.name}` }))} className="mt-1" />
                     </label>
                     <div className="col-span-2 sm:col-span-6 flex items-baseline justify-between gap-3 sm:justify-end sm:pb-2.5">
                       {lines.length > 1 && (
@@ -501,26 +482,17 @@ export function SalesDocumentBuilder({
           </button>
         </section>
 
-        <dl className="text-[13.5px]">
-          <div className="flex items-baseline justify-between gap-4 py-2 border-b border-feint">
-            <dt className="text-ink-900">Subtotal</dt>
-            <dd><Amount cents={totals.subtotalCents} currency={baseCurrency} tone="ink" /></dd>
-          </div>
-          <div className="flex items-baseline justify-between gap-4 py-2 border-b border-feint">
-            <dt className="text-ink-900">VAT</dt>
-            <dd><Amount cents={totals.taxCents} currency={baseCurrency} tone="ink" /></dd>
-          </div>
-          <div className="ll-total flex items-baseline justify-between gap-4 py-2">
-            <dt className="font-semibold text-ink-900">{config.totalLabel}, {baseCurrency}</dt>
-            <dd><Amount cents={totals.totalCents} currency={baseCurrency} tone="ink" className="font-semibold" /></dd>
-          </div>
-        </dl>
-
         <Field label="Notes" hint={config.notesHint}>
           <textarea rows={2} maxLength={4000} value={notes} onChange={(e) => setNotes(e.target.value)} />
         </Field>
 
         {problem && <p role="alert" className="text-[13.5px] text-ledger-red">{problem}</p>}
+      </div>
+      <DocumentReview title={initial ? config.editTitle : config.title} partyLabel={words.party}
+        party={customers.find((customer: any) => customer.id === customerId)?.displayName || payeeName}
+        date={orderDate} lines={checked.map(({ line, amountCents }) => ({ description: line.description, amountCents }))}
+        subtotalCents={totals.subtotalCents} taxCents={totals.taxCents} totalCents={totals.totalCents}
+        currency={baseCurrency} totalLabel={config.totalLabel} />
       </div>
     </Dialog>
   );

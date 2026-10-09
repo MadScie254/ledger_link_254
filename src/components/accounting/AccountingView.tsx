@@ -1,7 +1,7 @@
 import React from 'react';
 import { NO_TAGS, TagFields, tagHeaders, type Tags } from '../common/TagFields';
 import { X } from 'lucide-react';
-import { useState, useRef } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { useInfiniteQuery, useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAppStore } from '../../store';
 import { format } from 'date-fns';
@@ -11,6 +11,7 @@ import { EntityDrillDownModal } from '../common/EntityDrillDownModal';
 import { Amount } from '../ledger/Amount';
 import { Mark } from '../ledger/Mark';
 import { Dialog, Field } from '../ledger/Dialog';
+import { Combobox } from '../ledger/Combobox';
 import { PageHeading, IndexTabs, buttonClass } from '../ledger/Page';
 import { PostedStamp } from '../ledger/PostedStamp';
 import { AccountEditDialog, type EditableAccount } from './AccountEditDialog';
@@ -35,12 +36,19 @@ export function AccountingView() {
   const [justPostedJE, setJustPostedJE] = useState(false);
   const [jeLines, setJeLines] = useState([{ accountId: '', debit: 0, credit: 0 }, { accountId: '', debit: 0, credit: 0 }]);
   const [jeMemo, setJeMemo] = useState('');
+  const [jeProblem, setJeProblem] = useState('');
   const [jeDate, setJeDate] = useState(format(new Date(), 'yyyy-MM-dd'));
   const [jeIdempotencyKey, setJeIdempotencyKey] = useState(() => crypto.randomUUID());
   const [importNote, setImportNote] = useState<{ ok: boolean; text: string } | null>(null);
 
   const queryClient = useQueryClient();
-  const { currentOrgId, activeCompany } = useAppStore();
+  const { currentOrgId, activeCompany, createIntent, setCreateIntent } = useAppStore();
+  useEffect(() => {
+    if (createIntent !== 'journalEntry') return;
+    setActiveTab('Journal Entries');
+    setIsAddingJE(true);
+    setCreateIntent(null);
+  }, [createIntent, setCreateIntent]);
 
   const { data: accountsData, isLoading: isLoadingAccounts } = useQuery({
     queryKey: ['accounts', currentOrgId],
@@ -170,6 +178,7 @@ export function AccountingView() {
     setIsAddingJE(false);
     setJeLines([{ accountId: '', debit: 0, credit: 0 }, { accountId: '', debit: 0, credit: 0 }]);
     setJeMemo('');
+    setJeProblem('');
     setJeIdempotencyKey(crypto.randomUUID());
     addJeMutation.reset();
   }
@@ -197,11 +206,16 @@ export function AccountingView() {
 
   const handlePostJE = (e: React.FormEvent) => {
     e.preventDefault();
+    setJeProblem('');
     const formattedLines = jeLines.map(line => ({
       accountId: line.accountId,
       debit: Math.round(line.debit * 100),
       credit: Math.round(line.credit * 100)
     })).filter(l => l.debit > 0 || l.credit > 0);
+    if (formattedLines.some((line) => !line.accountId)) {
+      setJeProblem('Choose an account for every line with an amount.');
+      return;
+    }
     
     addJeMutation.mutate({
       entryDate: jeDate,
@@ -491,10 +505,12 @@ export function AccountingView() {
         open={isAddingJE}
         onClose={closeJE}
         width="xl"
+        placement="page"
         title="Post a journal entry"
         note="Debits must equal credits before it can be posted."
         footer={
           <>
+            {jeProblem && <p role="alert" className="mr-auto text-[13px] text-negative">{jeProblem}</p>}
             {addJeMutation.isError && (
               <p role="alert" className="mr-auto text-[13px] text-ledger-red">
                 {addJeMutation.error.message}
@@ -511,7 +527,8 @@ export function AccountingView() {
       >
         <div className="relative">
           {justPostedJE && <PostedStamp />}
-          <form id="je-form" onSubmit={handlePostJE} className="space-y-5">
+          <form id="je-form" onSubmit={handlePostJE} className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_20rem]">
+          <div className="space-y-5">
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-[12rem_minmax(0,1fr)]">
             <Field label="Date">
               <input required type="date" value={jeDate} onChange={(e) => setJeDate(e.target.value)} />
@@ -522,10 +539,10 @@ export function AccountingView() {
             <TagFields value={jeTags} onChange={setJeTags} />
           </div>
 
-          <div className="relative overflow-x-auto">
-            <table className="w-full min-w-[34rem] text-[13.5px]">
+          <div className="relative">
+            <table className="block w-full text-[13.5px] sm:table">
               <caption className="sr-only">Journal lines in {baseCurrency}</caption>
-              <thead>
+              <thead className="hidden sm:table-header-group">
                 <tr>
                   <th scope="col" className="pr-3 text-left">Account</th>
                   <th scope="col" className="w-36 pr-3 text-right">Debit</th>
@@ -533,18 +550,17 @@ export function AccountingView() {
                   <th scope="col" className="w-8"><span className="sr-only">Remove</span></th>
                 </tr>
               </thead>
-              <tbody>
+              <tbody className="block sm:table-row-group">
                 {jeLines.map((line, index) => (
-                  <tr key={index}>
-                    <td className="pr-3">
-                      <select aria-label={`Line ${index + 1} account`} required value={line.accountId} onChange={(e) => setJeLine(index, { accountId: e.target.value })} className="h-9 w-full border px-2">
-                        <option value="">Choose an account</option>
-                        {activeAccounts.map((acc: any) => (
-                          <option key={acc.id} value={acc.id}>{acc.code} · {acc.name}</option>
-                        ))}
-                      </select>
+                  <tr key={index} className="grid grid-cols-2 gap-2 border-b border-border py-2 sm:table-row sm:border-0">
+                    <td className="col-span-2 block sm:table-cell sm:pr-3">
+                      <span className="mb-1 block text-xs text-text-2 sm:hidden">Account</span>
+                      <Combobox aria-label={`Line ${index + 1} account`} required value={line.accountId}
+                        onChange={(next) => setJeLine(index, { accountId: next })} placeholder="Choose an account"
+                        options={activeAccounts.map((acc: any) => ({ value: acc.id, label: `${acc.code} · ${acc.name}` }))} />
                     </td>
-                    <td className="pr-3">
+                    <td className="block sm:table-cell sm:pr-3">
+                      <span className="mb-1 block text-xs text-text-2 sm:hidden">Debit</span>
                       <input
                         aria-label={`Line ${index + 1} debit`}
                         type="number"
@@ -559,7 +575,8 @@ export function AccountingView() {
                         className="h-9 w-full border px-2.5 text-right tabular-currency text-ink-blue"
                       />
                     </td>
-                    <td className="pr-3">
+                    <td className="block sm:table-cell sm:pr-3">
+                      <span className="mb-1 block text-xs text-text-2 sm:hidden">Credit</span>
                       <input
                         aria-label={`Line ${index + 1} credit`}
                         type="number"
@@ -574,7 +591,7 @@ export function AccountingView() {
                         className="h-9 w-full border px-2.5 text-right tabular-currency text-ink-blue"
                       />
                     </td>
-                    <td>
+                    <td className="col-span-2 block text-right sm:table-cell">
                       {jeLines.length > 2 && (
                         <button type="button" onClick={() => setJeLines(jeLines.filter((_, i) => i !== index))} aria-label={`Remove line ${index + 1}`} className="p-1 text-graphite-600 hover:text-oxblood">
                           <X className="h-4 w-4" aria-hidden="true" />
@@ -584,14 +601,14 @@ export function AccountingView() {
                   </tr>
                 ))}
               </tbody>
-              <tfoot>
-                <tr>
-                  <th scope="row" className="ll-total py-2 pr-3 text-left font-semibold text-ink-900">
+              <tfoot className="block sm:table-footer-group">
+                <tr className="grid grid-cols-2 gap-2 sm:table-row">
+                  <th scope="row" className="col-span-2 block py-2 text-left font-semibold text-text sm:table-cell sm:pr-3">
                     Totals
                   </th>
-                  <td className="ll-total py-2 pr-3 text-right font-semibold"><Amount cents={debitCents} currency={baseCurrency} tone="ink" /></td>
-                  <td className="ll-total py-2 pr-3 text-right font-semibold"><Amount cents={creditCents} currency={baseCurrency} tone="ink" /></td>
-                  <td className="ll-total" />
+                  <td className="block py-2 text-right font-semibold sm:table-cell sm:pr-3"><span className="block text-xs text-text-2 sm:hidden">Debit</span><Amount cents={debitCents} currency={baseCurrency} tone="ink" /></td>
+                  <td className="block py-2 text-right font-semibold sm:table-cell sm:pr-3"><span className="block text-xs text-text-2 sm:hidden">Credit</span><Amount cents={creditCents} currency={baseCurrency} tone="ink" /></td>
+                  <td className="hidden sm:table-cell" />
                 </tr>
               </tfoot>
             </table>
@@ -613,6 +630,32 @@ export function AccountingView() {
               )}
             </p>
           </div>
+          </div>
+          <aside className="space-y-4" aria-label="Journal entry review">
+            <section className="rounded-xl border border-border bg-surface p-5 shadow-sm" aria-live="polite">
+              <h3 className="text-[15px] font-semibold text-text">Totals</h3>
+              <dl className="mt-3 space-y-2 text-[13px]">
+                <div className="flex justify-between gap-3"><dt>Debits</dt><dd><Amount cents={debitCents} currency={baseCurrency} tone="ink" /></dd></div>
+                <div className="flex justify-between gap-3"><dt>Credits</dt><dd><Amount cents={creditCents} currency={baseCurrency} tone="ink" /></dd></div>
+                <div className="flex justify-between gap-3 border-t border-border pt-3 font-semibold"><dt>Difference</dt><dd><Amount cents={Math.abs(debitCents - creditCents)} currency={baseCurrency} tone="ink" /></dd></div>
+              </dl>
+            </section>
+            <section className="rounded-xl border border-border bg-surface-2 p-4">
+              <h3 className="text-[13px] font-semibold text-text">Entry preview</h3>
+              <div className="mt-3 rounded-lg border border-border bg-surface p-5 text-[13px] shadow-sm">
+                <p className="font-display text-[18px] font-bold text-text">Journal entry</p>
+                <p className="mt-2 text-text-2">{jeDate} · {jeMemo || 'Particulars'}</p>
+                <ul className="mt-4 divide-y divide-border">
+                  {jeLines.filter((line) => line.accountId || line.debit || line.credit).map((line, index) => (
+                    <li key={index} className="flex justify-between gap-2 py-2">
+                      <span className="min-w-0 text-text">{activeAccounts.find((account: any) => account.id === line.accountId)?.name || 'Choose an account'}</span>
+                      <span className="shrink-0 text-right text-text-2">{line.debit ? 'Dr ' : 'Cr '}<Amount cents={Math.round((line.debit || line.credit) * 100)} currency={baseCurrency} size="xs" tone="ink" /></span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            </section>
+          </aside>
           </form>
         </div>
       </Dialog>

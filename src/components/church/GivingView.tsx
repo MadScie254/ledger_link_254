@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '../../context/AuthProvider';
 import { apiRequest } from '../../utils/apiRequest';
+import { useCreateIntent } from '../../hooks/useCreateIntent';
 import { Amount } from '../ledger/Amount';
 import { EmptyNote, IndexTabs, LoadProblem, PageHeading, SkeletonRows, buttonClass } from '../ledger/Page';
 import {
@@ -36,6 +37,11 @@ export function GivingView({ initialTab = 'today' }: { initialTab?: Tab }) {
   const [dialog, setDialog] = useState<'gift' | 'statement' | 'count' | null>(null);
   const [notice, setNotice] = useState('');
   const done = (message: string) => { setDialog(null); setNotice(message); };
+  useCreateIntent({
+    gift: () => setDialog('gift'),
+    cashCount: () => setDialog('count'),
+    mpesaStatement: () => { setTab('queue'); setDialog('statement'); },
+  }, canPost);
   return (
     <div className="space-y-5">
       <PageHeading title={tab === 'cash' ? 'Cash count' : COPY.giving.en}

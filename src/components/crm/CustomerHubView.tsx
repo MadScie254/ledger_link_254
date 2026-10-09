@@ -5,6 +5,8 @@ import { DynamicQuickAddModal } from '../common/DynamicQuickAddModal';
 import { EntityDrillDownModal } from '../common/EntityDrillDownModal';
 import { BulkActionBar } from '../common/BulkActionBar';
 import { Amount } from '../ledger/Amount';
+import { DataTable, type DataColumn } from '../ledger/DataTable';
+import { MoneyBar } from '../ledger/MoneyBar';
 import { PageHeading, IndexTabs, PageNote, SkeletonRows, EmptyNote, LoadProblem, buttonClass } from '../ledger/Page';
 import { useConfirm } from '../../hooks/useConfirm';
 import { inParts } from '../../utils/apiRequest';
@@ -19,6 +21,7 @@ export function CustomerHubView() {
   const [importNotice, setImportNotice] = useState('');
   const [selectedCustomer, setSelectedCustomer] = useState<any | null>(null);
   const [selectedCustomerIds, setSelectedCustomerIds] = useState<string[]>([]);
+  const [customerFilter, setCustomerFilter] = useState('ALL');
 
   const { currentOrgId, activeCompany } = useAppStore();
   const baseCurrency = activeCompany?.baseCurrency || 'KES';
@@ -62,6 +65,11 @@ export function CustomerHubView() {
   const withPin = customers.filter((c) => c.kraPin).length;
   const totalOwed = customers.reduce((sum, c) => sum + (c.balance || 0), 0);
   const byBalance = [...customers].filter((c) => (c.balance || 0) !== 0).sort((a, b) => (b.balance || 0) - (a.balance || 0));
+  const owingCustomers = customers.filter((c) => Number(c.balance || 0) > 0);
+  const creditCustomers = customers.filter((c) => Number(c.balance || 0) < 0);
+  const clearCustomers = customers.filter((c) => Number(c.balance || 0) === 0);
+  const shownCustomers = customerFilter === 'OWED' ? owingCustomers : customerFilter === 'CREDIT' ? creditCustomers : customerFilter === 'CLEAR' ? clearCustomers : customers;
+  const shownOwed = shownCustomers.reduce((sum, customer) => sum + Number(customer.balance || 0), 0);
 
   // Sent in parts the API accepts. The database refuses to delete a
   // customer with invoices or orders; mark those inactive instead.
@@ -101,11 +109,15 @@ export function CustomerHubView() {
     onSettled: () => queryClient.invalidateQueries({ queryKey: ['customers', currentOrgId] }),
   });
 
-  const isAllSelected = customers.length > 0 && selectedCustomerIds.length === customers.length;
-  const isIndeterminate = selectedCustomerIds.length > 0 && selectedCustomerIds.length < customers.length;
-  const toggleOne = (id: string) =>
-    setSelectedCustomerIds((prev) => (prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id]));
   const standing = (c: any) => (c.isActive === false ? 'Inactive' : 'Active');
+  const customerColumns: DataColumn<any>[] = [
+    { id: 'customer', label: 'Customer', value: (c) => c.displayName || '', render: (c) => <button type="button" onClick={(event) => { event.stopPropagation(); setSelectedCustomer(c); }} className="text-left font-medium text-text hover:text-primary-ink">{c.displayName}</button> },
+    { id: 'pin', label: 'KRA PIN', value: (c) => c.kraPin || '', render: (c) => c.kraPin || '–' },
+    { id: 'email', label: 'Email', value: (c) => c.email || '', render: (c) => c.email || '–' },
+    { id: 'standing', label: 'Standing', value: standing, render: standing },
+    { id: 'invoiced', label: 'Invoiced to date', value: (c) => invoicedByCustomer.get(c.id) || 0, render: (c) => <Amount cents={invoicedByCustomer.get(c.id) || 0} currency={baseCurrency} tone="ink" />, numeric: true },
+    { id: 'owed', label: `Owes, ${baseCurrency}`, value: (c) => Number(c.balance || 0), render: (c) => <Amount cents={c.balance || 0} currency={baseCurrency} />, numeric: true },
+  ];
 
   return (
     <div className="pb-16 space-y-5">
@@ -157,9 +169,15 @@ export function CustomerHubView() {
             <span>{invoicedRecently.size} invoiced in the last 90 days</span>
             <span>{withPin} of {customers.length} with a KRA PIN on record</span>
           </PageNote>
+          <MoneyBar label="Customer balances" active={customerFilter} onChange={setCustomerFilter} currency={baseCurrency} segments={[
+            { id: 'OWED', label: 'Owes you', count: owingCustomers.length, cents: owingCustomers.reduce((sum, c) => sum + Number(c.balance || 0), 0), color: 'var(--primary)' },
+            { id: 'CREDIT', label: 'Credit balance', count: creditCustomers.length, cents: creditCustomers.reduce((sum, c) => sum + Math.abs(Number(c.balance || 0)), 0), color: 'var(--info)' },
+            { id: 'CLEAR', label: 'Clear', count: clearCustomers.length, cents: 0, color: 'var(--chart-expense)' },
+          ]} />
 
           <ul className="sm:hidden" aria-label={`Customers, figures in ${baseCurrency}`}>
-            {customers.map((c) => (
+            {shownCustomers.length === 0 && <li className="py-6 text-sm text-text-2">No customers match this filter. Choose All to see every customer.</li>}
+            {shownCustomers.map((c) => (
               <li key={c.id} className="border-b border-feint">
                 <button type="button" onClick={() => setSelectedCustomer(c)} className="w-full py-3 text-left">
                   <span className="flex items-baseline justify-between gap-3">
@@ -170,84 +188,29 @@ export function CustomerHubView() {
                     {[c.kraPin && `PIN ${c.kraPin}`, standing(c)].filter(Boolean).join(' · ')}
                   </span>
                 </button>
+                <label className="inline-flex min-h-11 items-center gap-2 text-xs text-text-2"><input type="checkbox" aria-label={`Select ${c.displayName}`} checked={selectedCustomerIds.includes(c.id)} onChange={() => setSelectedCustomerIds((current) => current.includes(c.id) ? current.filter((id) => id !== c.id) : [...current, c.id])} />Select</label>
               </li>
             ))}
           </ul>
 
-          <div className="hidden sm:block relative overflow-x-auto">
-            <table className="w-full text-[13.5px]">
-              <caption className="sr-only">Customers, figures in {baseCurrency}</caption>
-              <thead>
-                <tr>
-                  <th scope="col" className="w-8 pr-2 text-left">
-                    <input
-                      type="checkbox"
-                      aria-label="Select all customers"
-                      checked={isAllSelected}
-                      ref={(input) => {
-                        if (input) input.indeterminate = isIndeterminate;
-                      }}
-                      onChange={(e) => setSelectedCustomerIds(e.target.checked ? customers.map((c) => c.id) : [])}
-                      className="h-4 w-4"
-                    />
-                  </th>
-                  <th scope="col" className="pr-4 text-left">Customer</th>
-                  <th scope="col" className="pr-4 text-left">KRA PIN</th>
-                  <th scope="col" className="pr-4 text-left">Email</th>
-                  <th scope="col" className="pr-4 text-left">Standing</th>
-                  <th scope="col" className="pr-4 text-right">Invoiced to date</th>
-                  <th scope="col" className="text-right">Owes, {baseCurrency}</th>
-                </tr>
-              </thead>
-              <tbody>
-                {customers.map((c) => (
-                  <tr key={c.id} onClick={() => setSelectedCustomer(c)} className="cursor-pointer">
-                    <td className="w-8 pr-2" onClick={(e) => e.stopPropagation()}>
-                      <input
-                        type="checkbox"
-                        aria-label={`Select ${c.displayName}`}
-                        checked={selectedCustomerIds.includes(c.id)}
-                        onChange={() => toggleOne(c.id)}
-                        className="h-4 w-4"
-                      />
-                    </td>
-                    <td className="pr-4">
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setSelectedCustomer(c);
-                        }}
-                        className="text-left text-ink-900 hover:underline underline-offset-[3px]"
-                      >
-                        {c.displayName}
-                      </button>
-                    </td>
-                    <td className="pr-4 whitespace-nowrap text-graphite-600">{c.kraPin || '–'}</td>
-                    <td className="pr-4 text-graphite-600">{c.email || '–'}</td>
-                    <td className="pr-4 text-graphite-600">{standing(c)}</td>
-                    <td className="pr-4 text-right whitespace-nowrap">
-                      <Amount cents={invoicedByCustomer.get(c.id) || 0} currency={baseCurrency} tone="ink" />
-                    </td>
-                    <td className="text-right whitespace-nowrap">
-                      <Amount cents={c.balance || 0} currency={baseCurrency} />
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-              <tfoot>
-                <tr>
-                  <th scope="row" colSpan={6} className="ll-total py-2 pr-4 text-left font-semibold text-ink-900">
-                    Owed by {customers.length} customers
-                  </th>
-                  <td className="ll-total py-2 text-right whitespace-nowrap">
-                    <Amount cents={totalOwed} currency={baseCurrency} tone="ink" className="font-semibold" />
-                  </td>
-                </tr>
-              </tfoot>
-            </table>
-          </div>
-        </div>
+          <div className="hidden sm:block">
+            <DataTable
+              records={shownCustomers}
+              columns={customerColumns}
+              caption={`Customers, figures in ${baseCurrency}`}
+              onOpen={setSelectedCustomer}
+              openLabel={(customer) => `Open ${customer.displayName}`}
+              selectedIds={selectedCustomerIds}
+              onSelectionChange={setSelectedCustomerIds}
+              selectAllLabel="Select all customers"
+              selectRowLabel={(customer) => `Select ${customer.displayName}`}
+              rowActions={(customer) => <button type="button" onClick={() => setSelectedCustomer(customer)} className={buttonClass.quiet}>Open</button>}
+            />
+            <div className="flex items-baseline justify-between gap-4 px-4 py-3 text-[13px]">
+              <span className="font-semibold text-text">Net balance for {shownCustomers.length} customers</span>
+              <Amount cents={shownOwed} currency={baseCurrency} tone="ink" className="font-semibold" />
+            </div>
+          </div>        </div>
       ) : byBalance.length === 0 ? (
         <EmptyNote>No customer owes anything. Customers with an open balance are listed here, largest first.</EmptyNote>
       ) : (

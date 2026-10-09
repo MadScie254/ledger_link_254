@@ -3,6 +3,7 @@ import { Sidebar } from './Sidebar';
 import { Header } from './Header';
 import { CommandPalette } from './CommandPalette';
 import { MobileTabBar } from './MobileTabBar';
+import { NewMenu } from './NewMenu';
 import { useAppStore } from '../../store';
 
 export function AppLayout({ children }: { children: React.ReactNode }) {
@@ -11,6 +12,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
   return (
     <div className="app-shell min-h-screen flex flex-col md:flex-row">
       <CommandPalette />
+      <NewMenu />
       <Sidebar />
       <div className="flex-1 flex flex-col min-w-0 relative">
         <Header />

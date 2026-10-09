@@ -27,14 +27,7 @@ function syncInert() {
 
 const FOCUSABLE = 'a[href], button:not([disabled]), input:not([disabled]):not([type="hidden"]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
 
-/**
- * A sheet lifted over the page: the one place the book casts a shadow.
- *
- * No entrance animation (selection and opening are instant in this world).
- * The sheet is portalled to the body with the rest of the page made inert, so
- * focus cannot wander behind it. Escape and the backdrop close it; focus moves
- * into the sheet on open and returns to whatever opened it on close.
- */
+/** A focused sheet over the workspace. */
 export function Dialog({
   open,
   onClose,
@@ -43,6 +36,7 @@ export function Dialog({
   children,
   footer,
   width = 'md',
+  placement = 'center',
   showCloseButton = true,
 }: {
   open: boolean;
@@ -52,6 +46,7 @@ export function Dialog({
   children: React.ReactNode;
   footer?: React.ReactNode;
   width?: 'sm' | 'md' | 'lg' | 'xl';
+  placement?: 'center' | 'right' | 'page' | 'bottom';
   showCloseButton?: boolean;
 }) {
   const titleId = useId();
@@ -111,11 +106,12 @@ export function Dialog({
   if (!open) return null;
 
   const widths = { sm: 'max-w-sm', md: 'max-w-lg', lg: 'max-w-2xl', xl: 'max-w-4xl' };
+  const responsiveWidths = { sm: 'sm:max-w-sm', md: 'sm:max-w-lg', lg: 'sm:max-w-2xl', xl: 'sm:max-w-4xl' };
 
   return createPortal(
     <div
       ref={layerRef}
-      className="ll-layer fixed inset-0 z-[70] flex items-start justify-center overflow-y-auto bg-black/45 p-3 sm:items-center sm:p-6"
+      className={`ll-layer fixed inset-0 z-[70] flex ${placement === 'page' ? 'bg-canvas' : `bg-black/50 ${placement === 'right' ? 'justify-end' : placement === 'bottom' ? 'items-end justify-center sm:items-center sm:p-6' : 'items-start justify-center overflow-y-auto p-3 sm:items-center sm:p-6'}`}`}
       onMouseDown={(e) => {
         if (e.target === e.currentTarget) onClose();
       }}
@@ -126,38 +122,38 @@ export function Dialog({
         aria-modal="true"
         aria-labelledby={titleId}
         tabIndex={-1}
-        className={`relative my-auto w-full ${widths[width]} border border-feint-strong bg-paper-100 ll-lift focus:outline-none`}
+        className={`relative w-full border border-border bg-surface shadow-lg focus:outline-none ${placement === 'page' ? 'flex h-full flex-col border-0 shadow-none' : placement === 'right' ? 'll-drawer flex h-full max-w-[38rem] flex-col rounded-l-2xl' : placement === 'bottom' ? `flex max-h-[85dvh] flex-col rounded-t-2xl sm:my-auto ${responsiveWidths[width]} sm:rounded-2xl` : `my-auto ${widths[width]} rounded-2xl`}`}
       >
-        <div className="flex items-start justify-between gap-4 border-b-2 border-ink-900 px-5 pt-4 pb-3">
+        <div className={`flex items-start justify-between gap-4 border-b border-border px-6 py-5 ${placement === 'page' ? 'lg:px-[max(2rem,calc((100vw-80rem)/2))]' : ''}`}>
           <div className="min-w-0">
-            <h2 id={titleId} className="ll-heading text-[22px] leading-tight text-ink-900">{title}</h2>
-            {note && <p className="mt-1 text-[13px] text-graphite-600">{note}</p>}
+            <h2 id={titleId} className="ll-heading text-[22px] leading-7 text-text">{title}</h2>
+            {note && <p className="mt-1 text-[14px] leading-5 text-text-2">{note}</p>}
           </div>
           {showCloseButton && (
-            <button type="button" data-dialog-close onClick={onClose} aria-label="Close" className="-mr-1 p-1 text-graphite-600 hover:text-ink-900">
+            <button type="button" data-dialog-close onClick={onClose} aria-label="Close" className="-mr-2 rounded-md p-2 text-text-2 hover:bg-hover hover:text-text">
               <X className="h-5 w-5" aria-hidden="true" />
             </button>
           )}
         </div>
-        <div className="px-5 py-4">{children}</div>
-        {footer && <div className="flex flex-wrap items-center justify-end gap-2 border-t border-feint px-5 py-3">{footer}</div>}
+        <div className={`px-6 py-5 ${placement === 'right' || placement === 'page' || placement === 'bottom' ? 'min-h-0 flex-1 overflow-y-auto' : ''} ${placement === 'page' ? 'lg:px-[max(2rem,calc((100vw-80rem)/2))]' : ''}`}>{children}</div>
+        {footer && <div className={`flex flex-wrap items-center justify-end gap-2 border-t border-border bg-surface-2 px-6 py-4 ${placement === 'right' ? 'rounded-bl-2xl' : placement === 'page' ? 'lg:px-[max(2rem,calc((100vw-80rem)/2))]' : 'rounded-b-2xl'}`}>{footer}</div>}
       </div>
     </div>,
     document.body,
   );
 }
 
-/** A labelled field in the book's form vocabulary. */
+/** A labelled field with space for guidance and validation. */
 export function Field({ label, hint, error, children }: { label: string; hint?: string; error?: string; children: React.ReactNode }) {
   return (
     <label className="block">
-      <span className="block text-[13px] font-semibold text-ink-900">{label}</span>
-      <span className="mt-1.5 block [&>input]:w-full [&>select]:w-full [&>textarea]:w-full [&>input]:h-10 [&>select]:h-10 [&>input]:px-3 [&>select]:px-2.5 [&>textarea]:px-3 [&>textarea]:py-2 [&>input]:border [&>select]:border [&>textarea]:border [&>input]:text-[14px] [&>select]:text-[14px] [&>textarea]:text-[14px]">
+      <span className="block text-[12.5px] leading-4 font-medium text-text-2">{label}</span>
+      <span className="mt-1.5 block [&>input]:w-full [&>select]:w-full [&>textarea]:w-full [&>input]:h-9 [&>select]:h-9 [&>input]:px-3 [&>select]:px-2.5 [&>textarea]:px-3 [&>textarea]:py-2 [&>input]:border [&>select]:border [&>textarea]:border [&>input]:text-[14px] [&>select]:text-[14px] [&>textarea]:text-[14px]">
         {children}
       </span>
-      {hint && !error && <span className="mt-1 block text-[12.5px] text-graphite-600">{hint}</span>}
+      {hint && !error && <span className="mt-1 block text-[12.5px] text-text-3">{hint}</span>}
       {error && (
-        <span role="alert" className="mt-1 block text-[12.5px] text-ledger-red">
+        <span role="alert" className="mt-1 block text-[12.5px] text-negative">
           {error}
         </span>
       )}

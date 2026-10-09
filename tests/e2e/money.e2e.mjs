@@ -2,7 +2,7 @@
 // their screens against the real API.
 import assert from 'node:assert/strict';
 import test, { after } from 'node:test';
-import { signedIn, openView, refusedWrites, closeBrowser, sql, flow } from './helpers.mjs';
+import { signedIn, openView, chooseOption, refusedWrites, closeBrowser, sql, flow } from './helpers.mjs';
 
 after(closeBrowser);
 
@@ -11,14 +11,14 @@ test('a walk-in sale is posted on a sales receipt into the till', async () => {
   const { page, api, problems } = session;
   await flow('sales-receipt', session, async () => {
     const before = Number(sql(`SELECT quantity_on_hand FROM public.inventory_items WHERE name = 'Cement 50kg'`));
-    await openView(page, 'Sales');
+    await openView(page, 'Sales & customers');
     await page.getByRole('tab', { name: /Sales receipts/ }).click();
     await page.getByRole('button', { name: 'New sales receipt' }).click();
     const dialog = page.getByRole('dialog');
-    await dialog.getByLabel('Line 1 stock item').selectOption({ label: 'Cement 50kg' });
+    await chooseOption(dialog, 'Line 1 stock item', 'Cement 50kg');
     await dialog.getByLabel('Line 1 quantity').fill('1');
     await dialog.getByLabel('Line 1 VAT rate').fill('16');
-    await dialog.locator('select').filter({ hasText: '1050 · M-Pesa Till' }).selectOption({ label: '1050 · M-Pesa Till' });
+    await chooseOption(dialog, 'Received into', '1050 · M-Pesa Till');
     await dialog.getByRole('button', { name: 'Post sales receipt' }).click();
     await dialog.waitFor({ state: 'hidden', timeout: 10_000 });
     await page.getByText(/SR-\d{4}-00001/).waitFor({ timeout: 10_000 });
@@ -33,19 +33,20 @@ test('an expense paid from the bank is posted', async () => {
   const session = await signedIn();
   const { page, api, problems } = session;
   await flow('expense', session, async () => {
-    await openView(page, 'Bills and expenses');
+    await openView(page, 'Expenses & suppliers');
     await page.getByRole('tab', { name: 'Expenses' }).click();
     await page.getByRole('button', { name: 'New expense' }).click();
     const dialog = page.getByRole('dialog');
     await dialog.locator('input[name="payeeName"]').fill('Naivas Supermarket');
-    await dialog.locator('select[name="paidFromAccountId"]').selectOption({ label: '1000 · Bank' });
+    await chooseOption(dialog, 'Paid from', '1000 · Bank');
     await dialog.getByLabel('Line 1 particulars').fill('Cleaning supplies');
-    await dialog.getByLabel('Line 1 account').selectOption({ label: '6000 · Operating expenses' });
+    await chooseOption(dialog, 'Line 1 account', '6000 · Operating expenses');
     await dialog.getByLabel('Line 1 amount').fill('2,500');
     await dialog.getByLabel('Line 1 VAT percentage').fill('16');
     await dialog.getByRole('button', { name: 'Post expense' }).click();
     await dialog.waitFor({ state: 'hidden', timeout: 10_000 });
-    await page.getByText(/EXP-\d{4}-00001/).waitFor({ timeout: 10_000 });
+    // The number shows in the table row and in the phone layout's hidden copy.
+    await page.locator('text=/EXP-\\d{4}-00001/ >> visible=true').first().waitFor({ timeout: 10_000 });
     assert.deepEqual(refusedWrites(api), []);
     assert.equal(sql(`SELECT payee_name || ' ' || total_cents FROM public.cash_transactions WHERE kind = 'EXPENSE'`), 'Naivas Supermarket 290000');
     assert.deepEqual(problems, []);
@@ -56,7 +57,7 @@ test('a receipt PDF is attached to an expense and downloaded again', async () =>
   const session = await signedIn();
   const { page, api, problems } = session;
   await flow('attachment', session, async () => {
-    await openView(page, 'Bills and expenses');
+    await openView(page, 'Expenses & suppliers');
     await page.getByRole('tab', { name: 'Expenses' }).click();
     await page.getByRole('button', { name: 'Files' }).first().click();
     const dialog = page.getByRole('dialog');
@@ -106,11 +107,11 @@ test('a credit note is issued against an invoice and lowers what is due', async 
       CURRENT_DATE - 3, CURRENT_DATE + 27, 'KES', 1, NULL, '00000000-0000-0000-0000-000000000001',
       jsonb_build_array(jsonb_build_object('description', 'Cement', 'accountId', '00000000-0000-0000-0000-00000000a400', 'amountCents', 300000)), 'e2e-cn-invoice')`);
     const invoiceNumber = sql(`SELECT invoice_number FROM public.invoices WHERE id = '${invoiceId}'`);
-    await openView(page, 'Sales');
+    await openView(page, 'Sales & customers');
     await page.getByRole('tab', { name: /Credit notes/ }).click();
     await page.getByRole('button', { name: 'New credit note' }).click();
     const dialog = page.getByRole('dialog');
-    await dialog.locator('select').first().selectOption({ label: 'Acme' });
+    await chooseOption(dialog, 'Customer', 'Acme');
     await dialog.locator('select').filter({ hasText: 'Keep as credit' }).selectOption({ label: `${invoiceNumber} · 3,000.00 due` });
     await dialog.getByLabel('Line 1 description').fill('Price agreed down');
     await dialog.getByLabel('Line 1 unit price, KES').fill('500');
@@ -128,13 +129,13 @@ test('a supplier credit is recorded, then refunded into the bank', async () => {
   const session = await signedIn();
   const { page, api, problems } = session;
   await flow('supplier-credit', session, async () => {
-    await openView(page, 'Bills and expenses');
+    await openView(page, 'Expenses & suppliers');
     await page.getByRole('tab', { name: 'Supplier credits' }).click();
     await page.getByRole('button', { name: 'New supplier credit' }).click();
     const dialog = page.getByRole('dialog');
-    await dialog.locator('select[name="vendorId"]').selectOption({ label: 'Kenya Power' });
+    await chooseOption(dialog, 'Supplier', 'Kenya Power');
     await dialog.getByLabel('Line 1 particulars').fill('Overbilled tokens');
-    await dialog.getByLabel('Line 1 account').selectOption({ label: '6000 · Operating expenses' });
+    await chooseOption(dialog, 'Line 1 account', '6000 · Operating expenses');
     await dialog.getByLabel('Line 1 amount').fill('1,000');
     await dialog.getByLabel('Line 1 VAT percentage').fill('0');
     await dialog.getByRole('button', { name: 'Record supplier credit' }).click();
@@ -157,15 +158,15 @@ test('a purchase order is written, then billed for what arrived', async () => {
   const { page, api, problems } = session;
   await flow('purchase-order', session, async () => {
     const before = Number(sql(`SELECT quantity_on_hand FROM public.inventory_items WHERE name = 'Cement 50kg'`));
-    await openView(page, 'Bills and expenses');
+    await openView(page, 'Expenses & suppliers');
     await page.getByRole('tab', { name: 'Purchase orders' }).click();
     await page.getByRole('button', { name: 'New purchase order' }).click();
     const dialog = page.getByRole('dialog');
-    await dialog.locator('select').first().selectOption({ label: 'Kenya Power' });
-    await dialog.getByLabel('Line 1 stock item').selectOption({ label: 'Cement 50kg' });
+    await chooseOption(dialog, 'Supplier', 'Kenya Power');
+    await chooseOption(dialog, 'Line 1 stock item', 'Cement 50kg');
     await dialog.getByLabel('Line 1 quantity').fill('10');
     await dialog.getByLabel('Line 1 unit cost, KES').fill('700');
-    await dialog.getByLabel('Line 1 account').selectOption({ label: '6000 Operating expenses' });
+    await chooseOption(dialog, 'Line 1 account', '6000 Operating expenses');
     await dialog.getByRole('button', { name: 'Save purchase order' }).click();
     await dialog.waitFor({ state: 'hidden', timeout: 10_000 });
     await page.getByText(/PO-\d{4}-00001/).first().waitFor({ timeout: 10_000 });
@@ -192,7 +193,7 @@ test('an invoice is made recurring and the next one posted now', async () => {
       CURRENT_DATE, CURRENT_DATE + 14, 'KES', 1, 'Retainer', '00000000-0000-0000-0000-000000000001',
       jsonb_build_array(jsonb_build_object('description', 'Monthly bookkeeping', 'accountId', '00000000-0000-0000-0000-00000000a400', 'amountCents', 1500000)), 'e2e-recurring-source')`);
     const invoiceNumber = sql(`SELECT invoice_number FROM public.invoices WHERE id = '${invoiceId}'`);
-    await openView(page, 'Sales');
+    await openView(page, 'Sales & customers');
     await page.getByRole('tab', { name: 'Recurring' }).click();
     await page.getByRole('button', { name: 'New recurring invoice' }).click();
     const dialog = page.getByRole('dialog');
@@ -222,7 +223,7 @@ test('one payment settles two invoices, keeps the rest as credit, and is reverse
       jsonb_build_array(jsonb_build_object('description', 'Cement', 'accountId', '00000000-0000-0000-0000-00000000a400', 'amountCents', ${cents})), '${key}')`);
     const older = invoiceFor(10, 150000, 'e2e-pay-1');
     const newer = invoiceFor(5, 250000, 'e2e-pay-2');
-    await openView(page, 'Sales');
+    await openView(page, 'Sales & customers');
     await page.getByRole('button', { name: 'Receive a payment' }).click();
     const dialog = page.getByRole('dialog');
     await dialog.locator('select[name="customerId"]').selectOption(customer);
@@ -253,7 +254,7 @@ test('an invoice is paid net of income tax and VAT the customer withheld', async
       CURRENT_DATE - 2, CURRENT_DATE + 28, 'KES', 1, NULL, '00000000-0000-0000-0000-000000000001',
       jsonb_build_array(jsonb_build_object('description', 'Consultancy', 'accountId', '00000000-0000-0000-0000-00000000a400', 'amountCents', 1000000, 'taxCents', 160000)), 'e2e-wht-invoice')`);
     const invoiceNumber = sql(`SELECT invoice_number FROM public.invoices WHERE id = '${invoiceId}'`);
-    await openView(page, 'Sales');
+    await openView(page, 'Sales & customers');
     await page.getByRole('row').filter({ hasText: invoiceNumber }).getByRole('button', { name: 'Receive payment' }).click();
     const dialog = page.getByRole('dialog');
     await dialog.getByLabel('The customer withheld tax and paid the rest').check();
@@ -281,7 +282,7 @@ test('a dollar invoice is settled at the day\'s rate and the exchange gain is po
       CURRENT_DATE - 3, CURRENT_DATE + 27, 'USD', 0.01, NULL, '00000000-0000-0000-0000-000000000001',
       jsonb_build_array(jsonb_build_object('description', 'Export consultancy', 'accountId', '00000000-0000-0000-0000-00000000a400', 'amountCents', 10000000, 'foreignAmountCents', 100000)), 'e2e-fx-invoice')`);
     const invoiceNumber = sql(`SELECT invoice_number FROM public.invoices WHERE id = '${invoiceId}'`);
-    await openView(page, 'Sales');
+    await openView(page, 'Sales & customers');
     await page.getByRole('row').filter({ hasText: invoiceNumber }).getByRole('button', { name: 'Receive payment' }).click();
     const dialog = page.getByRole('dialog');
     await dialog.getByText(/still owing, booked at KES 100\.0000 to the USD/).waitFor();

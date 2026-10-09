@@ -5,11 +5,15 @@ import { useAppStore } from '../../store';
 import { apiRequest } from '../../utils/apiRequest';
 import { todayIn } from '../../utils/dates';
 import { Amount } from '../ledger/Amount';
+import { DataTable, type DataColumn } from '../ledger/DataTable';
+import { MoneyBar } from '../ledger/MoneyBar';
 import { Dialog, Field } from '../ledger/Dialog';
 import { Mark } from '../ledger/Mark';
 import { EmptyNote, LoadProblem, SkeletonRows, buttonClass } from '../ledger/Page';
 import { AttachmentsButton } from './AttachmentsPanel';
 import { PrintButton } from './PrintButton';
+import { BulkActionBar } from './BulkActionBar';
+import { downloadCsv } from '../../utils/exportCsv';
 
 export type CashKind = 'SALES_RECEIPT' | 'EXPENSE' | 'TRANSFER';
 
@@ -35,6 +39,9 @@ export function CashTransactionsPanel({ kind, onCreate, createLabel }: { kind: C
   const [voidDate, setVoidDate] = useState('');
   const [reason, setReason] = useState('');
   const [notice, setNotice] = useState('');
+  const [expenseFilter, setExpenseFilter] = useState('ALL');
+  const [selectedExpense, setSelectedExpense] = useState<any | null>(null);
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
 
   const list = useQuery({
     queryKey: ['cash-transactions', currentOrgId, kind],
@@ -58,12 +65,33 @@ export function CashTransactionsPanel({ kind, onCreate, createLabel }: { kind: C
   const transactions = list.data?.transactions || [];
   const posted = transactions.filter((t) => t.status !== 'VOID');
   const postedTotal = posted.reduce((sum, t) => sum + t.totalCents, 0);
+  const voidRecords = transactions.filter((t) => t.status === 'VOID');
+  const shownExpenses = expenseFilter === 'POSTED' ? posted : expenseFilter === 'VOID' ? voidRecords : transactions;
 
   const describe = (t: any) => {
     if (kind === 'TRANSFER') return `${t.moneyAccountName || 'Account'} to ${t.toAccountName || 'account'}`;
     const party = t.partyName || (kind === 'SALES_RECEIPT' ? 'Walk-in' : 'No payee');
     const first = t.lines[0]?.description;
     return `${party}${first ? ` · ${first}${t.lines.length > 1 ? ' and more' : ''}` : ''}`;
+  };
+  const expenseColumns: DataColumn<any>[] = [
+    { id: 'date', label: 'Date', value: (t) => t.date || '', render: (t) => shortDate(t.date) },
+    { id: 'number', label: 'Expense', value: (t) => t.number || '', render: (t) => <span className="font-medium text-text">{t.number}</span> },
+    { id: 'description', label: 'Payee and purpose', value: describe, render: describe },
+    { id: 'status', label: 'Standing', value: (t) => t.status || '', render: (t) => <Mark kind={t.status === 'VOID' ? 'query' : 'tick'} label={t.status === 'VOID' ? 'Void' : 'Posted'} /> },
+    { id: 'amount', label: currency, value: (t) => Number(t.totalCents || 0), render: (t) => <Amount cents={t.totalCents} currency={currency} tone="ink" />, numeric: true },
+  ];
+  const openVoid = (record: any) => {
+    voidMutation.reset();
+    setVoidDate(todayIn(activeCompany?.timeZone));
+    setReason('');
+    setNotice('');
+    setSelectedExpense(null);
+    setVoiding(record);
+  };
+  const exportSelected = () => {
+    const selected = transactions.filter((record) => selectedIds.includes(record.id));
+    downloadCsv('expenses.csv', [['Date', 'Expense', 'Payee and purpose', 'Status', 'Amount'], ...selected.map((record) => [record.date, record.number, describe(record), record.status, (record.totalCents / 100).toFixed(2)])]);
   };
 
   return (
@@ -77,6 +105,36 @@ export function CashTransactionsPanel({ kind, onCreate, createLabel }: { kind: C
         <EmptyNote action={onCreate && canPost ? <button type="button" onClick={onCreate} className={buttonClass.quiet}>{createLabel || `Record the first ${noun.one}`}</button> : undefined}>
           {noun.empty}
         </EmptyNote>
+      ) : kind === 'EXPENSE' ? (
+        <>
+          <MoneyBar label="Expense money" active={expenseFilter} onChange={setExpenseFilter} currency={currency} segments={[
+            { id: 'POSTED', label: 'Posted', count: posted.length, cents: postedTotal, color: 'var(--primary)' },
+            { id: 'VOID', label: 'Void', count: voidRecords.length, cents: voidRecords.reduce((sum, record) => sum + Number(record.totalCents || 0), 0), color: 'var(--chart-expense)' },
+          ]} />
+          <DataTable
+            records={shownExpenses}
+            columns={expenseColumns}
+            caption={`Expenses, figures in ${currency}`}
+            onOpen={setSelectedExpense}
+            openLabel={(record) => `Open expense ${record.number}`}
+            selectedIds={selectedIds}
+            onSelectionChange={setSelectedIds}
+            selectAllLabel="Select all expenses"
+            selectRowLabel={(record) => `Select expense ${record.number}`}
+            rowActions={(record) => <>
+              <AttachmentsButton recordType="CASH_TRANSACTION" recordId={record.id} title={record.number} />
+              {record.status !== 'VOID' && canPost && <button type="button" onClick={() => openVoid(record)} className={buttonClass.quiet}>Void</button>}
+            </>}
+            mobile={{
+              primary: (record) => `${record.number} · ${describe(record)}`,
+              secondary: (record) => `${shortDate(record.date)} · ${record.moneyAccountName || 'Account not recorded'}`,
+              amount: (record) => <Amount cents={record.totalCents} currency={currency} tone="ink" />,
+              status: (record) => <Mark kind={record.status === 'VOID' ? 'query' : 'tick'} label={record.status === 'VOID' ? 'Void' : 'Posted'} />,
+            }}
+          />
+          <div className="flex items-baseline justify-between gap-4 px-4 py-3 text-[13px]"><span className="font-semibold text-text">Posted total of {shownExpenses.length} expenses shown</span><Amount cents={shownExpenses.filter((record) => record.status !== 'VOID').reduce((sum, record) => sum + Number(record.totalCents || 0), 0)} currency={currency} tone="ink" /></div>
+          <BulkActionBar selectedCount={selectedIds.length} totalCount={transactions.length} entityName="expenses" onClearSelection={() => setSelectedIds([])} onExport={exportSelected} />
+        </>
       ) : (
         <ul className="border-t border-feint-strong" aria-label={`${noun.many}, figures in ${currency}`}>
           {transactions.map((t) => (
@@ -139,6 +197,24 @@ export function CashTransactionsPanel({ kind, onCreate, createLabel }: { kind: C
             <input maxLength={500} value={reason} onChange={(e) => setReason(e.target.value)} />
           </Field>
         </div>
+      </Dialog>
+      <Dialog
+        open={kind === 'EXPENSE' && !!selectedExpense}
+        onClose={() => setSelectedExpense(null)}
+        placement="right"
+        title={selectedExpense?.number || 'Expense'}
+        note={selectedExpense ? describe(selectedExpense) : undefined}
+        footer={<>
+          {selectedExpense && <AttachmentsButton recordType="CASH_TRANSACTION" recordId={selectedExpense.id} title={selectedExpense.number} />}
+          {selectedExpense?.status !== 'VOID' && selectedExpense && canPost && <button type="button" onClick={() => openVoid(selectedExpense)} className={buttonClass.secondary}>Void</button>}
+          <button type="button" onClick={() => setSelectedExpense(null)} className={buttonClass.secondary}>Close</button>
+        </>}
+      >
+        {selectedExpense && <div className="space-y-6">
+          <dl className="grid grid-cols-2 gap-3"><div className="rounded-xl bg-surface-2 p-4"><dt className="text-xs text-text-2">Amount paid</dt><dd className="mt-1 font-display text-lg font-bold"><Amount cents={selectedExpense.totalCents} currency={currency} tone="ink" /></dd></div><div className="rounded-xl bg-surface-2 p-4"><dt className="text-xs text-text-2">Standing</dt><dd className="mt-1 text-sm font-semibold text-text">{selectedExpense.status === 'VOID' ? 'Void' : 'Posted'}</dd></div></dl>
+          <section><h3 className="mb-3 text-sm font-semibold text-text">Summary</h3><dl className="space-y-2 text-[13px]"><div className="flex justify-between gap-4"><dt className="text-text-2">Payee</dt><dd>{selectedExpense.partyName || 'Not recorded'}</dd></div><div className="flex justify-between gap-4"><dt className="text-text-2">Paid from</dt><dd>{selectedExpense.moneyAccountName || 'Not recorded'}</dd></div><div className="flex justify-between gap-4"><dt className="text-text-2">Reference</dt><dd>{selectedExpense.reference || 'Not recorded'}</dd></div></dl>{selectedExpense.lines?.length > 0 && <ul className="mt-4 divide-y divide-border rounded-lg border border-border px-3">{selectedExpense.lines.map((line: any, index: number) => <li key={line.id || index} className="flex justify-between gap-4 py-2 text-[13px]"><span>{line.description}</span><Amount cents={line.amountCents || 0} currency={currency} size="xs" tone="ink" /></li>)}</ul>}</section>
+          <section aria-label="Activity timeline"><h3 className="mb-3 text-sm font-semibold text-text">Activity</h3><ol className="border-l border-border-strong pl-4 text-[13px]"><li className="relative pb-4 before:absolute before:-left-[21px] before:top-1.5 before:size-2.5 before:rounded-full before:bg-primary"><span className="font-medium text-text">Expense dated</span><span className="block text-xs text-text-2">{shortDate(selectedExpense.date)}</span></li>{selectedExpense.createdAt && <li className="relative pb-4 before:absolute before:-left-[21px] before:top-1.5 before:size-2.5 before:rounded-full before:bg-primary"><span className="font-medium text-text">Recorded</span><span className="block text-xs text-text-2">{shortDate(selectedExpense.createdAt)}</span></li>}{selectedExpense.voidedAt && <li className="relative before:absolute before:-left-[21px] before:top-1.5 before:size-2.5 before:rounded-full before:bg-negative"><span className="font-medium text-text">Voided</span><span className="block text-xs text-text-2">{shortDate(selectedExpense.voidedAt)}{selectedExpense.voidReason ? ` · ${selectedExpense.voidReason}` : ''}</span></li>}</ol></section>
+        </div>}
       </Dialog>
       {!list.isLoading && transactions.length > 0 && posted.length === 0 && (
         <p className="text-[13px] text-graphite-600"><Mark kind="tick" label={`Every ${noun.one} listed is void.`} /></p>

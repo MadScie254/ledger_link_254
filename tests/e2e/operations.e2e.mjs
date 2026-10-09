@@ -2,7 +2,7 @@
 // against the real API.
 import assert from 'node:assert/strict';
 import test, { after } from 'node:test';
-import { signedIn, openView, refusedWrites, closeBrowser, sql, flow } from './helpers.mjs';
+import { signedIn, openView, chooseOption, refusedWrites, closeBrowser, sql, flow } from './helpers.mjs';
 
 after(closeBrowser);
 const ORG = '00000000-0000-0000-0000-0000000000aa';
@@ -80,7 +80,7 @@ test('closing date, approval limit and time zone are saved from Settings', async
   const session = await signedIn();
   const { page, api, problems } = session;
   await flow('controls', session, async () => {
-    await openView(page, 'Settings');
+    await openView(page, 'Company');
     await page.getByRole('tab', { name: 'Closing and controls' }).click();
     await page.getByLabel('Books closed through').fill('2026-06-30');
     await page.getByLabel(/Approval limit/).fill('250,000');
@@ -96,21 +96,21 @@ test('a class is added, an expense posted under it, and the profit and loss spli
   const session = await signedIn();
   const { page, api, problems } = session;
   await flow('classes', session, async () => {
-    await openView(page, 'Settings');
+    await openView(page, 'Company');
     await page.getByRole('tab', { name: 'Classes and locations' }).click();
     await page.locator('input[name="new-class"]').fill('Contracts');
     await page.getByRole('button', { name: 'Add class' }).click();
     await page.getByText('Contracts', { exact: true }).waitFor({ timeout: 10_000 });
 
-    await openView(page, 'Bills and expenses');
+    await openView(page, 'Expenses & suppliers');
     await page.getByRole('tab', { name: 'Expenses' }).click();
     await page.getByRole('button', { name: 'New expense' }).click();
     const dialog = page.getByRole('dialog');
     await dialog.locator('input[name="payeeName"]').fill('Site transporter');
-    await dialog.locator('select[name="paidFromAccountId"]').selectOption({ label: '1000 · Bank' });
+    await chooseOption(dialog, 'Paid from', '1000 · Bank');
     await dialog.locator('select[name="classId"]').selectOption({ label: 'Contracts' });
     await dialog.getByLabel('Line 1 particulars').fill('Haulage to site');
-    await dialog.getByLabel('Line 1 account').selectOption({ label: '6000 · Operating expenses' });
+    await chooseOption(dialog, 'Line 1 account', '6000 · Operating expenses');
     await dialog.getByLabel('Line 1 amount').fill('4,000');
     await dialog.getByLabel('Line 1 VAT percentage').fill('0');
     await dialog.getByRole('button', { name: 'Post expense' }).click();
@@ -149,12 +149,12 @@ test('an order is recorded, completed and invoiced', async () => {
   const session = await signedIn();
   const { page, api, problems } = session;
   await flow('order', session, async () => {
-    await openView(page, 'Sales');
+    await openView(page, 'Sales & customers');
     await page.getByRole('tab', { name: /Orders/ }).click();
     await page.getByRole('button', { name: 'New order' }).click();
     const dialog = page.getByRole('dialog');
-    await dialog.locator('select').first().selectOption({ label: 'Acme' });
-    await dialog.getByLabel('Line 1 stock item').selectOption({ label: 'Cement 50kg' });
+    await chooseOption(dialog, 'Customer', 'Acme');
+    await chooseOption(dialog, 'Line 1 stock item', 'Cement 50kg');
     await dialog.getByLabel('Line 1 quantity').fill('2');
     await dialog.getByRole('button', { name: 'Record order' }).click();
     await dialog.waitFor({ state: 'hidden', timeout: 10_000 });

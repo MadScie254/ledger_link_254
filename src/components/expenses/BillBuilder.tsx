@@ -6,8 +6,10 @@ import { SUPPORTED_CURRENCIES } from '../../utils/currency';
 import { apiRequest, newIdempotencyKey } from '../../utils/apiRequest';
 import { addDaysIso, todayIn } from '../../utils/dates';
 import { centsFromAmountText } from '../../utils/salesOrders';
-import { Amount, figureText } from '../ledger/Amount';
+import { figureText } from '../ledger/Amount';
 import { Dialog, Field } from '../ledger/Dialog';
+import { Combobox } from '../ledger/Combobox';
+import { DocumentReview } from '../ledger/DocumentReview';
 import { buttonClass } from '../ledger/Page';
 import { PostedStamp } from '../ledger/PostedStamp';
 import { attachFile } from '../common/AttachmentsPanel';
@@ -258,6 +260,7 @@ export function BillBuilder({ open, onClose, scanned, mode = 'bill' }: {
       open={open}
       onClose={() => { if (!post.isPending) onClose(); }}
       width="xl"
+      placement="page"
       title={scanned ? 'Check the receipt' : isCredit ? 'New supplier credit' : isExpense ? 'New expense' : 'New bill'}
       note={scanned
         ? 'Read from the photo. Correct anything misread before saving.'
@@ -276,6 +279,7 @@ export function BillBuilder({ open, onClose, scanned, mode = 'bill' }: {
         </>
       }
     >
+      <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_20rem]">
       <div className="relative">
         {posted && <PostedStamp label={isCredit ? 'Credit recorded' : isExpense ? 'Expense posted' : 'Bill posted'} />}
         <form id="bill-builder" onSubmit={submit} className="space-y-5">
@@ -284,10 +288,10 @@ export function BillBuilder({ open, onClose, scanned, mode = 'bill' }: {
               label={isExpense ? 'Paid to' : 'Supplier'}
               hint={scanned?.vendor && !vendorId ? `The receipt names ${scanned.vendor}.${isExpense ? '' : ' Add them as a vendor if they are new.'}` : isExpense ? 'Optional' : undefined}
             >
-              <select required={!isExpense} name="vendorId" value={vendorId} onChange={(e) => { setVendorId(e.target.value); setAgainstBillId(''); }}>
-                <option value="">{isExpense ? 'No vendor record' : 'Choose a vendor'}</option>
-                {vendorList.map((v) => <option key={v.id} value={v.id}>{v.displayName}</option>)}
-              </select>
+              <Combobox required={!isExpense} name="vendorId" value={vendorId}
+                onChange={(next) => { setVendorId(next); setAgainstBillId(''); }}
+                placeholder={isExpense ? 'No vendor record' : 'Choose a vendor'}
+                options={vendorList.map((v) => ({ value: v.id, label: v.displayName }))} />
             </Field>
             {isExpense && !vendorId && (
               <Field label="Name on the receipt" hint="Optional">
@@ -299,10 +303,9 @@ export function BillBuilder({ open, onClose, scanned, mode = 'bill' }: {
             </Field>
             {isExpense ? (
               <Field label="Paid from" hint={moneyAccounts.length === 0 ? 'Mark a bank, cash or M-Pesa account as holding money (Accounting, Edit) first.' : undefined}>
-                <select required name="paidFromAccountId" value={paidFromId || moneyAccounts[0]?.id || ''} onChange={(e) => setPaidFromId(e.target.value)}>
-                  <option value="">Choose an account</option>
-                  {moneyAccounts.map((a) => <option key={a.id} value={a.id}>{a.code} · {a.name}</option>)}
-                </select>
+                <Combobox required name="paidFromAccountId" value={paidFromId || moneyAccounts[0]?.id || ''}
+                  onChange={setPaidFromId} placeholder="Choose an account"
+                  options={moneyAccounts.map((a) => ({ value: a.id, label: `${a.code} · ${a.name}` }))} />
               </Field>
             ) : isCredit ? (
               <Field label="Apply to bill" hint={vendorId ? 'Optional. Leave blank to keep it as credit for later.' : 'Choose the supplier first.'}>
@@ -347,10 +350,8 @@ export function BillBuilder({ open, onClose, scanned, mode = 'bill' }: {
                   <li key={l.key} className="relative grid grid-cols-2 gap-2 border-b border-feint py-3 pr-8 sm:grid-cols-12 sm:gap-3">
                     <label className="col-span-2 block sm:col-span-4">
                       <span className="mb-1 block text-[12.5px] text-graphite-600">Line {i + 1}, stock item</span>
-                      <select aria-label={`Line ${i + 1} stock item`} value={l.itemId} onChange={(e) => chooseItem(l, e.target.value)} className="h-9 w-full border px-2 text-[13.5px]">
-                        <option value="">No stock item</option>
-                        {items.map((it) => <option key={it.id} value={it.id}>{it.name}</option>)}
-                      </select>
+                      <Combobox aria-label={`Line ${i + 1} stock item`} value={l.itemId} onChange={(next) => chooseItem(l, next)}
+                        placeholder="No stock item" options={items.map((it) => ({ value: it.id, label: it.name }))} />
                     </label>
                     <label className="col-span-2 block sm:col-span-8">
                       <span className="mb-1 block text-[12.5px] text-graphite-600">Particulars</span>
@@ -358,10 +359,9 @@ export function BillBuilder({ open, onClose, scanned, mode = 'bill' }: {
                     </label>
                     <label className="col-span-2 block sm:col-span-5">
                       <span className="mb-1 block text-[12.5px] text-graphite-600">Account</span>
-                      <select aria-label={`Line ${i + 1} account`} value={l.accountId} onChange={(e) => setLine(l.key, { accountId: e.target.value })} className="h-9 w-full border px-2 text-[13.5px]">
-                        <option value="">Choose an account</option>
-                        {lineAccounts.map((a) => <option key={a.id} value={a.id}>{a.code} · {a.name}</option>)}
-                      </select>
+                      <Combobox aria-label={`Line ${i + 1} account`} value={l.accountId}
+                        onChange={(next) => setLine(l.key, { accountId: next })} placeholder="Choose an account"
+                        options={lineAccounts.map((a) => ({ value: a.id, label: `${a.code} · ${a.name}` }))} />
                     </label>
                     <label className="block sm:col-span-2">
                       <span className="mb-1 block text-[12.5px] text-graphite-600">Qty</span>
@@ -398,26 +398,18 @@ export function BillBuilder({ open, onClose, scanned, mode = 'bill' }: {
             <button type="button" onClick={() => setLines((prev) => [...prev, emptyLine(Math.max(...prev.map((x) => x.key)) + 1, defaultAccountId)])} className={`${buttonClass.quiet} mt-3`}>
               Add a line
             </button>
-            <div className="ml-auto mt-3 max-w-sm">
-              <div className="flex items-baseline justify-between border-b border-feint py-1.5 text-[13px] text-graphite-600">
-                <span>Subtotal</span>
-                <Amount cents={subtotalCents} currency={currency} size="xs" tone="ink" />
-              </div>
-              <div className="flex items-baseline justify-between border-b border-feint py-1.5 text-[13px] text-graphite-600">
-                <span>Recoverable VAT</span>
-                <Amount cents={shownTaxCents} currency={currency} size="xs" tone="ink" />
-              </div>
-              <div className="ll-total flex items-baseline justify-between py-2">
-                <span className="font-semibold text-ink-900">{isCredit ? 'Total credited' : 'Total owed'}</span>
-                <span className="font-semibold" aria-live="polite"><Amount cents={subtotalCents + shownTaxCents} currency={currency} tone="ink" /></span>
-              </div>
-            </div>
           </div>
 
           <Field label="Notes" hint="Optional">
             <textarea rows={2} maxLength={4000} value={notes} onChange={(e) => setNotes(e.target.value)} className="resize-none" />
           </Field>
         </form>
+      </div>
+      <DocumentReview title={isCredit ? 'Supplier credit' : isExpense ? 'Expense' : 'Bill'} partyLabel="Supplier"
+        party={vendor?.displayName || payeeName} date={billDate}
+        lines={lines.map((line) => ({ description: line.description, amountCents: lineCents(line) }))}
+        subtotalCents={subtotalCents} taxCents={shownTaxCents} totalCents={subtotalCents + shownTaxCents}
+        currency={currency} totalLabel={isCredit ? 'Total credited' : isExpense ? 'Total paid' : 'Total owed'} />
       </div>
     </Dialog>
   );

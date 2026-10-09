@@ -6,8 +6,9 @@ import { X } from 'lucide-react';
 import { useAppStore } from '../../store';
 import { SUPPORTED_CURRENCIES } from '../../utils/currency';
 import { DynamicQuickAddModal } from '../common/DynamicQuickAddModal';
-import { Amount } from '../ledger/Amount';
 import { Field } from '../ledger/Dialog';
+import { Combobox } from '../ledger/Combobox';
+import { DocumentReview } from '../ledger/DocumentReview';
 import { PageHeading, EmptyNote, buttonClass } from '../ledger/Page';
 import { PostedStamp } from '../ledger/PostedStamp';
 
@@ -95,6 +96,10 @@ export function InvoiceBuilder({ onDone }: { onDone: () => void }) {
       setProblem('Enter an amount on at least one line.');
       return;
     }
+    if (!customerId || lines.some((line) => !line.accountId)) {
+      setProblem('Choose a customer and an income account for each line.');
+      return;
+    }
     setIsPosting(true);
     try {
       const res = await fetch('/api/invoices', {
@@ -138,7 +143,7 @@ export function InvoiceBuilder({ onDone }: { onDone: () => void }) {
   };
 
   return (
-    <div className="relative max-w-4xl space-y-5 pb-16">
+    <div className="relative max-w-7xl space-y-5 pb-16">
       {justPosted && <PostedStamp label="Invoice posted" />}
       <div>
         <button type="button" onClick={onDone} className={buttonClass.quiet}>
@@ -160,16 +165,13 @@ export function InvoiceBuilder({ onDone }: { onDone: () => void }) {
           An invoice needs a customer. Add one to continue.
         </EmptyNote>
       ) : (
-        <form onSubmit={post} className="space-y-6">
+        <form onSubmit={post} className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_20rem]">
+          <div className="space-y-6">
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
             <div className="sm:col-span-2">
               <Field label="Customer">
-                <select required value={customerId} onChange={(e) => setCustomerId(e.target.value)}>
-                  <option value="">Choose a customer</option>
-                  {customers.map((c) => (
-                    <option key={c.id} value={c.id}>{c.displayName}</option>
-                  ))}
-                </select>
+                <Combobox required value={customerId} onChange={setCustomerId} placeholder="Choose a customer"
+                  options={customers.map((c) => ({ value: c.id, label: c.displayName }))} />
               </Field>
             </div>
             <Field label="Issued">
@@ -212,12 +214,9 @@ export function InvoiceBuilder({ onDone }: { onDone: () => void }) {
                     </label>
                     <label className="block">
                       <span className="mb-1 block text-[12.5px] text-graphite-600 sm:sr-only">Line {i + 1} income account</span>
-                      <select required value={l.accountId} onChange={(e) => setLine(l.key, { accountId: e.target.value })} className="h-10 w-full border px-2 sm:h-9">
-                        <option value="">Choose an account</option>
-                        {incomeAccounts.map((a) => (
-                          <option key={a.id} value={a.id}>{a.code} · {a.name}</option>
-                        ))}
-                      </select>
+                      <Combobox required value={l.accountId} onChange={(next) => setLine(l.key, { accountId: next })}
+                        placeholder="Choose an account"
+                        options={incomeAccounts.map((a) => ({ value: a.id, label: `${a.code} · ${a.name}` }))} />
                     </label>
                     <label className="block">
                       <span className="mb-1 block text-[12.5px] text-graphite-600 sm:sr-only">Line {i + 1} VAT percentage</span>
@@ -262,36 +261,18 @@ export function InvoiceBuilder({ onDone }: { onDone: () => void }) {
                   </li>
                 ))}
               </ol>
-              <div className="sm:pr-[calc(2rem+0.75rem)]">
-                <div className="flex items-baseline justify-between gap-4 border-b border-feint py-1.5 text-[13px] text-graphite-600">
-                  <span>Subtotal</span>
-                  <Amount cents={subtotalCents} currency={currency} size="xs" tone="ink" />
-                </div>
-                <div className="flex items-baseline justify-between gap-4 border-b border-feint py-1.5 text-[13px] text-graphite-600">
-                  <span>VAT</span>
-                  <Amount cents={displayedTaxCents} currency={currency} size="xs" tone="ink" />
-                </div>
-                <div className="ll-total flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1 py-2">
-                  <span className="font-semibold text-ink-900">
-                    Total
-                    {isForeign && totalCents > 0 && (
-                      <span className="ml-2 font-normal text-graphite-600">
-                        posts as <Amount cents={Math.round(subtotalCents / rateNum) + baseTaxCents} currency={base} size="xs" tone="ink" />
-                      </span>
-                    )}
-                  </span>
-                  <span className="font-semibold" aria-live="polite">
-                    <Amount cents={totalCents} currency={currency} tone="ink" />
-                  </span>
-                </div>
-              </div>
             </div>
             <button type="button" onClick={addLine} className={`${buttonClass.quiet} mt-3`}>
               Add a line
             </button>
           </div>
 
-          <div className="flex flex-col-reverse gap-3 border-t border-feint pt-4 sm:flex-row sm:items-center sm:justify-end">
+          </div>
+          <DocumentReview title="Invoice" partyLabel="Customer" party={customers.find((customer) => customer.id === customerId)?.displayName || ''}
+            date={issueDate} lines={lines.map((line) => ({ description: line.description, amountCents: toCents(line.amount) }))}
+            subtotalCents={subtotalCents} taxCents={displayedTaxCents} totalCents={totalCents} currency={currency} />
+
+          <div className="sticky bottom-0 z-10 -mx-4 flex flex-col-reverse gap-3 border-t border-border bg-surface px-4 py-3 shadow-md sm:flex-row sm:items-center sm:justify-end xl:col-span-2">
             {problem && (
               <p role="alert" className="text-[13.5px] text-ledger-red sm:mr-auto">
                 {problem}

@@ -142,12 +142,27 @@ const FIXTURES: Record<string, unknown> = {
       currencySummaries: [{ currency: 'USD', rate: 0.00773 }, { currency: 'UGX', rate: 28.4 }],
     },
   },
+  '/api/reports/pnl': {
+    income: [{ name: 'Sales Revenue', amountCents: 230_000_000 }],
+    costOfSales: [{ name: 'Cost of goods sold', amountCents: 137_000_000 }],
+    expenses: [
+      { name: 'Payroll', amountCents: 42_000_000 },
+      { name: 'Rent', amountCents: 18_000_000 },
+      { name: 'Utilities', amountCents: 4_650_000 },
+    ],
+  },
+  '/api/reports/pnl-monthly': {
+    months: ['2026-05', '2026-06', '2026-07', '2026-08', '2026-09', '2026-10'],
+    income: { months: [24_000_000, 31_000_000, 46_000_000, 33_000_000, 52_000_000, 44_000_000] },
+    costOfSales: { months: [13_000_000, 18_000_000, 29_000_000, 19_000_000, 33_000_000, 25_000_000] },
+    expenses: { months: [7_000_000, 9_000_000, 11_000_000, 10_000_000, 15_000_000, 12_650_000] },
+  },
   '/api/invoices': {
     invoices: [
-      { id: 'inv-41', invoiceNumber: 'INV-2026-0041', customerId: 'c-1', invoiceNo: 'INV-2026-0041', totalCents: 28_500_000, status: 'OVERDUE', currency: 'KES', issueDate: '2026-03-15', dueDate: '2026-04-14' },
-      { id: 'inv-43', invoiceNumber: 'INV-2026-0043', customerId: 'c-2', invoiceNo: 'INV-2026-0043', totalCents: 14_500_000, status: 'SENT', currency: 'KES', issueDate: '2026-08-20', dueDate: '2026-09-19' },
-      { id: 'inv-44', invoiceNumber: 'INV-2026-0044', customerId: 'c-3', invoiceNo: 'INV-2026-0044', totalCents: 11_000_000, status: 'SENT', currency: 'KES', issueDate: '2026-09-02', dueDate: '2026-10-02' },
-      { id: 'inv-39', invoiceNumber: 'INV-2026-0039', customerId: 'c-2', invoiceNo: 'INV-2026-0039', totalCents: 120_000_000, status: 'PAID', currency: 'KES', issueDate: '2026-03-10', dueDate: '2026-04-09' },
+      { id: 'inv-41', invoiceNumber: 'INV-2026-0041', customerId: 'c-1', invoiceNo: 'INV-2026-0041', totalCents: 28_500_000, amountDueCents: 28_500_000, status: 'OVERDUE', currency: 'KES', issueDate: '2026-03-15', dueDate: '2026-04-14' },
+      { id: 'inv-43', invoiceNumber: 'INV-2026-0043', customerId: 'c-2', invoiceNo: 'INV-2026-0043', totalCents: 14_500_000, amountDueCents: 14_500_000, status: 'SENT', currency: 'KES', issueDate: '2026-08-20', dueDate: '2026-11-19' },
+      { id: 'inv-44', invoiceNumber: 'INV-2026-0044', customerId: 'c-3', invoiceNo: 'INV-2026-0044', totalCents: 11_000_000, amountDueCents: 11_000_000, status: 'SENT', currency: 'KES', issueDate: '2026-09-02', dueDate: '2026-11-02' },
+      { id: 'inv-39', invoiceNumber: 'INV-2026-0039', customerId: 'c-2', invoiceNo: 'INV-2026-0039', totalCents: 120_000_000, amountDueCents: 0, status: 'PAID', currency: 'KES', issueDate: '2026-03-10', dueDate: '2026-04-09', payments: [{ amountCents: 120_000_000, paymentDate: '2026-09-24', reversedAt: null }] },
     ],
   },
   '/api/vendors': {
@@ -328,10 +343,17 @@ const FIXTURES: Record<string, unknown> = {
   },
   '/api/banking/transactions': {
     transactions: [
-      { id: 't-1', date: '2026-09-15', description: 'M-Pesa QJK4XS2L1 from 0712 xxx 234', amountCents: 450_000, direction: 'IN', status: 'UNMATCHED' },
-      { id: 't-2', date: '2026-09-15', description: 'M-Pesa QJK7PL9A2 from Kiambu Contractors, 0722 xxx 918', amountCents: 14_500_000, direction: 'IN', status: 'UNMATCHED' },
-      { id: 't-3', date: '2026-09-14', description: 'KCB transfer, Nairobi Steel Supplies', amountCents: 5_000_000, direction: 'OUT', status: 'UNMATCHED' },
-      { id: 't-4', date: '2026-09-12', description: 'M-Pesa QJH2ZX8M4 from 0733 xxx 101', amountCents: 320_000, direction: 'IN', status: 'MATCHED' },
+      { id: 't-1', date: '2026-09-15', description: 'M-Pesa QJK4XS2L1 from 0712 xxx 234', amountCents: 450_000, direction: 'IN', status: 'UNMATCHED', bankAccountId: 'a-1010' },
+      { id: 't-2', date: '2026-09-15', description: 'M-Pesa QJK7PL9A2 from Kiambu Contractors, 0722 xxx 918', amountCents: 14_500_000, direction: 'IN', status: 'UNMATCHED', bankAccountId: 'a-1010' },
+      { id: 't-3', date: '2026-09-14', description: 'KCB transfer, Nairobi Steel Supplies', amountCents: 5_000_000, direction: 'OUT', status: 'UNMATCHED', bankAccountId: 'a-1000' },
+      { id: 't-4', date: '2026-09-12', description: 'M-Pesa QJH2ZX8M4 from 0733 xxx 101', amountCents: 320_000, direction: 'IN', status: 'MATCHED', bankAccountId: 'a-1010' },
+    ],
+  },
+  '/api/cash-transactions?kind=EXPENSE': {
+    transactions: [
+      { id: 'ex-1', kind: 'EXPENSE', number: 'EXP-2026-0018', date: '2026-10-02', partyName: 'KPLC', moneyAccountName: '1000 Cash at Bank - KCB', reference: 'KPLC-381', totalCents: 4_650_000, status: 'POSTED', createdAt: '2026-10-02T09:00:00Z', lines: [{ description: 'Electricity and water', amountCents: 4_650_000 }] },
+      { id: 'ex-2', kind: 'EXPENSE', number: 'EXP-2026-0017', date: '2026-09-26', partyName: 'Nairobi Supplies', moneyAccountName: '1010 M-Pesa Till', reference: null, totalCents: 1_850_000, status: 'POSTED', createdAt: '2026-09-26T14:00:00Z', lines: [{ description: 'Cleaning materials', amountCents: 1_850_000 }] },
+      { id: 'ex-3', kind: 'EXPENSE', number: 'EXP-2026-0013', date: '2026-09-04', partyName: 'Office Store', moneyAccountName: '1000 Cash at Bank - KCB', reference: null, totalCents: 980_000, status: 'VOID', voidedAt: '2026-09-05T10:00:00Z', voidReason: 'Entered twice', createdAt: '2026-09-04T08:00:00Z', lines: [{ description: 'Stationery', amountCents: 980_000 }] },
     ],
   },
 };
@@ -394,7 +416,7 @@ function installFixtureFetch() {
       return new Response(JSON.stringify(state), { status: 200, headers: { 'Content-Type': 'application/json' } });
     }
     const payslips = /^\/api\/payroll\/runs\/[^/]+\/payslips$/.test(url.pathname) ? PAYSLIPS : undefined;
-    const body = method === 'GET' ? payslips ?? FIXTURES[url.pathname] ?? {} : previewWrite(url.pathname, init?.body);
+    const body = method === 'GET' ? payslips ?? FIXTURES[url.pathname + url.search] ?? FIXTURES[url.pathname] ?? {} : previewWrite(url.pathname, init?.body);
     await new Promise((resolve) => setTimeout(resolve, 120));
     return new Response(JSON.stringify(body), { status: 200, headers: { 'Content-Type': 'application/json' } });
   };

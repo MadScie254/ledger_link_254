@@ -1,10 +1,12 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useRenderTracker } from '../../utils/monitoring';
 import { format } from 'date-fns';
 import { Filter, Search, Download } from 'lucide-react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAppStore } from '../../store';
 import { Amount } from '../ledger/Amount';
+import { DataTable, type DataColumn } from '../ledger/DataTable';
+import { MoneyBar } from '../ledger/MoneyBar';
 import { Mark } from '../ledger/Mark';
 import { PageHeading, IndexTabs, PageNote, SkeletonRows, EmptyNote, buttonClass } from '../ledger/Page';
 import { CashTransactionsPanel } from '../common/CashTransactionsPanel';
@@ -14,6 +16,7 @@ import { ReconcilePanel } from './ReconcilePanel';
 import { useConfirm } from '../../hooks/useConfirm';
 import { downloadCsv } from '../../utils/exportCsv';
 import { Dialog, Field } from '../ledger/Dialog';
+import { BulkActionBar } from '../common/BulkActionBar';
 
 const tabs = ['Bank transactions', 'AI Match Assistant', 'Transfers', 'Rules', 'Reconcile', 'Bank connections'];
 
@@ -36,6 +39,8 @@ export function BankingView() {
   const [filterDirection, setFilterDirection] = useState('ALL');
   const [filterStatus, setFilterStatus] = useState('ALL');
   const [matchingTx, setMatchingTx] = useState<any>(null); // Transaction being matched
+  const [selectedTx, setSelectedTx] = useState<any>(null);
+  const [selectedTxIds, setSelectedTxIds] = useState<string[]>([]);
   const [selectedCandidate, setSelectedCandidate] = useState<any>(null);
   const [matchProblem, setMatchProblem] = useState('');
   const [manualAccountId, setManualAccountId] = useState('');
@@ -46,7 +51,11 @@ export function BankingView() {
   const [isConnecting, setIsConnecting] = useState(false);
   const [connectInstitution, setConnectInstitution] = useState('');
   const [connectEmail, setConnectEmail] = useState('');
-  const { currentOrgId, activeCompany } = useAppStore();
+  const { currentOrgId, activeCompany, createIntent, setCreateIntent } = useAppStore();
+  useEffect(() => {
+    if (createIntent === 'transfer') { setActiveTab('Transfers'); setIsTransferring(true); setCreateIntent(null); }
+    if (createIntent === 'importStatement') { setActiveTab('Bank transactions'); setIsImporting(true); setCreateIntent(null); }
+  }, [createIntent, setCreateIntent]);
   const queryClient = useQueryClient();
   const { confirm, confirmDialog } = useConfirm();
 
@@ -348,7 +357,7 @@ export function BankingView() {
   const handleExportCSV = () => {
     if (!rawTx.length) return;
     const headers = ['Date', 'Description', 'Direction', 'Amount', 'Status'];
-    const rows = rawTx.map((tx: any) => [
+    const rows = (selectedTxIds.length ? rawTx.filter((tx: any) => selectedTxIds.includes(tx.id)) : rawTx).map((tx: any) => [
       format(new Date(tx.date), 'yyyy-MM-dd'),
       tx.description || '',
       tx.direction,
@@ -395,6 +404,13 @@ export function BankingView() {
   const baseCurrency = activeCompany?.baseCurrency || 'KES';
   const totalOut = filteredTx.filter((t: any) => t.direction === 'OUT').reduce((s: number, t: any) => s + (t.amountCents || 0), 0);
   const totalIn = filteredTx.filter((t: any) => t.direction === 'IN').reduce((s: number, t: any) => s + (t.amountCents || 0), 0);
+  const bankColumns: DataColumn<any>[] = [
+    { id: 'date', label: 'Date', value: (tx) => tx.date || '', render: (tx) => format(new Date(tx.date), 'dd/MM/yyyy') },
+    { id: 'description', label: 'Particulars', value: (tx) => tx.description || '', render: (tx) => <span className="text-text">{tx.description}{tx.bankReference && <span className="block text-xs text-text-2">Ref. {tx.bankReference}</span>}</span> },
+    { id: 'out', label: `Out, ${baseCurrency}`, value: (tx) => tx.direction === 'OUT' ? Number(tx.amountCents || 0) : 0, render: (tx) => tx.direction === 'OUT' ? <Amount cents={tx.amountCents} currency={baseCurrency} /> : '–', numeric: true },
+    { id: 'in', label: `In, ${baseCurrency}`, value: (tx) => tx.direction === 'IN' ? Number(tx.amountCents || 0) : 0, render: (tx) => tx.direction === 'IN' ? <Amount cents={tx.amountCents} currency={baseCurrency} /> : '–', numeric: true },
+    { id: 'match', label: 'Match', value: (tx) => tx.status || '', render: (tx) => tx.status === 'MATCHED' ? <Mark kind="tick" label="Matched" draw={justMatched.has(tx.id)} /> : <Mark kind="query" label="Not matched" /> },
+  ];
 
   return (
     <div className="space-y-5">
@@ -434,7 +450,7 @@ export function BankingView() {
       <IndexTabs
         label="Banking"
         active={activeTab}
-        onChange={setActiveTab}
+        onChange={(tab) => { setActiveTab(tab); setSelectedTxIds([]); }}
         tabs={[
           { id: 'Bank transactions', name: 'Statement lines', count: rawTx.length },
           { id: 'AI Match Assistant', name: 'Suggested matches', count: aiMatches.length },
@@ -458,6 +474,11 @@ export function BankingView() {
               </button>
             </PageNote>
           )}
+
+          {!txLoading && <MoneyBar label="Statement money" active={filterDirection} onChange={setFilterDirection} currency={baseCurrency} segments={[
+            { id: 'IN', label: 'Money in', count: rawTx.filter((tx: any) => tx.direction === 'IN').length, cents: rawTx.filter((tx: any) => tx.direction === 'IN').reduce((sum: number, tx: any) => sum + Number(tx.amountCents || 0), 0), color: 'var(--primary)' },
+            { id: 'OUT', label: 'Money out', count: rawTx.filter((tx: any) => tx.direction === 'OUT').length, cents: rawTx.filter((tx: any) => tx.direction === 'OUT').reduce((sum: number, tx: any) => sum + Number(tx.amountCents || 0), 0), color: 'var(--chart-expense)' },
+          ]} />}
 
           <div className="flex flex-wrap items-end gap-3 py-3">
             <label className="flex-1 min-w-[14rem]">
@@ -535,7 +556,7 @@ export function BankingView() {
                         <Amount cents={tx.amountCents} currency={baseCurrency} size="md" />
                       </span>
                     </div>
-                    <p className="mt-1 text-[14px] leading-snug text-ink-900">{tx.description}</p>
+                    <button type="button" onClick={() => setSelectedTx(tx)} className="mt-1 text-left text-[14px] leading-snug text-ink-900">{tx.description}</button>
                     <div className="mt-2 flex items-center justify-between gap-3">
                       {isMatched ? (
                         <Mark kind="tick" label="Matched" draw={justMatched.has(tx.id)} />
@@ -564,6 +585,7 @@ export function BankingView() {
                           </button>
                         ))}
                     </div>
+                    <label className="mt-2 inline-flex min-h-11 items-center gap-2 text-xs text-text-2"><input type="checkbox" aria-label={`Select statement line ${tx.description}`} checked={selectedTxIds.includes(tx.id)} onChange={() => setSelectedTxIds((current) => current.includes(tx.id) ? current.filter((id) => id !== tx.id) : [...current, tx.id])} />Select</label>
                   </li>
                 );
               })}
@@ -571,95 +593,39 @@ export function BankingView() {
                 <span className="font-semibold text-ink-900">Out</span>
                 <Amount cents={totalOut} currency={baseCurrency} tone="ink" className="font-semibold" />
               </li>
-              <li className="flex items-baseline justify-between gap-3 border-b-[3px] border-double border-ledger-red py-2 text-[13.5px]">
+              <li className="flex items-baseline justify-between gap-3 border-b border-border-strong py-2 text-[13.5px]">
                 <span className="font-semibold text-ink-900">In</span>
                 <Amount cents={totalIn} currency={baseCurrency} tone="ink" className="font-semibold" />
               </li>
             </ul>
-            <div className="hidden sm:block relative overflow-x-auto">
-              <table className="w-full text-[13.5px]">
-                <caption className="sr-only">Statement lines, figures in {baseCurrency}</caption>
-                <thead>
-                  <tr>
-                    <th scope="col" className="pr-4 text-left">Date</th>
-                    <th scope="col" className="pr-4 text-left">Particulars</th>
-                    <th scope="col" className="pr-4 text-right">Out, {baseCurrency}</th>
-                    <th scope="col" className="pr-4 text-right">In, {baseCurrency}</th>
-                    <th scope="col" className="pr-4 text-left">Match</th>
-                    <th scope="col" className="text-right"><span className="sr-only">Action</span></th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {filteredTx.map((tx: any) => {
-                    const match = aiMatchesMap.get(tx.id);
-                    const isMatched = tx.status === 'MATCHED';
-                    return (
-                      <tr key={tx.id}>
-                        <td className="pr-4 whitespace-nowrap text-graphite-600">{format(new Date(tx.date), 'dd/MM/yyyy')}</td>
-                        <td className="pr-4">
-                          <span className="block text-ink-900">{tx.description}</span>
-                          {tx.bankReference && <span className="block text-[12px] text-graphite-500">Ref. {tx.bankReference}</span>}
-                        </td>
-                        <td className="pr-4 text-right whitespace-nowrap">
-                          {tx.direction === 'OUT' ? <Amount cents={tx.amountCents} currency={baseCurrency} /> : <span className="text-graphite-400" aria-label="none">–</span>}
-                        </td>
-                        <td className="pr-4 text-right whitespace-nowrap">
-                          {tx.direction === 'IN' ? <Amount cents={tx.amountCents} currency={baseCurrency} /> : <span className="text-graphite-400" aria-label="none">–</span>}
-                        </td>
-                        <td className="pr-4">
-                          {isMatched ? (
-                            <Mark kind="tick" label="Matched" draw={justMatched.has(tx.id)} />
-                          ) : match ? (
-                            <span className="inline-flex flex-wrap items-center gap-x-2 text-[12px] text-ink-900">
-                              <Mark kind="query" />
-                              <span>{match.entityReference || match.suggestedAccountName}</span>
-                              <span className="text-graphite-600">{match.confidence}% likely</span>
-                            </span>
-                          ) : (
-                            <span className="text-[12px] text-graphite-600">No suggestion</span>
-                          )}
-                        </td>
-                        <td className="text-right whitespace-nowrap">
-                          {isMatched ? (
-                            <button type="button" onClick={() => undoMatch(tx)} disabled={unmatchMutation.isPending} className={buttonClass.quiet}>
-                              Undo match
-                            </button>
-                          ) : match && match.confidence >= 80 ? (
-                            <button
-                              type="button"
-                              onClick={() => handleAcceptAIMatch(match)}
-                              disabled={matchMutation.isPending}
-                              className={buttonClass.quiet}
-                            >
-                              Accept match
-                            </button>
-                          ) : (
-                            <button type="button" onClick={() => setMatchingTx(tx)} className={buttonClass.quiet}>
-                              Match…
-                            </button>
-                          )}
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-                <tfoot>
-                  <tr>
-                    <th scope="row" colSpan={2} className="ll-total py-2 pr-4 text-left font-semibold text-ink-900">
-                      Total of {filteredTx.length} lines shown
-                    </th>
-                    <td className="ll-total py-2 pr-4 text-right whitespace-nowrap">
-                      <Amount cents={totalOut} currency={baseCurrency} tone="ink" className="font-semibold" />
-                    </td>
-                    <td className="ll-total py-2 pr-4 text-right whitespace-nowrap">
-                      <Amount cents={totalIn} currency={baseCurrency} tone="ink" className="font-semibold" />
-                    </td>
-                    <td colSpan={2} className="ll-total py-2" />
-                  </tr>
-                </tfoot>
-              </table>
-            </div>
-            </>
+            <div className="hidden sm:block">
+              <DataTable
+                records={filteredTx}
+                columns={bankColumns}
+                caption={`Statement lines, figures in ${baseCurrency}`}
+                onOpen={setSelectedTx}
+                openLabel={(tx) => `Open statement line ${tx.description}`}
+                selectedIds={selectedTxIds}
+                onSelectionChange={setSelectedTxIds}
+                selectAllLabel="Select all statement lines"
+                selectRowLabel={(tx) => `Select statement line ${tx.description}`}
+                rowActions={(tx) => {
+                  const match = aiMatchesMap.get(tx.id);
+                  return tx.status === 'MATCHED' ? (
+                    <button type="button" onClick={() => undoMatch(tx)} disabled={unmatchMutation.isPending} className={buttonClass.quiet}>Undo match</button>
+                  ) : match && match.confidence >= 80 ? (
+                    <button type="button" onClick={() => handleAcceptAIMatch(match)} disabled={matchMutation.isPending} className={buttonClass.quiet}>Accept match</button>
+                  ) : (
+                    <button type="button" onClick={() => setMatchingTx(tx)} className={buttonClass.quiet}>Match…</button>
+                  );
+                }}
+              />
+              <div className="flex items-baseline justify-end gap-6 px-4 py-3 text-[13px]">
+                <span className="font-semibold text-text">Total of {filteredTx.length} lines shown</span>
+                <span>Out <Amount cents={totalOut} currency={baseCurrency} tone="ink" /></span>
+                <span>In <Amount cents={totalIn} currency={baseCurrency} tone="ink" /></span>
+              </div>
+            </div>            </>
           )}
         </div>
       )}
@@ -896,6 +862,29 @@ export function BankingView() {
             <input type="email" value={connectEmail} onChange={(e) => setConnectEmail(e.target.value)} />
           </Field>
         </form>
+      </Dialog>
+
+      <BulkActionBar selectedCount={selectedTxIds.length} totalCount={rawTx.length} entityName="statement lines" onClearSelection={() => setSelectedTxIds([])} onExport={handleExportCSV} />
+
+      <Dialog
+        open={!!selectedTx}
+        onClose={() => setSelectedTx(null)}
+        placement="right"
+        title="Statement line"
+        note={selectedTx?.description}
+        footer={<>
+          {selectedTx?.status === 'MATCHED' ? <button type="button" onClick={() => undoMatch(selectedTx)} className={buttonClass.secondary}>Undo match</button> : <button type="button" onClick={() => { setMatchingTx(selectedTx); setSelectedTx(null); }} className={buttonClass.primary}>Match this line</button>}
+          <button type="button" onClick={() => setSelectedTx(null)} className={buttonClass.secondary}>Close</button>
+        </>}
+      >
+        {selectedTx && <div className="space-y-6">
+          <dl className="grid grid-cols-2 gap-3">
+            <div className="rounded-xl bg-surface-2 p-4"><dt className="text-xs text-text-2">{selectedTx.direction === 'IN' ? 'Money in' : 'Money out'}</dt><dd className="mt-1 font-display text-lg font-bold"><Amount cents={selectedTx.amountCents} currency={baseCurrency} tone="ink" /></dd></div>
+            <div className="rounded-xl bg-surface-2 p-4"><dt className="text-xs text-text-2">Standing</dt><dd className="mt-1 text-sm font-semibold text-text">{selectedTx.status === 'MATCHED' ? 'Matched' : 'Needs review'}</dd></div>
+          </dl>
+          <section><h3 className="mb-3 text-sm font-semibold text-text">Summary</h3><dl className="space-y-2 text-[13px]"><div className="flex justify-between gap-4"><dt className="text-text-2">Date</dt><dd>{format(new Date(selectedTx.date), 'd MMM yyyy')}</dd></div><div className="flex justify-between gap-4"><dt className="text-text-2">Reference</dt><dd>{selectedTx.reference || selectedTx.bankReference || 'Not recorded'}</dd></div><div className="flex justify-between gap-4"><dt className="text-text-2">Account</dt><dd>{statementAccounts.find((account: any) => account.id === selectedTx.bankAccountId)?.name || 'Not recorded'}</dd></div></dl></section>
+          <section aria-label="Activity timeline"><h3 className="mb-3 text-sm font-semibold text-text">Activity</h3><ol className="border-l border-border-strong pl-4 text-[13px]"><li className="relative pb-4 before:absolute before:-left-[21px] before:top-1.5 before:size-2.5 before:rounded-full before:bg-primary"><span className="font-medium text-text">Statement dated</span><span className="block text-xs text-text-2">{format(new Date(selectedTx.date), 'd MMM yyyy')}</span></li>{selectedTx.createdAt && <li className="relative pb-4 before:absolute before:-left-[21px] before:top-1.5 before:size-2.5 before:rounded-full before:bg-primary"><span className="font-medium text-text">Imported</span><span className="block text-xs text-text-2">{format(new Date(selectedTx.createdAt), 'd MMM yyyy')}</span></li>}{selectedTx.matchedJournalEntryId && <li className="relative before:absolute before:-left-[21px] before:top-1.5 before:size-2.5 before:rounded-full before:bg-positive"><span className="font-medium text-text">Matched to a journal entry</span><span className="block text-xs text-text-2">{selectedTx.matchedJournalEntryId}</span></li>}</ol></section>
+        </div>}
       </Dialog>
 
       <Dialog

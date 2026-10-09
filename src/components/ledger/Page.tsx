@@ -1,22 +1,21 @@
 import React, { useEffect, useRef } from 'react';
 
-/**
- * The shared furniture of a page in the book: its heading ruled heavy below,
- * printed index tabs, and one vocabulary of buttons. Every view uses these so
- * a heading, a tab or a primary action never looks different from one page to
- * the next. One filled primary per page.
- */
+/** Shared page headings, tabs, and actions. */
 
 export const buttonClass = {
   /** The one filled action on a page. */
   primary:
-    'inline-flex items-center justify-center gap-1.5 h-9 px-3.5 rounded-sm bg-oxblood-fill text-white text-[13.5px] font-semibold hover:bg-[var(--oxblood-fill-hover)] disabled:opacity-50 disabled:cursor-not-allowed',
+    'inline-flex items-center justify-center gap-1.5 h-9 px-4 rounded-md bg-primary text-on-primary text-[14px] font-semibold shadow-sm transition-colors duration-[120ms] ease-[var(--motion-ease)] hover:bg-primary-hover disabled:opacity-50 disabled:cursor-not-allowed',
   /** Everything else that is still a button. */
   secondary:
-    'inline-flex items-center justify-center gap-1.5 h-9 px-3 rounded-sm border border-field bg-paper-100 text-ink-900 text-[13.5px] hover:border-ink-900 disabled:opacity-50 disabled:cursor-not-allowed',
+    'inline-flex items-center justify-center gap-1.5 h-9 px-4 rounded-md border border-border-strong bg-surface text-text text-[14px] font-medium shadow-sm transition-colors duration-[120ms] ease-[var(--motion-ease)] hover:bg-hover disabled:opacity-50 disabled:cursor-not-allowed',
   /** A text action inside a row or a sentence. */
   quiet:
-    'inline-flex items-center gap-1 text-[13px] text-oxblood underline underline-offset-[3px] decoration-[color-mix(in_srgb,currentColor_40%,transparent)] hover:decoration-current disabled:opacity-50 disabled:no-underline',
+    'inline-flex items-center justify-center gap-1 min-h-9 px-2 rounded-md text-[14px] font-medium text-primary-ink transition-colors duration-[120ms] ease-[var(--motion-ease)] hover:bg-primary-soft disabled:opacity-50',
+  ghost:
+    'inline-flex items-center justify-center gap-1.5 h-9 px-3 rounded-md text-[14px] font-medium text-text-2 transition-colors duration-[120ms] ease-[var(--motion-ease)] hover:bg-hover hover:text-text disabled:opacity-50',
+  danger:
+    'inline-flex items-center justify-center gap-1.5 h-9 px-4 rounded-md bg-negative text-white text-[14px] font-semibold transition-colors duration-[120ms] ease-[var(--motion-ease)] hover:opacity-90 disabled:opacity-50',
 } as const;
 
 export function PageHeading({
@@ -31,10 +30,10 @@ export function PageHeading({
   tourId?: string;
 }) {
   return (
-    <header data-tour={tourId} className="flex flex-col gap-4 border-b-2 border-ink-900 pb-3 sm:flex-row sm:items-end sm:justify-between">
+    <header data-tour={tourId} className="flex flex-col gap-4 pb-2 sm:flex-row sm:items-center sm:justify-between">
       <div className="min-w-0">
-        <h1 className="ll-cover text-[28px] sm:text-[34px] leading-[0.98] text-ink-900">{title}</h1>
-        {note && <p className="mt-2 text-[13px] text-graphite-600">{note}</p>}
+        <h1 className="ll-heading text-[22px] leading-7 text-text">{title}</h1>
+        {note && <p className="mt-2 text-[14px] leading-5 text-text-2">{note}</p>}
       </div>
       {actions && <div className="flex flex-wrap items-center gap-2 shrink-0">{actions}</div>}
     </header>
@@ -62,7 +61,7 @@ export function IndexTabs<T extends string>({
     <div
       role="tablist"
       aria-label={label}
-      className="flex snap-x scroll-px-4 gap-6 overflow-x-auto border-b border-feint-strong pr-4 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+      className="flex snap-x scroll-px-4 gap-6 overflow-x-auto border-b border-border pr-4 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
     >
       {tabs.map((tab) => {
         const selected = tab.id === active;
@@ -74,8 +73,8 @@ export function IndexTabs<T extends string>({
             ref={selected ? selectedTabRef : undefined}
             aria-selected={selected}
             onClick={() => onChange(tab.id)}
-            className={`-mb-px shrink-0 snap-start border-b-2 pb-2 pt-3 text-[14px] ${
-              selected ? 'border-oxblood font-semibold text-ink-900' : 'border-transparent text-graphite-600 hover:text-ink-900'
+            className={`-mb-px shrink-0 snap-start border-b-2 px-1 pb-2 pt-3 text-[14px] transition-colors duration-150 ${
+              selected ? 'border-primary font-semibold text-primary-ink' : 'border-transparent text-text-2 hover:text-text'
             }`}
           >
             {tab.name}
@@ -89,7 +88,7 @@ export function IndexTabs<T extends string>({
 
 /** A one-line note about the state of a list, printed rather than boxed. */
 export function PageNote({ children }: { children: React.ReactNode }) {
-  return <p className="flex flex-wrap items-center gap-x-3 gap-y-1 py-2.5 text-[13px] text-graphite-600 border-b border-feint">{children}</p>;
+  return <p className="flex flex-wrap items-center gap-x-3 gap-y-1 py-2.5 text-[13px] text-text-2">{children}</p>;
 }
 
 /** Ruled placeholder rows that hold the shape of the table about to load. */

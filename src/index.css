@@ -1,35 +1,48 @@
+@import "@fontsource-variable/inter";
+@import "@fontsource-variable/plus-jakarta-sans";
 @import "tailwindcss";
 
-/*
- * The Counter Book.
- *
- * The app is the hardcover counter book every Kenyan duka already keeps:
- * bright paper with feint blue ruling, a stationery-red margin, figures in
- * ballpoint blue, an oxblood bookcloth spine. Dark mode is the carbon sheet.
- *
- * Palette law. Nothing borrows these roles:
- *   ink-blue     entered figures only
- *   red          totals rules, losses, errors
- *   green        auditor's tick: reconciled, paid, verified
- *   pending      the yellow duplicate sheet: waiting on someone
- *   oxblood      the binding: navigation, the primary action, focus
- *
- * Existing class names (ink-900, paper-*, slate-*, focus-blue-*, rust-*,
- * ledger-green-*, brass-*, amber-*) are remapped onto these roles below, so
- * every screen adopts the book without a rewrite and follows dark mode.
- */
+/* Shared workspace tokens. Legacy utility names below remain aliases while views migrate. */
 
 @theme inline {
-  --font-sans: "Archivo", ui-sans-serif, system-ui, "Segoe UI", Roboto, sans-serif;
-  --font-serif: "Archivo", ui-sans-serif, system-ui, "Segoe UI", Roboto, sans-serif;
-  --font-mono: "Archivo", ui-sans-serif, system-ui, "Segoe UI", Roboto, sans-serif;
-  /* The one new voice: a serif for the single heading each page leads with
-     (PageHeading's <h1>, the Dashboard date, the cover screens). Everything
-     else, printed caps, body, tabular figures, stays Archivo's variable
-     axes, which were already doing that job well. */
-  --font-display: "IBM Plex Serif", Georgia, "Times New Roman", serif;
+  --font-sans: "Inter Variable", Inter, ui-sans-serif, system-ui, sans-serif;
+  --font-serif: "Plus Jakarta Sans Variable", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: ui-monospace, Consolas, monospace;
+  --font-display: "Plus Jakarta Sans Variable", ui-sans-serif, system-ui, sans-serif;
 
-  /* World tokens */
+  --color-canvas: var(--canvas);
+  --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
+  --color-hover: var(--hover);
+  --color-border: var(--border);
+  --color-border-strong: var(--border-strong);
+  --color-text: var(--text);
+  --color-text-2: var(--text-2);
+  --color-text-3: var(--text-3);
+  --color-primary: var(--primary);
+  --color-primary-hover: var(--primary-hover);
+  --color-primary-soft: var(--primary-soft);
+  --color-primary-ink: var(--primary-ink);
+  --color-on-primary: var(--on-primary);
+  --color-positive: var(--positive);
+  --color-positive-soft: var(--positive-soft);
+  --color-warning: var(--warning);
+  --color-warning-soft: var(--warning-soft);
+  --color-negative: var(--negative);
+  --color-negative-soft: var(--negative-soft);
+  --color-info: var(--info);
+  --color-info-soft: var(--info-soft);
+  --color-neutral-soft: var(--neutral-soft);
+  --color-chart-income: var(--chart-income);
+  --color-chart-expense: var(--chart-expense);
+  --color-chart-category-1: var(--chart-category-1);
+  --color-chart-category-2: var(--chart-category-2);
+  --color-chart-category-3: var(--chart-category-3);
+  --color-chart-category-4: var(--chart-category-4);
+  --color-chart-category-5: var(--chart-category-5);
+  --color-chart-category-6: var(--chart-category-6);
+
+  /* Existing utility names map to the semantic roles. */
   --color-paper-50: var(--paper-ground);
   --color-paper-100: var(--paper-sheet);
   --color-paper-200: var(--paper-tab);
@@ -53,7 +66,7 @@
   --color-sidebar-ink: var(--spine-ink);
   --color-sidebar-muted: var(--spine-muted);
 
-  /* Graphite: every grey in the app is pencil on paper */
+  /* Neutral aliases */
   --color-slate-50: var(--paper-tab);
   --color-slate-100: var(--paper-tab);
   --color-slate-200: var(--feint);
@@ -65,7 +78,7 @@
   --color-slate-800: var(--graphite-700);
   --color-slate-900: var(--ink);
 
-  /* The binding: action, selection, focus */
+  /* Action aliases */
   --color-focus-blue-50: var(--oxblood-tint);
   --color-focus-blue-100: var(--oxblood-tint);
   --color-focus-blue-300: var(--oxblood);
@@ -75,14 +88,14 @@
   --color-focus-blue-800: var(--oxblood);
   --color-focus-blue-900: var(--oxblood-tint);
 
-  /* Stationery red */
+  /* Negative aliases */
   --color-rust-50: var(--red-tint);
   --color-rust-100: var(--red-tint);
   --color-rust-200: var(--red-tint);
   --color-rust-700: var(--red);
   --color-rust-800: var(--red);
 
-  /* Auditor's green */
+  /* Positive aliases */
   --color-ledger-green-50: var(--green-tint);
   --color-ledger-green-100: var(--green-tint);
   --color-ledger-green-200: var(--green-tint);
@@ -92,7 +105,7 @@
   --color-ledger-green-800: var(--green);
   --color-ledger-green-900: var(--green);
 
-  /* The yellow duplicate sheet: pending */
+  /* Warning aliases */
   --color-brass-400: var(--pending-sheet);
   --color-brass-500: var(--pending-sheet);
   --color-brass-600: var(--pending-ink);
@@ -107,26 +120,25 @@
   --color-amber-900: var(--pending-ink);
   --color-amber-950: var(--pending-tint);
 
-  /* Square rules; controls get the slightest round of a cut card */
-  --radius-xs: 2px;
-  --radius-sm: 3px;
-  --radius: 3px;
-  --radius-md: 3px;
-  --radius-lg: 3px;
-  --radius-xl: 3px;
-  --radius-2xl: 3px;
-  --radius-3xl: 3px;
+  /* Shape */
+  --radius-xs: 4px;
+  --radius-sm: 8px;
+  --radius: 8px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+  --radius-xl: 12px;
+  --radius-2xl: 16px;
+  --radius-3xl: 16px;
 
-  /* Paper does not cast shadows on the desk. Only a sheet lifted over the
-     page does: menus, dialogs and the command palette. */
-  --shadow-2xs: 0 0 #0000;
-  --shadow-xs: 0 0 #0000;
-  --shadow-sm: 0 0 #0000;
-  --shadow: 0 0 #0000;
-  --shadow-md: 0 0 #0000;
-  --shadow-lg: 0 10px 28px -12px rgb(12 16 24 / 0.28), 0 2px 6px rgb(12 16 24 / 0.08);
-  --shadow-xl: 0 18px 40px -16px rgb(12 16 24 / 0.32), 0 3px 8px rgb(12 16 24 / 0.08);
-  --shadow-2xl: 0 24px 56px -20px rgb(12 16 24 / 0.36), 0 4px 10px rgb(12 16 24 / 0.10);
+  /* Elevation */
+  --shadow-2xs: var(--elevation-sm);
+  --shadow-xs: var(--elevation-sm);
+  --shadow-sm: var(--elevation-sm);
+  --shadow: var(--elevation-sm);
+  --shadow-md: var(--elevation-md);
+  --shadow-lg: var(--elevation-lg);
+  --shadow-xl: var(--elevation-lg);
+  --shadow-2xl: var(--elevation-lg);
 
   /* No frosted glass */
   --blur-xs: 0px;
@@ -136,188 +148,146 @@
 }
 
 @layer base {
+  /* Raw palette, semantic roles, then the legacy utility aliases above. */
   :root {
     color-scheme: light;
+    --raw-canvas: #F3F5F8;
+    --raw-surface: #FFFFFF;
+    --raw-surface-2: #F8FAFC;
+    --raw-hover: #F1F4F8;
+    --raw-border: #E2E7EE;
+    --raw-border-strong: #C8D1DC;
+    --raw-text: #0F1A2A;
+    --raw-text-2: #465467;
+    --raw-text-3: #69778A;
+    --raw-primary: #0E7A5B;
+    --raw-primary-hover: #0A6449;
+    --raw-primary-soft: #E4F2EC;
+    --raw-primary-ink: #0A4E3A;
+    --raw-on-primary: #FFFFFF;
+    --raw-positive: #12804A;
+    --raw-positive-soft: #E5F5EB;
+    --raw-warning: #B25E0A;
+    --raw-warning-soft: #FDF0DF;
+    --raw-negative: #C1362C;
+    --raw-negative-soft: #FCE9E7;
+    --raw-info: #2457C5;
+    --raw-info-soft: #E8EFFC;
+    --raw-neutral-soft: #EEF1F5;
+    --raw-chart-expense: #A9BBD1;
 
-    --paper-ground: #FBFCFD;
-    --paper-sheet: #FFFFFF;
-    --paper-tab: #EEF2F7;
-    --feint: #D5E0EE;
-    --feint-strong: #A9BEDA;
+    --canvas: var(--raw-canvas);
+    --surface: var(--raw-surface);
+    --surface-2: var(--raw-surface-2);
+    --hover: var(--raw-hover);
+    --border: var(--raw-border);
+    --border-strong: var(--raw-border-strong);
+    --text: var(--raw-text);
+    --text-2: var(--raw-text-2);
+    --text-3: var(--raw-text-3);
+    --primary: var(--raw-primary);
+    --primary-hover: var(--raw-primary-hover);
+    --primary-soft: var(--raw-primary-soft);
+    --primary-ink: var(--raw-primary-ink);
+    --on-primary: var(--raw-on-primary);
+    --positive: var(--raw-positive);
+    --positive-soft: var(--raw-positive-soft);
+    --warning: var(--raw-warning);
+    --warning-soft: var(--raw-warning-soft);
+    --negative: var(--raw-negative);
+    --negative-soft: var(--raw-negative-soft);
+    --info: var(--raw-info);
+    --info-soft: var(--raw-info-soft);
+    --neutral-soft: var(--raw-neutral-soft);
+    --chart-income: var(--primary);
+    --chart-expense: var(--raw-chart-expense);
+    --chart-category-1: var(--primary);
+    --chart-category-2: #6E8DB3;
+    --chart-category-3: #E0A13A;
+    --chart-category-4: #8E6CC0;
+    --chart-category-5: #3FA7B5;
+    --chart-category-6: #B4BECB;
+    --elevation-sm: 0 1px 2px rgba(16,24,40,.06), 0 1px 1px rgba(16,24,40,.03);
+    --elevation-md: 0 6px 16px rgba(16,24,40,.10), 0 1px 3px rgba(16,24,40,.06);
+    --elevation-lg: 0 16px 40px rgba(16,24,40,.16), 0 2px 6px rgba(16,24,40,.06);
+    --motion-hover: 120ms;
+    --motion-menu: 160ms;
+    --motion-drawer: 220ms;
+    --motion-ease: cubic-bezier(.2,.8,.2,1);
 
-    --ink: #1A1D24;
-    --graphite-700: #343A46;
-    --graphite-600: #4B5361;
-    --graphite-500: #5F6776;
-    --graphite-400: #8C93A0;
-
-    --ink-blue: #1C3F94;
-    --red: #B3202F;
-    --red-tint: #FBECEC;
-    --green: #1E6B45;
-    --green-tint: #E7F2EC;
-    --pending-ink: #7A5A00;
-    --pending-sheet: #F4DB7A;
-    --pending-tint: #FBF3D6;
-
-    --oxblood: #5A1A1F;
-    --oxblood-fill: #5A1A1F;
-    --oxblood-fill-hover: #45121A;
-    --oxblood-tint: #F6ECEC;
-    --red-fill: #B3202F;
-    --green-fill: #1E6B45;
-
-    --field: #7F899B;
-
-    --spine: #5A1A1F;
-    --spine-raised: #6B2228;
-    --spine-ink: #F6EDEA;
-    --spine-muted: #D9B8B4;
-    --spine-rule: rgb(246 237 234 / 0.14);
-
-    --lift: 0 18px 40px -16px rgb(12 16 24 / 0.32), 0 3px 8px rgb(12 16 24 / 0.08);
+    --paper-ground: var(--canvas);
+    --paper-sheet: var(--surface);
+    --paper-tab: var(--surface-2);
+    --feint: var(--border);
+    --feint-strong: var(--border-strong);
+    --ink: var(--text);
+    --graphite-700: var(--text-2);
+    --graphite-600: var(--text-2);
+    --graphite-500: var(--text-3);
+    --graphite-400: var(--text-3);
+    --ink-blue: var(--text);
+    --red: var(--negative);
+    --red-tint: var(--negative-soft);
+    --red-fill: var(--negative);
+    --green: var(--positive);
+    --green-tint: var(--positive-soft);
+    --green-fill: var(--positive);
+    --pending-ink: var(--warning);
+    --pending-sheet: var(--warning-soft);
+    --pending-tint: var(--warning-soft);
+    --oxblood: var(--primary);
+    --oxblood-fill: var(--primary);
+    --oxblood-fill-hover: var(--primary-hover);
+    --oxblood-tint: var(--primary-soft);
+    --field: var(--border-strong);
+    --spine: var(--surface);
+    --spine-raised: var(--hover);
+    --spine-ink: var(--text);
+    --spine-muted: var(--text-2);
+    --spine-rule: var(--border);
+    --lift: var(--elevation-lg);
   }
 
-  /* The carbon sheet */
   .dark {
     color-scheme: dark;
-
-    --paper-ground: #0F131B;
-    --paper-sheet: #151A24;
-    --paper-tab: #1C2230;
-    --feint: #253043;
-    --feint-strong: #34435C;
-
-    --ink: #E6E9EF;
-    --graphite-700: #CDD2DB;
-    --graphite-600: #B3BAC6;
-    --graphite-500: #9AA2B0;
-    --graphite-400: #6E7686;
-
-    --ink-blue: #A9BEFF;
-    --red: #FF8C8F;
-    --red-tint: #2E1719;
-    --green: #6FCF9B;
-    --green-tint: #15271E;
-    --pending-ink: #F2D16B;
-    --pending-sheet: #6B5A1E;
-    --pending-tint: #2A2412;
-
-    --oxblood: #E9A7AB;
-    --oxblood-fill: #8E2F37;
-    --oxblood-fill-hover: #A23842;
-    --oxblood-tint: #2A1A1D;
-    --red-fill: #A3303B;
-    --green-fill: #1F6B47;
-
-    --field: #5E6A80;
-
-    --spine: #2B1014;
-    --spine-raised: #3A161B;
-    --spine-ink: #F3E6E4;
-    --spine-muted: #C9A3A1;
-    --spine-rule: rgb(243 230 228 / 0.12);
-
-    --lift: 0 18px 40px -16px rgb(0 0 0 / 0.6), 0 3px 8px rgb(0 0 0 / 0.3);
+    --raw-canvas: #0A101B;
+    --raw-surface: #111A28;
+    --raw-surface-2: #152033;
+    --raw-hover: #1A263B;
+    --raw-border: #233149;
+    --raw-border-strong: #33435E;
+    --raw-text: #E7ECF3;
+    --raw-text-2: #A9B4C4;
+    --raw-text-3: #8290A4;
+    --raw-primary: #3CC296;
+    --raw-primary-hover: #5CD2AA;
+    --raw-primary-soft: rgba(60,194,150,.15);
+    --raw-primary-ink: #A3E6CE;
+    --raw-on-primary: #08130F;
+    --raw-positive: #4CC385;
+    --raw-positive-soft: rgba(76,195,133,.15);
+    --raw-warning: #EAA250;
+    --raw-warning-soft: rgba(234,162,80,.15);
+    --raw-negative: #F27D73;
+    --raw-negative-soft: rgba(242,125,115,.15);
+    --raw-info: #86AAF3;
+    --raw-info-soft: rgba(134,170,243,.15);
+    --raw-neutral-soft: #1C2840;
+    --raw-chart-expense: #4E6382;
   }
 
-  /*
-   * A company's own accent, in place of the default oxblood: the primary
-   * button, the sidebar spine, focus rings, the tour's spotlight border.
-   * Every other token (entered-figure blue, loss/error red, the tick green)
-   * is untouched here and stays identical on every accent, on purpose.
-   */
-  :root[data-accent="forest"] {
-    --oxblood: #1F4B3A;
-    --oxblood-fill: #1F4B3A;
-    --oxblood-fill-hover: #163627;
-    --oxblood-tint: #EAF1ED;
-    --spine: #1F4B3A;
-    --spine-raised: #2A5C48;
-    --spine-ink: #EAF3EE;
-    --spine-muted: #B9D4C6;
-    --spine-rule: rgb(234 243 238 / 0.14);
-  }
-  .dark[data-accent="forest"] {
-    --oxblood: #8FC9A9;
-    --oxblood-fill: #2E6B4E;
-    --oxblood-fill-hover: #3C7D5E;
-    --oxblood-tint: #16241D;
-    --spine: #12241C;
-    --spine-raised: #1C3227;
-    --spine-ink: #E7F2EC;
-    --spine-muted: #A9C9BA;
-    --spine-rule: rgb(231 242 236 / 0.12);
-  }
-
-  :root[data-accent="navy"] {
-    --oxblood: #1E2A52;
-    --oxblood-fill: #1E2A52;
-    --oxblood-fill-hover: #141C3A;
-    --oxblood-tint: #EAEDF6;
-    --spine: #1E2A52;
-    --spine-raised: #2A3A6B;
-    --spine-ink: #ECEFF8;
-    --spine-muted: #B7C0DD;
-    --spine-rule: rgb(236 239 248 / 0.14);
-  }
-  .dark[data-accent="navy"] {
-    --oxblood: #AFC0EA;
-    --oxblood-fill: #33427A;
-    --oxblood-fill-hover: #425290;
-    --oxblood-tint: #181D2E;
-    --spine: #12172A;
-    --spine-raised: #1E2540;
-    --spine-ink: #E9EDF8;
-    --spine-muted: #A7B3D6;
-    --spine-rule: rgb(233 237 248 / 0.12);
-  }
-
-  :root[data-accent="plum"] {
-    --oxblood: #4A1F4E;
-    --oxblood-fill: #4A1F4E;
-    --oxblood-fill-hover: #37163B;
-    --oxblood-tint: #F3ECF4;
-    --spine: #4A1F4E;
-    --spine-raised: #5C2C61;
-    --spine-ink: #F5EDF6;
-    --spine-muted: #D6B9D9;
-    --spine-rule: rgb(245 237 246 / 0.14);
-  }
-  .dark[data-accent="plum"] {
-    --oxblood: #DCAEDF;
-    --oxblood-fill: #6B3870;
-    --oxblood-fill-hover: #7D4784;
-    --oxblood-tint: #251A27;
-    --spine: #241226;
-    --spine-raised: #341D38;
-    --spine-ink: #F2E6F4;
-    --spine-muted: #C9A6CC;
-    --spine-rule: rgb(242 230 244 / 0.12);
-  }
-
-  :root[data-accent="slate"] {
-    --oxblood: #2B3542;
-    --oxblood-fill: #2B3542;
-    --oxblood-fill-hover: #1D242D;
-    --oxblood-tint: #EDEFF2;
-    --spine: #2B3542;
-    --spine-raised: #3A4756;
-    --spine-ink: #EEF1F4;
-    --spine-muted: #B9C2CC;
-    --spine-rule: rgb(238 241 244 / 0.14);
-  }
-  .dark[data-accent="slate"] {
-    --oxblood: #B7C2CE;
-    --oxblood-fill: #41505F;
-    --oxblood-fill-hover: #516272;
-    --oxblood-tint: #1A1F26;
-    --spine: #161B22;
-    --spine-raised: #232B34;
-    --spine-ink: #ECEFF3;
-    --spine-muted: #A7B2BE;
-    --spine-rule: rgb(236 239 243 / 0.12);
-  }
+  :root[data-accent="forest"] { --raw-primary: #25735D; --raw-primary-hover: #1C5D4B; --raw-primary-soft: #E5F2ED; --raw-primary-ink: #154F3F; }
+  :root[data-accent="navy"] { --raw-primary: #2457C5; --raw-primary-hover: #1C459E; --raw-primary-soft: #E8EFFC; --raw-primary-ink: #193D8A; }
+  :root[data-accent="plum"] { --raw-primary: #7A3A86; --raw-primary-hover: #622E6C; --raw-primary-soft: #F2E8F4; --raw-primary-ink: #592663; }
+  :root[data-accent="slate"] { --raw-primary: #465467; --raw-primary-hover: #354256; --raw-primary-soft: #EEF1F5; --raw-primary-ink: #293548; }
+  .dark[data-accent="forest"] { --raw-primary: #60CAB3; --raw-primary-hover: #82D8C6; --raw-primary-soft: rgba(96,202,179,.15); --raw-primary-ink: #ABEADC; }
+  .dark[data-accent="navy"] { --raw-primary: #86AAF3; --raw-primary-hover: #A4BFF6; --raw-primary-soft: rgba(134,170,243,.15); --raw-primary-ink: #BDD0F8; }
+  .dark[data-accent="plum"] { --raw-primary: #C98AD4; --raw-primary-hover: #D9A7E2; --raw-primary-soft: rgba(201,138,212,.15); --raw-primary-ink: #E5BDEA; }
+  .dark[data-accent="slate"] { --raw-primary: #A9B4C4; --raw-primary-hover: #C8D1DC; --raw-primary-soft: #1C2840; --raw-primary-ink: #E7ECF3; }
+  :root[data-edition="law"] { --raw-primary: #3B3FB6; --raw-primary-hover: #30349A; --raw-primary-soft: #EAEAFE; --raw-primary-ink: #2C2F89; }
+  :root[data-edition="church"] { --raw-primary: #7A3A86; --raw-primary-hover: #622E6C; --raw-primary-soft: #F2E8F4; --raw-primary-ink: #592663; }
+  .dark[data-edition="law"] { --raw-primary: #8F93F2; --raw-primary-hover: #AAADF7; --raw-primary-soft: rgba(143,147,242,.15); --raw-primary-ink: #C5C7FA; }
+  .dark[data-edition="church"] { --raw-primary: #C98AD4; --raw-primary-hover: #D9A7E2; --raw-primary-soft: rgba(201,138,212,.15); --raw-primary-ink: #E5BDEA; }
 
   html {
     min-width: 320px;
@@ -335,7 +305,7 @@
     font-feature-settings: "tnum" 1, "lnum" 1;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
-    caret-color: var(--ink-blue);
+    caret-color: var(--primary);
   }
 
   button, input, select, textarea {
@@ -343,19 +313,23 @@
     font-feature-settings: inherit;
   }
 
+  button, a {
+    transition: background-color var(--motion-hover) var(--motion-ease), color var(--motion-hover) var(--motion-ease), border-color var(--motion-hover) var(--motion-ease);
+    text-decoration-line: none;
+  }
+
   ::selection {
-    background: color-mix(in srgb, var(--ink-blue) 20%, transparent);
+    background: var(--primary-soft);
     color: inherit;
   }
 
   :focus-visible {
-    outline: 2px solid var(--oxblood);
+    outline: 2px solid var(--primary);
     outline-offset: 2px;
   }
 
   a {
-    text-underline-offset: 3px;
-    text-decoration-thickness: 1px;
+    text-decoration: none;
   }
 
   kbd {
@@ -373,72 +347,53 @@
 }
 
 @layer utilities {
-  /* Printed stationery: the condensed capitals a counter book is ruled with. */
+  /* Type */
   .font-serif {
-    font-stretch: 78%;
-    letter-spacing: -0.005em;
+    font-family: var(--font-display);
   }
 
   .ll-printed {
     font-family: var(--font-sans);
-    font-stretch: 72%;
-    font-weight: 650;
-    letter-spacing: 0.06em;
+    font-weight: 600;
+    letter-spacing: 0.02em;
     text-transform: uppercase;
   }
 
   .ll-heading {
-    font-family: var(--font-sans);
-    font-stretch: 78%;
-    font-weight: 650;
-    letter-spacing: -0.01em;
+    font-family: var(--font-display);
+    font-weight: 700;
+    letter-spacing: -0.02em;
   }
 
-  /* The cover of the book: one serif heading per screen, nowhere else.
-     PageHeading's <h1>, the Dashboard's date, the two lock-screen covers,
-     and the landing page's headings. Every smaller heading stays .ll-heading. */
+  /* Display heading */
   .ll-cover {
     font-family: var(--font-display);
-    font-weight: 500;
-    letter-spacing: -0.005em;
+    font-weight: 800;
+    letter-spacing: -0.025em;
   }
 
-  /* A figure written into the book. Colour comes from its tone class, never
-     from here: a utility declared after Tailwind's own would override
-     text-ledger-red on a loss and text-ink-900 on a printed total. */
+  /* Figures inherit their colour from tone classes. */
   .ll-figure {
     font-family: var(--font-sans);
-    font-stretch: 100%;
+    text-align: right;
     font-variant-numeric: tabular-nums lining-nums;
   }
 
   .tabular-currency {
     font-family: var(--font-sans);
     font-variant-numeric: tabular-nums lining-nums;
-    font-stretch: 100%;
+    text-align: right;
   }
 
-  /* Legacy names kept so nothing breaks; each now speaks the book.
-     `.page-kicker` is deliberately gone: an eyebrow above a heading is not
-     part of this world, and removing the class keeps any view from reviving it. */
-  /* Stock, not glass: a barely-there fibre grain on the page background only,
-     never on a card, a dialog or anywhere text sits directly on it, so it
-     never costs legibility. One flat colour plus one tiled image on the same
-     box, so there is no overlay element and nothing to stack above it. Shared
-     by .app-shell below and, in markup, by the two screens that render
-     outside it (the lock screen, the landing page). */
+  /* Legacy class names keep existing screens styled during migration. */
   .ll-grain-bg {
-    background-color: var(--paper-ground);
-    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix type='matrix' values='0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0.035 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
-    background-repeat: repeat;
+    background-color: var(--canvas);
   }
 
   .app-shell {
     position: relative;
     isolation: isolate;
-    background-color: var(--paper-ground);
-    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix type='matrix' values='0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0.035 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
-    background-repeat: repeat;
+    background-color: var(--canvas);
   }
 
   .app-page-container {
@@ -455,34 +410,30 @@
   .dashboard-widget {
     background: var(--paper-sheet);
     border: 1px solid var(--feint);
-    border-radius: 0;
+    border-radius: 12px;
+    box-shadow: var(--elevation-sm);
   }
 
   .ledger-divider {
     border-bottom: 1px solid var(--feint-strong);
   }
 
-  /* The total: a single rule above, a double rule below, in stationery red. */
+  /* Totals use a simple divider on screen. */
   .ll-total {
-    border-top: 1px solid var(--red);
-    border-bottom: 3px double var(--red);
+    border-top: 1px solid var(--border-strong);
+    border-bottom: 1px solid var(--border-strong);
   }
 
-  /* The red double margin line down the left of a page. */
+  /* Older margin containers retain their spacing. */
   .ll-margin {
-    background-image:
-      linear-gradient(var(--red), var(--red)),
-      linear-gradient(var(--red), var(--red));
-    background-size: 1px 100%, 1px 100%;
-    background-position: left 0 top 0, left 3px top 0;
-    background-repeat: no-repeat;
+    border-left: 1px solid var(--border);
   }
 
   .ll-lift {
     box-shadow: var(--lift);
   }
 
-  /* Bookcloth: flat oxblood. A drawn weave aliased into scanlines on 1x screens. */
+  /* Sidebar surface. */
   .ll-cloth {
     background-color: var(--spine);
   }
@@ -515,13 +466,7 @@
   to { stroke-dashoffset: 0; }
 }
 
-/*
- * Unlayered: these win over utility classes on purpose. They are the book's
- * rules for every table and form control in the app, so no screen can drift
- * back to loose rows, grey fills or unthemed fields.
- */
-/* Separate, not collapsed: under border-collapse a total's red top rule loses
-   the tie to the feint bottom rule of the row above and never draws. */
+/* Shared table and form control styling. */
 :is(.app-shell, .ll-layer) table {
   border-collapse: separate;
   border-spacing: 0;
@@ -537,10 +482,9 @@
   padding-top: 0.5rem;
   padding-bottom: 0.4rem;
   color: var(--graphite-600);
-  font-stretch: 72%;
-  font-size: 0.6875rem;
-  font-weight: 650;
-  letter-spacing: 0.06em;
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0;
   text-transform: uppercase;
   border-bottom: 1px solid var(--feint-strong);
   white-space: nowrap;
@@ -553,14 +497,14 @@
 }
 
 :is(.app-shell, .ll-layer) tbody tr:hover {
-  background: color-mix(in srgb, var(--paper-tab) 70%, transparent);
+  background: var(--hover);
 }
 
 :is(.app-shell, .ll-layer) input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="color"]),
 :is(.app-shell, .ll-layer) select,
 :is(.app-shell, .ll-layer) textarea {
   border-color: var(--field);
-  border-radius: 3px;
+  border-radius: 8px;
   background-color: var(--paper-sheet);
   color: var(--ink);
 }
@@ -574,8 +518,8 @@
 :is(.app-shell, .ll-layer) input:focus,
 :is(.app-shell, .ll-layer) select:focus,
 :is(.app-shell, .ll-layer) textarea:focus {
-  border-color: var(--oxblood);
-  box-shadow: 0 0 0 1px var(--oxblood);
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px var(--primary-soft);
   outline: none;
 }
 
@@ -584,14 +528,26 @@
   accent-color: var(--oxblood-fill);
 }
 
+a, button {
+  text-decoration-line: none;
+}
+
+.dark .bg-oxblood-fill { color: var(--on-primary); }
+
 /* Dark mode splits the binding: link text is light, a filled button is deep. */
 .dark .bg-focus-blue-500,
 .dark .bg-focus-blue-600,
-.dark .bg-focus-blue-700 { background-color: var(--oxblood-fill); }
+.dark .bg-focus-blue-700 { background-color: var(--oxblood-fill); color: var(--on-primary); }
 .dark .hover\:bg-focus-blue-600:hover,
 .dark .hover\:bg-focus-blue-700:hover { background-color: var(--oxblood-fill-hover); }
 .dark .bg-rust-700 { background-color: var(--red-fill); }
 .dark .bg-ledger-green-700 { background-color: var(--green-fill); }
+
+@keyframes ll-drawer-in {
+  from { transform: translateX(100%); }
+  to { transform: translateX(0); }
+}
+.ll-drawer { animation: ll-drawer-in 220ms cubic-bezier(.2,.8,.2,1) both; }
 
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {
@@ -601,6 +557,10 @@
 }
 
 @media print {
+  .ll-total {
+    border-top: 1px solid var(--negative);
+    border-bottom: 3px double var(--negative);
+  }
   body {
     background-color: white !important;
     color: black !important;

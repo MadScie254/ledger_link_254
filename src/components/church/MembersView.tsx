@@ -3,6 +3,7 @@ import { useQuery } from '@tanstack/react-query';
 import { create } from 'zustand';
 import { useAppStore } from '../../store';
 import { apiRequest } from '../../utils/apiRequest';
+import { useCreateIntent } from '../../hooks/useCreateIntent';
 import { MEMBER_STATUSES } from '../../utils/memberImport';
 import { Amount } from '../ledger/Amount';
 import { EmptyNote, LoadProblem, PageHeading, SkeletonRows, buttonClass } from '../ledger/Page';
@@ -40,6 +41,7 @@ export function MembersView() {
   const [dialog, setDialog] = useState<'add' | 'import' | null>(null);
   const [notice, setNotice] = useState('');
   const focus = useMemberFocus();
+  useCreateIntent({ member: () => setDialog('add') }, canPost);
   const members = useMembers({ search: search.trim().length >= 2 ? search.trim() : undefined, status: status || undefined });
   const list = members.data?.members || [];
   const done = (message: string) => { setDialog(null); setNotice(message); };

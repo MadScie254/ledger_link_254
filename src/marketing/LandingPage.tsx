@@ -138,15 +138,15 @@ export function LandingPage({ onSignIn, onSignUp, brand = BUSINESS_BRAND }: Land
       : 'Members, giving, Sunday collections and funds, in one set of double-entry books. Each gift lands in its fund, and the treasurer\'s report comes from the same ledger.';
     const startLabel = { en: 'Create account', sw: 'TODO-SW' };
     const signInLabel = { en: 'Sign in', sw: 'TODO-SW' };
-    return <main className="min-h-screen ll-grain-bg text-ink-900">
-      <header className="border-b border-feint-strong bg-paper-50/95">
+    return <main className="min-h-screen bg-canvas text-text">
+      <header className="border-b border-border bg-surface/95">
         <div className="mx-auto flex h-16 max-w-6xl items-center justify-between px-5 sm:px-8">
-          <span className="flex items-center gap-2 ll-printed text-[16px]">
-            <BrandMark edition={brand.edition} className="h-5 w-5 text-oxblood" /> {brand.brandName}
+          <span className="flex items-center gap-2 font-display text-[16px] font-bold">
+            <BrandMark edition={brand.edition} className="h-5 w-5 text-primary" /> {brand.brandName}
           </span>
           <div className="flex items-center gap-2">
             <ThemeToggle />
-            <button type="button" onClick={onSignIn} className="text-[13.5px] font-semibold text-oxblood underline underline-offset-4">
+            <button type="button" onClick={onSignIn} className="rounded-lg px-3 py-2 text-[13.5px] font-semibold text-primary-ink hover:bg-primary-soft">
               {signInLabel.en}
             </button>
           </div>
@@ -154,19 +154,19 @@ export function LandingPage({ onSignIn, onSignUp, brand = BUSINESS_BRAND }: Land
       </header>
       <section className="mx-auto grid max-w-6xl gap-12 px-5 py-20 sm:px-8 md:grid-cols-[1.4fr_1fr] md:py-28">
         <div>
-          <p className="ll-printed text-[12px] text-oxblood">{brand.brandName} · {edition.audience}</p>
-          <h1 className="mt-5 max-w-2xl ll-cover text-[44px] leading-[1.05] sm:text-[62px]">
+          <p className="text-[12px] font-semibold text-primary-ink">{brand.brandName} · {edition.audience}</p>
+          <h1 className="mt-5 max-w-2xl ll-cover text-[44px] leading-[1.08] sm:text-[62px]">
             One set of books for {audience}.
           </h1>
           <p className="mt-7 max-w-xl text-[16px] leading-relaxed text-graphite-600">{summary}</p>
           <button type="button" onClick={onSignUp}
-            className="mt-9 inline-flex h-11 items-center gap-2 rounded-sm bg-oxblood-fill px-5 text-[14px] font-semibold text-white hover:bg-[var(--oxblood-fill-hover)]">
+            className="mt-9 inline-flex h-11 items-center gap-2 rounded-lg bg-primary px-5 text-[14px] font-semibold text-on-primary shadow-sm hover:bg-primary-hover">
             {startLabel.en} <ArrowRight className="h-4 w-4" aria-hidden="true" />
           </button>
           <p className="mt-4 text-[12px] text-graphite-600">powered by Ledger Link</p>
         </div>
-        <aside className="self-start border border-feint-strong bg-paper-50 p-8 ll-lift">
-          <p className="ll-printed text-[12px] text-graphite-600">What opens with the organization</p>
+        <aside className="self-start rounded-2xl border border-border bg-surface p-8 shadow-md">
+          <p className="text-[12px] font-semibold text-text-2">What opens with the organization</p>
           <ul className="mt-5 space-y-4 text-[14px] leading-relaxed">
             {edition.points.map((point) => <li key={point}>{point}</li>)}
             <li>Full books: the chart of accounts, journal entries and trial balance, for owners, admins and accountants.</li>
@@ -178,20 +178,18 @@ export function LandingPage({ onSignIn, onSignUp, brand = BUSINESS_BRAND }: Land
 
   return (
     <motion.div
-      className="min-h-screen ll-grain-bg text-ink-900"
+      className="min-h-screen bg-canvas text-text"
       initial={reducedMotion ? false : { opacity: 0, x: -28 }}
       animate={{ opacity: 1, x: 0 }}
-      transition={{ duration: reducedMotion ? 0 : 0.32, ease: [0.2, 0.8, 0.2, 1] }}
+      transition={{ duration: reducedMotion ? 0 : 0.22, ease: [0.2, 0.8, 0.2, 1] }}
     >
-      <header className="sticky top-0 z-40 border-b border-feint-strong bg-paper-50/95 backdrop-blur-sm">
+      <header className="sticky top-0 z-40 border-b border-border bg-surface/95 backdrop-blur-sm">
         <div className="mx-auto flex h-16 max-w-6xl items-center justify-between px-5 sm:px-8">
           <div className="flex items-center gap-2">
-            <span className="border border-ink-900 p-[3px]" aria-hidden="true">
-              <span className="flex h-6 w-6 items-center justify-center border border-ink-900">
-                <BrandMark className="h-3.5 w-3.5 text-oxblood" />
-              </span>
+            <span className="flex size-8 items-center justify-center rounded-lg bg-primary-soft" aria-hidden="true">
+              <BrandMark className="h-4 w-4 text-primary" />
             </span>
-            <span className="ll-printed text-[14px] tracking-[0.14em] text-ink-900">Ledger Link</span>
+            <span className="font-display text-[15px] font-bold text-text">Ledger Link</span>
           </div>
 
           <nav aria-label="Page sections" className="hidden items-center gap-7 md:flex">
@@ -207,7 +205,7 @@ export function LandingPage({ onSignIn, onSignUp, brand = BUSINESS_BRAND }: Land
             <button type="button" onClick={onSignIn} className="h-9 px-3 text-[13.5px] font-semibold text-ink-900 hover:text-oxblood">
               Sign in
             </button>
-            <button type="button" onClick={onSignUp} className="inline-flex h-9 items-center gap-1.5 rounded-sm bg-oxblood-fill px-3.5 text-[13.5px] font-semibold text-white hover:bg-[var(--oxblood-fill-hover)]">
+            <button type="button" onClick={onSignUp} className="inline-flex h-9 items-center gap-1.5 rounded-lg bg-primary px-3.5 text-[13.5px] font-semibold text-on-primary hover:bg-primary-hover">
               Get started <ArrowRight className="h-3.5 w-3.5" aria-hidden="true" />
             </button>
           </div>
@@ -230,10 +228,10 @@ export function LandingPage({ onSignIn, onSignUp, brand = BUSINESS_BRAND }: Land
               ))}
             </nav>
             <div className="mt-3 flex flex-col gap-2 border-t border-feint pt-3">
-              <button type="button" onClick={onSignIn} className="h-10 border border-field text-[14px] font-semibold text-ink-900">
+              <button type="button" onClick={onSignIn} className="h-10 rounded-lg border border-border-strong bg-surface text-[14px] font-semibold text-text">
                 Sign in
               </button>
-              <button type="button" onClick={onSignUp} className="h-10 rounded-sm bg-oxblood-fill text-[14px] font-semibold text-white">
+              <button type="button" onClick={onSignUp} className="h-10 rounded-lg bg-primary text-[14px] font-semibold text-on-primary">
                 Get started
               </button>
             </div>
@@ -245,8 +243,8 @@ export function LandingPage({ onSignIn, onSignUp, brand = BUSINESS_BRAND }: Land
       <section className="mx-auto max-w-6xl px-5 pb-16 pt-14 sm:px-8 sm:pb-24 sm:pt-20">
         <div className="grid grid-cols-1 gap-12 lg:grid-cols-[minmax(0,1fr)_minmax(0,26rem)] lg:items-center lg:gap-10">
           <div>
-            <p className="ll-printed text-[11px] text-oxblood">Double-entry bookkeeping for Kenyan businesses</p>
-            <h1 className="ll-cover mt-4 text-[38px] leading-[1.04] text-ink-900 sm:text-[52px]">
+            <p className="text-[12px] font-semibold text-primary-ink">Double-entry bookkeeping for Kenyan businesses</p>
+            <h1 className="ll-cover mt-4 text-[38px] leading-[1.08] text-text sm:text-[52px]">
               Every invoice, bill and payment, posted to one ledger.
             </h1>
             <p className="mt-5 max-w-xl text-[16px] leading-relaxed text-graphite-600 sm:text-[17px]">
@@ -255,10 +253,10 @@ export function LandingPage({ onSignIn, onSignUp, brand = BUSINESS_BRAND }: Land
               on a month-end export.
             </p>
             <div className="mt-8 flex flex-wrap items-center gap-3">
-              <button type="button" onClick={onSignUp} className="inline-flex h-12 items-center gap-2 rounded-sm bg-oxblood-fill px-5 text-[15px] font-semibold text-white hover:bg-[var(--oxblood-fill-hover)]">
+              <button type="button" onClick={onSignUp} className="inline-flex h-12 items-center gap-2 rounded-lg bg-primary px-5 text-[15px] font-semibold text-on-primary shadow-sm hover:bg-primary-hover">
                 Get started free <ArrowRight className="h-4 w-4" aria-hidden="true" />
               </button>
-              <button type="button" onClick={() => scrollTo('how-it-works')} className="inline-flex h-12 items-center gap-2 border border-field px-5 text-[15px] font-semibold text-ink-900 hover:border-ink-900">
+              <button type="button" onClick={() => scrollTo('how-it-works')} className="inline-flex h-12 items-center gap-2 rounded-lg border border-border-strong bg-surface px-5 text-[15px] font-semibold text-text hover:bg-hover">
                 See how it works
               </button>
             </div>
@@ -305,9 +303,9 @@ export function LandingPage({ onSignIn, onSignUp, brand = BUSINESS_BRAND }: Land
       <section id="features" className="py-16 sm:py-24">
         <div className="mx-auto max-w-6xl px-5 sm:px-8">
           <SectionHeading eyebrow="Features" title="One ledger behind every screen" note="Nothing here is a separate app bolted on. An invoice, a bank match and a payroll run all post to the same accounts." />
-          <div className="mt-12 grid grid-cols-1 gap-px overflow-hidden border border-feint-strong bg-feint-strong sm:grid-cols-2 lg:grid-cols-3">
+          <div className="mt-12 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
             {FEATURES.map((feature) => (
-              <div key={feature.title} className="bg-paper-50 p-6">
+              <div key={feature.title} className="rounded-xl border border-border bg-surface p-6 shadow-sm">
                 <feature.icon className="h-5 w-5 text-oxblood" aria-hidden="true" />
                 <h3 className="ll-heading mt-4 text-[18px] text-ink-900">{feature.title}</h3>
                 <p className="mt-2 text-[13.5px] leading-relaxed text-graphite-600">{feature.body}</p>
@@ -387,11 +385,11 @@ export function LandingPage({ onSignIn, onSignUp, brand = BUSINESS_BRAND }: Land
       <section id="faq" className="py-16 sm:py-24">
         <div className="mx-auto max-w-3xl px-5 sm:px-8">
           <SectionHeading eyebrow="Questions" title="Frequently asked questions" />
-          <div className="mt-10 border-t border-feint-strong">
+          <div className="mt-10 space-y-3">
             {FAQS.map((faq, index) => {
               const open = openFaq === index;
               return (
-                <div key={faq.q} className="border-b border-feint-strong">
+                <div key={faq.q} className="rounded-xl border border-border bg-surface px-5 shadow-sm">
                   <button
                     type="button"
                     onClick={() => setOpenFaq(open ? null : index)}
@@ -416,7 +414,7 @@ export function LandingPage({ onSignIn, onSignUp, brand = BUSINESS_BRAND }: Land
           <p className="mx-auto mt-4 max-w-lg text-[15px] leading-relaxed text-graphite-600">
             No card required to start. Choose what kind of business this is, and the books are ready.
           </p>
-          <button type="button" onClick={onSignUp} className="mx-auto mt-8 inline-flex h-12 items-center gap-2 rounded-sm bg-oxblood-fill px-6 text-[15px] font-semibold text-white hover:bg-[var(--oxblood-fill-hover)]">
+          <button type="button" onClick={onSignUp} className="mx-auto mt-8 inline-flex h-12 items-center gap-2 rounded-lg bg-primary px-6 text-[15px] font-semibold text-on-primary shadow-sm hover:bg-primary-hover">
             Get started free <ArrowRight className="h-4 w-4" aria-hidden="true" />
           </button>
         </div>
@@ -425,10 +423,10 @@ export function LandingPage({ onSignIn, onSignUp, brand = BUSINESS_BRAND }: Land
       <footer className="border-t border-feint-strong">
         <div className="mx-auto flex max-w-6xl flex-col gap-4 px-5 py-8 sm:flex-row sm:items-center sm:justify-between sm:px-8">
           <div className="flex items-center gap-2">
-            <span className="flex h-6 w-6 items-center justify-center border border-feint-strong" aria-hidden="true">
-              <BrandMark className="h-3.5 w-3.5 text-oxblood" />
+            <span className="flex size-8 items-center justify-center rounded-lg bg-primary-soft" aria-hidden="true">
+              <BrandMark className="h-4 w-4 text-primary" />
             </span>
-            <span className="ll-printed text-[12px] tracking-[0.14em] text-graphite-600">Ledger Link</span>
+            <span className="font-display text-[13px] font-bold text-text">Ledger Link</span>
           </div>
           <p className="text-[12.5px] text-graphite-500">Double-entry bookkeeping for Kenyan businesses, law firms and churches. Built in Nairobi.</p>
         </div>
@@ -440,7 +438,7 @@ export function LandingPage({ onSignIn, onSignUp, brand = BUSINESS_BRAND }: Land
 function SectionHeading({ eyebrow, title, note }: { eyebrow: string; title: string; note?: string }) {
   return (
     <div className="max-w-2xl">
-      <p className="ll-printed text-[11px] text-oxblood">{eyebrow}</p>
+      <p className="text-[12px] font-semibold text-primary-ink">{eyebrow}</p>
       <h2 className="ll-cover mt-3 text-[28px] leading-tight text-ink-900 sm:text-[34px]">{title}</h2>
       {note && <p className="mt-3 text-[14.5px] leading-relaxed text-graphite-600">{note}</p>}
     </div>
@@ -451,8 +449,8 @@ function SecurityPoint({ icon: Icon, title, body }: { icon: typeof ShieldCheck; 
   return (
     <div>
       <dt className="flex items-center gap-2.5">
-        <span className="flex h-8 w-8 shrink-0 items-center justify-center border border-feint-strong bg-paper-100" aria-hidden="true">
-          <Icon className="h-4 w-4 text-oxblood" />
+        <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary-soft" aria-hidden="true">
+          <Icon className="h-4 w-4 text-primary" />
         </span>
         <span className="text-[14.5px] font-semibold text-ink-900">{title}</span>
       </dt>
@@ -463,7 +461,7 @@ function SecurityPoint({ icon: Icon, title, body }: { icon: typeof ShieldCheck; 
 
 function Testimonial({ quote, name, role }: { quote: string; name: string; role: string }) {
   return (
-    <figure className="flex h-full flex-col border border-feint-strong bg-paper-50 p-6">
+    <figure className="flex h-full flex-col rounded-xl border border-border bg-surface p-6 shadow-sm">
       <blockquote className="flex-1 text-[14.5px] leading-relaxed text-ink-900">&ldquo;{quote}&rdquo;</blockquote>
       <figcaption className="mt-5 border-t border-feint pt-4">
         <span className="block text-[13.5px] font-semibold text-ink-900">{name}</span>
@@ -480,7 +478,7 @@ function Testimonial({ quote, name, role }: { quote: string; name: string; role:
  */
 function TestimonialPending({ role }: { role: string }) {
   return (
-    <figure className="flex h-full flex-col justify-between border border-dashed border-feint-strong bg-paper-50 p-6">
+    <figure className="flex h-full flex-col justify-between rounded-xl border border-dashed border-border-strong bg-surface p-6">
       <p className="text-[13.5px] italic leading-relaxed text-graphite-500">Quote pending. This card is reserved for feedback from someone at {role.split(',').pop()?.trim() || role} once it is collected.</p>
       <figcaption className="mt-5 border-t border-feint pt-4">
         <span className="block text-[12.5px] text-graphite-500">{role}</span>
@@ -492,21 +490,21 @@ function TestimonialPending({ role }: { role: string }) {
 /** A stylised rendition of the Home dashboard, drawn, not a screenshot: it never goes stale as the real page changes. */
 function HeroLedgerPreview() {
   return (
-    <div className="border border-feint-strong bg-paper-100 shadow-none" aria-hidden="true">
+    <div className="overflow-hidden rounded-2xl border border-border bg-surface shadow-lg" aria-hidden="true">
       <div className="flex items-center justify-between border-b border-feint-strong px-4 py-3">
         <span className="ll-printed text-[10px] text-graphite-600">Home</span>
         <span className="ll-printed text-[10px] text-graphite-500">Figures in KES</span>
       </div>
-      <div className="grid grid-cols-2 divide-x divide-feint-strong border-b border-feint-strong">
+      <div className="grid grid-cols-2 gap-3 border-b border-border bg-surface-2 p-4">
         {[
           ['CASH', '1,931,250'],
           ['OWED TO YOU', '540,000'],
           ['YOU OWE', '800,000'],
           ['NET PROFIT', '283,500'],
         ].map(([label, value]) => (
-          <div key={label} className="px-4 py-3.5">
-            <p className="ll-printed text-[9px] text-graphite-500">{label}</p>
-            <p className="mt-1 text-[19px] font-semibold text-ink-blue">{value}</p>
+          <div key={label} className="rounded-lg border border-border bg-surface px-4 py-3.5">
+            <p className="text-[10px] font-medium text-text-3">{label}</p>
+            <p className="mt-1 font-display text-[19px] font-bold tabular-nums text-text">{value}</p>
           </div>
         ))}
       </div>

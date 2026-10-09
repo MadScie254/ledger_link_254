@@ -13,11 +13,11 @@ test('an unset edition is the existing Ledger Link business edition', () => {
   assert.equal(business.brandName, 'Ledger Link');
   assert.equal(business.poweredBy, false);
   assert.equal(business.defaultView, 'Home / Dashboard');
-  assert.deepEqual(business.sidebar.map((group) => group.label.en), ['Money', 'Books', 'Office']);
+  assert.deepEqual(business.sidebar.map((group) => group.label.en), ['Workspace', 'Books', 'Settings', 'Help']);
   assert.deepEqual(business.sidebar.flatMap((group) => group.items.map((item) => item.view)), [
-    'Home / Dashboard', 'Banking', 'Sales', 'Customer Hub', 'Expenses & Bills',
-    'Accounting', 'Reports', 'Tax', 'Payroll', 'Inventory', 'Projects',
-    'Business Feed', 'Team', 'Apps / Integrations', 'Audit Logs', 'Documentation', 'Settings',
+    'Home / Dashboard', 'Business Feed', 'Sales', 'Customer Hub', 'Expenses & Bills',
+    'Banking', 'Payroll', 'Inventory', 'Projects', 'Reports', 'Tax', 'Accounting',
+    'Settings', 'Team', 'Apps / Integrations', 'Audit Logs', 'Documentation',
   ]);
 });
 
@@ -85,10 +85,9 @@ test('hostnames can be injected from environment without changing the shared def
   assert.deepEqual(editionDefinition('law').hostnames, []);
 });
 
-test('business book order still follows its business type', () => {
+test('business book navigation keeps its workspace order', () => {
   const books = navigationGroupsFor('business', 'services', 'member').find((group) => group.label.en === 'Books');
-  assert.equal(books?.items[0].view, 'Projects');
-  assert.equal(books?.items.length, 6);
+  assert.deepEqual(books?.items.map((item) => item.view), ['Reports', 'Tax', 'Accounting']);
 });
 
 test('Full books belongs only to privileged law and church members', () => {

@@ -16,7 +16,7 @@ const CONTENTS = [
 ];
 
 const fieldClass =
-  'mt-1.5 block w-full h-11 rounded-sm border border-field bg-paper-100 px-3 text-[15px] text-ink-900 placeholder:text-graphite-500 focus:border-oxblood focus:shadow-[0_0_0_1px_var(--oxblood)] focus:outline-none';
+  'mt-1.5 block w-full h-11 rounded-lg border border-border-strong bg-surface px-3 text-[15px] text-text placeholder:text-text-3 focus:border-primary focus:ring-2 focus:ring-primary/20 focus:outline-none';
 
 /** The cover of the book, and its first page. */
 export function LockScreen({ initialMode = 'signIn', onBack, brand = BUSINESS_BRAND }: {
@@ -91,39 +91,39 @@ export function LockScreen({ initialMode = 'signIn', onBack, brand = BUSINESS_BR
   };
 
   const stampedLabel = (compact: boolean) => (
-    <div className={`inline-block border border-[var(--spine-rule)] p-[3px] ${compact ? '' : 'w-full max-w-[20rem]'}`}>
-      <div className={`border border-[var(--spine-rule)] ${compact ? 'px-3 py-2' : 'px-5 py-4'}`}>
+    <div className={`inline-block rounded-xl border border-border bg-surface shadow-sm ${compact ? 'px-3 py-2' : 'w-full max-w-[20rem] px-5 py-4'}`}>
+      <div>
         <span className="flex items-center gap-2">
           <BrandMark edition={brand.edition} className={compact ? 'h-3.5 w-3.5 shrink-0' : 'h-5 w-5 shrink-0'} />
-          <p className={`ll-printed tracking-[0.16em] text-sidebar-ink leading-none ${compact ? 'text-[14px]' : 'text-[19px]'}`}>{brand.brandName}</p>
+          <p className={`font-display font-bold text-text leading-none ${compact ? 'text-[14px]' : 'text-[19px]'}`}>{brand.brandName}</p>
         </span>
-        {!compact && <p className="mt-2.5 text-[12.5px] text-sidebar-muted">
+        {!compact && <p className="mt-2.5 text-[12.5px] text-text-2">
           {brand.edition === 'business' ? 'Books of account for Kenyan business'
             : brand.edition === 'law' ? 'Practice books for Kenyan law firms' : 'Church books for Kenyan congregations'}
         </p>}
-        {brand.poweredBy && <p className="mt-1 text-[10px] text-sidebar-muted">powered by Ledger Link</p>}
+        {brand.poweredBy && <p className="mt-1 text-[10px] text-text-3">powered by Ledger Link</p>}
       </div>
     </div>
   );
 
   return (
     <motion.div
-      className="fixed inset-0 z-[100] overflow-y-auto ll-grain-bg"
+      className="fixed inset-0 z-[100] overflow-y-auto bg-canvas"
       initial={reducedMotion ? false : { opacity: 0, x: 28 }}
       animate={{ opacity: 1, x: 0 }}
-      transition={{ duration: reducedMotion ? 0 : 0.32, ease: [0.2, 0.8, 0.2, 1] }}
+      transition={{ duration: reducedMotion ? 0 : 0.22, ease: [0.2, 0.8, 0.2, 1] }}
     >
       <div className="grid min-h-full grid-cols-1 md:grid-cols-[minmax(22rem,44%)_minmax(0,1fr)]">
         {/* The cover */}
-        <aside className="ll-cloth hidden md:flex min-h-screen flex-col justify-between px-10 py-10 lg:px-14 lg:py-12 text-sidebar-ink">
+        <aside className="hidden min-h-screen flex-col justify-between border-r border-border bg-surface-2 px-10 py-10 text-text md:flex lg:px-14 lg:py-12">
           {stampedLabel(false)}
 
           <div className="max-w-[26rem]">
-            <h1 className="ll-cover text-[40px] lg:text-[46px] leading-[1.02] text-sidebar-ink">
+            <h1 className="ll-cover text-[36px] leading-[1.12] text-text lg:text-[42px]">
               {brand.edition === 'business' ? 'Every invoice, bill and payment, posted to one ledger.'
                 : brand.edition === 'law' ? 'Practice books for your firm.' : 'Books for your congregation.'}
             </h1>
-            <p className="mt-5 text-[15px] leading-relaxed text-sidebar-muted">
+            <p className="mt-5 text-[15px] leading-relaxed text-text-2">
               {brand.edition === 'business' ? 'Day-to-day financial work stays tied to the ledger it affects.'
                 : brand.edition === 'law' ? 'Matters, court dates, time, client money and fee notes, in one ledger.'
                   : 'Members, giving, Sunday collections and funds, in one ledger.'}
@@ -131,8 +131,8 @@ export function LockScreen({ initialMode = 'signIn', onBack, brand = BUSINESS_BR
           </div>
 
           <div className="max-w-[26rem]">
-            <p className="ll-printed text-[11px] text-sidebar-muted pb-2 border-b border-[var(--spine-rule)]">Contents</p>
-            <ul>
+            <p className="text-[12px] font-semibold text-text-3">In the workspace</p>
+            <ul className="mt-3 space-y-3">
               {(brand.edition === 'business' ? CONTENTS : brand.edition === 'law' ? [
                 ['Matters', 'Opened after a conflict search, with parties, court dates and time.'],
                 ['Client account', 'Client money kept apart from office money, never overdrawn.'],
@@ -142,9 +142,9 @@ export function LockScreen({ initialMode = 'signIn', onBack, brand = BUSINESS_BR
                 ['Giving', 'M-Pesa, cash and cheque gifts, each placed on a member and a fund.'],
                 ['Treasurer\'s report', 'Monthly, as a PDF, with fund balances that agree with the ledger.'],
               ]).map(([title, description]) => (
-                <li key={title} className="border-b border-[var(--spine-rule)] py-3">
-                  <p className="text-[14px] font-semibold text-sidebar-ink">{title}</p>
-                  <p className="mt-0.5 text-[13px] leading-snug text-sidebar-muted">{description}</p>
+                <li key={title} className="rounded-xl border border-border bg-surface p-4 shadow-sm">
+                  <p className="text-[14px] font-semibold text-text">{title}</p>
+                  <p className="mt-0.5 text-[13px] leading-snug text-text-2">{description}</p>
                 </li>
               ))}
             </ul>
@@ -153,10 +153,10 @@ export function LockScreen({ initialMode = 'signIn', onBack, brand = BUSINESS_BR
 
         {/* The first page */}
         <main className="flex min-h-screen min-w-0 flex-col">
-          <div className="ll-cloth flex items-center justify-between px-5 py-4 md:hidden">
+          <div className="flex items-center justify-between border-b border-border bg-surface-2 px-5 py-4 md:hidden">
             {stampedLabel(true)}
             {onBack && (
-              <button type="button" onClick={onBack} className="p-1.5 text-sidebar-muted hover:text-sidebar-ink" aria-label="Back">
+              <button type="button" onClick={onBack} className="rounded-lg p-2 text-text-2 hover:bg-hover hover:text-text" aria-label="Back">
                 <ArrowLeft className="h-5 w-5" />
               </button>
             )}
@@ -172,7 +172,7 @@ export function LockScreen({ initialMode = 'signIn', onBack, brand = BUSINESS_BR
           )}
 
           <div className="flex flex-1 items-center justify-center px-5 py-10 sm:px-10">
-            <div className="ll-margin w-full max-w-[25rem] pl-6 sm:pl-8">
+            <div className="w-full max-w-[28rem] rounded-2xl border border-border bg-surface p-6 shadow-md sm:p-8">
               {confirmationSent ? (
                 <div>
                   <Mark kind="tick" draw className="[&_svg]:h-7 [&_svg]:w-7" />
@@ -186,7 +186,7 @@ export function LockScreen({ initialMode = 'signIn', onBack, brand = BUSINESS_BR
                       type="button"
                       onClick={handleResend}
                       disabled={resendStatus === 'sending'}
-                      className="font-semibold text-oxblood underline underline-offset-[3px] disabled:opacity-50"
+                      className="rounded-md px-1 font-semibold text-primary-ink hover:bg-primary-soft disabled:opacity-50"
                     >
                       {resendStatus === 'sending' ? 'Sending' : 'Send it again'}
                     </button>
@@ -206,7 +206,7 @@ export function LockScreen({ initialMode = 'signIn', onBack, brand = BUSINESS_BR
                       setResendError('');
                       switchMode('signIn');
                     }}
-                    className="mt-7 h-11 w-full rounded-sm bg-oxblood-fill text-[15px] font-semibold text-white hover:bg-[var(--oxblood-fill-hover)]"
+                    className="mt-7 h-11 w-full rounded-lg bg-primary text-[15px] font-semibold text-on-primary hover:bg-primary-hover"
                   >
                     Return to sign in
                   </button>
@@ -267,7 +267,7 @@ export function LockScreen({ initialMode = 'signIn', onBack, brand = BUSINESS_BR
                         <button
                           type="button"
                           onClick={() => switchMode('reset')}
-                          className="mt-1.5 text-[12.5px] text-oxblood underline underline-offset-[3px] decoration-[color-mix(in_srgb,currentColor_40%,transparent)] hover:decoration-current"
+                          className="mt-1.5 rounded-md px-1 text-[12.5px] font-medium text-primary-ink hover:bg-primary-soft"
                         >
                           Forgot your password?
                         </button>
@@ -293,7 +293,7 @@ export function LockScreen({ initialMode = 'signIn', onBack, brand = BUSINESS_BR
                     <button
                       type="submit"
                       disabled={loading}
-                      className="h-11 w-full rounded-sm bg-oxblood-fill text-[15px] font-semibold text-white hover:bg-[var(--oxblood-fill-hover)] disabled:cursor-wait disabled:opacity-60"
+                      className="h-11 w-full rounded-lg bg-primary text-[15px] font-semibold text-on-primary hover:bg-primary-hover disabled:cursor-wait disabled:opacity-60"
                     >
                       {loading
                         ? mode === 'signIn' ? 'Signing in…' : mode === 'reset' ? 'Sending…' : 'Creating account…'
@@ -306,7 +306,7 @@ export function LockScreen({ initialMode = 'signIn', onBack, brand = BUSINESS_BR
                     <button
                       type="button"
                       onClick={() => switchMode(mode === 'signIn' ? 'signUp' : 'signIn')}
-                      className="font-semibold text-oxblood underline underline-offset-[3px] decoration-[color-mix(in_srgb,currentColor_40%,transparent)] hover:decoration-current"
+                      className="rounded-md px-1 font-semibold text-primary-ink hover:bg-primary-soft"
                     >
                       {mode === 'signIn' ? 'Create an account' : 'Sign in'}
                     </button>
