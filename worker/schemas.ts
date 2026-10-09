@@ -257,6 +257,7 @@ export const organizationCreateSchema = z.object({
 export const organizationUpdateSchema = z.object(organizationFields).partial().extend({
   paymentDetails: z.preprocess((value) => (typeof value === 'string' && value.trim() === '' ? null : value), z.string().trim().max(1000).nullable().optional()),
   documentFooter: z.preprocess((value) => (typeof value === 'string' && value.trim() === '' ? null : value), z.string().trim().max(500).nullable().optional()),
+  vatRegistered: z.boolean().optional(),
   booksClosedThrough: isoDate.nullable().optional(),
   approvalThresholdCents: cents.nullable().optional(),
   aiEnabled: z.boolean().optional(),
@@ -327,20 +328,50 @@ export const invoiceUpdateSchema = z.object({
 export const billUpdateSchema = invoiceUpdateSchema.extend({
   supplierReference: z.string().trim().max(100).optional(),
 });
+/** Income tax and VAT withheld at payment, from the KRA certificates; no rate is assumed. */
+const withheldFields = {
+  whtCents: cents.optional(),
+  wvatCents: cents.optional(),
+  whtCertificate: text(100),
+  wvatCertificate: text(100),
+  /** A foreign-currency document settled at the day's rate: the amount in its currency. */
+  foreignAmountCents: positiveCents.optional(),
+};
 export const invoicePaymentSchema = z.object({
-  amountCents: positiveCents,
+  amountCents: cents,
   paymentDate: isoDate,
   depositAccountId: uuid,
   idempotencyKey,
+  ...withheldFields,
+}).refine((body) => body.amountCents + (body.whtCents || 0) + (body.wvatCents || 0) > 0, 'The payment must be greater than zero.');
+/**
+ * One payment from a customer across their invoices. Without allocations it
+ * is shared oldest due first; whatever the invoices do not take is kept as
+ * the customer's credit.
+ */
+export const customerPaymentSchema = z.object({
+  customerId: uuid,
+  paymentDate: isoDate,
+  depositAccountId: uuid,
+  amountCents: positiveCents,
+  allocations: z.array(z.object({ invoiceId: uuid, amountCents: positiveCents })).max(200, 'Share a payment across up to 200 invoices.').nullable().optional(),
+  reference: text(100),
+  memo: text(2000),
+  idempotencyKey,
 });
-export const billPaymentSchema = z.object({
+const billPaymentFields = {
   amountCents: positiveCents,
   paymentDate: isoDate,
   sourceAccountId: uuid,
   idempotencyKey,
-});
+};
+export const billPaymentSchema = z.object({
+  ...billPaymentFields,
+  amountCents: cents,
+  ...withheldFields,
+}).refine((body) => body.amountCents + (body.whtCents || 0) + (body.wvatCents || 0) > 0, 'The payment must be greater than zero.');
 export const batchBillPaymentSchema = z.object({
-  payments: z.array(billPaymentSchema.extend({ billId: uuid })).min(1).max(40),
+  payments: z.array(z.object(billPaymentFields).extend({ billId: uuid })).min(1).max(40),
 });
 
 // --- Bulk -----------------------------------------------------------------------------------

@@ -11,6 +11,8 @@ export interface RequestContext {
   /** The class and location a posting request is made under, checked by the database. */
   classId?: string;
   locationId?: string;
+  /** The church fund an expense is posted to (Kundi), checked by the database. */
+  fundId?: string;
 }
 
 const storage = new AsyncLocalStorage<RequestContext>();
@@ -23,12 +25,13 @@ export function currentActorId(): string | undefined {
   return storage.getStore()?.actorId;
 }
 
-/** Headers naming who acts and the class and location postings are made under. */
+/** Headers naming who acts and the class, location and fund postings are made under. */
 export function contextHeaders(): Record<string, string> {
   const context = storage.getStore();
   const headers: Record<string, string> = {};
   if (context?.actorId) headers['x-ledger-actor'] = context.actorId;
   if (context?.classId) headers['x-ledger-class'] = context.classId;
   if (context?.locationId) headers['x-ledger-location'] = context.locationId;
+  if (context?.fundId) headers['x-ledger-fund'] = context.fundId;
   return headers;
 }

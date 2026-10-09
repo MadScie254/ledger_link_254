@@ -5,7 +5,7 @@ import { Dialog } from '../ledger/Dialog';
 import { PageHeading, buttonClass } from '../ledger/Page';
 
 const integrations = [
-  { name: 'M-Pesa Business', desc: 'Bring paybill and till payments into Banking as statement lines.', requires: 'Not built yet. When it is, it will need a Safaricom Daraja API app (consumer key and secret) and a registered paybill or till.', built: false },
+  { name: 'M-Pesa Business', desc: 'A live paybill or till feed into Banking. M-Pesa statements already import as CSV in Banking, Import statement.', requires: 'A live paybill or till feed for a business is not built yet; it will need a Safaricom Daraja API app (consumer key and secret) and a registered paybill or till. M-Pesa statements exported as CSV import today, in Banking, Import statement.', built: false },
   { name: 'KRA eTIMS', desc: 'Submit each invoice to KRA and receive its signature.', requires: 'A KRA-issued OSCU or VSCU device registration tied to your PIN. Every invoice is already logged and queued; it cannot be submitted without those device credentials.', built: true },
   { name: 'WhatsApp Business', desc: 'Send invoices and payment reminders on WhatsApp.', requires: 'Not built yet.', built: false },
   { name: 'Stripe', desc: 'Accept international card payments against invoices.', requires: 'Not built yet.', built: false },

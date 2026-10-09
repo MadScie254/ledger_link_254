@@ -74,6 +74,64 @@ async function fetchOne(table: string, columns: string, orgId: string, id: strin
 }
 
 /**
+ * A law firm's fee note (an invoice on a matter): professional fees and
+ * disbursements under their own headings and totals, as the Advocates
+ * (Accounts) Rules keep them apart, withholding tax shown apart from money
+ * received, and the KRA eTIMS number when the firm has recorded one. It
+ * never claims eTIMS submission: the number is entered by hand.
+ */
+function feeNoteModel(row: any, base: Pick<PrintDocument, 'kind' | 'accent' | 'company' | 'footer'>, paymentDetails: string | null, baseCurrency: string): PrintDocument {
+  const lines = [...(row.invoice_lines || [])].sort(byPosition);
+  const section = (kind: string) => (kind === 'DISBURSEMENT' ? 'Disbursements' : 'Professional fees');
+  const printed: PrintLine[] = [...lines.filter((line) => line.line_kind !== 'DISBURSEMENT'), ...lines.filter((line) => line.line_kind === 'DISBURSEMENT')]
+    .map((line: any) => {
+      const amountCents = Number(line.amount_cents) || 0;
+      const taxCents = Number(line.tax_cents) || 0;
+      return { section: section(line.line_kind), description: line.description, quantity: null, unitPriceCents: null, taxRate: rateOf(amountCents, taxCents), amountCents, taxCents };
+    });
+  const fees = printed.filter((line) => line.section === 'Professional fees').reduce((sum, line) => sum + line.amountCents, 0);
+  const disbursed = printed.filter((line) => line.section === 'Disbursements').reduce((sum, line) => sum + line.amountCents, 0);
+  const isVoid = row.status === 'VOID';
+  const payments = ((row.invoice_payments || []) as any[]).filter((payment) => !payment.reversed_at);
+  const withheld = payments.reduce((sum, payment) => sum + (Number(payment.wht_cents) || 0), 0);
+  const paid = payments.reduce((sum, payment) => sum + (Number(payment.amount_cents) || 0), 0) - withheld;
+  const balance = isVoid ? 0 : Number(row.amount_due_cents) || 0;
+  const totals: PrintTotal[] = [
+    { label: 'Professional fees', cents: fees },
+    { label: 'Disbursements', cents: disbursed },
+    { label: 'VAT on fees', cents: Number(row.tax_cents) || 0 },
+    { label: 'Total', cents: Number(row.total_cents) || 0, emphasis: 'total' },
+  ];
+  if (!isVoid) {
+    if (paid) totals.push({ label: 'Paid', cents: -paid });
+    if (withheld) totals.push({ label: 'Withholding tax', cents: -withheld });
+    totals.push({ label: 'Balance due', cents: balance, emphasis: 'balance' });
+  }
+  const matter = one(row.matter);
+  const facts = [{ label: 'Date', value: printedDate(row.date) }];
+  if (row.due_date) facts.push({ label: 'Due', value: printedDate(row.due_date) });
+  if (matter?.matter_number) facts.push({ label: 'Matter', value: matter.matter_number });
+  if (textOrNull(matter?.case_number)) facts.push({ label: 'Case', value: matter.case_number.trim() });
+  if (textOrNull(row.etims_invoice_number)) facts.push({ label: 'KRA eTIMS invoice', value: row.etims_invoice_number.trim() });
+  return {
+    ...base,
+    title: 'Fee note',
+    number: row.invoice_number,
+    currency: String(row.currency || baseCurrency).toUpperCase(),
+    stamp: isVoid ? 'VOID' : row.status === 'PAID' ? 'PAID' : null,
+    partyLabel: 'Client',
+    party: partyOf(row.customer),
+    facts,
+    priceLabel: 'Unit price',
+    lines: printed,
+    totals,
+    notes: [textOrNull(matter?.title) ? `Re: ${matter.title.trim()}` : null, textOrNull(row.notes)].filter(Boolean).join('\n') || null,
+    paymentDetails: isVoid || balance === 0 ? null : paymentDetails,
+    etims: null,
+  };
+}
+
+/**
  * Invoices, credit notes, estimates, sales receipts, sales orders and
  * purchase orders as they are printed. Figures are read from the books as
  * posted; nothing here recalculates a document. A foreign-currency invoice is
@@ -110,11 +168,13 @@ export class DocumentPrintService {
         const row = await fetchOne('invoices', `
           *,
           invoice_lines(*),
-          invoice_payments(amount_cents, foreign_amount_cents, reversed_at),
+          invoice_payments(amount_cents, foreign_amount_cents, reversed_at, wht_cents, wvat_cents),
           credit_applications!credit_applications_invoice_fkey(amount_cents, reversed_at),
           etims_submissions(status, kra_control_code, qr_code_url, submitted_at),
-          customer:customers(${PARTY_COLUMNS})
+          customer:customers(${PARTY_COLUMNS}),
+          matter:matters!invoices_org_matter_fkey(matter_number, title, case_number, court)
         `, orgId, id, kind);
+        if (row.matter_id) return feeNoteModel(row, base, paymentDetails, baseCurrency);
         const currency = String(row.currency || baseCurrency).toUpperCase();
         const foreign = currency !== baseCurrency;
         const lines: PrintLine[] = [...(row.invoice_lines || [])].sort(byPosition).map((line: any) => {
@@ -137,7 +197,10 @@ export class DocumentPrintService {
         const totalCents = foreign ? Number(row.foreign_amount_cents) || subtotalCents + taxCents : Number(row.total_cents) || 0;
         const isVoid = row.status === 'VOID';
         const payments = ((row.invoice_payments || []) as any[]).filter((payment) => !payment.reversed_at);
-        const paidCents = payments.reduce((sum, payment) => sum + (Number(foreign ? payment.foreign_amount_cents : payment.amount_cents) || 0), 0);
+        // Tax the customer withheld settles the invoice too, and prints on its own lines.
+        const whtCents = foreign ? 0 : payments.reduce((sum, payment) => sum + (Number(payment.wht_cents) || 0), 0);
+        const wvatCents = foreign ? 0 : payments.reduce((sum, payment) => sum + (Number(payment.wvat_cents) || 0), 0);
+        const paidCents = payments.reduce((sum, payment) => sum + (Number(foreign ? payment.foreign_amount_cents : payment.amount_cents) || 0), 0) - whtCents - wvatCents;
         const creditedCents = foreign ? 0 : ((row.credit_applications || []) as any[])
           .filter((use) => !use.reversed_at)
           .reduce((sum, use) => sum + (Number(use.amount_cents) || 0), 0);
@@ -151,6 +214,8 @@ export class DocumentPrintService {
         ];
         if (!isVoid) {
           if (paidCents) totals.push({ label: 'Paid', cents: -paidCents });
+          if (whtCents) totals.push({ label: 'Income tax withheld', cents: -whtCents });
+          if (wvatCents) totals.push({ label: 'VAT withheld', cents: -wvatCents });
           if (creditedCents) totals.push({ label: 'Credit applied', cents: -creditedCents });
           totals.push({ label: 'Balance due', cents: balanceCents, emphasis: 'balance' });
         }

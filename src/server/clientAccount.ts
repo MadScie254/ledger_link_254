@@ -10,6 +10,20 @@ export class ClientAccountService {
     return data ?? [];
   }
 
+  /** The client bank account, client money held and the matter ledgers on a day. */
+  static async position(orgId: string, asOf: string) {
+    const { data, error } = await getSupabase().rpc('client_account_position', { p_org_id: orgId, p_as_of: asOf });
+    if (error) throw error;
+    const row = (Array.isArray(data) ? data[0] : data) || {};
+    return {
+      asOf,
+      clientBankCents: Number(row.client_bank_cents) || 0,
+      clientHeldCents: Number(row.client_held_cents) || 0,
+      matterLedgersCents: Number(row.matter_ledgers_cents) || 0,
+      untaggedHeldCents: Number(row.untagged_held_cents) || 0,
+    };
+  }
+
   /**
    * A matter's client ledger: its lines on client money held (2200), oldest
    * first, each with the balance held for the client after it.

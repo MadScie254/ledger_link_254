@@ -59,12 +59,12 @@ export const EDITIONS: EditionDefinition[] = [
     id: 'law', brandName: 'Mizani', poweredBy: true, hostnames: [],
     sidebar: [
       { label: label('Practice'), items: [
-        item('Home / Dashboard', 'Home'), item('Law / Matters', 'Matters', false),
-        item('Law / Court diary', 'Court diary', false), item('Law / Time', 'Time', false),
+        item('Home / Dashboard', 'Home'), item('Law / Matters', 'Matters'),
+        item('Law / Court diary', 'Court diary'), item('Law / Time', 'Time'),
       ] },
       { label: label('Money'), items: [
-        item('Law / Fee notes', 'Fee notes', false), item('Law / Client account', 'Client account', false),
-        item('Law / Disbursements', 'Disbursements', false), item('Customer Hub', 'Clients'),
+        item('Law / Fee notes', 'Fee notes'), item('Law / Client account', 'Client account'),
+        item('Law / Disbursements', 'Disbursements'), item('Customer Hub', 'Clients'),
       ] },
       { label: label('Office'), items: [item('Team', 'Team'), item('Settings', 'Settings')] },
     ],
@@ -82,17 +82,17 @@ export const EDITIONS: EditionDefinition[] = [
     id: 'church', brandName: 'Kundi', poweredBy: true, hostnames: [],
     sidebar: [
       { label: label('People'), items: [
-        item('Home / Dashboard', 'Home'), item('Church / Members', 'Members', false),
-        item('Church / Households', 'Households', false),
+        item('Home / Dashboard', 'Home'), item('Church / Members', 'Members'),
+        item('Church / Households', 'Households'),
       ] },
       { label: label('Money'), items: [
-        item('Church / Giving', 'Giving', false), item('Church / Funds', 'Funds', false),
-        item('Church / Cash count', 'Cash count', false),
+        item('Church / Giving', 'Giving'), item('Church / Funds', 'Funds'),
+        item('Church / Cash count', 'Cash count'),
         item('Expenses & Bills', 'Expenses'),
       ] },
       { label: label('Reports'), items: [
-        item("Church / Treasurer's report", "Treasurer's report", false),
-        item('Church / Fund balances', 'Fund balances', false),
+        item("Church / Treasurer's report", "Treasurer's report"),
+        item('Church / Fund balances', 'Fund balances'),
       ] },
       { label: label('Office'), items: [item('Team', 'Team'), item('Settings', 'Settings')] },
     ],

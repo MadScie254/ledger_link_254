@@ -125,17 +125,22 @@ export function LockScreen({ initialMode = 'signIn', onBack, brand = BUSINESS_BR
             </h1>
             <p className="mt-5 text-[15px] leading-relaxed text-text-2">
               {brand.edition === 'business' ? 'Day-to-day financial work stays tied to the ledger it affects.'
-                : 'The edition is in pilot build. Accounts and team access are available now; specialist workflows are being built.'}
+                : brand.edition === 'law' ? 'Matters, court dates, time, client money and fee notes, in one ledger.'
+                  : 'Members, giving, Sunday collections and funds, in one ledger.'}
             </p>
           </div>
 
           <div className="max-w-[26rem]">
             <p className="text-[12px] font-semibold text-text-3">In the workspace</p>
             <ul className="mt-3 space-y-3">
-              {(brand.edition === 'business' ? CONTENTS : [
-                ['Accounts', 'A chart of accounts for this edition is ready when you create your organization.'],
-                ['Team', 'Invite colleagues to work in the same books.'],
-                ['Pilot sections', 'Specialist records and reports are being built.'],
+              {(brand.edition === 'business' ? CONTENTS : brand.edition === 'law' ? [
+                ['Matters', 'Opened after a conflict search, with parties, court dates and time.'],
+                ['Client account', 'Client money kept apart from office money, never overdrawn.'],
+                ['Fee notes', 'Raised from unbilled work, settled from client money or paid net of withholding.'],
+              ] : [
+                ['Members', 'The register and households, imported from a spreadsheet.'],
+                ['Giving', 'M-Pesa, cash and cheque gifts, each placed on a member and a fund.'],
+                ['Treasurer\'s report', 'Monthly, as a PDF, with fund balances that agree with the ledger.'],
               ]).map(([title, description]) => (
                 <li key={title} className="rounded-xl border border-border bg-surface p-4 shadow-sm">
                   <p className="text-[14px] font-semibold text-text">{title}</p>

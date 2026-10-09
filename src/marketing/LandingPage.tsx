@@ -17,6 +17,7 @@ import {
   X,
 } from 'lucide-react';
 import { BrandMark } from '../components/ledger/BrandMark';
+import { ThemeToggle } from '../components/layout/ThemeToggle';
 import { BUSINESS_BRAND } from '../hooks/usePublicBrand';
 import type { PublicBrand } from '../utils/publicBrand';
 
@@ -31,30 +32,55 @@ import type { PublicBrand } from '../utils/publicBrand';
 const NAV_LINKS = [
   { id: 'how-it-works', label: 'How it works' },
   { id: 'features', label: 'Features' },
+  { id: 'editions', label: 'Editions' },
   { id: 'security', label: 'Security' },
   { id: 'faq', label: 'FAQ' },
 ];
 
 const TRUST_MARKS = [
-  { icon: ScrollText, label: 'Kenyan tax context' },
+  { icon: ScrollText, label: 'VAT and withholding tax on each document' },
   { icon: ShieldCheck, label: 'Row-level tenant isolation' },
   { icon: Layers, label: 'Double-entry, always balanced' },
 ];
 
 const SETUP_STEPS = [
   { title: 'Create an account', body: 'Sign up with a work email. No card required to start.' },
-  { title: 'Say what the business is', body: 'Retail, services, hospitality and more. This decides the accounts and pages you see first.' },
-  { title: 'The books are ready', body: 'A chart of accounts is seeded for that kind of business. Nothing to configure by hand.' },
-  { title: 'Record the first sale', body: 'An invoice, a bill or a bank line. Each one posts to the ledger behind it automatically.' },
+  { title: 'Say what it is', body: 'A business, a law firm or a church. It decides the accounts that open first.' },
+  { title: 'The books are ready', body: 'A chart of accounts is seeded for it. Nothing to set up by hand.' },
+  { title: 'Record the first sale', body: 'An invoice, a bill or a bank line, posted to the ledger as it is saved.' },
 ];
 
 const FEATURES: { icon: typeof BookOpen; title: string; body: string }[] = [
-  { icon: FileCheck2, title: 'Invoices and bills', body: 'Raise an invoice or record a bill in a few fields. VAT is worked out on each line, and the posting to the ledger happens without a second step.' },
-  { icon: Landmark, title: 'Banking and M-Pesa matching', body: 'Import bank and M-Pesa statements, then match lines to the invoice or bill they settle, with rules for the ones that repeat every month.' },
-  { icon: Wallet, title: 'Payroll and statutory deductions', body: 'PAYE, NSSF, SHA and the Housing Levy calculated from gross pay, with the filing dates tracked against the Kenyan calendar.' },
-  { icon: BarChart3, title: 'Reports that read themselves', body: 'Profit and loss, balance sheet, cash flow and a general ledger, built from what has already been posted. Nothing to reconcile by hand.' },
-  { icon: Users, title: 'Roles for a real team', body: 'An owner and an accountant work from the same books, each with clearly stated limits on what they can post or change.' },
-  { icon: ScrollText, title: 'An audit log that cannot be edited', body: 'Every change to accounts, entries and the team is recorded in the order it happened, and stays there.' },
+  { icon: FileCheck2, title: 'Invoices, bills and the papers around them', body: 'Estimates, sales and purchase orders, invoices, bills, credit notes and recurring documents, each printed as a PDF. VAT is worked out on each line, and the posting to the ledger happens without a second step.' },
+  { icon: Wallet, title: 'Payments as they really arrive', body: 'One customer payment shared across several invoices. Tax a customer withheld, recorded against its KRA certificate number. A dollar invoice settled at the day\'s rate, with the exchange gain or loss posted.' },
+  { icon: Landmark, title: 'Banking and M-Pesa matching', body: 'Bank and M-Pesa statements import as CSV, OFX or QFX, get matched to the invoice or bill they settle, with rules for the lines that repeat, and each account reconciles to its statement.' },
+  { icon: Users, title: 'Payroll and statutory deductions', body: 'PAYE, NSSF, SHA and the Housing Levy calculated from gross pay, with the filing dates tracked against the Kenyan calendar.' },
+  { icon: BarChart3, title: 'Reports that read themselves', body: 'Profit and loss (also by class or location), balance sheet, cash flow, VAT summary, aging and customer statements, built from what has already been posted.' },
+  { icon: ShieldCheck, title: 'Roles and approvals for a real team', body: 'An owner, admin or accountant posts; a member reads. A bill over the approval limit waits for someone who did not enter it, and every change is in an audit log that cannot be edited.' },
+];
+
+/** What each edition adds on top of the shared ledger. Each point is built and tested; the Daraja connection is marked as pilot. */
+const EDITIONS: { edition: 'law' | 'church'; name: string; audience: string; points: string[] }[] = [
+  {
+    edition: 'law', name: 'Mizani', audience: 'For law firms',
+    points: [
+      'Matters, opened after a conflict search across clients and parties.',
+      'A court diary with outcomes and next dates, and a private calendar feed for each advocate.',
+      'Time at the matter\'s rate and office disbursements, waiting to be billed.',
+      'A client account kept apart from office money, refused if it would go overdrawn.',
+      'Fee notes raised from unbilled work, settled from client money or paid net of withholding.',
+    ],
+  },
+  {
+    edition: 'church', name: 'Kundi', audience: 'For churches',
+    points: [
+      'A member register and households, imported from a spreadsheet.',
+      'M-Pesa giving from the paybill statement, placed on each member by the reference they typed. A direct Daraja paybill connection is in pilot.',
+      'Sunday cash counted by two people before it is banked, with any shortfall recorded.',
+      'Funds such as building, missions and welfare kept apart in the same books.',
+      'A monthly treasurer\'s report as a PDF, and fund balances that agree with the ledger.',
+    ],
+  },
 ];
 
 const FAQS = [
@@ -67,12 +93,16 @@ const FAQS = [
     a: 'It adds a few accounts suited to that kind of work to the standard chart of accounts, and it reorders the sidebar so the pages you need most come first. Nothing is ever hidden or removed, and it can be changed later from Settings.',
   },
   {
+    q: 'Is there a version for law firms or churches?',
+    a: 'Yes. Mizani is the edition for law firms: matters, the court diary, time, the client account and fee notes. Kundi is the edition for churches: members, giving, Sunday cash counts, funds and the treasurer\'s report. The edition is chosen once, when the organization is created, and both post to the same double-entry ledger.',
+  },
+  {
     q: 'Is eTIMS submission built in?',
-    a: 'No. Ledger Link records VAT on invoices and provides tax reports. eTIMS submission is not available.',
+    a: 'Not yet. Each invoice is logged in the eTIMS queue on the Tax page, where it waits for a connected KRA device; sending the queue to KRA is not built. Nothing is shown as submitted to KRA. A law firm can record a fee note\'s eTIMS invoice number by hand.',
   },
   {
     q: 'Can more than one person work on the same books?',
-    a: 'Yes. Invite a teammate from Team settings and choose their role. An owner or admin can post to the books; a member can read them.',
+    a: 'Yes. Invite a teammate from Team settings and choose their role. An owner, admin or accountant can post to the books; a member can read them.',
   },
   {
     q: 'Where is the data kept?',
@@ -102,7 +132,10 @@ export function LandingPage({ onSignIn, onSignUp, brand = BUSINESS_BRAND }: Land
 
   if (brand.edition !== 'business') {
     const audience = brand.edition === 'law' ? 'law firms' : 'churches';
-    const firstRecord = brand.edition === 'law' ? 'matters and client money' : 'members, giving and funds';
+    const edition = EDITIONS.find((entry) => entry.edition === brand.edition)!;
+    const summary = brand.edition === 'law'
+      ? 'Matters, the court diary, time, client money and fee notes, in one set of double-entry books. Client money is kept apart from office money and can never be overdrawn.'
+      : 'Members, giving, Sunday collections and funds, in one set of double-entry books. Each gift lands in its fund, and the treasurer\'s report comes from the same ledger.';
     const startLabel = { en: 'Create account', sw: 'TODO-SW' };
     const signInLabel = { en: 'Sign in', sw: 'TODO-SW' };
     return <main className="min-h-screen bg-canvas text-text">
@@ -111,20 +144,21 @@ export function LandingPage({ onSignIn, onSignUp, brand = BUSINESS_BRAND }: Land
           <span className="flex items-center gap-2 font-display text-[16px] font-bold">
             <BrandMark edition={brand.edition} className="h-5 w-5 text-primary" /> {brand.brandName}
           </span>
-          <button type="button" onClick={onSignIn} className="rounded-lg px-3 py-2 text-[13.5px] font-semibold text-primary-ink hover:bg-primary-soft">
-            {signInLabel.en}
-          </button>
+          <div className="flex items-center gap-2">
+            <ThemeToggle />
+            <button type="button" onClick={onSignIn} className="rounded-lg px-3 py-2 text-[13.5px] font-semibold text-primary-ink hover:bg-primary-soft">
+              {signInLabel.en}
+            </button>
+          </div>
         </div>
       </header>
       <section className="mx-auto grid max-w-6xl gap-12 px-5 py-20 sm:px-8 md:grid-cols-[1.4fr_1fr] md:py-28">
         <div>
-          <p className="text-[12px] font-semibold text-primary-ink">{brand.brandName} · Pilot build</p>
+          <p className="text-[12px] font-semibold text-primary-ink">{brand.brandName} · {edition.audience}</p>
           <h1 className="mt-5 max-w-2xl ll-cover text-[44px] leading-[1.08] sm:text-[62px]">
             One set of books for {audience}.
           </h1>
-          <p className="mt-7 max-w-xl text-[16px] leading-relaxed text-graphite-600">
-            Start with a dedicated chart of accounts and team access. Workflows for {firstRecord} are being built for the pilot.
-          </p>
+          <p className="mt-7 max-w-xl text-[16px] leading-relaxed text-graphite-600">{summary}</p>
           <button type="button" onClick={onSignUp}
             className="mt-9 inline-flex h-11 items-center gap-2 rounded-lg bg-primary px-5 text-[14px] font-semibold text-on-primary shadow-sm hover:bg-primary-hover">
             {startLabel.en} <ArrowRight className="h-4 w-4" aria-hidden="true" />
@@ -132,11 +166,10 @@ export function LandingPage({ onSignIn, onSignUp, brand = BUSINESS_BRAND }: Land
           <p className="mt-4 text-[12px] text-graphite-600">powered by Ledger Link</p>
         </div>
         <aside className="self-start rounded-2xl border border-border bg-surface p-8 shadow-md">
-          <p className="text-[12px] font-semibold text-text-2">What opens now</p>
+          <p className="text-[12px] font-semibold text-text-2">What opens with the organization</p>
           <ul className="mt-5 space-y-4 text-[14px] leading-relaxed">
-            <li><strong>Accounts.</strong> An edition chart is created with the organization.</li>
-            <li><strong>Team.</strong> Invite people into the same books.</li>
-            <li><strong>Specialist sections.</strong> Marked as planned until each workflow is ready.</li>
+            {edition.points.map((point) => <li key={point}>{point}</li>)}
+            <li>Full books: the chart of accounts, journal entries and trial balance, for owners, admins and accountants.</li>
           </ul>
         </aside>
       </section>
@@ -168,6 +201,7 @@ export function LandingPage({ onSignIn, onSignUp, brand = BUSINESS_BRAND }: Land
           </nav>
 
           <div className="hidden items-center gap-2 md:flex">
+            <ThemeToggle />
             <button type="button" onClick={onSignIn} className="h-9 px-3 text-[13.5px] font-semibold text-ink-900 hover:text-oxblood">
               Sign in
             </button>
@@ -176,9 +210,12 @@ export function LandingPage({ onSignIn, onSignUp, brand = BUSINESS_BRAND }: Land
             </button>
           </div>
 
-          <button type="button" onClick={() => setIsMenuOpen((open) => !open)} className="p-2 text-ink-900 md:hidden" aria-label={isMenuOpen ? 'Close menu' : 'Open menu'} aria-expanded={isMenuOpen}>
-            {isMenuOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
-          </button>
+          <div className="flex items-center gap-1 md:hidden">
+            <ThemeToggle />
+            <button type="button" onClick={() => setIsMenuOpen((open) => !open)} className="p-2 text-ink-900" aria-label={isMenuOpen ? 'Close menu' : 'Open menu'} aria-expanded={isMenuOpen}>
+              {isMenuOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
+            </button>
+          </div>
         </div>
 
         {isMenuOpen && (
@@ -230,11 +267,11 @@ export function LandingPage({ onSignIn, onSignUp, brand = BUSINESS_BRAND }: Land
               </div>
               <div>
                 <dt className="ll-printed text-[10.5px] text-graphite-600">Currency</dt>
-                <dd className="mt-1 text-[13.5px] text-ink-900">KES and 5 others</dd>
+                <dd className="mt-1 text-[13.5px] text-ink-900">KES and 11 others</dd>
               </div>
               <div>
                 <dt className="ll-printed text-[10.5px] text-graphite-600">Built for</dt>
-                <dd className="mt-1 text-[13.5px] text-ink-900">Kenyan SMEs</dd>
+                <dd className="mt-1 text-[13.5px] text-ink-900">SMEs, law firms, churches</dd>
               </div>
             </dl>
           </div>
@@ -272,6 +309,29 @@ export function LandingPage({ onSignIn, onSignUp, brand = BUSINESS_BRAND }: Land
                 <feature.icon className="h-5 w-5 text-oxblood" aria-hidden="true" />
                 <h3 className="ll-heading mt-4 text-[18px] text-ink-900">{feature.title}</h3>
                 <p className="mt-2 text-[13.5px] leading-relaxed text-graphite-600">{feature.body}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* Editions */}
+      <section id="editions" className="border-t border-feint-strong py-16 sm:py-24">
+        <div className="mx-auto max-w-6xl px-5 sm:px-8">
+          <SectionHeading eyebrow="Editions" title="The same ledger, set out for law firms and churches" note="Choose the edition when the organization is created. Each opens with its own chart of accounts, sidebar and Home, and posts to the same double-entry books." />
+          <div className="mt-12 grid grid-cols-1 gap-px overflow-hidden border border-feint-strong bg-feint-strong md:grid-cols-2">
+            {EDITIONS.map((edition) => (
+              <div key={edition.name} className="bg-paper-50 p-6 sm:p-8">
+                <p className="flex items-center gap-2">
+                  <BrandMark edition={edition.edition} className="h-5 w-5 text-oxblood" />
+                  <span className="ll-heading text-[20px] text-ink-900">{edition.name}</span>
+                  <span className="ll-printed text-[11px] text-graphite-600">{edition.audience}</span>
+                </p>
+                <ul className="mt-5 space-y-3">
+                  {edition.points.map((point) => (
+                    <li key={point} className="border-b border-feint pb-3 text-[13.5px] leading-relaxed text-graphite-600 last:border-b-0 last:pb-0">{point}</li>
+                  ))}
+                </ul>
               </div>
             ))}
           </div>
@@ -368,7 +428,7 @@ export function LandingPage({ onSignIn, onSignUp, brand = BUSINESS_BRAND }: Land
             </span>
             <span className="font-display text-[13px] font-bold text-text">Ledger Link</span>
           </div>
-          <p className="text-[12.5px] text-graphite-500">Double-entry bookkeeping for Kenyan businesses. Built in Nairobi.</p>
+          <p className="text-[12.5px] text-graphite-500">Double-entry bookkeeping for Kenyan businesses, law firms and churches. Built in Nairobi.</p>
         </div>
       </footer>
     </motion.div>

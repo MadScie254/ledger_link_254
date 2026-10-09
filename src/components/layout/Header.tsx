@@ -1,8 +1,9 @@
 import { useState } from 'react';
-import { Search, Menu, ChevronDown, Check, Moon, Sun, HelpCircle, UserRound } from 'lucide-react';
+import { Search, Menu, ChevronDown, Check, HelpCircle, UserRound } from 'lucide-react';
 import { useAppStore } from '../../store';
 import { useQueryClient } from '@tanstack/react-query';
 import { NotificationDropdown } from './NotificationDropdown';
+import { ThemeToggle } from './ThemeToggle';
 import { CompanyMark } from '../ledger/CompanyMark';
 import { BrandMark } from '../ledger/BrandMark';
 import { editionDefinition } from '../../utils/editions';
@@ -34,8 +35,6 @@ export function Header() {
     setActiveCompany,
     setCurrentOrgId,
     setDisplayCurrency,
-    theme,
-    setTheme,
     setMobileSidebarOpen,
   } = useAppStore();
   const [isCompanyMenuOpen, setIsCompanyMenuOpen] = useState(false);
@@ -161,14 +160,7 @@ export function Header() {
             </div>
           </details>
 
-          <button
-            type="button"
-            onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
-            className="flex h-9 w-9 items-center justify-center rounded-md text-text-2 hover:bg-hover hover:text-text"
-            aria-label={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
-          >
-            {theme === 'dark' ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
-          </button>
+          <ThemeToggle className="flex h-9 w-9 items-center justify-center rounded-md text-text-2 hover:bg-hover hover:text-text" />
 
           <NotificationDropdown />
           <details className="relative" onKeyDown={(event) => { if (event.key === 'Escape') event.currentTarget.open = false; }}>

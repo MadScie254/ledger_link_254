@@ -58,7 +58,7 @@ export function PlanPanel({ orgId }: { orgId: string }) {
         <dt className="ll-printed text-[11px] text-graphite-600">Member records</dt>
         <dd className="mt-1 text-[14px] text-ink-900">
           {plan.maxMembers === null ? 'No plan limit' : `Up to ${plan.maxMembers.toLocaleString('en-KE')}`}
-          <span className="block text-[12px] text-graphite-600">Member records are being built for the pilot.</span>
+          <span className="block text-[12px] text-graphite-600">Counts visitors, adherents and members; transferred, deceased and inactive records do not.</span>
         </dd>
       </div>}
     </dl>

@@ -16,7 +16,7 @@ import { LandingPage } from "./marketing/LandingPage";
 import { Mark } from "./components/ledger/Mark";
 import { InvitationsPrompt } from "./components/team/InvitationsPrompt";
 import { NewPasswordScreen } from "./components/layout/NewPasswordScreen";
-import { isPlannedEditionView, type BusinessView } from "./utils/views";
+import { isPlannedEditionView, type BusinessView, type ChurchView, type LawView } from "./utils/views";
 import { PlannedEditionView } from "./components/layout/PlannedEditionView";
 import { editionDefinition } from "./utils/editions";
 import { BUSINESS_BRAND, usePublicBrand } from "./hooks/usePublicBrand";
@@ -77,6 +77,28 @@ const AuditLogView = lazy(() => import('./components/audit/AuditLogView').then((
 const SystemHealthView = lazy(() => import('./components/health/SystemHealthView').then((module) => ({ default: module.SystemHealthView })));
 const SettingsView = lazy(() => import('./components/settings/SettingsView').then((module) => ({ default: module.SettingsView })));
 const DocumentationView = lazy(() => import('./components/documentation/DocumentationView').then((module) => ({ default: module.DocumentationView })));
+const lawView = (name: 'MattersView' | 'CourtDiaryView' | 'TimeView' | 'FeeNotesView' | 'ClientAccountView' | 'DisbursementsView' | 'LawHomeView') =>
+  lazy(() => import('./components/law/LawViews').then((module) => ({ default: module[name] })));
+const LawHomeView = lawView('LawHomeView');
+const LAW_RENDERERS: Record<LawView, ComponentType> = {
+  'Law / Matters': lawView('MattersView'),
+  'Law / Court diary': lawView('CourtDiaryView'),
+  'Law / Time': lawView('TimeView'),
+  'Law / Fee notes': lawView('FeeNotesView'),
+  'Law / Client account': lawView('ClientAccountView'),
+  'Law / Disbursements': lawView('DisbursementsView'),
+};
+
+const ChurchHomeView = lazy(() => import('./components/church/ChurchReports').then((module) => ({ default: module.ChurchHomeView })));
+const CHURCH_RENDERERS: Record<ChurchView, ComponentType> = {
+  'Church / Members': lazy(() => import('./components/church/MembersView').then((module) => ({ default: module.MembersView }))),
+  'Church / Households': lazy(() => import('./components/church/MembersView').then((module) => ({ default: module.HouseholdsView }))),
+  'Church / Giving': lazy(() => import('./components/church/GivingView').then((module) => ({ default: module.GivingView as ComponentType }))),
+  'Church / Funds': lazy(() => import('./components/church/FundsView').then((module) => ({ default: module.FundsView }))),
+  'Church / Cash count': lazy(() => import('./components/church/GivingView').then((module) => ({ default: module.CashCountView }))),
+  "Church / Treasurer's report": lazy(() => import('./components/church/ChurchReports').then((module) => ({ default: module.TreasurerReportView }))),
+  'Church / Fund balances': lazy(() => import('./components/church/FundsView').then((module) => ({ default: module.FundBalancesView }))),
+};
 
 // Every business view key has a real renderer. Edition pilot keys below show
 // an explicit unavailable state until their own feature tasks are complete.
@@ -252,6 +274,14 @@ function LedgerApp() {
   }, [setActiveView, isLocked]);
 
   const renderContent = () => {
+    // A law firm's Home is its practice: court today, unbilled work, client money.
+    if (activeView === 'Home / Dashboard' && activeCompany?.edition === 'law') return <LawHomeView />;
+    const LawRenderer = activeCompany?.edition === 'law' ? LAW_RENDERERS[activeView as LawView] : undefined;
+    if (LawRenderer) return <LawRenderer />;
+    // A church's Home is its giving: this Sunday, the month by fund, what waits.
+    if (activeView === 'Home / Dashboard' && activeCompany?.edition === 'church') return <ChurchHomeView />;
+    const ChurchRenderer = activeCompany?.edition === 'church' ? CHURCH_RENDERERS[activeView as ChurchView] : undefined;
+    if (ChurchRenderer) return <ChurchRenderer />;
     const BusinessRenderer = BUSINESS_RENDERERS[activeView as BusinessView];
     if (BusinessRenderer) return <BusinessRenderer />;
     if (isPlannedEditionView(activeView)) return <PlannedEditionView view={activeView} />;

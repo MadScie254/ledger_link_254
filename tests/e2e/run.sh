@@ -63,7 +63,11 @@ for _ in $(seq 1 120); do
 done
 
 status=0
-E2E_URL="http://127.0.0.1:$PORT" node --test --test-concurrency=1 "$HERE"/*.e2e.mjs || status=$?
+# Pass flow files (e.g. `run.sh law`) to run only those.
+files=()
+if [ $# -gt 0 ]; then for name in "$@"; do files+=("$HERE/$name.e2e.mjs"); done
+else files=("$HERE"/*.e2e.mjs); fi
+E2E_URL="http://127.0.0.1:$PORT" node --test --test-concurrency=1 "${files[@]}" || status=$?
 
 # The daily schedule runs through the same Worker: fire it once and look for its log line.
 curl -sf -o /dev/null "http://127.0.0.1:$PORT/cdn-cgi/handler/scheduled?cron=17+0+*+*+*" || true

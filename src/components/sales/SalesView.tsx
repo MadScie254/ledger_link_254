@@ -14,6 +14,9 @@ import { MoneyBar } from '../ledger/MoneyBar';
 import { Dialog, Field } from '../ledger/Dialog';
 import { Mark } from '../ledger/Mark';
 import { IndexTabs, PageHeading, PageNote, buttonClass } from '../ledger/Page';
+import { CustomerPaymentDialog, CustomerPaymentsPanel } from './CustomerPayments';
+import { NO_WITHHOLDING, WithheldTaxFields, withheldCents, type Withheld } from '../common/WithheldTax';
+import { ForeignSettlementFields, foreignBalanceOf, settlementCents } from '../common/ForeignSettlement';
 import { useConfirm } from '../../hooks/useConfirm';
 import { downloadCsv } from '../../utils/exportCsv';
 import { todayIn } from '../../utils/dates';
@@ -25,7 +28,7 @@ import { CashTransactionsPanel } from '../common/CashTransactionsPanel';
 import { CreditsPanel } from '../common/CreditsPanel';
 import { RecurringPanel } from '../common/RecurringPanel';
 
-type SalesTab = 'Invoices' | 'Recurring' | 'Receipts' | 'Credits' | 'Estimates' | 'Orders';
+type SalesTab = 'Invoices' | 'Payments' | 'Recurring' | 'Receipts' | 'Credits' | 'Estimates' | 'Orders';
 
 export function SalesView() {
   useRenderTracker("SalesView");
@@ -35,6 +38,8 @@ export function SalesView() {
   const [isBuilding, setIsBuilding] = useState(false);
   const [isOrdering, setIsOrdering] = useState(false);
   const [isEstimating, setIsEstimating] = useState(false);
+  const [isReceivingPayment, setIsReceivingPayment] = useState(false);
+  const [paymentNotice, setPaymentNotice] = useState('');
   const [isSellingNow, setIsSellingNow] = useState(false);
   const [isCrediting, setIsCrediting] = useState(false);
   const [isScheduling, setIsScheduling] = useState(false);
@@ -43,6 +48,8 @@ export function SalesView() {
   const [selectedInvoice, setSelectedInvoice] = useState<any | null>(null);
   const [paymentInvoice, setPaymentInvoice] = useState<any | null>(null);
   const [paymentAmount, setPaymentAmount] = useState('');
+  const [paymentWithheld, setPaymentWithheld] = useState<Withheld>(NO_WITHHOLDING);
+  const [paymentForeign, setPaymentForeign] = useState({ foreign: '', rate: '', base: '' });
   const [paymentDate, setPaymentDate] = useState(format(new Date(), 'yyyy-MM-dd'));
   const [depositAccountId, setDepositAccountId] = useState('');
   const [paymentIdempotencyKey, setPaymentIdempotencyKey] = useState('');
@@ -126,7 +133,10 @@ export function SalesView() {
   });
 
   const receivePaymentMutation = useMutation({
-    mutationFn: async (payment: { invoiceId: string; amountCents: number; paymentDate: string; depositAccountId: string; idempotencyKey: string }) => {
+    mutationFn: async (payment: {
+      invoiceId: string; amountCents: number; paymentDate: string; depositAccountId: string; idempotencyKey: string;
+      whtCents?: number; wvatCents?: number; whtCertificate?: string; wvatCertificate?: string; foreignAmountCents?: number;
+    }) => {
       const res = await fetch(`/api/invoices/${payment.invoiceId}/payments`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'x-org-id': currentOrgId },
@@ -135,6 +145,11 @@ export function SalesView() {
           paymentDate: payment.paymentDate,
           depositAccountId: payment.depositAccountId,
           idempotencyKey: payment.idempotencyKey,
+          ...(payment.foreignAmountCents ? { foreignAmountCents: payment.foreignAmountCents } : {}),
+          ...(payment.whtCents || payment.wvatCents ? {
+            whtCents: payment.whtCents, wvatCents: payment.wvatCents,
+            whtCertificate: payment.whtCertificate, wvatCertificate: payment.wvatCertificate,
+          } : {}),
         })
       });
       if (!res.ok) {
@@ -199,17 +214,43 @@ export function SalesView() {
     setDepositAccountId(depositAccounts[0]?.id || '');
     setPaymentIdempotencyKey(crypto.randomUUID());
     setPaymentProblem('');
+    setPaymentWithheld(NO_WITHHOLDING);
+    const foreign = foreignBalanceOf(invoice, baseCurrency);
+    setPaymentForeign(foreign ? {
+      foreign: (foreign.foreignDueCents / 100).toFixed(2),
+      rate: (1 / foreign.bookedRate).toFixed(4),
+      base: (foreign.baseDueCents / 100).toFixed(2),
+    } : { foreign: '', rate: '', base: '' });
   };
 
   const submitPayment = () => {
     if (!paymentInvoice) return;
-    const amountCents = Math.round(Number(paymentAmount) * 100);
-    if (!Number.isSafeInteger(amountCents) || amountCents <= 0) {
+    const foreignBalance = foreignBalanceOf(paymentInvoice, baseCurrency);
+    if (foreignBalance) {
+      const settled = settlementCents(paymentForeign);
+      if (settled.problem) { setPaymentProblem(settled.problem); return; }
+      if (settled.foreignCents > foreignBalance.foreignDueCents) { setPaymentProblem(`No more than ${paymentInvoice.currency} ${(foreignBalance.foreignDueCents / 100).toFixed(2)} is owing.`); return; }
+      if (!depositAccountId) { setPaymentProblem('Choose the account that received the money.'); return; }
+      setPaymentProblem('');
+      receivePaymentMutation.mutate({
+        invoiceId: paymentInvoice.id, amountCents: settled.baseCents, foreignAmountCents: settled.foreignCents,
+        paymentDate, depositAccountId, idempotencyKey: paymentIdempotencyKey,
+      });
+      return;
+    }
+    const amountCents = Math.round(Number(paymentAmount || 0) * 100);
+    const withheld = withheldCents(paymentWithheld);
+    if (withheld.problem) {
+      setPaymentProblem(withheld.problem);
+      return;
+    }
+    const withheldTotal = withheld.whtCents + withheld.wvatCents;
+    if (!Number.isSafeInteger(amountCents) || amountCents < 0 || amountCents + withheldTotal <= 0) {
       setPaymentProblem('Enter a payment amount greater than zero.');
       return;
     }
-    if (amountCents > Number(paymentInvoice.amountDueCents || 0)) {
-      setPaymentProblem('Payment cannot exceed the amount due.');
+    if (amountCents + withheldTotal > Number(paymentInvoice.amountDueCents || 0)) {
+      setPaymentProblem(withheldTotal ? 'The amount received and the tax withheld come to more than is due.' : 'Payment cannot exceed the amount due.');
       return;
     }
     if (!depositAccountId) {
@@ -222,6 +263,10 @@ export function SalesView() {
       paymentDate,
       depositAccountId,
       idempotencyKey: paymentIdempotencyKey,
+      ...(withheldTotal ? {
+        whtCents: withheld.whtCents, wvatCents: withheld.wvatCents,
+        whtCertificate: paymentWithheld.whtCertificate, wvatCertificate: paymentWithheld.wvatCertificate,
+      } : {}),
     });
   };
 
@@ -261,6 +306,8 @@ export function SalesView() {
         note={
           salesTab === 'Invoices'
             ? <>{invoices.length} invoices for {activeCompany?.name || 'this organization'} · Figures in {baseCurrency}</>
+            : salesTab === 'Payments'
+              ? <>Payments that settle several invoices at once · Figures in {baseCurrency}</>
             : salesTab === 'Estimates'
               ? <>Quotes to customers, before they become invoices · Figures in {baseCurrency}</>
               : salesTab === 'Receipts'
@@ -277,10 +324,17 @@ export function SalesView() {
               <button type="button" onClick={handleExportCSV} className={buttonClass.secondary}>
                 <Download className="h-4 w-4" aria-hidden="true" /> Export CSV
               </button>
+              <button type="button" onClick={() => setIsReceivingPayment(true)} className={buttonClass.secondary}>
+                Receive a payment
+              </button>
               <button data-tour="new-invoice" type="button" onClick={() => setIsBuilding(true)} className={buttonClass.primary}>
                 New invoice
               </button>
             </>
+          ) : salesTab === 'Payments' ? (
+            <button type="button" onClick={() => setIsReceivingPayment(true)} className={buttonClass.primary}>
+              Receive a payment
+            </button>
           ) : salesTab === 'Estimates' ? (
             <button type="button" onClick={() => setIsEstimating(true)} className={buttonClass.primary}>
               New estimate
@@ -315,6 +369,7 @@ export function SalesView() {
         }}
         tabs={[
           { id: 'Invoices', name: 'Invoices', count: invoices.length },
+          { id: 'Payments', name: 'Payments' },
           { id: 'Recurring', name: 'Recurring' },
           { id: 'Receipts', name: 'Sales receipts' },
           { id: 'Credits', name: 'Credit notes' },
@@ -323,7 +378,15 @@ export function SalesView() {
         ]}
       />
 
-      {salesTab === 'Receipts' ? (
+      {paymentNotice && <p role="status" className="mt-3 text-[13.5px] text-ink-900">{paymentNotice}</p>}
+      {isReceivingPayment && (
+        <CustomerPaymentDialog invoices={invoices} customers={(customersData?.customers || []).filter((c: any) => c.isActive !== false)}
+          accounts={accountsData?.accounts || []} baseCurrency={baseCurrency}
+          onClose={() => setIsReceivingPayment(false)} onDone={(message) => { setIsReceivingPayment(false); setPaymentNotice(message); }} />
+      )}
+      {salesTab === 'Payments' ? (
+        <CustomerPaymentsPanel baseCurrency={baseCurrency} onReceive={() => setIsReceivingPayment(true)} />
+      ) : salesTab === 'Receipts' ? (
         <CashTransactionsPanel kind="SALES_RECEIPT" onCreate={() => setIsSellingNow(true)} />
       ) : salesTab === 'Credits' ? (
         <CreditsPanel kind="CUSTOMER" onCreate={() => setIsCrediting(true)} />
@@ -489,22 +552,29 @@ export function SalesView() {
       >
         <div className="space-y-4">
           <div className="ll-total flex items-baseline justify-between py-2 text-[13.5px]">
-            <span className="font-semibold text-ink-900">Amount due</span>
+            <span className="font-semibold text-ink-900">
+              Amount due{foreignBalanceOf(paymentInvoice, baseCurrency) ? ` (${baseCurrency} at the booked rate)` : ''}
+            </span>
             <Amount cents={paymentInvoice?.amountDueCents || 0} currency={baseCurrency} tone="ink" />
           </div>
-          <Field label={`Amount received (${baseCurrency})`}>
-            <input
-              type="number"
-              min="0.01"
-              max={((paymentInvoice?.amountDueCents || 0) / 100).toFixed(2)}
-              step="0.01"
-              inputMode="decimal"
-              required
-              value={paymentAmount}
-              onChange={(event) => setPaymentAmount(event.target.value)}
-              className="tabular-currency"
-            />
-          </Field>
+          {foreignBalanceOf(paymentInvoice, baseCurrency) ? (
+            <ForeignSettlementFields value={paymentForeign} onChange={setPaymentForeign} side="invoice"
+              balance={foreignBalanceOf(paymentInvoice, baseCurrency)!} currency={paymentInvoice.currency} baseCurrency={baseCurrency} />
+          ) : (
+            <Field label={`Amount received (${baseCurrency})`}>
+              <input
+                type="number"
+                min="0.01"
+                max={((paymentInvoice?.amountDueCents || 0) / 100).toFixed(2)}
+                step="0.01"
+                inputMode="decimal"
+                required
+                value={paymentAmount}
+                onChange={(event) => setPaymentAmount(event.target.value)}
+                className="tabular-currency"
+              />
+            </Field>
+          )}
           <Field label="Date received">
             <input type="date" required value={paymentDate} onChange={(event) => setPaymentDate(event.target.value)} />
           </Field>
@@ -516,8 +586,11 @@ export function SalesView() {
               ))}
             </select>
           </Field>
+          {String(paymentInvoice?.currency || baseCurrency).toUpperCase() === baseCurrency.toUpperCase() && (
+            <WithheldTaxFields value={paymentWithheld} onChange={setPaymentWithheld} currency={baseCurrency} side="customer" />
+          )}
           {paymentProblem && <p role="alert" className="text-[13px] text-ledger-red">{paymentProblem}</p>}
-          <p className="text-[12.5px] text-graphite-600">This posts cash or bank against accounts receivable. A smaller amount leaves the invoice part paid.</p>
+          <p className="text-[12.5px] text-graphite-600">This posts cash or bank against accounts receivable{paymentWithheld.on ? ', and tax withheld to 1170 and 1175 to claim from KRA' : ''}. A smaller amount leaves the invoice part paid.</p>
         </div>
       </Dialog>
 

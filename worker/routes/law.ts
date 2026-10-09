@@ -42,6 +42,10 @@ export function registerLawRoutes(api: Api) {
       return c.json({ matches: await MatterService.conflictCheck(c.get('orgId'), query) });
     } catch (err) { return respondError(c, err); }
   });
+  api.get('/matters/work-in-progress', async (c) => {
+    try { return c.json(await MatterService.workInProgress(c.get('orgId'))); }
+    catch (err) { return respondError(c, err); }
+  });
   api.get('/matters', async (c) => {
     try {
       const filters = matterListSchema.parse(c.req.query());
@@ -118,6 +122,11 @@ export function registerLawRoutes(api: Api) {
     try {
       const asOf = isoDate.parse(c.req.query('asOf'));
       return c.json({ balances: await ClientAccountService.balances(c.get('orgId'), asOf) });
+    } catch (err) { return respondError(c, err); }
+  });
+  api.get('/client-account/position', async (c) => {
+    try {
+      return c.json(await ClientAccountService.position(c.get('orgId'), isoDate.parse(c.req.query('asOf'))));
     } catch (err) { return respondError(c, err); }
   });
   api.get('/client-account/entries', async (c) => {

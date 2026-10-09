@@ -32,11 +32,23 @@ export interface BillInput {
 }
 
 export interface BillPaymentInput {
+  /** The money paid. */
   amountCents: number;
   paymentDate: string;
   sourceAccountId: string;
   idempotencyKey: string;
   createdBy: string;
+  /** Income tax and VAT this business withheld and owes to KRA. */
+  whtCents?: number;
+  wvatCents?: number;
+  whtCertificate?: string;
+  wvatCertificate?: string;
+  /**
+   * For a bill in a foreign currency: how much of it this settles, in that
+   * currency. amountCents is then what it cost in the base currency on the
+   * day, and the exchange difference is realized.
+   */
+  foreignAmountCents?: number;
 }
 
 export interface BillBatchPaymentInput extends Omit<BillPaymentInput, 'createdBy'> {
@@ -72,6 +84,7 @@ function mapBillPayment(row: any) {
     journalEntryId: row.journal_entry_id,
     reversedAt: row.reversed_at ?? null,
     reversalReason: row.reversal_reason ?? null,
+    realizedFxCents: Number(row.realized_fx_cents) || 0,
     createdAt: row.created_at,
   };
 }
@@ -221,9 +234,39 @@ export class BillService {
     const bill = billResult.data;
     if (!bill) throw new UserError('Bill not found in this organization.', 404);
     if (bill.status === 'VOID') throw new UserError('A void bill cannot be paid.');
-    if (input.amountCents > Number(bill.amount_due_cents)) throw new UserError('Payment cannot exceed the bill amount due.');
 
-    const { data, error } = await supabase.rpc('pay_bill', {
+    // Settled in its own currency at the day's rate: the exchange difference is realized.
+    if (input.foreignAmountCents) {
+      const { data, error } = await supabase.rpc('pay_bill_at_rate', {
+        p_org_id: orgId,
+        p_bill_id: billId,
+        p_foreign_cents: Math.trunc(input.foreignAmountCents),
+        p_base_cents: Math.trunc(input.amountCents),
+        p_payment_date: input.paymentDate,
+        p_source_account_id: input.sourceAccountId,
+        p_idempotency_key: input.idempotencyKey,
+        p_created_by: input.createdBy,
+      });
+      if (error) throw error;
+      return data as { paymentId: string; journalEntryId: string; amountDueCents: number; status: string; realizedFxCents?: number };
+    }
+    const withheldCents = Math.trunc(input.whtCents || 0) + Math.trunc(input.wvatCents || 0);
+    if (input.amountCents + withheldCents > Number(bill.amount_due_cents)) throw new UserError('Payment cannot exceed the bill amount due.');
+
+    // Paid net of tax withheld for KRA: payables, the cash and the tax owed in one entry.
+    const { data, error } = withheldCents > 0 ? await supabase.rpc('pay_bill_withheld', {
+      p_org_id: orgId,
+      p_bill_id: billId,
+      p_cash_cents: Math.trunc(input.amountCents),
+      p_wht_cents: Math.trunc(input.whtCents || 0),
+      p_wvat_cents: Math.trunc(input.wvatCents || 0),
+      p_wht_certificate: input.whtCertificate?.trim() || null,
+      p_wvat_certificate: input.wvatCertificate?.trim() || null,
+      p_payment_date: input.paymentDate,
+      p_source_account_id: input.sourceAccountId,
+      p_idempotency_key: input.idempotencyKey,
+      p_created_by: input.createdBy,
+    }) : await supabase.rpc('pay_bill', {
       p_org_id: orgId,
       p_bill_id: billId,
       p_amount_cents: Math.trunc(input.amountCents),

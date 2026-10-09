@@ -16,8 +16,9 @@ import { THEME_ACCENTS, DEFAULT_THEME_ACCENT, type ThemeAccent } from '../../uti
 import { TrackingPanel } from './TrackingPanel';
 import { ControlsPanel } from './ControlsPanel';
 import { PlanPanel } from './PlanPanel';
+import { IntegrationsPanel } from './IntegrationsPanel';
 
-type Tab = 'companies' | 'plan' | 'controls' | 'currencies' | 'accounting' | 'tracking' | 'security';
+type Tab = 'companies' | 'plan' | 'integrations' | 'controls' | 'currencies' | 'accounting' | 'tracking' | 'security';
 
 const POSTING_ACCOUNTS = [
   { code: '1100', name: 'Accounts receivable', use: 'Every invoice posts its amount owed here' },
@@ -42,13 +43,15 @@ export function SettingsView() {
   const [customRateValue, setCustomRateValue] = useState('');
   const [exportProblem, setExportProblem] = useState('');
   const base = activeCompany?.baseCurrency || 'KES';
+  const canManageIntegrations = activeCompany?.edition === 'church' && (activeCompany.role === 'owner' || activeCompany.role === 'admin');
   const { restartTutorial, isReady: isOnboardingReady } = useOnboarding();
 
   React.useEffect(() => {
-    if (activeTab === 'plan' && (!activeCompany?.edition || activeCompany.edition === 'business')) {
+    if ((activeTab === 'plan' && (!activeCompany?.edition || activeCompany.edition === 'business'))
+      || (activeTab === 'integrations' && !canManageIntegrations)) {
       setActiveTab('companies');
     }
-  }, [activeTab, activeCompany?.edition]);
+  }, [activeTab, activeCompany?.edition, canManageIntegrations]);
 
   const { data: orgsData, refetch: refetchOrgs, isLoading: orgsLoading } = useQuery({
     queryKey: ['organizations'],
@@ -206,6 +209,7 @@ export function SettingsView() {
           { id: 'companies', name: 'Companies', count: organizations.length },
           ...(activeCompany?.edition && activeCompany.edition !== 'business'
             ? [{ id: 'plan', name: 'Plan' }] : []),
+          ...(canManageIntegrations ? [{ id: 'integrations', name: 'Integrations' }] : []),
           { id: 'controls', name: 'Closing and controls' },
           { id: 'currencies', name: 'Currencies' },
           { id: 'accounting', name: 'Posting accounts' },
@@ -295,6 +299,8 @@ export function SettingsView() {
       )}
 
       {activeTab === 'plan' && activeCompany?.edition && activeCompany.edition !== 'business' && <PlanPanel orgId={currentOrgId} />}
+
+      {activeTab === 'integrations' && canManageIntegrations && <IntegrationsPanel orgId={currentOrgId} />}
 
       {activeTab === 'controls' && activeCompany && <ControlsPanel company={activeCompany} onSaved={() => refetchOrgs()} />}
 
@@ -514,6 +520,7 @@ function CompanyModal({ initialData, onClose, onSuccess }: {
   const [website, setWebsite] = useState(initialData?.website || '');
   const [paymentDetails, setPaymentDetails] = useState(initialData?.paymentDetails || '');
   const [documentFooter, setDocumentFooter] = useState(initialData?.documentFooter || '');
+  const [vatRegistered, setVatRegistered] = useState(Boolean(initialData?.vatRegistered));
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -536,6 +543,8 @@ function CompanyModal({ initialData, onClose, onSuccess }: {
         themeAccent, address, city, phone, email, website,
         // Printed on documents; only an existing company can carry them.
         ...(initialData ? { paymentDetails, documentFooter } : {}),
+        // Only a law firm's fee notes read it today.
+        ...(initialData?.edition === 'law' ? { vatRegistered } : {}),
       };
       const res = await fetch(initialData ? `/api/organizations/${initialData.id}` : '/api/organizations', {
         method: initialData ? 'PUT' : 'POST',
@@ -586,7 +595,7 @@ function CompanyModal({ initialData, onClose, onSuccess }: {
         </Field>
         {!initialData && siteBrand?.edition !== 'business' && siteBrand?.edition ? <Field label="Edition">
           <p className="text-[14px] text-ink-900">{siteBrand.brandName} · {siteBrand.edition === 'law' ? 'Law' : 'Church'}</p>
-        </Field> : !initialData && <Field label="Edition" hint="Mizani and Kundi pilot sections are being built. Available sections open now.">
+        </Field> : !initialData && <Field label="Edition" hint="Mizani adds matters, client money and fee notes; Kundi adds members, giving and funds. Chosen once, here.">
           <select value={edition} onChange={(e) => {
             const next = e.target.value as Edition;
             setEdition(next);
@@ -681,6 +690,15 @@ function CompanyModal({ initialData, onClose, onSuccess }: {
                 <input type="text" name="documentFooter" maxLength={500} value={documentFooter} onChange={(e) => setDocumentFooter(e.target.value)} />
               </Field>
             </div>
+            {initialData.edition === 'law' && (
+              <label className="sm:col-span-2 flex items-start gap-2 text-[13.5px] text-ink-900">
+                <input type="checkbox" name="vatRegistered" className="mt-1" checked={vatRegistered} onChange={(e) => setVatRegistered(e.target.checked)} />
+                <span>
+                  Registered for VAT with KRA
+                  <span className="block text-[12.5px] text-graphite-600">Fee notes may then charge VAT on professional fees, never on disbursements. Needs the KRA PIN above.</span>
+                </span>
+              </label>
+            )}
           </>
         )}
       </form>

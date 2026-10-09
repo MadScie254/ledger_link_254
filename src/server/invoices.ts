@@ -27,11 +27,23 @@ export interface InvoiceInput {
 }
 
 export interface InvoicePaymentInput {
+  /** The money received. */
   amountCents: number;
   paymentDate: string;
   depositAccountId: string;
   idempotencyKey: string;
   createdBy: string;
+  /** Income tax and VAT the customer withheld, from their KRA certificates. */
+  whtCents?: number;
+  wvatCents?: number;
+  whtCertificate?: string;
+  wvatCertificate?: string;
+  /**
+   * For an invoice in a foreign currency: how much of it this settles, in
+   * that currency. amountCents is then what it came to in the base
+   * currency on the day, and the exchange difference is realized.
+   */
+  foreignAmountCents?: number;
 }
 
 function mapInvoiceLine(row: any) {
@@ -61,6 +73,7 @@ function mapInvoicePayment(row: any) {
     journalEntryId: row.journal_entry_id,
     reversedAt: row.reversed_at ?? null,
     reversalReason: row.reversal_reason ?? null,
+    realizedFxCents: Number(row.realized_fx_cents) || 0,
     createdAt: row.created_at,
   };
 }
@@ -212,9 +225,39 @@ export class InvoiceService {
     const invoice = invoiceResult.data;
     if (!invoice) throw new UserError('Invoice not found in this organization.', 404);
     if (invoice.status === 'VOID') throw new UserError('A void invoice cannot receive a payment.');
-    if (input.amountCents > Number(invoice.amount_due_cents)) throw new UserError('Payment cannot exceed the invoice amount due.');
 
-    const { data, error } = await supabase.rpc('receive_invoice_payment', {
+    // Settled in its own currency at the day's rate: the exchange difference is realized.
+    if (input.foreignAmountCents) {
+      const { data, error } = await supabase.rpc('receive_invoice_payment_at_rate', {
+        p_org_id: orgId,
+        p_invoice_id: invoiceId,
+        p_foreign_cents: Math.trunc(input.foreignAmountCents),
+        p_base_cents: Math.trunc(input.amountCents),
+        p_payment_date: input.paymentDate,
+        p_deposit_account_id: input.depositAccountId,
+        p_idempotency_key: input.idempotencyKey,
+        p_created_by: input.createdBy,
+      });
+      if (error) throw error;
+      return data as { paymentId: string; journalEntryId: string; amountDueCents: number; status: string; realizedFxCents?: number };
+    }
+    const withheldCents = Math.trunc(input.whtCents || 0) + Math.trunc(input.wvatCents || 0);
+    if (input.amountCents + withheldCents > Number(invoice.amount_due_cents)) throw new UserError('Payment cannot exceed the invoice amount due.');
+
+    // Paid net of tax the customer withheld: the cash, the withheld tax and receivables in one entry.
+    const { data, error } = withheldCents > 0 ? await supabase.rpc('receive_invoice_payment_withheld', {
+      p_org_id: orgId,
+      p_invoice_id: invoiceId,
+      p_cash_cents: Math.trunc(input.amountCents),
+      p_wht_cents: Math.trunc(input.whtCents || 0),
+      p_wvat_cents: Math.trunc(input.wvatCents || 0),
+      p_wht_certificate: input.whtCertificate?.trim() || null,
+      p_wvat_certificate: input.wvatCertificate?.trim() || null,
+      p_payment_date: input.paymentDate,
+      p_deposit_account_id: input.depositAccountId,
+      p_idempotency_key: input.idempotencyKey,
+      p_created_by: input.createdBy,
+    }) : await supabase.rpc('receive_invoice_payment', {
       p_org_id: orgId,
       p_invoice_id: invoiceId,
       p_amount_cents: Math.trunc(input.amountCents),

@@ -24,7 +24,7 @@ async function seedDemoOrg() {
     fiscalYearStart: 'January',
     baseCurrency: 'KES',
     country: 'Kenya',
-    taxId: 'P012345678Z',
+    // No KRA PIN: a made-up one could be a real taxpayer's.
   }, userId);
   // Marks the organization as sample books; only this script does that.
   const { error: demoError } = await supabase.from('organizations').update({ is_demo: true }).eq('id', orgId);
@@ -190,25 +190,16 @@ async function seedDemoOrg() {
       });
     }
 
-    // Add etims submission
-    const { error: etimsError } = await supabase
-      .from('etims_submissions')
-      .update({
-        status: 'SUCCESS',
-        submitted_at: inv.date.toISOString(),
-        kra_control_code: 'KRA-' + Math.random().toString(36).substring(2, 10).toUpperCase(),
-        qr_code_url: 'https://etims.kra.go.ke/verify'
-      })
-      .eq('org_id', orgId)
-      .eq('invoice_id', inv.id);
-    if (etimsError) throw etimsError;
+    // eTIMS is not integrated: the demo leaves each invoice's submission
+    // as the app records it (NOT_CONFIGURED) and never invents a KRA code.
   }
 
   if (bankTransactions.length > 0) {
-    await supabase.from('bank_transactions').insert(bankTransactions);
+    const { error: bankError } = await supabase.from('bank_transactions').insert(bankTransactions);
+    if (bankError) throw bankError;
   }
 
-  console.log('Invoices, Bills, Ledger, Bank Transactions, and eTIMS seeded.');
+  console.log('Invoices, bills, ledger and bank transactions seeded.');
   console.log('Seed Complete!');
 }
 

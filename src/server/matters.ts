@@ -102,6 +102,32 @@ export class MatterService {
     return { timeEntries: time.data ?? [], disbursements: disbursements.data ?? [] };
   }
 
+  /** Billable time and office disbursements not yet on a fee note, across the firm. */
+  static async workInProgress(orgId: string) {
+    const supabase = getSupabase();
+    const [time, costs] = await Promise.all([
+      fetchAllRows<any>((from, to) => supabase.from('time_entries').select('id,matter_id,amount_cents')
+        .eq('org_id', orgId).not('matter_id', 'is', null).eq('billable', true).is('invoice_id', null)
+        .order('id').range(from, to)),
+      fetchAllRows<any>((from, to) => supabase.from('disbursements').select('id,matter_id,amount_cents')
+        .eq('org_id', orgId).eq('paid_from', 'OFFICE').is('invoice_id', null)
+        .order('id').range(from, to)),
+    ]);
+    const byMatter = new Map<string, { matterId: string; timeCents: number; disbursementCents: number }>();
+    const entry = (matterId: string) => {
+      if (!byMatter.has(matterId)) byMatter.set(matterId, { matterId, timeCents: 0, disbursementCents: 0 });
+      return byMatter.get(matterId)!;
+    };
+    for (const row of time) entry(row.matter_id).timeCents += Number(row.amount_cents) || 0;
+    for (const row of costs) entry(row.matter_id).disbursementCents += Number(row.amount_cents) || 0;
+    const matters = [...byMatter.values()];
+    return {
+      timeCents: matters.reduce((sum, row) => sum + row.timeCents, 0),
+      disbursementCents: matters.reduce((sum, row) => sum + row.disbursementCents, 0),
+      matters,
+    };
+  }
+
   static async timeEntries(orgId: string, matterId: string) {
     await this.get(orgId, matterId);
     const { data, error } = await getSupabase().from('time_entries').select('*')

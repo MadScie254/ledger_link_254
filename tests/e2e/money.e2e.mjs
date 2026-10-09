@@ -211,3 +211,89 @@ test('an invoice is made recurring and the next one posted now', async () => {
     assert.deepEqual(problems, []);
   });
 });
+
+test('one payment settles two invoices, keeps the rest as credit, and is reversed whole', async () => {
+  const session = await signedIn();
+  const { page, api, problems } = session;
+  await flow('customer-payment', session, async () => {
+    const customer = sql(`INSERT INTO public.customers (org_id, display_name) VALUES ('00000000-0000-0000-0000-0000000000aa', 'Mfano Traders') RETURNING id`);
+    const invoiceFor = (days, cents, key) => sql(`SELECT public.create_invoice_with_journal('00000000-0000-0000-0000-0000000000aa', '${customer}',
+      CURRENT_DATE - ${days}, CURRENT_DATE + 30 - ${days}, 'KES', 1, NULL, '00000000-0000-0000-0000-000000000001',
+      jsonb_build_array(jsonb_build_object('description', 'Cement', 'accountId', '00000000-0000-0000-0000-00000000a400', 'amountCents', ${cents})), '${key}')`);
+    const older = invoiceFor(10, 150000, 'e2e-pay-1');
+    const newer = invoiceFor(5, 250000, 'e2e-pay-2');
+    await openView(page, 'Sales');
+    await page.getByRole('button', { name: 'Receive a payment' }).click();
+    const dialog = page.getByRole('dialog');
+    await dialog.locator('select[name="customerId"]').selectOption(customer);
+    await dialog.locator('input[name="amount"]').fill('4500');
+    await dialog.getByText('kept as the customer\'s credit, to apply to a later invoice or refund').waitFor();
+    await dialog.getByRole('button', { name: 'Post payment' }).click();
+    await page.getByText(/Payment PMT-\d{4}-\d{5} posted: KES 4,000\.00 to 2 invoices, KES 500\.00 kept as credit\./).waitFor({ timeout: 10_000 });
+    assert.equal(sql(`SELECT string_agg(status, ',' ORDER BY date) FROM public.invoices WHERE id IN ('${older}', '${newer}')`), 'PAID,PAID');
+
+    await page.getByRole('tab', { name: 'Payments' }).click();
+    const row = page.getByRole('row').filter({ hasText: 'Mfano Traders' });
+    await row.getByRole('button', { name: 'Reverse' }).click();
+    const reversal = page.getByRole('dialog');
+    await reversal.locator('input[name="reason"]').fill('Paid into the wrong account');
+    await reversal.getByRole('button', { name: 'Reverse payment' }).click();
+    await page.getByText(/Payment PMT-\d{4}-\d{5} reversed\. Its invoices are owed again\./).waitFor({ timeout: 10_000 });
+    assert.equal(sql(`SELECT sum(amount_due_cents) FROM public.invoices WHERE id IN ('${older}', '${newer}')`), '400000');
+    assert.deepEqual(refusedWrites(api), []);
+    assert.deepEqual(problems, []);
+  });
+});
+
+test('an invoice is paid net of income tax and VAT the customer withheld', async () => {
+  const session = await signedIn();
+  const { page, api, problems } = session;
+  await flow('payment-withheld', session, async () => {
+    const invoiceId = sql(`SELECT public.create_invoice_with_journal('00000000-0000-0000-0000-0000000000aa', '00000000-0000-0000-0000-0000000000c1',
+      CURRENT_DATE - 2, CURRENT_DATE + 28, 'KES', 1, NULL, '00000000-0000-0000-0000-000000000001',
+      jsonb_build_array(jsonb_build_object('description', 'Consultancy', 'accountId', '00000000-0000-0000-0000-00000000a400', 'amountCents', 1000000, 'taxCents', 160000)), 'e2e-wht-invoice')`);
+    const invoiceNumber = sql(`SELECT invoice_number FROM public.invoices WHERE id = '${invoiceId}'`);
+    await openView(page, 'Sales');
+    await page.getByRole('row').filter({ hasText: invoiceNumber }).getByRole('button', { name: 'Receive payment' }).click();
+    const dialog = page.getByRole('dialog');
+    await dialog.getByLabel('The customer withheld tax and paid the rest').check();
+    await dialog.locator('input[name="whtAmount"]').fill('500');
+    await dialog.locator('input[name="whtCertificate"]').fill('WHT-E2E-1');
+    await dialog.locator('input[name="wvatAmount"]').fill('200');
+    await dialog.locator('input[name="wvatCertificate"]').fill('WVAT-E2E-1');
+    await dialog.getByLabel('Amount received (KES)').fill('10900');
+    await dialog.getByRole('button', { name: 'Post payment' }).click();
+    await dialog.waitFor({ state: 'hidden', timeout: 10_000 });
+    assert.equal(sql(`SELECT status || ' ' || amount_due_cents FROM public.invoices WHERE id = '${invoiceId}'`), 'PAID 0');
+    assert.equal(sql(`SELECT amount_cents || ':' || wht_cents || ':' || wvat_cents || ':' || wht_certificate_number FROM public.invoice_payments WHERE invoice_id = '${invoiceId}'`),
+      '1160000:50000:20000:WHT-E2E-1');
+    assert.deepEqual(refusedWrites(api), []);
+    assert.deepEqual(problems, []);
+  });
+});
+
+test('a dollar invoice is settled at the day\'s rate and the exchange gain is posted', async () => {
+  const session = await signedIn();
+  const { page, api, problems } = session;
+  await flow('payment-foreign', session, async () => {
+    // USD 1,000 booked at KES 100 to the dollar.
+    const invoiceId = sql(`SELECT public.create_invoice_with_journal('00000000-0000-0000-0000-0000000000aa', '00000000-0000-0000-0000-0000000000c1',
+      CURRENT_DATE - 3, CURRENT_DATE + 27, 'USD', 0.01, NULL, '00000000-0000-0000-0000-000000000001',
+      jsonb_build_array(jsonb_build_object('description', 'Export consultancy', 'accountId', '00000000-0000-0000-0000-00000000a400', 'amountCents', 10000000, 'foreignAmountCents', 100000)), 'e2e-fx-invoice')`);
+    const invoiceNumber = sql(`SELECT invoice_number FROM public.invoices WHERE id = '${invoiceId}'`);
+    await openView(page, 'Sales');
+    await page.getByRole('row').filter({ hasText: invoiceNumber }).getByRole('button', { name: 'Receive payment' }).click();
+    const dialog = page.getByRole('dialog');
+    await dialog.getByText(/still owing, booked at KES 100\.0000 to the USD/).waitFor();
+    await dialog.locator('input[name="dayRate"]').fill('103');
+    await dialog.getByText(/Exchange gain of/).waitFor();
+    assert.equal(await dialog.locator('input[name="baseAmount"]').inputValue(), '103000.00');
+    await dialog.getByRole('button', { name: 'Post payment' }).click();
+    await dialog.waitFor({ state: 'hidden', timeout: 10_000 });
+    assert.equal(sql(`SELECT status || ' ' || amount_due_cents FROM public.invoices WHERE id = '${invoiceId}'`), 'PAID 0');
+    assert.equal(sql(`SELECT amount_cents || ':' || foreign_amount_cents || ':' || realized_fx_cents FROM public.invoice_payments WHERE invoice_id = '${invoiceId}'`),
+      '10000000:100000:300000');
+    assert.deepEqual(refusedWrites(api), []);
+    assert.deepEqual(problems, []);
+  });
+});
