@@ -334,6 +334,21 @@ export const invoicePaymentSchema = z.object({
   depositAccountId: uuid,
   idempotencyKey,
 });
+/**
+ * One payment from a customer across their invoices. Without allocations it
+ * is shared oldest due first; whatever the invoices do not take is kept as
+ * the customer's credit.
+ */
+export const customerPaymentSchema = z.object({
+  customerId: uuid,
+  paymentDate: isoDate,
+  depositAccountId: uuid,
+  amountCents: positiveCents,
+  allocations: z.array(z.object({ invoiceId: uuid, amountCents: positiveCents })).max(200, 'Share a payment across up to 200 invoices.').nullable().optional(),
+  reference: text(100),
+  memo: text(2000),
+  idempotencyKey,
+});
 export const billPaymentSchema = z.object({
   amountCents: positiveCents,
   paymentDate: isoDate,

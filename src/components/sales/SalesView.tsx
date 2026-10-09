@@ -12,6 +12,7 @@ import { Amount } from '../ledger/Amount';
 import { Dialog, Field } from '../ledger/Dialog';
 import { Mark } from '../ledger/Mark';
 import { IndexTabs, PageHeading, PageNote, buttonClass } from '../ledger/Page';
+import { CustomerPaymentDialog, CustomerPaymentsPanel } from './CustomerPayments';
 import { useConfirm } from '../../hooks/useConfirm';
 import { downloadCsv } from '../../utils/exportCsv';
 import { todayIn } from '../../utils/dates';
@@ -23,7 +24,7 @@ import { CashTransactionsPanel } from '../common/CashTransactionsPanel';
 import { CreditsPanel } from '../common/CreditsPanel';
 import { RecurringPanel } from '../common/RecurringPanel';
 
-type SalesTab = 'Invoices' | 'Recurring' | 'Receipts' | 'Credits' | 'Estimates' | 'Orders';
+type SalesTab = 'Invoices' | 'Payments' | 'Recurring' | 'Receipts' | 'Credits' | 'Estimates' | 'Orders';
 
 export function SalesView() {
   useRenderTracker("SalesView");
@@ -32,6 +33,8 @@ export function SalesView() {
   const [isBuilding, setIsBuilding] = useState(false);
   const [isOrdering, setIsOrdering] = useState(false);
   const [isEstimating, setIsEstimating] = useState(false);
+  const [isReceivingPayment, setIsReceivingPayment] = useState(false);
+  const [paymentNotice, setPaymentNotice] = useState('');
   const [isSellingNow, setIsSellingNow] = useState(false);
   const [isCrediting, setIsCrediting] = useState(false);
   const [isScheduling, setIsScheduling] = useState(false);
@@ -240,6 +243,8 @@ export function SalesView() {
         note={
           salesTab === 'Invoices'
             ? <>{invoices.length} invoices for {activeCompany?.name || 'this organization'} · Figures in {baseCurrency}</>
+            : salesTab === 'Payments'
+              ? <>Payments that settle several invoices at once · Figures in {baseCurrency}</>
             : salesTab === 'Estimates'
               ? <>Quotes to customers, before they become invoices · Figures in {baseCurrency}</>
               : salesTab === 'Receipts'
@@ -256,10 +261,17 @@ export function SalesView() {
               <button type="button" onClick={handleExportCSV} className={buttonClass.secondary}>
                 <Download className="h-4 w-4" aria-hidden="true" /> Export CSV
               </button>
+              <button type="button" onClick={() => setIsReceivingPayment(true)} className={buttonClass.secondary}>
+                Receive a payment
+              </button>
               <button data-tour="new-invoice" type="button" onClick={() => setIsBuilding(true)} className={buttonClass.primary}>
                 New invoice
               </button>
             </>
+          ) : salesTab === 'Payments' ? (
+            <button type="button" onClick={() => setIsReceivingPayment(true)} className={buttonClass.primary}>
+              Receive a payment
+            </button>
           ) : salesTab === 'Estimates' ? (
             <button type="button" onClick={() => setIsEstimating(true)} className={buttonClass.primary}>
               New estimate
@@ -293,6 +305,7 @@ export function SalesView() {
         }}
         tabs={[
           { id: 'Invoices', name: 'Invoices', count: invoices.length },
+          { id: 'Payments', name: 'Payments' },
           { id: 'Recurring', name: 'Recurring' },
           { id: 'Receipts', name: 'Sales receipts' },
           { id: 'Credits', name: 'Credit notes' },
@@ -301,7 +314,15 @@ export function SalesView() {
         ]}
       />
 
-      {salesTab === 'Receipts' ? (
+      {paymentNotice && <p role="status" className="mt-3 text-[13.5px] text-ink-900">{paymentNotice}</p>}
+      {isReceivingPayment && (
+        <CustomerPaymentDialog invoices={invoices} customers={(customersData?.customers || []).filter((c: any) => c.isActive !== false)}
+          accounts={accountsData?.accounts || []} baseCurrency={baseCurrency}
+          onClose={() => setIsReceivingPayment(false)} onDone={(message) => { setIsReceivingPayment(false); setPaymentNotice(message); }} />
+      )}
+      {salesTab === 'Payments' ? (
+        <CustomerPaymentsPanel baseCurrency={baseCurrency} onReceive={() => setIsReceivingPayment(true)} />
+      ) : salesTab === 'Receipts' ? (
         <CashTransactionsPanel kind="SALES_RECEIPT" onCreate={() => setIsSellingNow(true)} />
       ) : salesTab === 'Credits' ? (
         <CreditsPanel kind="CUSTOMER" onCreate={() => setIsCrediting(true)} />
