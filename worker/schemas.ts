@@ -334,6 +334,8 @@ const withheldFields = {
   wvatCents: cents.optional(),
   whtCertificate: text(100),
   wvatCertificate: text(100),
+  /** A foreign-currency document settled at the day's rate: the amount in its currency. */
+  foreignAmountCents: positiveCents.optional(),
 };
 export const invoicePaymentSchema = z.object({
   amountCents: cents,

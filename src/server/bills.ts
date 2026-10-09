@@ -43,6 +43,12 @@ export interface BillPaymentInput {
   wvatCents?: number;
   whtCertificate?: string;
   wvatCertificate?: string;
+  /**
+   * For a bill in a foreign currency: how much of it this settles, in that
+   * currency. amountCents is then what it cost in the base currency on the
+   * day, and the exchange difference is realized.
+   */
+  foreignAmountCents?: number;
 }
 
 export interface BillBatchPaymentInput extends Omit<BillPaymentInput, 'createdBy'> {
@@ -78,6 +84,7 @@ function mapBillPayment(row: any) {
     journalEntryId: row.journal_entry_id,
     reversedAt: row.reversed_at ?? null,
     reversalReason: row.reversal_reason ?? null,
+    realizedFxCents: Number(row.realized_fx_cents) || 0,
     createdAt: row.created_at,
   };
 }
@@ -227,6 +234,22 @@ export class BillService {
     const bill = billResult.data;
     if (!bill) throw new UserError('Bill not found in this organization.', 404);
     if (bill.status === 'VOID') throw new UserError('A void bill cannot be paid.');
+
+    // Settled in its own currency at the day's rate: the exchange difference is realized.
+    if (input.foreignAmountCents) {
+      const { data, error } = await supabase.rpc('pay_bill_at_rate', {
+        p_org_id: orgId,
+        p_bill_id: billId,
+        p_foreign_cents: Math.trunc(input.foreignAmountCents),
+        p_base_cents: Math.trunc(input.amountCents),
+        p_payment_date: input.paymentDate,
+        p_source_account_id: input.sourceAccountId,
+        p_idempotency_key: input.idempotencyKey,
+        p_created_by: input.createdBy,
+      });
+      if (error) throw error;
+      return data as { paymentId: string; journalEntryId: string; amountDueCents: number; status: string; realizedFxCents?: number };
+    }
     const withheldCents = Math.trunc(input.whtCents || 0) + Math.trunc(input.wvatCents || 0);
     if (input.amountCents + withheldCents > Number(bill.amount_due_cents)) throw new UserError('Payment cannot exceed the bill amount due.');
 

@@ -271,3 +271,29 @@ test('an invoice is paid net of income tax and VAT the customer withheld', async
     assert.deepEqual(problems, []);
   });
 });
+
+test('a dollar invoice is settled at the day\'s rate and the exchange gain is posted', async () => {
+  const session = await signedIn();
+  const { page, api, problems } = session;
+  await flow('payment-foreign', session, async () => {
+    // USD 1,000 booked at KES 100 to the dollar.
+    const invoiceId = sql(`SELECT public.create_invoice_with_journal('00000000-0000-0000-0000-0000000000aa', '00000000-0000-0000-0000-0000000000c1',
+      CURRENT_DATE - 3, CURRENT_DATE + 27, 'USD', 0.01, NULL, '00000000-0000-0000-0000-000000000001',
+      jsonb_build_array(jsonb_build_object('description', 'Export consultancy', 'accountId', '00000000-0000-0000-0000-00000000a400', 'amountCents', 10000000, 'foreignAmountCents', 100000)), 'e2e-fx-invoice')`);
+    const invoiceNumber = sql(`SELECT invoice_number FROM public.invoices WHERE id = '${invoiceId}'`);
+    await openView(page, 'Sales');
+    await page.getByRole('row').filter({ hasText: invoiceNumber }).getByRole('button', { name: 'Receive payment' }).click();
+    const dialog = page.getByRole('dialog');
+    await dialog.getByText(/still owing, booked at KES 100\.0000 to the USD/).waitFor();
+    await dialog.locator('input[name="dayRate"]').fill('103');
+    await dialog.getByText(/Exchange gain of/).waitFor();
+    assert.equal(await dialog.locator('input[name="baseAmount"]').inputValue(), '103000.00');
+    await dialog.getByRole('button', { name: 'Post payment' }).click();
+    await dialog.waitFor({ state: 'hidden', timeout: 10_000 });
+    assert.equal(sql(`SELECT status || ' ' || amount_due_cents FROM public.invoices WHERE id = '${invoiceId}'`), 'PAID 0');
+    assert.equal(sql(`SELECT amount_cents || ':' || foreign_amount_cents || ':' || realized_fx_cents FROM public.invoice_payments WHERE invoice_id = '${invoiceId}'`),
+      '10000000:100000:300000');
+    assert.deepEqual(refusedWrites(api), []);
+    assert.deepEqual(problems, []);
+  });
+});

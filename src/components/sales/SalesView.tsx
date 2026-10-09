@@ -14,6 +14,7 @@ import { Mark } from '../ledger/Mark';
 import { IndexTabs, PageHeading, PageNote, buttonClass } from '../ledger/Page';
 import { CustomerPaymentDialog, CustomerPaymentsPanel } from './CustomerPayments';
 import { NO_WITHHOLDING, WithheldTaxFields, withheldCents, type Withheld } from '../common/WithheldTax';
+import { ForeignSettlementFields, foreignBalanceOf, settlementCents } from '../common/ForeignSettlement';
 import { useConfirm } from '../../hooks/useConfirm';
 import { downloadCsv } from '../../utils/exportCsv';
 import { todayIn } from '../../utils/dates';
@@ -44,6 +45,7 @@ export function SalesView() {
   const [paymentInvoice, setPaymentInvoice] = useState<any | null>(null);
   const [paymentAmount, setPaymentAmount] = useState('');
   const [paymentWithheld, setPaymentWithheld] = useState<Withheld>(NO_WITHHOLDING);
+  const [paymentForeign, setPaymentForeign] = useState({ foreign: '', rate: '', base: '' });
   const [paymentDate, setPaymentDate] = useState(format(new Date(), 'yyyy-MM-dd'));
   const [depositAccountId, setDepositAccountId] = useState('');
   const [paymentIdempotencyKey, setPaymentIdempotencyKey] = useState('');
@@ -118,7 +120,7 @@ export function SalesView() {
   const receivePaymentMutation = useMutation({
     mutationFn: async (payment: {
       invoiceId: string; amountCents: number; paymentDate: string; depositAccountId: string; idempotencyKey: string;
-      whtCents?: number; wvatCents?: number; whtCertificate?: string; wvatCertificate?: string;
+      whtCents?: number; wvatCents?: number; whtCertificate?: string; wvatCertificate?: string; foreignAmountCents?: number;
     }) => {
       const res = await fetch(`/api/invoices/${payment.invoiceId}/payments`, {
         method: 'POST',
@@ -128,6 +130,7 @@ export function SalesView() {
           paymentDate: payment.paymentDate,
           depositAccountId: payment.depositAccountId,
           idempotencyKey: payment.idempotencyKey,
+          ...(payment.foreignAmountCents ? { foreignAmountCents: payment.foreignAmountCents } : {}),
           ...(payment.whtCents || payment.wvatCents ? {
             whtCents: payment.whtCents, wvatCents: payment.wvatCents,
             whtCertificate: payment.whtCertificate, wvatCertificate: payment.wvatCertificate,
@@ -200,10 +203,29 @@ export function SalesView() {
     setPaymentIdempotencyKey(crypto.randomUUID());
     setPaymentProblem('');
     setPaymentWithheld(NO_WITHHOLDING);
+    const foreign = foreignBalanceOf(invoice, baseCurrency);
+    setPaymentForeign(foreign ? {
+      foreign: (foreign.foreignDueCents / 100).toFixed(2),
+      rate: (1 / foreign.bookedRate).toFixed(4),
+      base: (foreign.baseDueCents / 100).toFixed(2),
+    } : { foreign: '', rate: '', base: '' });
   };
 
   const submitPayment = () => {
     if (!paymentInvoice) return;
+    const foreignBalance = foreignBalanceOf(paymentInvoice, baseCurrency);
+    if (foreignBalance) {
+      const settled = settlementCents(paymentForeign);
+      if (settled.problem) { setPaymentProblem(settled.problem); return; }
+      if (settled.foreignCents > foreignBalance.foreignDueCents) { setPaymentProblem(`No more than ${paymentInvoice.currency} ${(foreignBalance.foreignDueCents / 100).toFixed(2)} is owing.`); return; }
+      if (!depositAccountId) { setPaymentProblem('Choose the account that received the money.'); return; }
+      setPaymentProblem('');
+      receivePaymentMutation.mutate({
+        invoiceId: paymentInvoice.id, amountCents: settled.baseCents, foreignAmountCents: settled.foreignCents,
+        paymentDate, depositAccountId, idempotencyKey: paymentIdempotencyKey,
+      });
+      return;
+    }
     const amountCents = Math.round(Number(paymentAmount || 0) * 100);
     const withheld = withheldCents(paymentWithheld);
     if (withheld.problem) {
@@ -561,22 +583,29 @@ export function SalesView() {
       >
         <div className="space-y-4">
           <div className="ll-total flex items-baseline justify-between py-2 text-[13.5px]">
-            <span className="font-semibold text-ink-900">Amount due</span>
+            <span className="font-semibold text-ink-900">
+              Amount due{foreignBalanceOf(paymentInvoice, baseCurrency) ? ` (${baseCurrency} at the booked rate)` : ''}
+            </span>
             <Amount cents={paymentInvoice?.amountDueCents || 0} currency={baseCurrency} tone="ink" />
           </div>
-          <Field label={`Amount received (${baseCurrency})`}>
-            <input
-              type="number"
-              min="0.01"
-              max={((paymentInvoice?.amountDueCents || 0) / 100).toFixed(2)}
-              step="0.01"
-              inputMode="decimal"
-              required
-              value={paymentAmount}
-              onChange={(event) => setPaymentAmount(event.target.value)}
-              className="tabular-currency"
-            />
-          </Field>
+          {foreignBalanceOf(paymentInvoice, baseCurrency) ? (
+            <ForeignSettlementFields value={paymentForeign} onChange={setPaymentForeign} side="invoice"
+              balance={foreignBalanceOf(paymentInvoice, baseCurrency)!} currency={paymentInvoice.currency} baseCurrency={baseCurrency} />
+          ) : (
+            <Field label={`Amount received (${baseCurrency})`}>
+              <input
+                type="number"
+                min="0.01"
+                max={((paymentInvoice?.amountDueCents || 0) / 100).toFixed(2)}
+                step="0.01"
+                inputMode="decimal"
+                required
+                value={paymentAmount}
+                onChange={(event) => setPaymentAmount(event.target.value)}
+                className="tabular-currency"
+              />
+            </Field>
+          )}
           <Field label="Date received">
             <input type="date" required value={paymentDate} onChange={(event) => setPaymentDate(event.target.value)} />
           </Field>
