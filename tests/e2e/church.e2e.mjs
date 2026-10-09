@@ -147,7 +147,7 @@ test('a church imports its register, counts and banks a collection, takes M-Pesa
       WHERE l.org_id = '${church()}' AND a.type IN ('INCOME','EXPENSE','COGS') AND l.entity_type IS DISTINCT FROM 'FUND'`), '0', 'every income and expense line has a fund');
 
     // Daraja keys are saved to Vault from Settings, Integrations, and never shown again.
-    await openView(page, 'Settings');
+    await openView(page, 'Organization');
     await page.getByRole('tab', { name: 'Integrations' }).click();
     await page.locator('input[type="password"]').first().fill('e2e-consumer-key');
     await page.locator('input[type="password"]').nth(1).fill('e2e-consumer-secret');

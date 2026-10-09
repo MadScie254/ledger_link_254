@@ -3,7 +3,34 @@ import { Dialog } from '../ledger/Dialog';
 import { useAppStore, type CreateIntent } from '../../store';
 import { navigationGroupsFor } from '../../utils/editions';
 
-const columns: { title: string; actions: { label: string; view: string; intent: CreateIntent }[] }[] = [
+type Column = { title: string; actions: { label: string; view: string; intent: CreateIntent }[] };
+
+/** What a law firm or a church records most, ahead of the shared columns. */
+const EDITION_COLUMNS: Partial<Record<string, Column[]>> = {
+  law: [
+    { title: 'Practice', actions: [
+      { label: 'Matter', view: 'Law / Matters', intent: 'matter' },
+      { label: 'Court date', view: 'Law / Court diary', intent: 'courtDate' },
+      { label: 'Time entry', view: 'Law / Time', intent: 'lawTime' },
+    ] },
+    { title: 'Client money', actions: [
+      { label: 'Client receipt', view: 'Law / Client account', intent: 'clientReceipt' },
+      { label: 'Office disbursement', view: 'Law / Disbursements', intent: 'disbursement' },
+    ] },
+  ],
+  church: [
+    { title: 'Giving', actions: [
+      { label: 'Gift', view: 'Church / Giving', intent: 'gift' },
+      { label: 'Cash count', view: 'Church / Cash count', intent: 'cashCount' },
+      { label: 'M-Pesa statement', view: 'Church / Giving', intent: 'mpesaStatement' },
+    ] },
+    { title: 'People', actions: [
+      { label: 'Member', view: 'Church / Members', intent: 'member' },
+    ] },
+  ],
+};
+
+const columns: Column[] = [
   { title: 'Customers', actions: [
     { label: 'Invoice', view: 'Sales', intent: 'invoice' },
     { label: 'Receive payment', view: 'Sales', intent: 'payment' },
@@ -33,6 +60,7 @@ const columns: { title: string; actions: { label: string; view: string; intent: 
 
 export function NewMenu() {
   const { activeCompany, isNewMenuOpen, setNewMenuOpen, setActiveView, setCreateIntent, setMobileSidebarOpen } = useAppStore();
+  const allColumns = [...(EDITION_COLUMNS[activeCompany?.edition || 'business'] || []), ...columns];
   const reachable = new Set(navigationGroupsFor(activeCompany?.edition, activeCompany?.businessType, activeCompany?.role)
     .flatMap((group) => group.items).filter((item) => item.available !== false).map((item) => item.view));
 
@@ -59,7 +87,7 @@ export function NewMenu() {
   return (
     <Dialog open={isNewMenuOpen} onClose={() => setNewMenuOpen(false)} title="New" note="Choose what to record" width="xl" placement="bottom">
       <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
-        {columns.map((column) => {
+        {allColumns.map((column) => {
           const actions = column.actions.filter((action) => reachable.has(action.view));
           if (!actions.length) return null;
           return (

@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useAppStore } from '../../store';
 import { apiRequest, newIdempotencyKey } from '../../utils/apiRequest';
@@ -39,6 +39,9 @@ export function CustomerPaymentDialog({ invoices, customers, accounts, baseCurre
   const [amount, setAmount] = useState('');
   const [date, setDate] = useState(todayIn(activeCompany?.timeZone));
   const [depositAccountId, setDepositAccountId] = useState(deposit[0]?.id || '');
+  // The accounts can arrive after the dialog opens: take the first money account then.
+  const firstDeposit = deposit[0]?.id || '';
+  useEffect(() => { if (!depositAccountId && firstDeposit) setDepositAccountId(firstDeposit); }, [depositAccountId, firstDeposit]);
   const [reference, setReference] = useState('');
   const [choose, setChoose] = useState(false);
   const [chosen, setChosen] = useState<Record<string, string>>({});
@@ -95,6 +98,7 @@ export function CustomerPaymentDialog({ invoices, customers, accounts, baseCurre
           <Field label="Date received"><input type="date" required value={date} onChange={(e) => setDate(e.target.value)} name="paymentDate" /></Field>
           <Field label="Deposit account">
             <select required value={depositAccountId} onChange={(e) => setDepositAccountId(e.target.value)} name="depositAccountId">
+              <option value="">Choose an account</option>
               {deposit.map((account) => <option key={account.id} value={account.id}>{account.code} · {account.name}</option>)}
             </select>
           </Field>

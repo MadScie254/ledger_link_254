@@ -10,6 +10,7 @@ import { CreditNoteService } from '../../src/server/creditNotes';
 import { EstimateService } from '../../src/server/estimates';
 import { SalesOrderService } from '../../src/server/salesOrders';
 import { CashTransactionService } from '../../src/server/cashTransactions';
+import { THEME_ACCENTS } from '../../src/utils/themeAccents';
 import { PurchaseOrderService } from '../../src/server/purchaseOrders';
 import { buildDocumentPdf } from '../../src/utils/documentPdf';
 import { ORG, OWNER, BANK, SALES, OPEX, CUSTOMER, VENDOR, CEMENT, sql, uuid, refused } from './helpers';
@@ -40,7 +41,7 @@ test('an invoice prints its lines, what was paid and credited, the balance and h
   assert.equal(printed.title, 'Invoice', 'not a tax invoice until eTIMS signs it');
   assert.equal(printed.number, number);
   assert.equal(printed.currency, 'KES');
-  assert.equal(printed.accent, '#1F4B3A', 'the company\'s own accent');
+  assert.equal(printed.accent, THEME_ACCENTS.find((accent) => accent.id === 'forest')?.swatch, 'the company\'s own accent');
   assert.equal(printed.company.taxId, 'P051234567X');
   assert.equal(printed.partyLabel, 'Bill to');
   assert.equal(printed.party?.name, 'Acme');

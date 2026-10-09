@@ -46,14 +46,14 @@ export async function signedIn(email = 'owner@example.com', viewport = { width: 
   await page.getByLabel('Work email').fill(email);
   await page.getByLabel('Password').fill('e2e-password');
   await page.getByRole('button', { name: 'Sign in' }).click();
-  await page.getByRole('navigation').first().waitFor();
+  await page.locator('nav >> visible=true').first().waitFor();
   return { page, api, problems, context };
 }
 
 /** Opens a page through the current navigation. */
 export async function openView(page, label) {
   try {
-    if (['Company', 'Team', 'Integrations', 'Audit log'].includes(label)) {
+    if (['Company', 'Organization', 'Team', 'Integrations', 'Audit log'].includes(label)) {
       await page.locator('summary[aria-label="Settings"]').first().click();
       await page.getByRole('menu', { name: 'Settings' }).getByRole('menuitem', { name: label, exact: true }).click();
     } else if (label === 'Documentation') {
@@ -70,7 +70,10 @@ export async function openView(page, label) {
 
 /** Select an option in a searchable form field by its accessible name. */
 export async function chooseOption(scope, label, option) {
-  await scope.getByRole('combobox', { name: label, exact: true }).fill(option);
+  const field = scope.getByRole('combobox', { name: label, exact: true });
+  // Already chosen (a default, say): typing the same text changes nothing, so the list would not open.
+  if ((await field.inputValue()) === option) return;
+  await field.fill(option);
   await scope.getByRole('option', { name: option, exact: true }).click();
 }
 

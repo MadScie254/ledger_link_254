@@ -60,7 +60,11 @@ export type CreateIntent =
   | 'invoice' | 'payment' | 'estimate' | 'salesReceipt' | 'creditNote'
   | 'bill' | 'payBills' | 'expense' | 'purchaseOrder' | 'supplierCredit'
   | 'payrollRun' | 'employee' | 'timeEntry' | 'transfer' | 'journalEntry'
-  | 'stockCount' | 'importStatement';
+  | 'stockCount' | 'importStatement'
+  // Mizani
+  | 'matter' | 'courtDate' | 'lawTime' | 'clientReceipt' | 'disbursement'
+  // Kundi
+  | 'gift' | 'cashCount' | 'member' | 'mpesaStatement';
 
 interface AppState {
   displayCurrency: string;

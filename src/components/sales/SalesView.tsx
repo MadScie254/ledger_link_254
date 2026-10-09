@@ -58,9 +58,9 @@ export function SalesView() {
 
   useEffect(() => {
     if (!createIntent || !['invoice', 'payment', 'estimate', 'salesReceipt', 'creditNote'].includes(createIntent)) return;
-    setActionHint(createIntent === 'payment' ? 'Choose an open invoice to receive a payment.' : '');
+    setActionHint('');
     if (createIntent === 'invoice') { setSalesTab('Invoices'); setIsBuilding(true); }
-    if (createIntent === 'payment') setSalesTab('Invoices');
+    if (createIntent === 'payment') { setSalesTab('Invoices'); setIsReceivingPayment(true); }
     if (createIntent === 'estimate') { setSalesTab('Estimates'); setIsEstimating(true); }
     if (createIntent === 'salesReceipt') { setSalesTab('Receipts'); setIsSellingNow(true); }
     if (createIntent === 'creditNote') { setSalesTab('Credits'); setIsCrediting(true); }
@@ -186,6 +186,12 @@ export function SalesView() {
     ]);
     downloadCsv('invoices.csv', [headers, ...rows]);
   };
+
+  // A payment dialog opened before the accounts loaded takes the first money account once they arrive.
+  const firstDepositId = (accountsData?.accounts || []).find((account: any) => account.isBankAccount && account.isActive !== false)?.id || '';
+  useEffect(() => {
+    if (paymentInvoice && !depositAccountId && firstDepositId) setDepositAccountId(firstDepositId);
+  }, [paymentInvoice, depositAccountId, firstDepositId]);
 
   if (isBuilding) return <InvoiceBuilder onDone={() => setIsBuilding(false)} />;
 

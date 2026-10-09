@@ -1,4 +1,4 @@
-import { Banknote, FileText, HandCoins, House, Menu, Plus, ReceiptText, Settings2, Users } from 'lucide-react';
+import { Banknote, CalendarDays, FileText, HandCoins, House, Menu, Plus, ReceiptText, Scale, Settings2, Users } from 'lucide-react';
 import { useAppStore } from '../../store';
 import { editionDefinition, navigationGroupsFor } from '../../utils/editions';
 
@@ -10,6 +10,7 @@ const PRIMARY_DESTINATIONS = [
 
 /** An edition's daily jobs, in tab order; its other sections stay in More. */
 const EDITION_PRIMARY: Partial<Record<string, string[]>> = {
+  law: ['Home / Dashboard', 'Law / Matters', 'Law / Court diary'],
   church: ['Home / Dashboard', 'Church / Giving', 'Church / Cash count', 'Church / Members'],
 };
 const rank = (preferred: string[], view: string) => {
@@ -17,7 +18,7 @@ const rank = (preferred: string[], view: string) => {
   return index === -1 ? preferred.length : index;
 };
 
-/** Thumb-reachable navigation for the four daily jobs; the full index stays in More. */
+/** Thumb-reachable navigation: three daily jobs and New; the full index stays in More. */
 export function MobileTabBar() {
   const { activeView, setActiveView, setMobileSidebarOpen, setNewMenuOpen, activeCompany } = useAppStore();
   const edition = editionDefinition(activeCompany?.edition);
@@ -33,6 +34,8 @@ export function MobileTabBar() {
       label: entry.name.en,
       icon: entry.view === 'Home / Dashboard' ? House
         : entry.view === 'Expenses & Bills' ? ReceiptText
+          : entry.view === 'Law / Matters' ? Scale
+          : entry.view === 'Law / Court diary' ? CalendarDays
           : entry.view === 'Church / Giving' ? HandCoins
           : entry.view === 'Church / Members' ? Users
           : entry.view === 'Church / Cash count' ? Banknote

@@ -45,7 +45,8 @@ test('an expense paid from the bank is posted', async () => {
     await dialog.getByLabel('Line 1 VAT percentage').fill('16');
     await dialog.getByRole('button', { name: 'Post expense' }).click();
     await dialog.waitFor({ state: 'hidden', timeout: 10_000 });
-    await page.getByText(/EXP-\d{4}-00001/).waitFor({ timeout: 10_000 });
+    // The number shows in the table row and in the phone layout's hidden copy.
+    await page.locator('text=/EXP-\\d{4}-00001/ >> visible=true').first().waitFor({ timeout: 10_000 });
     assert.deepEqual(refusedWrites(api), []);
     assert.equal(sql(`SELECT payee_name || ' ' || total_cents FROM public.cash_transactions WHERE kind = 'EXPENSE'`), 'Naivas Supermarket 290000');
     assert.deepEqual(problems, []);
@@ -222,7 +223,7 @@ test('one payment settles two invoices, keeps the rest as credit, and is reverse
       jsonb_build_array(jsonb_build_object('description', 'Cement', 'accountId', '00000000-0000-0000-0000-00000000a400', 'amountCents', ${cents})), '${key}')`);
     const older = invoiceFor(10, 150000, 'e2e-pay-1');
     const newer = invoiceFor(5, 250000, 'e2e-pay-2');
-    await openView(page, 'Sales');
+    await openView(page, 'Sales & customers');
     await page.getByRole('button', { name: 'Receive a payment' }).click();
     const dialog = page.getByRole('dialog');
     await dialog.locator('select[name="customerId"]').selectOption(customer);
@@ -253,7 +254,7 @@ test('an invoice is paid net of income tax and VAT the customer withheld', async
       CURRENT_DATE - 2, CURRENT_DATE + 28, 'KES', 1, NULL, '00000000-0000-0000-0000-000000000001',
       jsonb_build_array(jsonb_build_object('description', 'Consultancy', 'accountId', '00000000-0000-0000-0000-00000000a400', 'amountCents', 1000000, 'taxCents', 160000)), 'e2e-wht-invoice')`);
     const invoiceNumber = sql(`SELECT invoice_number FROM public.invoices WHERE id = '${invoiceId}'`);
-    await openView(page, 'Sales');
+    await openView(page, 'Sales & customers');
     await page.getByRole('row').filter({ hasText: invoiceNumber }).getByRole('button', { name: 'Receive payment' }).click();
     const dialog = page.getByRole('dialog');
     await dialog.getByLabel('The customer withheld tax and paid the rest').check();
@@ -281,7 +282,7 @@ test('a dollar invoice is settled at the day\'s rate and the exchange gain is po
       CURRENT_DATE - 3, CURRENT_DATE + 27, 'USD', 0.01, NULL, '00000000-0000-0000-0000-000000000001',
       jsonb_build_array(jsonb_build_object('description', 'Export consultancy', 'accountId', '00000000-0000-0000-0000-00000000a400', 'amountCents', 10000000, 'foreignAmountCents', 100000)), 'e2e-fx-invoice')`);
     const invoiceNumber = sql(`SELECT invoice_number FROM public.invoices WHERE id = '${invoiceId}'`);
-    await openView(page, 'Sales');
+    await openView(page, 'Sales & customers');
     await page.getByRole('row').filter({ hasText: invoiceNumber }).getByRole('button', { name: 'Receive payment' }).click();
     const dialog = page.getByRole('dialog');
     await dialog.getByText(/still owing, booked at KES 100\.0000 to the USD/).waitFor();

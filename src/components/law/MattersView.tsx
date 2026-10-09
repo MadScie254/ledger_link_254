@@ -3,6 +3,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiRequest } from '../../utils/apiRequest';
 import { centsFromAmountText } from '../../utils/salesOrders';
 import { todayIn } from '../../utils/dates';
+import { useCreateIntent } from '../../hooks/useCreateIntent';
 import { Amount, figureText } from '../ledger/Amount';
 import { Dialog, Field } from '../ledger/Dialog';
 import { Mark } from '../ledger/Mark';
@@ -30,6 +31,7 @@ export function MattersView() {
   const [status, setStatus] = useState<'OPEN' | 'ON_HOLD' | 'CLOSED' | 'ALL'>('OPEN');
   const [stage, setStage] = useState('');
   const [opening, setOpening] = useState(false);
+  useCreateIntent({ matter: () => setOpening(true) }, canPost);
   const [selected, setSelected] = useState<string | null>(focused);
   const [notice, setNotice] = useState('');
 

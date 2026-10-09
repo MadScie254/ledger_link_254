@@ -36,7 +36,7 @@ export function Sidebar() {
   const navGroups = groups.filter((group) => group.label.en !== 'Settings' && group.label.en !== 'Help');
   const settingsItems = edition.id === 'business'
     ? groups.find((group) => group.label.en === 'Settings')?.items || []
-    : [{ view: 'Settings', name: { en: 'Company', sw: 'TODO-SW' as const } }];
+    : [{ view: 'Settings', name: { en: 'Organization', sw: 'TODO-SW' as const } }];
 
   const toggleRail = () => {
     const next = !collapsed;

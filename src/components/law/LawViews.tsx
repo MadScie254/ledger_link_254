@@ -1,6 +1,7 @@
 import { Fragment, useMemo, useState } from 'react';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { useAppStore } from '../../store';
+import { useCreateIntent } from '../../hooks/useCreateIntent';
 import { apiRequest } from '../../utils/apiRequest';
 import { addDaysIso, todayIn } from '../../utils/dates';
 import { printedDateTime, zonedLocalToIso, zonedParts } from '../../utils/lawDates';
@@ -67,6 +68,7 @@ export function CourtDiaryView() {
     queryFn: () => apiRequest<{ events: any[] }>(`/api/court-events?from=${encodeURIComponent(zonedLocalToIso(`${from}T00:00`, timeZone))}&to=${encodeURIComponent(zonedLocalToIso(`${to}T23:59`, timeZone))}`),
   });
   const [adding, setAdding] = useState(false);
+  useCreateIntent({ courtDate: () => setAdding(true) }, canPost);
   const [outcome, setOutcome] = useState<any | null>(null);
   const [notice, setNotice] = useState('');
   const [feed, setFeed] = useState('');
@@ -192,6 +194,7 @@ export function ClientAccountView() {
   const focus = useMatterFocus((state) => state.focus);
   const [asOf, setAsOf] = useState(today);
   const [receiving, setReceiving] = useState(false);
+  useCreateIntent({ clientReceipt: () => setReceiving(true) }, canPost);
   const [notice, setNotice] = useState('');
   const { byId } = useMatterIndex();
   const balances = useQuery({
@@ -342,6 +345,7 @@ export function TimeView() {
   const { list, byId } = useMatterIndex();
   const [matterId, setMatterId] = useState('');
   const [logging, setLogging] = useState(false);
+  useCreateIntent({ lawTime: () => setLogging(true) }, canPost);
   const [notice, setNotice] = useState('');
   const time = useQuery({
     queryKey: ['matter-time', orgId, matterId],
@@ -396,6 +400,7 @@ export function DisbursementsView() {
   const { byId } = useMatterIndex();
   const costs = useQuery({ queryKey: ['disbursements', orgId], queryFn: () => apiRequest<{ disbursements: any[] }>('/api/disbursements') });
   const [recording, setRecording] = useState(false);
+  useCreateIntent({ disbursement: () => setRecording(true) }, canPost);
   const [notice, setNotice] = useState('');
   const all = costs.data?.disbursements || [];
   const unbilled = all.filter((cost) => cost.paid_from === 'OFFICE' && !cost.invoice_id).reduce((sum, cost) => sum + Number(cost.amount_cents), 0);
@@ -461,11 +466,11 @@ export function LawHomeView() {
     <div className="space-y-5">
       <PageHeading title={date} note={COPY.home.en} />
       <Notice message={notice} />
-      <dl className="grid grid-cols-2 border-b border-feint-strong sm:grid-cols-4">
-        <div className="py-3"><dt className="ll-printed text-[10.5px] text-graphite-600">Open matters</dt><dd className="mt-1 text-[22px] text-ink-900">{matters.isSuccess ? list.filter((matter) => matter.status === 'OPEN').length : '–'}</dd></div>
-        <div className="border-l border-feint py-3 pl-4"><dt className="ll-printed text-[10.5px] text-graphite-600">Unbilled work</dt><dd className="mt-1"><Amount cents={wipCents} currency={currency} size="lg" /></dd></div>
-        <div className="border-t border-feint py-3 sm:border-l sm:border-t-0 sm:pl-4"><dt className="ll-printed text-[10.5px] text-graphite-600">Owing on fee notes</dt><dd className="mt-1"><Amount cents={owingCents} currency={currency} size="lg" /></dd></div>
-        <div className="border-l border-t border-feint py-3 pl-4 sm:border-t-0"><dt className="ll-printed text-[10.5px] text-graphite-600">Client money held</dt><dd className="mt-1"><Amount cents={heldCents} currency={currency} size="lg" /></dd></div>
+      <dl className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+        <div className="min-w-0 rounded-xl border border-border bg-surface p-5 shadow-sm"><dt className="text-[13px] font-medium text-text-2">Open matters</dt><dd className="mt-3 font-display text-[24px] font-bold leading-7 text-text">{matters.isSuccess ? list.filter((matter) => matter.status === 'OPEN').length : '–'}</dd></div>
+        <div className="min-w-0 rounded-xl border border-border bg-surface p-5 shadow-sm"><dt className="text-[13px] font-medium text-text-2">Unbilled work</dt><dd className="mt-3"><Amount cents={wipCents} currency={currency} size="lg" /></dd></div>
+        <div className="min-w-0 rounded-xl border border-border bg-surface p-5 shadow-sm"><dt className="text-[13px] font-medium text-text-2">Owing on fee notes</dt><dd className="mt-3"><Amount cents={owingCents} currency={currency} size="lg" /></dd></div>
+        <div className="min-w-0 rounded-xl border border-border bg-surface p-5 shadow-sm"><dt className="text-[13px] font-medium text-text-2">Client money held</dt><dd className="mt-3"><Amount cents={heldCents} currency={currency} size="lg" /></dd></div>
       </dl>
 
       {matters.isSuccess && list.length === 0 ? (

@@ -133,11 +133,11 @@ export function ChurchHomeView() {
       <PageHeading title={date} note={COPY.home.en} />
       {home.isLoading || !data ? <SkeletonRows label="Loading the church Home" rows={6} /> : (
         <>
-          <dl className="grid grid-cols-2 border-b border-feint-strong sm:grid-cols-4">
-            <div className="py-3"><dt className="ll-printed text-[10.5px] text-graphite-600">Sunday {shortDate(data.sunday)}</dt><dd className="mt-1"><Amount cents={data.sundayGivingCents} currency={currency} size="lg" /></dd></div>
-            <div className="border-l border-feint py-3 pl-4"><dt className="ll-printed text-[10.5px] text-graphite-600">This month so far</dt><dd className="mt-1"><Amount cents={data.monthGivingCents} currency={currency} size="lg" /></dd></div>
-            <div className="border-t border-feint py-3 sm:border-l sm:border-t-0 sm:pl-4"><dt className="ll-printed text-[10.5px] text-graphite-600">M-Pesa queue</dt><dd className="mt-1 text-[22px] text-ink-900">{data.unmatchedCount}</dd></div>
-            <div className="border-l border-t border-feint py-3 pl-4 sm:border-t-0"><dt className="ll-printed text-[10.5px] text-graphite-600">Cash not yet banked</dt><dd className="mt-1"><Amount cents={data.cashNotBankedCents} currency={currency} size="lg" /></dd></div>
+          <dl className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+            <div className="min-w-0 rounded-xl border border-border bg-surface p-5 shadow-sm"><dt className="text-[13px] font-medium text-text-2">Sunday {shortDate(data.sunday)}</dt><dd className="mt-3"><Amount cents={data.sundayGivingCents} currency={currency} size="lg" /></dd></div>
+            <div className="min-w-0 rounded-xl border border-border bg-surface p-5 shadow-sm"><dt className="text-[13px] font-medium text-text-2">This month so far</dt><dd className="mt-3"><Amount cents={data.monthGivingCents} currency={currency} size="lg" /></dd></div>
+            <div className="min-w-0 rounded-xl border border-border bg-surface p-5 shadow-sm"><dt className="text-[13px] font-medium text-text-2">M-Pesa queue</dt><dd className="mt-3 font-display text-[24px] font-bold leading-7 text-text">{data.unmatchedCount}</dd></div>
+            <div className="min-w-0 rounded-xl border border-border bg-surface p-5 shadow-sm"><dt className="text-[13px] font-medium text-text-2">Cash not yet banked</dt><dd className="mt-3"><Amount cents={data.cashNotBankedCents} currency={currency} size="lg" /></dd></div>
           </dl>
           <div className="grid gap-8 lg:grid-cols-2">
             <section aria-labelledby="home-funds">
