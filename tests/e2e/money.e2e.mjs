@@ -2,7 +2,7 @@
 // their screens against the real API.
 import assert from 'node:assert/strict';
 import test, { after } from 'node:test';
-import { signedIn, openView, refusedWrites, closeBrowser, sql, flow } from './helpers.mjs';
+import { signedIn, openView, chooseOption, refusedWrites, closeBrowser, sql, flow } from './helpers.mjs';
 
 after(closeBrowser);
 
@@ -15,10 +15,10 @@ test('a walk-in sale is posted on a sales receipt into the till', async () => {
     await page.getByRole('tab', { name: /Sales receipts/ }).click();
     await page.getByRole('button', { name: 'New sales receipt' }).click();
     const dialog = page.getByRole('dialog');
-    await dialog.getByLabel('Line 1 stock item').selectOption({ label: 'Cement 50kg' });
+    await chooseOption(dialog, 'Line 1 stock item', 'Cement 50kg');
     await dialog.getByLabel('Line 1 quantity').fill('1');
     await dialog.getByLabel('Line 1 VAT rate').fill('16');
-    await dialog.locator('select').filter({ hasText: '1050 · M-Pesa Till' }).selectOption({ label: '1050 · M-Pesa Till' });
+    await chooseOption(dialog, 'Received into', '1050 · M-Pesa Till');
     await dialog.getByRole('button', { name: 'Post sales receipt' }).click();
     await dialog.waitFor({ state: 'hidden', timeout: 10_000 });
     await page.getByText(/SR-\d{4}-00001/).waitFor({ timeout: 10_000 });
@@ -38,9 +38,9 @@ test('an expense paid from the bank is posted', async () => {
     await page.getByRole('button', { name: 'New expense' }).click();
     const dialog = page.getByRole('dialog');
     await dialog.locator('input[name="payeeName"]').fill('Naivas Supermarket');
-    await dialog.locator('select[name="paidFromAccountId"]').selectOption({ label: '1000 · Bank' });
+    await chooseOption(dialog, 'Paid from', '1000 · Bank');
     await dialog.getByLabel('Line 1 particulars').fill('Cleaning supplies');
-    await dialog.getByLabel('Line 1 account').selectOption({ label: '6000 · Operating expenses' });
+    await chooseOption(dialog, 'Line 1 account', '6000 · Operating expenses');
     await dialog.getByLabel('Line 1 amount').fill('2,500');
     await dialog.getByLabel('Line 1 VAT percentage').fill('16');
     await dialog.getByRole('button', { name: 'Post expense' }).click();
@@ -110,7 +110,7 @@ test('a credit note is issued against an invoice and lowers what is due', async 
     await page.getByRole('tab', { name: /Credit notes/ }).click();
     await page.getByRole('button', { name: 'New credit note' }).click();
     const dialog = page.getByRole('dialog');
-    await dialog.locator('select').first().selectOption({ label: 'Acme' });
+    await chooseOption(dialog, 'Customer', 'Acme');
     await dialog.locator('select').filter({ hasText: 'Keep as credit' }).selectOption({ label: `${invoiceNumber} · 3,000.00 due` });
     await dialog.getByLabel('Line 1 description').fill('Price agreed down');
     await dialog.getByLabel('Line 1 unit price, KES').fill('500');
@@ -132,9 +132,9 @@ test('a supplier credit is recorded, then refunded into the bank', async () => {
     await page.getByRole('tab', { name: 'Supplier credits' }).click();
     await page.getByRole('button', { name: 'New supplier credit' }).click();
     const dialog = page.getByRole('dialog');
-    await dialog.locator('select[name="vendorId"]').selectOption({ label: 'Kenya Power' });
+    await chooseOption(dialog, 'Supplier', 'Kenya Power');
     await dialog.getByLabel('Line 1 particulars').fill('Overbilled tokens');
-    await dialog.getByLabel('Line 1 account').selectOption({ label: '6000 · Operating expenses' });
+    await chooseOption(dialog, 'Line 1 account', '6000 · Operating expenses');
     await dialog.getByLabel('Line 1 amount').fill('1,000');
     await dialog.getByLabel('Line 1 VAT percentage').fill('0');
     await dialog.getByRole('button', { name: 'Record supplier credit' }).click();
@@ -161,11 +161,11 @@ test('a purchase order is written, then billed for what arrived', async () => {
     await page.getByRole('tab', { name: 'Purchase orders' }).click();
     await page.getByRole('button', { name: 'New purchase order' }).click();
     const dialog = page.getByRole('dialog');
-    await dialog.locator('select').first().selectOption({ label: 'Kenya Power' });
-    await dialog.getByLabel('Line 1 stock item').selectOption({ label: 'Cement 50kg' });
+    await chooseOption(dialog, 'Supplier', 'Kenya Power');
+    await chooseOption(dialog, 'Line 1 stock item', 'Cement 50kg');
     await dialog.getByLabel('Line 1 quantity').fill('10');
     await dialog.getByLabel('Line 1 unit cost, KES').fill('700');
-    await dialog.getByLabel('Line 1 account').selectOption({ label: '6000 Operating expenses' });
+    await chooseOption(dialog, 'Line 1 account', '6000 Operating expenses');
     await dialog.getByRole('button', { name: 'Save purchase order' }).click();
     await dialog.waitFor({ state: 'hidden', timeout: 10_000 });
     await page.getByText(/PO-\d{4}-00001/).first().waitFor({ timeout: 10_000 });

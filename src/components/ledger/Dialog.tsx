@@ -46,7 +46,7 @@ export function Dialog({
   children: React.ReactNode;
   footer?: React.ReactNode;
   width?: 'sm' | 'md' | 'lg' | 'xl';
-  placement?: 'center' | 'right';
+  placement?: 'center' | 'right' | 'page';
   showCloseButton?: boolean;
 }) {
   const titleId = useId();
@@ -110,7 +110,7 @@ export function Dialog({
   return createPortal(
     <div
       ref={layerRef}
-      className={`ll-layer fixed inset-0 z-[70] flex bg-black/50 ${placement === 'right' ? 'justify-end' : 'items-start justify-center overflow-y-auto p-3 sm:items-center sm:p-6'}`}
+      className={`ll-layer fixed inset-0 z-[70] flex ${placement === 'page' ? 'bg-canvas' : `bg-black/50 ${placement === 'right' ? 'justify-end' : 'items-start justify-center overflow-y-auto p-3 sm:items-center sm:p-6'}`}`}
       onMouseDown={(e) => {
         if (e.target === e.currentTarget) onClose();
       }}
@@ -121,9 +121,9 @@ export function Dialog({
         aria-modal="true"
         aria-labelledby={titleId}
         tabIndex={-1}
-        className={`relative w-full border border-border bg-surface shadow-lg focus:outline-none ${placement === 'right' ? 'll-drawer flex h-full max-w-[38rem] flex-col rounded-l-2xl' : `my-auto ${widths[width]} rounded-2xl`}`}
+        className={`relative w-full border border-border bg-surface shadow-lg focus:outline-none ${placement === 'page' ? 'flex h-full flex-col border-0 shadow-none' : placement === 'right' ? 'll-drawer flex h-full max-w-[38rem] flex-col rounded-l-2xl' : `my-auto ${widths[width]} rounded-2xl`}`}
       >
-        <div className="flex items-start justify-between gap-4 border-b border-border px-6 py-5">
+        <div className={`flex items-start justify-between gap-4 border-b border-border px-6 py-5 ${placement === 'page' ? 'lg:px-[max(2rem,calc((100vw-80rem)/2))]' : ''}`}>
           <div className="min-w-0">
             <h2 id={titleId} className="ll-heading text-[22px] leading-7 text-text">{title}</h2>
             {note && <p className="mt-1 text-[14px] leading-5 text-text-2">{note}</p>}
@@ -134,8 +134,8 @@ export function Dialog({
             </button>
           )}
         </div>
-        <div className={`px-6 py-5 ${placement === 'right' ? 'min-h-0 flex-1 overflow-y-auto' : ''}`}>{children}</div>
-        {footer && <div className={`flex flex-wrap items-center justify-end gap-2 border-t border-border bg-surface-2 px-6 py-4 ${placement === 'right' ? 'rounded-bl-2xl' : 'rounded-b-2xl'}`}>{footer}</div>}
+        <div className={`px-6 py-5 ${placement === 'right' || placement === 'page' ? 'min-h-0 flex-1 overflow-y-auto' : ''} ${placement === 'page' ? 'lg:px-[max(2rem,calc((100vw-80rem)/2))]' : ''}`}>{children}</div>
+        {footer && <div className={`flex flex-wrap items-center justify-end gap-2 border-t border-border bg-surface-2 px-6 py-4 ${placement === 'right' ? 'rounded-bl-2xl' : placement === 'page' ? 'lg:px-[max(2rem,calc((100vw-80rem)/2))]' : 'rounded-b-2xl'}`}>{footer}</div>}
       </div>
     </div>,
     document.body,

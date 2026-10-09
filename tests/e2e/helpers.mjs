@@ -68,6 +68,12 @@ export async function openView(page, label) {
   }
 }
 
+/** Select an option in a searchable form field by its accessible name. */
+export async function chooseOption(scope, label, option) {
+  await scope.getByRole('combobox', { name: label, exact: true }).fill(option);
+  await scope.getByRole('option', { name: option, exact: true }).click();
+}
+
 /** The writes refused since a given point, for a clear assertion message. */
 export function refusedWrites(api, since = 0) {
   return api.slice(since).filter((call) => call.method !== 'GET' && call.status >= 400);

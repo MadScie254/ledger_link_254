@@ -3,7 +3,7 @@
 // screen made was refused.
 import assert from 'node:assert/strict';
 import test, { after } from 'node:test';
-import { signedIn, openView, refusedWrites, closeBrowser, sql, flow } from './helpers.mjs';
+import { signedIn, openView, chooseOption, refusedWrites, closeBrowser, sql, flow } from './helpers.mjs';
 
 after(closeBrowser);
 const ORG = '00000000-0000-0000-0000-0000000000aa';
@@ -12,9 +12,9 @@ test('an invoice is written, posted, paid and the payment reversed', async () =>
   const { page, api, problems } = await signedIn();
   await openView(page, 'Sales & customers');
   await page.getByRole('button', { name: 'New invoice' }).first().click();
-  await page.locator('select[required]').first().selectOption({ label: 'Acme' });
+  await chooseOption(page, 'Customer', 'Acme');
   await page.getByLabel('Line 1 particulars').fill('Cement, 10 bags');
-  await page.getByLabel('Line 1 income account').selectOption({ label: '4000 · Sales' });
+  await chooseOption(page, 'Line 1 income account', '4000 · Sales');
   await page.getByLabel('Line 1 VAT percentage').fill('16');
   await page.getByLabel(/Line 1 amount/).fill('8500');
   await page.getByRole('button', { name: 'Post invoice' }).click();
@@ -80,15 +80,15 @@ test('a bill with a supplier reference is entered and paid', async () => {
   await openView(page, 'Expenses & suppliers');
   await page.getByRole('button', { name: 'New bill' }).click();
   const dialog = page.getByRole('dialog');
-  await dialog.locator('select[name="vendorId"]').selectOption({ label: 'Kenya Power' });
+  await chooseOption(dialog, 'Supplier', 'Kenya Power');
   await dialog.locator('input[name="supplierReference"]').fill('KPLC-2026-0917');
   await dialog.getByLabel('Line 1 particulars').fill('Electricity, September');
-  await dialog.getByLabel('Line 1 account').selectOption({ label: '6000 · Operating expenses' });
+  await chooseOption(dialog, 'Line 1 account', '6000 · Operating expenses');
   await dialog.getByLabel('Line 1 amount').fill('12,000');
   await dialog.getByLabel('Line 1 VAT percentage').fill('16');
   await dialog.getByRole('button', { name: 'Add a line' }).click();
-  await dialog.getByLabel('Line 2 stock item').selectOption({ label: 'Cement 50kg' });
-  await dialog.getByLabel('Line 2 account').selectOption({ label: '5000 · Cost of Goods Sold' });
+  await chooseOption(dialog, 'Line 2 stock item', 'Cement 50kg');
+  await chooseOption(dialog, 'Line 2 account', '5000 · Cost of Goods Sold');
   await dialog.getByLabel('Line 2 quantity').fill('10');
   await dialog.getByLabel('Line 2 amount').fill('7000');
   await dialog.getByLabel('Line 2 VAT percentage').fill('0');
@@ -118,9 +118,9 @@ test('a journal entry is posted by hand', async () => {
   await page.getByRole('button', { name: 'Post an entry' }).click();
   const dialog = page.getByRole('dialog');
   await dialog.getByLabel('Particulars').fill('Owner capital paid in');
-  await dialog.getByLabel('Line 1 account').selectOption({ label: '1000 · Bank' });
+  await chooseOption(dialog, 'Line 1 account', '1000 · Bank');
   await dialog.getByLabel('Line 1 debit').fill('50000');
-  await dialog.getByLabel('Line 2 account').selectOption({ label: '3000 · Owner capital' });
+  await chooseOption(dialog, 'Line 2 account', '3000 · Owner capital');
   await dialog.getByLabel('Line 2 credit').fill('50000');
   await dialog.getByRole('button', { name: 'Post entry' }).click();
   await dialog.waitFor({ state: 'hidden', timeout: 10_000 });
@@ -138,8 +138,8 @@ test('an estimate is written, sent, accepted and invoiced', async () => {
     await page.getByRole('tab', { name: /Estimates/ }).click();
     await page.getByRole('button', { name: 'New estimate' }).click();
     const dialog = page.getByRole('dialog');
-    await dialog.locator('select').first().selectOption({ label: 'Acme' });
-    await dialog.getByLabel('Line 1 stock item').selectOption({ label: 'Cement 50kg' });
+    await chooseOption(dialog, 'Customer', 'Acme');
+    await chooseOption(dialog, 'Line 1 stock item', 'Cement 50kg');
     await dialog.getByLabel('Line 1 quantity').fill('20');
     await dialog.getByLabel('Line 1 VAT rate').fill('16');
     await dialog.getByRole('button', { name: 'Save estimate' }).click();
