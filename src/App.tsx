@@ -16,7 +16,8 @@ import { LandingPage } from "./marketing/LandingPage";
 import { Mark } from "./components/ledger/Mark";
 import { InvitationsPrompt } from "./components/team/InvitationsPrompt";
 import { NewPasswordScreen } from "./components/layout/NewPasswordScreen";
-import { isPlannedEditionView, PLANNED_EDITION_VIEWS, PLANNED_SECTION_COPY, type BusinessView } from "./utils/views";
+import { isPlannedEditionView, type BusinessView } from "./utils/views";
+import { PlannedEditionView } from "./components/layout/PlannedEditionView";
 import { editionDefinition } from "./utils/editions";
 import { BUSINESS_BRAND, usePublicBrand } from "./hooks/usePublicBrand";
 export { KNOWN_VIEWS } from "./utils/views";
@@ -253,16 +254,7 @@ function LedgerApp() {
   const renderContent = () => {
     const BusinessRenderer = BUSINESS_RENDERERS[activeView as BusinessView];
     if (BusinessRenderer) return <BusinessRenderer />;
-    if (isPlannedEditionView(activeView)) return (
-      <section className="mx-auto max-w-2xl px-5 py-12" aria-labelledby="planned-edition-heading">
-        <h1 id="planned-edition-heading" className="ll-heading text-2xl text-ink-900">
-          {PLANNED_EDITION_VIEWS[activeView]}
-        </h1>
-        <p className="mt-3 text-sm text-graphite-600">
-          {PLANNED_SECTION_COPY.en}
-        </p>
-      </section>
-    );
+    if (isPlannedEditionView(activeView)) return <PlannedEditionView view={activeView} />;
     // Default catch-all
     return <DashboardView />;
   };

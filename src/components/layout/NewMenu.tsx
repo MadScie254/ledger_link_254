@@ -57,7 +57,7 @@ export function NewMenu() {
   };
 
   return (
-    <Dialog open={isNewMenuOpen} onClose={() => setNewMenuOpen(false)} title="New" note="Choose what to record" width="xl">
+    <Dialog open={isNewMenuOpen} onClose={() => setNewMenuOpen(false)} title="New" note="Choose what to record" width="xl" placement="bottom">
       <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
         {columns.map((column) => {
           const actions = column.actions.filter((action) => reachable.has(action.view));
