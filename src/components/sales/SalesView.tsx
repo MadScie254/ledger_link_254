@@ -13,6 +13,7 @@ import { Dialog, Field } from '../ledger/Dialog';
 import { Mark } from '../ledger/Mark';
 import { IndexTabs, PageHeading, PageNote, buttonClass } from '../ledger/Page';
 import { CustomerPaymentDialog, CustomerPaymentsPanel } from './CustomerPayments';
+import { NO_WITHHOLDING, WithheldTaxFields, withheldCents, type Withheld } from '../common/WithheldTax';
 import { useConfirm } from '../../hooks/useConfirm';
 import { downloadCsv } from '../../utils/exportCsv';
 import { todayIn } from '../../utils/dates';
@@ -42,6 +43,7 @@ export function SalesView() {
   const [selectedInvoice, setSelectedInvoice] = useState<any | null>(null);
   const [paymentInvoice, setPaymentInvoice] = useState<any | null>(null);
   const [paymentAmount, setPaymentAmount] = useState('');
+  const [paymentWithheld, setPaymentWithheld] = useState<Withheld>(NO_WITHHOLDING);
   const [paymentDate, setPaymentDate] = useState(format(new Date(), 'yyyy-MM-dd'));
   const [depositAccountId, setDepositAccountId] = useState('');
   const [paymentIdempotencyKey, setPaymentIdempotencyKey] = useState('');
@@ -114,7 +116,10 @@ export function SalesView() {
   });
 
   const receivePaymentMutation = useMutation({
-    mutationFn: async (payment: { invoiceId: string; amountCents: number; paymentDate: string; depositAccountId: string; idempotencyKey: string }) => {
+    mutationFn: async (payment: {
+      invoiceId: string; amountCents: number; paymentDate: string; depositAccountId: string; idempotencyKey: string;
+      whtCents?: number; wvatCents?: number; whtCertificate?: string; wvatCertificate?: string;
+    }) => {
       const res = await fetch(`/api/invoices/${payment.invoiceId}/payments`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'x-org-id': currentOrgId },
@@ -123,6 +128,10 @@ export function SalesView() {
           paymentDate: payment.paymentDate,
           depositAccountId: payment.depositAccountId,
           idempotencyKey: payment.idempotencyKey,
+          ...(payment.whtCents || payment.wvatCents ? {
+            whtCents: payment.whtCents, wvatCents: payment.wvatCents,
+            whtCertificate: payment.whtCertificate, wvatCertificate: payment.wvatCertificate,
+          } : {}),
         })
       });
       if (!res.ok) {
@@ -190,17 +199,24 @@ export function SalesView() {
     setDepositAccountId(depositAccounts[0]?.id || '');
     setPaymentIdempotencyKey(crypto.randomUUID());
     setPaymentProblem('');
+    setPaymentWithheld(NO_WITHHOLDING);
   };
 
   const submitPayment = () => {
     if (!paymentInvoice) return;
-    const amountCents = Math.round(Number(paymentAmount) * 100);
-    if (!Number.isSafeInteger(amountCents) || amountCents <= 0) {
+    const amountCents = Math.round(Number(paymentAmount || 0) * 100);
+    const withheld = withheldCents(paymentWithheld);
+    if (withheld.problem) {
+      setPaymentProblem(withheld.problem);
+      return;
+    }
+    const withheldTotal = withheld.whtCents + withheld.wvatCents;
+    if (!Number.isSafeInteger(amountCents) || amountCents < 0 || amountCents + withheldTotal <= 0) {
       setPaymentProblem('Enter a payment amount greater than zero.');
       return;
     }
-    if (amountCents > Number(paymentInvoice.amountDueCents || 0)) {
-      setPaymentProblem('Payment cannot exceed the amount due.');
+    if (amountCents + withheldTotal > Number(paymentInvoice.amountDueCents || 0)) {
+      setPaymentProblem(withheldTotal ? 'The amount received and the tax withheld come to more than is due.' : 'Payment cannot exceed the amount due.');
       return;
     }
     if (!depositAccountId) {
@@ -213,6 +229,10 @@ export function SalesView() {
       paymentDate,
       depositAccountId,
       idempotencyKey: paymentIdempotencyKey,
+      ...(withheldTotal ? {
+        whtCents: withheld.whtCents, wvatCents: withheld.wvatCents,
+        whtCertificate: paymentWithheld.whtCertificate, wvatCertificate: paymentWithheld.wvatCertificate,
+      } : {}),
     });
   };
 
@@ -568,8 +588,11 @@ export function SalesView() {
               ))}
             </select>
           </Field>
+          {String(paymentInvoice?.currency || baseCurrency).toUpperCase() === baseCurrency.toUpperCase() && (
+            <WithheldTaxFields value={paymentWithheld} onChange={setPaymentWithheld} currency={baseCurrency} side="customer" />
+          )}
           {paymentProblem && <p role="alert" className="text-[13px] text-ledger-red">{paymentProblem}</p>}
-          <p className="text-[12.5px] text-graphite-600">This posts cash or bank against accounts receivable. A smaller amount leaves the invoice part paid.</p>
+          <p className="text-[12.5px] text-graphite-600">This posts cash or bank against accounts receivable{paymentWithheld.on ? ', and tax withheld to 1170 and 1175 to claim from KRA' : ''}. A smaller amount leaves the invoice part paid.</p>
         </div>
       </Dialog>
 

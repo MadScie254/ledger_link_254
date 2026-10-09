@@ -244,3 +244,30 @@ test('one payment settles two invoices, keeps the rest as credit, and is reverse
     assert.deepEqual(problems, []);
   });
 });
+
+test('an invoice is paid net of income tax and VAT the customer withheld', async () => {
+  const session = await signedIn();
+  const { page, api, problems } = session;
+  await flow('payment-withheld', session, async () => {
+    const invoiceId = sql(`SELECT public.create_invoice_with_journal('00000000-0000-0000-0000-0000000000aa', '00000000-0000-0000-0000-0000000000c1',
+      CURRENT_DATE - 2, CURRENT_DATE + 28, 'KES', 1, NULL, '00000000-0000-0000-0000-000000000001',
+      jsonb_build_array(jsonb_build_object('description', 'Consultancy', 'accountId', '00000000-0000-0000-0000-00000000a400', 'amountCents', 1000000, 'taxCents', 160000)), 'e2e-wht-invoice')`);
+    const invoiceNumber = sql(`SELECT invoice_number FROM public.invoices WHERE id = '${invoiceId}'`);
+    await openView(page, 'Sales');
+    await page.getByRole('row').filter({ hasText: invoiceNumber }).getByRole('button', { name: 'Receive payment' }).click();
+    const dialog = page.getByRole('dialog');
+    await dialog.getByLabel('The customer withheld tax and paid the rest').check();
+    await dialog.locator('input[name="whtAmount"]').fill('500');
+    await dialog.locator('input[name="whtCertificate"]').fill('WHT-E2E-1');
+    await dialog.locator('input[name="wvatAmount"]').fill('200');
+    await dialog.locator('input[name="wvatCertificate"]').fill('WVAT-E2E-1');
+    await dialog.getByLabel('Amount received (KES)').fill('10900');
+    await dialog.getByRole('button', { name: 'Post payment' }).click();
+    await dialog.waitFor({ state: 'hidden', timeout: 10_000 });
+    assert.equal(sql(`SELECT status || ' ' || amount_due_cents FROM public.invoices WHERE id = '${invoiceId}'`), 'PAID 0');
+    assert.equal(sql(`SELECT amount_cents || ':' || wht_cents || ':' || wvat_cents || ':' || wht_certificate_number FROM public.invoice_payments WHERE invoice_id = '${invoiceId}'`),
+      '1160000:50000:20000:WHT-E2E-1');
+    assert.deepEqual(refusedWrites(api), []);
+    assert.deepEqual(problems, []);
+  });
+});

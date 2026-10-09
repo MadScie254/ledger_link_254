@@ -168,7 +168,7 @@ export class DocumentPrintService {
         const row = await fetchOne('invoices', `
           *,
           invoice_lines(*),
-          invoice_payments(amount_cents, foreign_amount_cents, reversed_at, wht_cents),
+          invoice_payments(amount_cents, foreign_amount_cents, reversed_at, wht_cents, wvat_cents),
           credit_applications!credit_applications_invoice_fkey(amount_cents, reversed_at),
           etims_submissions(status, kra_control_code, qr_code_url, submitted_at),
           customer:customers(${PARTY_COLUMNS}),
@@ -197,7 +197,10 @@ export class DocumentPrintService {
         const totalCents = foreign ? Number(row.foreign_amount_cents) || subtotalCents + taxCents : Number(row.total_cents) || 0;
         const isVoid = row.status === 'VOID';
         const payments = ((row.invoice_payments || []) as any[]).filter((payment) => !payment.reversed_at);
-        const paidCents = payments.reduce((sum, payment) => sum + (Number(foreign ? payment.foreign_amount_cents : payment.amount_cents) || 0), 0);
+        // Tax the customer withheld settles the invoice too, and prints on its own lines.
+        const whtCents = foreign ? 0 : payments.reduce((sum, payment) => sum + (Number(payment.wht_cents) || 0), 0);
+        const wvatCents = foreign ? 0 : payments.reduce((sum, payment) => sum + (Number(payment.wvat_cents) || 0), 0);
+        const paidCents = payments.reduce((sum, payment) => sum + (Number(foreign ? payment.foreign_amount_cents : payment.amount_cents) || 0), 0) - whtCents - wvatCents;
         const creditedCents = foreign ? 0 : ((row.credit_applications || []) as any[])
           .filter((use) => !use.reversed_at)
           .reduce((sum, use) => sum + (Number(use.amount_cents) || 0), 0);
@@ -211,6 +214,8 @@ export class DocumentPrintService {
         ];
         if (!isVoid) {
           if (paidCents) totals.push({ label: 'Paid', cents: -paidCents });
+          if (whtCents) totals.push({ label: 'Income tax withheld', cents: -whtCents });
+          if (wvatCents) totals.push({ label: 'VAT withheld', cents: -wvatCents });
           if (creditedCents) totals.push({ label: 'Credit applied', cents: -creditedCents });
           totals.push({ label: 'Balance due', cents: balanceCents, emphasis: 'balance' });
         }

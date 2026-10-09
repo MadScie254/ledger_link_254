@@ -328,12 +328,20 @@ export const invoiceUpdateSchema = z.object({
 export const billUpdateSchema = invoiceUpdateSchema.extend({
   supplierReference: z.string().trim().max(100).optional(),
 });
+/** Income tax and VAT withheld at payment, from the KRA certificates; no rate is assumed. */
+const withheldFields = {
+  whtCents: cents.optional(),
+  wvatCents: cents.optional(),
+  whtCertificate: text(100),
+  wvatCertificate: text(100),
+};
 export const invoicePaymentSchema = z.object({
-  amountCents: positiveCents,
+  amountCents: cents,
   paymentDate: isoDate,
   depositAccountId: uuid,
   idempotencyKey,
-});
+  ...withheldFields,
+}).refine((body) => body.amountCents + (body.whtCents || 0) + (body.wvatCents || 0) > 0, 'The payment must be greater than zero.');
 /**
  * One payment from a customer across their invoices. Without allocations it
  * is shared oldest due first; whatever the invoices do not take is kept as
@@ -349,14 +357,19 @@ export const customerPaymentSchema = z.object({
   memo: text(2000),
   idempotencyKey,
 });
-export const billPaymentSchema = z.object({
+const billPaymentFields = {
   amountCents: positiveCents,
   paymentDate: isoDate,
   sourceAccountId: uuid,
   idempotencyKey,
-});
+};
+export const billPaymentSchema = z.object({
+  ...billPaymentFields,
+  amountCents: cents,
+  ...withheldFields,
+}).refine((body) => body.amountCents + (body.whtCents || 0) + (body.wvatCents || 0) > 0, 'The payment must be greater than zero.');
 export const batchBillPaymentSchema = z.object({
-  payments: z.array(billPaymentSchema.extend({ billId: uuid })).min(1).max(40),
+  payments: z.array(z.object(billPaymentFields).extend({ billId: uuid })).min(1).max(40),
 });
 
 // --- Bulk -----------------------------------------------------------------------------------
