@@ -595,7 +595,7 @@ function CompanyModal({ initialData, onClose, onSuccess }: {
         </Field>
         {!initialData && siteBrand?.edition !== 'business' && siteBrand?.edition ? <Field label="Edition">
           <p className="text-[14px] text-ink-900">{siteBrand.brandName} · {siteBrand.edition === 'law' ? 'Law' : 'Church'}</p>
-        </Field> : !initialData && <Field label="Edition" hint="Mizani and Kundi pilot sections are being built. Available sections open now.">
+        </Field> : !initialData && <Field label="Edition" hint="Mizani adds matters, client money and fee notes; Kundi adds members, giving and funds. Chosen once, here.">
           <select value={edition} onChange={(e) => {
             const next = e.target.value as Edition;
             setEdition(next);
