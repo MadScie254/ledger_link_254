@@ -38,3 +38,38 @@ SELECT public.create_organization('00000000-0000-0000-0000-000000000007',
     {"code":"4310","name":"Conveyancing fees","type":"INCOME","currency":"KES"},
     {"code":"6000","name":"Operating expenses","type":"EXPENSE","currency":"KES"}]',
   'e2e-law-firm');
+-- A Kundi church with its treasurer (owner) and a second counter
+-- (accountant), and an M-Pesa link whose callback token the church flow
+-- replays a confirmation to. The token is test-only.
+INSERT INTO auth.users (id, email) VALUES
+  ('00000000-0000-0000-0000-000000000008', 'treasurer@example.com'),
+  ('00000000-0000-0000-0000-000000000009', 'counter@example.com')
+ON CONFLICT DO NOTHING;
+INSERT INTO public.user_profiles (user_id, onboarding_status, onboarding_step) VALUES
+  ('00000000-0000-0000-0000-000000000008', 'SKIPPED', 0),
+  ('00000000-0000-0000-0000-000000000009', 'SKIPPED', 0)
+ON CONFLICT (user_id) DO UPDATE SET onboarding_status = 'SKIPPED';
+SELECT public.create_organization('00000000-0000-0000-0000-000000000008',
+  '{"name":"Kanisa la Majaribio (test)","edition":"church","country":"Kenya"}',
+  '[{"code":"1000","name":"Church bank account","type":"ASSET","currency":"KES","isBankAccount":true},
+    {"code":"1040","name":"Cash on hand, collections","type":"ASSET","currency":"KES","isBankAccount":true},
+    {"code":"1050","name":"M-Pesa paybill","type":"ASSET","currency":"KES","isBankAccount":true},
+    {"code":"2000","name":"Accounts payable","type":"LIABILITY","currency":"KES"},
+    {"code":"3300","name":"General fund","type":"EQUITY","currency":"KES"},
+    {"code":"4010","name":"Tithes","type":"INCOME","currency":"KES"},
+    {"code":"4020","name":"Offerings","type":"INCOME","currency":"KES"},
+    {"code":"4030","name":"Thanksgiving and special offerings","type":"INCOME","currency":"KES"},
+    {"code":"4040","name":"Building and project giving","type":"INCOME","currency":"KES"},
+    {"code":"4050","name":"Missions giving","type":"INCOME","currency":"KES"},
+    {"code":"6310","name":"Ministry and department costs","type":"EXPENSE","currency":"KES"},
+    {"code":"6400","name":"Bank and M-Pesa charges","type":"EXPENSE","currency":"KES"}]',
+  'e2e-church');
+INSERT INTO public.memberships (org_id, user_id, role)
+SELECT id, '00000000-0000-0000-0000-000000000009', 'accountant' FROM public.organizations WHERE name = 'Kanisa la Majaribio (test)'
+ON CONFLICT DO NOTHING;
+UPDATE public.organizations SET integration_actor_id = '00000000-0000-0000-0000-000000000008'
+WHERE name = 'Kanisa la Majaribio (test)';
+INSERT INTO public.org_integrations (org_id, kind, shortcode, environment, callback_token_hash, status, registered_at)
+SELECT id, 'MPESA_C2B', '600984', 'SANDBOX',
+  encode(sha256(convert_to('e2e0e2e0e2e0e2e0e2e0e2e0e2e0e2e0e2e0e2e0e2e0e2e0e2e0e2e0e2e0e2e0', 'UTF8')), 'hex'), 'REGISTERED', now()
+FROM public.organizations WHERE name = 'Kanisa la Majaribio (test)';

@@ -13,19 +13,22 @@ export const LAW_VIEWS = [
 ] as const;
 export type LawView = (typeof LAW_VIEWS)[number];
 
-/** Pilot sections are registered with an honest unavailable view until built. */
-export const PLANNED_EDITION_VIEWS = {
-  'Church / Members': 'Members',
-  'Church / Households': 'Households',
-  'Church / Giving': 'Giving',
-  'Church / Funds': 'Funds',
-  'Church / Cash count': 'Cash count',
-  "Church / Treasurer's report": "Treasurer's report",
-  'Church / Fund balances': 'Fund balances',
-} as const;
+/** Kundi church views, rendered by src/components/church. */
+export const CHURCH_VIEWS = [
+  'Church / Members', 'Church / Households', 'Church / Giving', 'Church / Funds', 'Church / Cash count',
+  "Church / Treasurer's report", 'Church / Fund balances',
+] as const;
+export type ChurchView = (typeof CHURCH_VIEWS)[number];
 
-export type PlannedEditionView = keyof typeof PLANNED_EDITION_VIEWS;
-export const KNOWN_VIEWS = [...BUSINESS_VIEWS, ...LAW_VIEWS, ...Object.keys(PLANNED_EDITION_VIEWS) as PlannedEditionView[]] as const;
+/**
+ * Pilot sections are registered here with an honest unavailable view until
+ * they are built. Every edition section is built now; the mechanism stays
+ * for the next one.
+ */
+export const PLANNED_EDITION_VIEWS: Record<string, string> = {};
+
+export type PlannedEditionView = string;
+export const KNOWN_VIEWS = [...BUSINESS_VIEWS, ...LAW_VIEWS, ...CHURCH_VIEWS, ...Object.keys(PLANNED_EDITION_VIEWS)] as const;
 export const PLANNED_SECTION_COPY = {
   en: 'This section is not available yet. The team is building it for the edition pilot.',
   sw: 'TODO-SW',

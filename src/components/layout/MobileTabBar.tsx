@@ -1,4 +1,4 @@
-import { FileText, House, Landmark, Menu, ReceiptText, Settings2, Users } from 'lucide-react';
+import { Banknote, FileText, HandCoins, House, Landmark, Menu, ReceiptText, Settings2, Users } from 'lucide-react';
 import { useAppStore } from '../../store';
 import { editionDefinition, navigationGroupsFor } from '../../utils/editions';
 
@@ -9,20 +9,34 @@ const PRIMARY_DESTINATIONS = [
   { view: 'Expenses & Bills', label: 'Bills', icon: ReceiptText },
 ] as const;
 
+/** An edition's daily jobs, in tab order; its other sections stay in More. */
+const EDITION_PRIMARY: Partial<Record<string, string[]>> = {
+  church: ['Home / Dashboard', 'Church / Giving', 'Church / Members', 'Church / Cash count'],
+};
+const rank = (preferred: string[], view: string) => {
+  const index = preferred.indexOf(view);
+  return index === -1 ? preferred.length : index;
+};
+
 /** Thumb-reachable navigation for the four daily jobs; the full index stays in More. */
 export function MobileTabBar() {
   const { activeView, setActiveView, setMobileSidebarOpen, activeCompany } = useAppStore();
   const edition = editionDefinition(activeCompany?.edition);
+  const preferred = EDITION_PRIMARY[edition.id] || [];
   const destinations = edition.id === 'business' ? PRIMARY_DESTINATIONS
     : navigationGroupsFor(activeCompany?.edition, activeCompany?.businessType, activeCompany?.role)
     .flatMap((group) => group.items)
     .filter((entry) => entry.available !== false)
+    .sort((a, b) => rank(preferred, a.view) - rank(preferred, b.view))
     .slice(0, 4)
     .map((entry) => ({
       view: entry.view,
       label: entry.name.en,
       icon: entry.view === 'Home / Dashboard' ? House
         : entry.view === 'Expenses & Bills' ? ReceiptText
+          : entry.view === 'Church / Giving' ? HandCoins
+          : entry.view === 'Church / Members' ? Users
+          : entry.view === 'Church / Cash count' ? Banknote
           : entry.view === 'Team' ? Users
             : entry.view === 'Settings' ? Settings2 : FileText,
     }));

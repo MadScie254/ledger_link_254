@@ -16,7 +16,7 @@ import { LandingPage } from "./marketing/LandingPage";
 import { Mark } from "./components/ledger/Mark";
 import { InvitationsPrompt } from "./components/team/InvitationsPrompt";
 import { NewPasswordScreen } from "./components/layout/NewPasswordScreen";
-import { isPlannedEditionView, PLANNED_EDITION_VIEWS, PLANNED_SECTION_COPY, type BusinessView, type LawView } from "./utils/views";
+import { isPlannedEditionView, PLANNED_EDITION_VIEWS, PLANNED_SECTION_COPY, type BusinessView, type ChurchView, type LawView } from "./utils/views";
 import { editionDefinition } from "./utils/editions";
 import { BUSINESS_BRAND, usePublicBrand } from "./hooks/usePublicBrand";
 export { KNOWN_VIEWS } from "./utils/views";
@@ -86,6 +86,17 @@ const LAW_RENDERERS: Record<LawView, ComponentType> = {
   'Law / Fee notes': lawView('FeeNotesView'),
   'Law / Client account': lawView('ClientAccountView'),
   'Law / Disbursements': lawView('DisbursementsView'),
+};
+
+const ChurchHomeView = lazy(() => import('./components/church/ChurchReports').then((module) => ({ default: module.ChurchHomeView })));
+const CHURCH_RENDERERS: Record<ChurchView, ComponentType> = {
+  'Church / Members': lazy(() => import('./components/church/MembersView').then((module) => ({ default: module.MembersView }))),
+  'Church / Households': lazy(() => import('./components/church/MembersView').then((module) => ({ default: module.HouseholdsView }))),
+  'Church / Giving': lazy(() => import('./components/church/GivingView').then((module) => ({ default: module.GivingView as ComponentType }))),
+  'Church / Funds': lazy(() => import('./components/church/FundsView').then((module) => ({ default: module.FundsView }))),
+  'Church / Cash count': lazy(() => import('./components/church/GivingView').then((module) => ({ default: module.CashCountView }))),
+  "Church / Treasurer's report": lazy(() => import('./components/church/ChurchReports').then((module) => ({ default: module.TreasurerReportView }))),
+  'Church / Fund balances': lazy(() => import('./components/church/FundsView').then((module) => ({ default: module.FundBalancesView }))),
 };
 
 // Every business view key has a real renderer. Edition pilot keys below show
@@ -266,6 +277,10 @@ function LedgerApp() {
     if (activeView === 'Home / Dashboard' && activeCompany?.edition === 'law') return <LawHomeView />;
     const LawRenderer = activeCompany?.edition === 'law' ? LAW_RENDERERS[activeView as LawView] : undefined;
     if (LawRenderer) return <LawRenderer />;
+    // A church's Home is its giving: this Sunday, the month by fund, what waits.
+    if (activeView === 'Home / Dashboard' && activeCompany?.edition === 'church') return <ChurchHomeView />;
+    const ChurchRenderer = activeCompany?.edition === 'church' ? CHURCH_RENDERERS[activeView as ChurchView] : undefined;
+    if (ChurchRenderer) return <ChurchRenderer />;
     const BusinessRenderer = BUSINESS_RENDERERS[activeView as BusinessView];
     if (BusinessRenderer) return <BusinessRenderer />;
     if (isPlannedEditionView(activeView)) return (
