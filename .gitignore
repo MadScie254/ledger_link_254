@@ -13,3 +13,4 @@ coverage/
 *-config.json
 *-credentials.json
 *-service-account.json
+.seed/
