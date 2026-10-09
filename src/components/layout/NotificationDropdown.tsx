@@ -209,19 +209,19 @@ export function NotificationDropdown() {
         aria-label={unreadCount > 0 ? `Notifications, ${unreadCount} new` : 'Notifications'}
         aria-expanded={isOpen}
         onClick={() => setIsOpen(!isOpen)}
-        className="relative p-2 text-graphite-600 hover:text-ink-900"
+        className="relative flex h-9 w-9 items-center justify-center rounded-md text-text-2 hover:bg-hover hover:text-text"
       >
         <Bell className="h-5 w-5" aria-hidden="true" />
         {unreadCount > 0 && (
-          <span className="absolute top-0.5 right-0.5 flex h-[17px] min-w-[17px] items-center justify-center border border-ink-900 bg-paper-100 px-1 text-[10.5px] font-semibold tabular-nums text-ink-900" aria-hidden="true">
+          <span className="absolute -top-0.5 -right-0.5 flex h-[17px] min-w-[17px] items-center justify-center rounded-full bg-negative px-1 text-[10px] font-semibold tabular-nums text-white" aria-hidden="true">
             {unreadCount > 9 ? '9+' : unreadCount}
           </span>
         )}
       </button>
 
       {isOpen && (
-        <div className="ll-lift fixed inset-x-3 top-14 z-50 border border-feint-strong border-t-2 border-t-ink-900 bg-paper-100 sm:absolute sm:inset-x-auto sm:right-0 sm:top-auto sm:mt-2 sm:w-[420px]" role="dialog" aria-label="Notifications">
-          <div className="flex items-center justify-between gap-3 border-b border-feint px-4 py-2.5">
+        <div className="fixed inset-x-3 top-14 z-50 overflow-hidden rounded-xl border border-border bg-surface shadow-md sm:absolute sm:inset-x-auto sm:right-0 sm:top-auto sm:mt-2 sm:w-[420px]" role="dialog" aria-label="Notifications">
+          <div className="flex items-center justify-between gap-3 border-b border-border px-4 py-3">
             <p className="text-[14px] font-semibold text-ink-900">
               Needs attention
               {unreadCount > 0 && <span className="ml-2 font-normal text-graphite-600">{unreadCount} new</span>}
@@ -238,7 +238,7 @@ export function NotificationDropdown() {
             </div>
           </div>
 
-          <div className="flex gap-4 overflow-x-auto border-b border-feint px-4 text-[12.5px]" role="tablist" aria-label="Filter notifications">
+          <div className="flex gap-4 overflow-x-auto border-b border-border px-4 text-[12.5px]" role="tablist" aria-label="Filter notifications">
             {[
               { id: 'ALL', label: 'All' },
               { id: 'INVOICE', label: 'Sales' },

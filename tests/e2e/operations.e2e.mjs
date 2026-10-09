@@ -80,7 +80,7 @@ test('closing date, approval limit and time zone are saved from Settings', async
   const session = await signedIn();
   const { page, api, problems } = session;
   await flow('controls', session, async () => {
-    await openView(page, 'Settings');
+    await openView(page, 'Company');
     await page.getByRole('tab', { name: 'Closing and controls' }).click();
     await page.getByLabel('Books closed through').fill('2026-06-30');
     await page.getByLabel(/Approval limit/).fill('250,000');
@@ -96,13 +96,13 @@ test('a class is added, an expense posted under it, and the profit and loss spli
   const session = await signedIn();
   const { page, api, problems } = session;
   await flow('classes', session, async () => {
-    await openView(page, 'Settings');
+    await openView(page, 'Company');
     await page.getByRole('tab', { name: 'Classes and locations' }).click();
     await page.locator('input[name="new-class"]').fill('Contracts');
     await page.getByRole('button', { name: 'Add class' }).click();
     await page.getByText('Contracts', { exact: true }).waitFor({ timeout: 10_000 });
 
-    await openView(page, 'Bills and expenses');
+    await openView(page, 'Expenses & suppliers');
     await page.getByRole('tab', { name: 'Expenses' }).click();
     await page.getByRole('button', { name: 'New expense' }).click();
     const dialog = page.getByRole('dialog');
@@ -149,7 +149,7 @@ test('an order is recorded, completed and invoiced', async () => {
   const session = await signedIn();
   const { page, api, problems } = session;
   await flow('order', session, async () => {
-    await openView(page, 'Sales');
+    await openView(page, 'Sales & customers');
     await page.getByRole('tab', { name: /Orders/ }).click();
     await page.getByRole('button', { name: 'New order' }).click();
     const dialog = page.getByRole('dialog');

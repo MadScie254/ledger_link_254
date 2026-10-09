@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useRenderTracker } from '../../utils/monitoring';
 import { format } from 'date-fns';
 import { Filter, Search, Download } from 'lucide-react';
@@ -46,7 +46,11 @@ export function BankingView() {
   const [isConnecting, setIsConnecting] = useState(false);
   const [connectInstitution, setConnectInstitution] = useState('');
   const [connectEmail, setConnectEmail] = useState('');
-  const { currentOrgId, activeCompany } = useAppStore();
+  const { currentOrgId, activeCompany, createIntent, setCreateIntent } = useAppStore();
+  useEffect(() => {
+    if (createIntent === 'transfer') { setActiveTab('Transfers'); setIsTransferring(true); setCreateIntent(null); }
+    if (createIntent === 'importStatement') { setActiveTab('Bank transactions'); setIsImporting(true); setCreateIntent(null); }
+  }, [createIntent, setCreateIntent]);
   const queryClient = useQueryClient();
   const { confirm, confirmDialog } = useConfirm();
 

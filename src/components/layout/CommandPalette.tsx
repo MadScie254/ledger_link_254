@@ -22,12 +22,12 @@ interface SearchItem {
 const PAGES: { view: string; title: string; subtitle: string; shortcut?: string }[] = [
   { view: 'Home / Dashboard', title: 'Home', subtitle: 'Cash, what is owed and what is due', shortcut: '1' },
   { view: 'Banking', title: 'Banking', subtitle: 'Statement lines, matches and rules', shortcut: '4' },
-  { view: 'Sales', title: 'Sales', subtitle: 'Invoices and what customers owe', shortcut: '2' },
+  { view: 'Sales', title: 'Sales & customers', subtitle: 'Invoices and what customers owe', shortcut: '2' },
   { view: 'Customer Hub', title: 'Customers', subtitle: 'Customer records and balances' },
-  { view: 'Expenses & Bills', title: 'Bills and expenses', subtitle: 'Supplier bills, receipts and payments', shortcut: '3' },
+  { view: 'Expenses & Bills', title: 'Expenses & suppliers', subtitle: 'Supplier bills, receipts and payments', shortcut: '3' },
   { view: 'Accounting', title: 'Accounting', subtitle: 'Chart of accounts, journal entries and budgets', shortcut: '5' },
   { view: 'Reports', title: 'Reports', subtitle: 'Statements, ledgers and tax summaries', shortcut: '6' },
-  { view: 'Tax', title: 'Tax', subtitle: 'VAT position, eTIMS and the filing calendar' },
+  { view: 'Tax', title: 'Taxes', subtitle: 'VAT position, eTIMS and the filing calendar' },
   { view: 'Payroll', title: 'Payroll', subtitle: 'Employees, pay runs and statutory returns' },
   { view: 'Inventory', title: 'Inventory', subtitle: 'Stock items and reorder points' },
   { view: 'Projects', title: 'Projects', subtitle: 'Budget against cost, and hours logged' },
@@ -36,7 +36,7 @@ const PAGES: { view: string; title: string; subtitle: string; shortcut?: string 
   { view: 'Apps / Integrations', title: 'Integrations', subtitle: 'Connections that are and are not built' },
   { view: 'Audit Logs', title: 'Audit log', subtitle: 'Every change to accounts, entries and the team' },
   { view: 'Documentation', title: 'Documentation', subtitle: 'Tutorials, troubleshooting and technical runbooks' },
-  { view: 'Settings', title: 'Settings', subtitle: 'Companies, currencies and security' },
+  { view: 'Settings', title: 'Company', subtitle: 'Companies, currencies and security' },
   { view: 'System Health', title: 'System health', subtitle: 'Response and render times in this browser' },
 ];
 
@@ -82,6 +82,17 @@ export function CommandPalette() {
       setTimeout(() => inputRef.current?.focus(), 0);
     }
   }, [isCommandPaletteOpen]);
+
+  useEffect(() => {
+    if (!isCommandPaletteOpen) return;
+    const returnFocus = document.activeElement as HTMLElement | null;
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setCommandPaletteOpen(false);
+      if (event.key === 'Tab') { event.preventDefault(); inputRef.current?.focus(); }
+    };
+    document.addEventListener('keydown', onKey);
+    return () => { document.removeEventListener('keydown', onKey); returnFocus?.focus?.(); };
+  }, [isCommandPaletteOpen, setCommandPaletteOpen]);
 
   const listQuery = (key: string, path: string, field: string, view: string) => ({
     queryKey: [key, currentOrgId],
@@ -236,11 +247,11 @@ export function CommandPalette() {
 
   return (
     <div className="fixed inset-0 z-[100] flex items-start justify-center px-3 pt-14 sm:px-4 sm:pt-24">
-      <div className="fixed inset-0 bg-black/45" onClick={() => setCommandPaletteOpen(false)} aria-hidden="true" />
+      <div className="fixed inset-0 bg-black/50" onClick={() => setCommandPaletteOpen(false)} aria-hidden="true" />
 
-      <div className="ll-lift relative z-10 flex max-h-[80vh] w-full max-w-2xl flex-col border border-feint-strong border-t-2 border-t-ink-900 bg-paper-100" role="dialog" aria-modal="true" aria-label="Find">
-        <div className="flex items-center gap-3 border-b border-feint px-4 py-2.5">
-          <Search className="h-5 w-5 shrink-0 text-graphite-600" aria-hidden="true" />
+      <div className="relative z-10 flex max-h-[80vh] w-full max-w-2xl flex-col overflow-hidden rounded-2xl border border-border bg-surface shadow-lg" role="dialog" aria-modal="true" aria-label="Find">
+        <div className="flex items-center gap-3 border-b border-border px-4 py-3">
+          <Search className="h-5 w-5 shrink-0 text-text-3" aria-hidden="true" />
           <input
             ref={inputRef}
             type="text"
@@ -249,7 +260,7 @@ export function CommandPalette() {
             aria-controls="find-results"
             aria-activedescendant={filteredItems[selectedIndex] ? `find-${filteredItems[selectedIndex].id}` : undefined}
             aria-label="Find a page, customer, invoice or account"
-            className="h-9 w-full border-0 bg-transparent text-[15px] text-ink-900 outline-none focus:ring-0"
+            className="h-9 w-full border-0 bg-transparent text-[15px] text-text outline-none focus:ring-0"
             placeholder="Find a page, customer, invoice or account"
             value={query}
             onChange={(e) => {
@@ -258,7 +269,7 @@ export function CommandPalette() {
             }}
             onKeyDown={handleKeyDown}
           />
-          <kbd className="hidden shrink-0 border border-field px-1.5 py-0.5 text-[11px] text-graphite-600 sm:inline">Esc</kbd>
+          <kbd className="hidden shrink-0 rounded border border-border px-1.5 py-0.5 text-[11px] text-text-3 sm:inline">Esc</kbd>
         </div>
 
         <ul ref={listRef} id="find-results" role="listbox" className="overflow-y-auto">
@@ -274,8 +285,8 @@ export function CommandPalette() {
               return (
                 <React.Fragment key={item.id}>
                   {startsSection && (
-                    <li role="presentation" className="border-b border-ink-900 px-4 pb-1 pt-3">
-                      <span className="ll-printed text-[10.5px] text-graphite-600">{item.category}</span>
+                    <li role="presentation" className="bg-surface-2 px-4 pb-1 pt-3">
+                      <span className="text-[11px] font-semibold uppercase tracking-wide text-text-3">{item.category}</span>
                     </li>
                   )}
                   <li
@@ -285,7 +296,7 @@ export function CommandPalette() {
                     aria-selected={isSelected}
                     onMouseEnter={() => setSelectedIndex(index)}
                     onClick={() => item.action()}
-                    className={`flex cursor-pointer items-baseline justify-between gap-3 border-b border-feint px-4 py-2.5 ${isSelected ? 'bg-paper-200' : ''}`}
+                    className={`flex cursor-pointer items-baseline justify-between gap-3 px-4 py-2.5 ${isSelected ? 'bg-primary-soft' : 'hover:bg-hover'}`}
                   >
                     <div className="min-w-0">
                       <p className={`truncate text-[14px] text-ink-900 ${isSelected ? 'font-semibold' : ''}`}>{item.title}</p>
@@ -302,7 +313,7 @@ export function CommandPalette() {
           )}
         </ul>
 
-        <div className="border-t border-feint px-4 py-2 text-[11.5px] text-graphite-600">
+        <div className="border-t border-border bg-surface-2 px-4 py-2 text-[11.5px] text-text-3">
           <span className="sm:hidden">Tap a result to open it</span>
           <div className="hidden items-center gap-4 sm:flex">
             <span>

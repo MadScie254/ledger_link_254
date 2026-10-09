@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAppStore } from '../../store';
 import { DynamicQuickAddModal } from '../common/DynamicQuickAddModal';
@@ -34,8 +34,13 @@ export function PayrollView() {
   const [runError, setRunError] = useState('');
   const [selectedRunId, setSelectedRunId] = useState<string | null>(null);
 
-  const { currentOrgId, activeCompany } = useAppStore();
+  const { currentOrgId, activeCompany, createIntent, setCreateIntent } = useAppStore();
   const queryClient = useQueryClient();
+
+  useEffect(() => {
+    if (createIntent === 'payrollRun') { setActiveTab('Run payroll'); setCreateIntent(null); }
+    if (createIntent === 'employee') { setActiveTab('Employees'); setIsAddingEmployee(true); setCreateIntent(null); }
+  }, [createIntent, setCreateIntent]);
 
   const { data: employeesData, isLoading, error: employeesError } = useQuery({
     queryKey: ['employees', currentOrgId],

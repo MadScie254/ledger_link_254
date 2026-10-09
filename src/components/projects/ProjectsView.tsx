@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { format } from 'date-fns';
 import { useAppStore } from '../../store';
@@ -19,7 +19,12 @@ export function ProjectsView() {
   const [timesheetNotes, setTimesheetNotes] = useState('');
   const [timesheetError, setTimesheetError] = useState('');
 
-  const { currentOrgId, activeCompany } = useAppStore();
+  const { currentOrgId, activeCompany, createIntent, setCreateIntent } = useAppStore();
+  useEffect(() => {
+    if (createIntent !== 'timeEntry') return;
+    setActiveTab('Hours');
+    setCreateIntent(null);
+  }, [createIntent, setCreateIntent]);
   const baseCurrency = activeCompany?.baseCurrency || 'KES';
   const queryClient = useQueryClient();
 

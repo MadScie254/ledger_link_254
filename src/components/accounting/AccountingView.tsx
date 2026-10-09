@@ -1,7 +1,7 @@
 import React from 'react';
 import { NO_TAGS, TagFields, tagHeaders, type Tags } from '../common/TagFields';
 import { X } from 'lucide-react';
-import { useState, useRef } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { useInfiniteQuery, useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAppStore } from '../../store';
 import { format } from 'date-fns';
@@ -40,7 +40,13 @@ export function AccountingView() {
   const [importNote, setImportNote] = useState<{ ok: boolean; text: string } | null>(null);
 
   const queryClient = useQueryClient();
-  const { currentOrgId, activeCompany } = useAppStore();
+  const { currentOrgId, activeCompany, createIntent, setCreateIntent } = useAppStore();
+  useEffect(() => {
+    if (createIntent !== 'journalEntry') return;
+    setActiveTab('Journal Entries');
+    setIsAddingJE(true);
+    setCreateIntent(null);
+  }, [createIntent, setCreateIntent]);
 
   const { data: accountsData, isLoading: isLoadingAccounts } = useQuery({
     queryKey: ['accounts', currentOrgId],

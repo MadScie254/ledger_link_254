@@ -10,7 +10,7 @@ const ORG = '00000000-0000-0000-0000-0000000000aa';
 
 test('an invoice is written, posted, paid and the payment reversed', async () => {
   const { page, api, problems } = await signedIn();
-  await openView(page, 'Sales');
+  await openView(page, 'Sales & customers');
   await page.getByRole('button', { name: 'New invoice' }).first().click();
   await page.locator('select[required]').first().selectOption({ label: 'Acme' });
   await page.getByLabel('Line 1 particulars').fill('Cement, 10 bags');
@@ -46,7 +46,7 @@ test('how to pay is set once in Settings and printed on the invoice PDF', async 
   const session = await signedIn();
   const { page, api, problems } = session;
   await flow('invoice-pdf', session, async () => {
-    await openView(page, 'Settings');
+    await openView(page, 'Company');
     await page.getByRole('button', { name: 'Edit details' }).first().click();
     const dialog = page.getByRole('dialog');
     await dialog.locator('textarea[name="paymentDetails"]').fill('M-Pesa paybill 247247, account your invoice number.');
@@ -56,7 +56,7 @@ test('how to pay is set once in Settings and printed on the invoice PDF', async 
     assert.deepEqual(refusedWrites(api), []);
     assert.equal(sql(`SELECT payment_details || '|' || document_footer FROM public.organizations WHERE id = '${ORG}'`), 'M-Pesa paybill 247247, account your invoice number.|Asante sana.');
 
-    await openView(page, 'Sales');
+    await openView(page, 'Sales & customers');
     const number = sql(`SELECT invoice_number FROM public.invoices WHERE org_id = '${ORG}' ORDER BY created_at DESC LIMIT 1`);
     const [download] = await Promise.all([
       page.waitForEvent('download'),
@@ -77,7 +77,7 @@ test('a bill with a supplier reference is entered and paid', async () => {
   const session = await signedIn();
   const { page, api, problems } = session;
   await flow('bill', session, async () => {
-  await openView(page, 'Bills and expenses');
+  await openView(page, 'Expenses & suppliers');
   await page.getByRole('button', { name: 'New bill' }).click();
   const dialog = page.getByRole('dialog');
   await dialog.locator('select[name="vendorId"]').selectOption({ label: 'Kenya Power' });
@@ -134,7 +134,7 @@ test('an estimate is written, sent, accepted and invoiced', async () => {
   const session = await signedIn();
   const { page, api, problems } = session;
   await flow('estimate', session, async () => {
-    await openView(page, 'Sales');
+    await openView(page, 'Sales & customers');
     await page.getByRole('tab', { name: /Estimates/ }).click();
     await page.getByRole('button', { name: 'New estimate' }).click();
     const dialog = page.getByRole('dialog');

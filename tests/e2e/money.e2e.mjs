@@ -11,7 +11,7 @@ test('a walk-in sale is posted on a sales receipt into the till', async () => {
   const { page, api, problems } = session;
   await flow('sales-receipt', session, async () => {
     const before = Number(sql(`SELECT quantity_on_hand FROM public.inventory_items WHERE name = 'Cement 50kg'`));
-    await openView(page, 'Sales');
+    await openView(page, 'Sales & customers');
     await page.getByRole('tab', { name: /Sales receipts/ }).click();
     await page.getByRole('button', { name: 'New sales receipt' }).click();
     const dialog = page.getByRole('dialog');
@@ -33,7 +33,7 @@ test('an expense paid from the bank is posted', async () => {
   const session = await signedIn();
   const { page, api, problems } = session;
   await flow('expense', session, async () => {
-    await openView(page, 'Bills and expenses');
+    await openView(page, 'Expenses & suppliers');
     await page.getByRole('tab', { name: 'Expenses' }).click();
     await page.getByRole('button', { name: 'New expense' }).click();
     const dialog = page.getByRole('dialog');
@@ -56,7 +56,7 @@ test('a receipt PDF is attached to an expense and downloaded again', async () =>
   const session = await signedIn();
   const { page, api, problems } = session;
   await flow('attachment', session, async () => {
-    await openView(page, 'Bills and expenses');
+    await openView(page, 'Expenses & suppliers');
     await page.getByRole('tab', { name: 'Expenses' }).click();
     await page.getByRole('button', { name: 'Files' }).first().click();
     const dialog = page.getByRole('dialog');
@@ -106,7 +106,7 @@ test('a credit note is issued against an invoice and lowers what is due', async 
       CURRENT_DATE - 3, CURRENT_DATE + 27, 'KES', 1, NULL, '00000000-0000-0000-0000-000000000001',
       jsonb_build_array(jsonb_build_object('description', 'Cement', 'accountId', '00000000-0000-0000-0000-00000000a400', 'amountCents', 300000)), 'e2e-cn-invoice')`);
     const invoiceNumber = sql(`SELECT invoice_number FROM public.invoices WHERE id = '${invoiceId}'`);
-    await openView(page, 'Sales');
+    await openView(page, 'Sales & customers');
     await page.getByRole('tab', { name: /Credit notes/ }).click();
     await page.getByRole('button', { name: 'New credit note' }).click();
     const dialog = page.getByRole('dialog');
@@ -128,7 +128,7 @@ test('a supplier credit is recorded, then refunded into the bank', async () => {
   const session = await signedIn();
   const { page, api, problems } = session;
   await flow('supplier-credit', session, async () => {
-    await openView(page, 'Bills and expenses');
+    await openView(page, 'Expenses & suppliers');
     await page.getByRole('tab', { name: 'Supplier credits' }).click();
     await page.getByRole('button', { name: 'New supplier credit' }).click();
     const dialog = page.getByRole('dialog');
@@ -157,7 +157,7 @@ test('a purchase order is written, then billed for what arrived', async () => {
   const { page, api, problems } = session;
   await flow('purchase-order', session, async () => {
     const before = Number(sql(`SELECT quantity_on_hand FROM public.inventory_items WHERE name = 'Cement 50kg'`));
-    await openView(page, 'Bills and expenses');
+    await openView(page, 'Expenses & suppliers');
     await page.getByRole('tab', { name: 'Purchase orders' }).click();
     await page.getByRole('button', { name: 'New purchase order' }).click();
     const dialog = page.getByRole('dialog');
@@ -192,7 +192,7 @@ test('an invoice is made recurring and the next one posted now', async () => {
       CURRENT_DATE, CURRENT_DATE + 14, 'KES', 1, 'Retainer', '00000000-0000-0000-0000-000000000001',
       jsonb_build_array(jsonb_build_object('description', 'Monthly bookkeeping', 'accountId', '00000000-0000-0000-0000-00000000a400', 'amountCents', 1500000)), 'e2e-recurring-source')`);
     const invoiceNumber = sql(`SELECT invoice_number FROM public.invoices WHERE id = '${invoiceId}'`);
-    await openView(page, 'Sales');
+    await openView(page, 'Sales & customers');
     await page.getByRole('tab', { name: 'Recurring' }).click();
     await page.getByRole('button', { name: 'New recurring invoice' }).click();
     const dialog = page.getByRole('dialog');

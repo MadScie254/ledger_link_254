@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useRenderTracker } from '../../utils/monitoring';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { format } from 'date-fns';
@@ -27,8 +27,9 @@ type SalesTab = 'Invoices' | 'Recurring' | 'Receipts' | 'Credits' | 'Estimates' 
 
 export function SalesView() {
   useRenderTracker("SalesView");
-  const { currentOrgId, activeCompany } = useAppStore();
+  const { currentOrgId, activeCompany, createIntent, setCreateIntent } = useAppStore();
   const [salesTab, setSalesTab] = useState<SalesTab>('Invoices');
+  const [actionHint, setActionHint] = useState('');
   const [isBuilding, setIsBuilding] = useState(false);
   const [isOrdering, setIsOrdering] = useState(false);
   const [isEstimating, setIsEstimating] = useState(false);
@@ -44,6 +45,17 @@ export function SalesView() {
   const [paymentIdempotencyKey, setPaymentIdempotencyKey] = useState('');
   const [paymentProblem, setPaymentProblem] = useState('');
   const { confirm, confirmDialog } = useConfirm();
+
+  useEffect(() => {
+    if (!createIntent || !['invoice', 'payment', 'estimate', 'salesReceipt', 'creditNote'].includes(createIntent)) return;
+    setActionHint(createIntent === 'payment' ? 'Choose an open invoice to receive a payment.' : '');
+    if (createIntent === 'invoice') { setSalesTab('Invoices'); setIsBuilding(true); }
+    if (createIntent === 'payment') setSalesTab('Invoices');
+    if (createIntent === 'estimate') { setSalesTab('Estimates'); setIsEstimating(true); }
+    if (createIntent === 'salesReceipt') { setSalesTab('Receipts'); setIsSellingNow(true); }
+    if (createIntent === 'creditNote') { setSalesTab('Credits'); setIsCrediting(true); }
+    setCreateIntent(null);
+  }, [createIntent, setCreateIntent]);
 
   const queryClient = useQueryClient();
 
@@ -284,6 +296,7 @@ export function SalesView() {
         }
       />
 
+      {actionHint && <PageNote>{actionHint}</PageNote>}
       <IndexTabs
         label="Sales"
         active={salesTab}

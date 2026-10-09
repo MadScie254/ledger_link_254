@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAppStore } from '../../store';
 import { DynamicQuickAddModal } from '../common/DynamicQuickAddModal';
@@ -23,7 +23,13 @@ export function InventoryView() {
   const [countingItem, setCountingItem] = useState<any | null>(null);
   const [notice, setNotice] = useState('');
 
-  const { currentOrgId, activeCompany } = useAppStore();
+  const { currentOrgId, activeCompany, createIntent, setCreateIntent } = useAppStore();
+  useEffect(() => {
+    if (createIntent !== 'stockCount') return;
+    setActiveTab('Items');
+    setNotice('Choose an item to count.');
+    setCreateIntent(null);
+  }, [createIntent, setCreateIntent]);
   const baseCurrency = activeCompany?.baseCurrency || 'KES';
   const queryClient = useQueryClient();
   const { confirm, confirmDialog } = useConfirm();

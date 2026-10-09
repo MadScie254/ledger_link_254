@@ -50,10 +50,18 @@ export async function signedIn(email = 'owner@example.com', viewport = { width: 
   return { page, api, problems, context };
 }
 
-/** Opens a page from the sidebar by its label. */
+/** Opens a page through the current navigation. */
 export async function openView(page, label) {
   try {
-    await page.getByRole('navigation').first().getByRole('button', { name: label, exact: true }).first().click({ timeout: 5000 });
+    if (['Company', 'Team', 'Integrations', 'Audit log'].includes(label)) {
+      await page.locator('summary[aria-label="Settings"]').first().click();
+      await page.getByRole('menu', { name: 'Settings' }).getByRole('menuitem', { name: label, exact: true }).click();
+    } else if (label === 'Documentation') {
+      await page.locator('summary[aria-label="Help"]').click();
+      await page.getByRole('menu', { name: 'Help' }).getByRole('menuitem', { name: 'Documentation' }).click();
+    } else {
+      await page.getByRole('navigation', { name: 'Sections' }).getByRole('button', { name: label, exact: true }).first().click({ timeout: 5000 });
+    }
   } catch (error) {
     await page.screenshot({ path: new URL(`./.work/blocked-${label.replace(/\W+/g, '-')}.png`, import.meta.url).pathname, fullPage: true });
     throw error;

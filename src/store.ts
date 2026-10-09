@@ -54,6 +54,12 @@ export interface OrganizationData {
   role?: 'owner' | 'admin' | 'accountant' | 'member';
 }
 
+export type CreateIntent =
+  | 'invoice' | 'payment' | 'estimate' | 'salesReceipt' | 'creditNote'
+  | 'bill' | 'payBills' | 'expense' | 'purchaseOrder' | 'supplierCredit'
+  | 'payrollRun' | 'employee' | 'timeEntry' | 'transfer' | 'journalEntry'
+  | 'stockCount' | 'importStatement';
+
 interface AppState {
   displayCurrency: string;
   setDisplayCurrency: (c: string) => void;
@@ -73,6 +79,10 @@ interface AppState {
   setCommandPaletteOpen: (isOpen: boolean) => void;
   isMobileSidebarOpen: boolean;
   setMobileSidebarOpen: (isOpen: boolean) => void;
+  isNewMenuOpen: boolean;
+  setNewMenuOpen: (isOpen: boolean) => void;
+  createIntent: CreateIntent | null;
+  setCreateIntent: (intent: CreateIntent | null) => void;
   
   // Undo Stack
   undoStack: Array<{ id: string, message: string, revertEndpoint: string, data: any }>;
@@ -118,6 +128,10 @@ export const useAppStore = create<AppState>((set) => ({
   setCommandPaletteOpen: (isOpen) => set({ isCommandPaletteOpen: isOpen }),
   isMobileSidebarOpen: false,
   setMobileSidebarOpen: (isOpen) => set({ isMobileSidebarOpen: isOpen }),
+  isNewMenuOpen: false,
+  setNewMenuOpen: (isOpen) => set({ isNewMenuOpen: isOpen }),
+  createIntent: null,
+  setCreateIntent: (intent) => set({ createIntent: intent }),
   
   undoStack: [],
   pushUndoAction: (action) => set((state) => ({ undoStack: [...state.undoStack, action] })),

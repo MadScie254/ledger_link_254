@@ -1,10 +1,11 @@
-import { businessTypeDefinition, reorderByBusinessType, type BusinessType, type BusinessTypeAccount } from './businessTypes.ts';
+import { businessTypeDefinition, type BusinessType, type BusinessTypeAccount } from './businessTypes.ts';
 
 export type Edition = 'business' | 'law' | 'church';
 export interface LocalizedLabel { en: string; sw: 'TODO-SW' }
 export interface SidebarItem {
   view: string;
   name: LocalizedLabel;
+  childOf?: string;
   /** Sections still in the pilot backlog are visible as unavailable, never clickable. */
   available?: boolean;
 }
@@ -23,29 +24,30 @@ const label = (en: string): LocalizedLabel => ({ en, sw: 'TODO-SW' });
 const item = (view: string, en: string, available = true): SidebarItem =>
   ({ view, name: label(en), ...(available ? {} : { available: false }) });
 
-/** The existing Sidebar INDEX in its original order and with its original English labels. */
 const BUSINESS_SIDEBAR: SidebarGroup[] = [
-  { label: label('Money'), items: [
-    item('Home / Dashboard', 'Home'), item('Banking', 'Banking'),
-    item('Sales', 'Sales'), item('Customer Hub', 'Customers'),
-    item('Expenses & Bills', 'Bills and expenses'),
-  ] },
-  { label: label('Books'), items: [
-    item('Accounting', 'Accounting'), item('Reports', 'Reports'),
-    item('Tax', 'Tax'), item('Payroll', 'Payroll'),
+  { label: label('Workspace'), items: [
+    item('Home / Dashboard', 'Home'),
+    { ...item('Business Feed', 'Business feed'), childOf: 'Home / Dashboard' },
+    item('Sales', 'Sales & customers'),
+    { ...item('Customer Hub', 'Customers'), childOf: 'Sales' },
+    item('Expenses & Bills', 'Expenses & suppliers'),
+    item('Banking', 'Banking'), item('Payroll', 'Payroll'),
     item('Inventory', 'Inventory'), item('Projects', 'Projects'),
   ] },
-  { label: label('Office'), items: [
-    item('Business Feed', 'Business feed'), item('Team', 'Team'),
-    item('Apps / Integrations', 'Integrations'), item('Audit Logs', 'Audit log'),
-    item('Documentation', 'Documentation'), item('Settings', 'Settings'),
+  { label: label('Books'), items: [
+    item('Reports', 'Reports'), item('Tax', 'Taxes'), item('Accounting', 'Accounting'),
   ] },
+  { label: label('Settings'), items: [
+    item('Settings', 'Company'), item('Team', 'Team'),
+    item('Apps / Integrations', 'Integrations'), item('Audit Logs', 'Audit log'),
+  ] },
+  { label: label('Help'), items: [item('Documentation', 'Documentation')] },
 ];
 
 export const FULL_BOOKS_GROUP: SidebarGroup = {
   label: label('Full books'),
-  items: BUSINESS_SIDEBAR[1].items.filter((entry) =>
-    ['Accounting', 'Reports', 'Tax', 'Payroll'].includes(entry.view)),
+  items: [item('Accounting', 'Accounting'), item('Reports', 'Reports'),
+    item('Tax', 'Tax'), item('Payroll', 'Payroll')],
 };
 
 export const EDITIONS: EditionDefinition[] = [
@@ -136,15 +138,11 @@ export function businessTypeAllowedForEdition(
 
 export function navigationGroupsFor(
   edition: Edition | null | undefined,
-  businessType: BusinessType | null | undefined,
+  _businessType: BusinessType | null | undefined,
   role: 'owner' | 'admin' | 'accountant' | 'member' | null | undefined,
 ): SidebarGroup[] {
   const definition = editionDefinition(edition);
-  if (definition.id === 'business') {
-    return definition.sidebar.map((group) => group.label.en === 'Books'
-      ? { ...group, items: reorderByBusinessType(group.items, businessType) }
-      : group);
-  }
+  if (definition.id === 'business') return definition.sidebar;
   return role && ['owner', 'admin', 'accountant'].includes(role)
     ? [...definition.sidebar, FULL_BOOKS_GROUP] : definition.sidebar;
 }

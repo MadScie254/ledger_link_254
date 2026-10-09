@@ -1,5 +1,5 @@
 import React from 'react';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { format } from 'date-fns';
 import { ReceiptScanner } from './ReceiptScanner';
 import { BillBuilder } from './BillBuilder';
@@ -50,9 +50,19 @@ export function ExpensesView() {
   const [batchPaymentAccountId, setBatchPaymentAccountId] = useState('');
   const { confirm, confirmDialog } = useConfirm();
 
-  const { currentOrgId, activeCompany } = useAppStore();
+  const { currentOrgId, activeCompany, createIntent, setCreateIntent } = useAppStore();
   const baseCurrency = activeCompany?.baseCurrency || 'KES';
   const queryClient = useQueryClient();
+
+  useEffect(() => {
+    if (!createIntent || !['bill', 'payBills', 'expense', 'purchaseOrder', 'supplierCredit'].includes(createIntent)) return;
+    if (createIntent === 'bill') { setActiveTab('Bills'); setIsCreatingBill(true); }
+    if (createIntent === 'payBills') setActiveTab('Bill payments');
+    if (createIntent === 'expense') { setActiveTab('Expenses'); setIsRecordingExpense(true); }
+    if (createIntent === 'purchaseOrder') { setActiveTab('Purchase orders'); setIsOrdering(true); }
+    if (createIntent === 'supplierCredit') { setActiveTab('Supplier credits'); setIsRecordingCredit(true); }
+    setCreateIntent(null);
+  }, [createIntent, setCreateIntent]);
 
   const { data: vendorsData, isLoading: vendorsLoading } = useQuery({
     queryKey: ['vendors', currentOrgId],
