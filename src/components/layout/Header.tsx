@@ -1,8 +1,9 @@
 import { useState } from 'react';
-import { Search, Menu, Plus, ChevronDown, Check, Moon, Sun } from 'lucide-react';
+import { Search, Menu, Plus, ChevronDown, Check } from 'lucide-react';
 import { useAppStore } from '../../store';
 import { useQueryClient } from '@tanstack/react-query';
 import { NotificationDropdown } from './NotificationDropdown';
+import { ThemeToggle } from './ThemeToggle';
 import { DynamicQuickAddModal, getContextualEntityType } from '../common/DynamicQuickAddModal';
 import { EntityType } from '../../hooks/useEntityForm';
 import { CompanyMark } from '../ledger/CompanyMark';
@@ -50,8 +51,6 @@ export function Header() {
     setActiveCompany,
     setCurrentOrgId,
     setDisplayCurrency,
-    theme,
-    setTheme,
     setMobileSidebarOpen,
   } = useAppStore();
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
@@ -186,14 +185,7 @@ export function Header() {
           </button>
           )}
 
-          <button
-            type="button"
-            onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
-            className="p-2 text-graphite-600 hover:text-ink-900"
-            aria-label={theme === 'dark' ? 'Switch to paper (light)' : 'Switch to carbon (dark)'}
-          >
-            {theme === 'dark' ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
-          </button>
+          <ThemeToggle />
 
           <NotificationDropdown />
         </div>

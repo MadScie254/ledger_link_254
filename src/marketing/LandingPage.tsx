@@ -17,6 +17,7 @@ import {
   X,
 } from 'lucide-react';
 import { BrandMark } from '../components/ledger/BrandMark';
+import { ThemeToggle } from '../components/layout/ThemeToggle';
 import { BUSINESS_BRAND } from '../hooks/usePublicBrand';
 import type { PublicBrand } from '../utils/publicBrand';
 
@@ -143,9 +144,12 @@ export function LandingPage({ onSignIn, onSignUp, brand = BUSINESS_BRAND }: Land
           <span className="flex items-center gap-2 ll-printed text-[16px]">
             <BrandMark edition={brand.edition} className="h-5 w-5 text-oxblood" /> {brand.brandName}
           </span>
-          <button type="button" onClick={onSignIn} className="text-[13.5px] font-semibold text-oxblood underline underline-offset-4">
-            {signInLabel.en}
-          </button>
+          <div className="flex items-center gap-2">
+            <ThemeToggle />
+            <button type="button" onClick={onSignIn} className="text-[13.5px] font-semibold text-oxblood underline underline-offset-4">
+              {signInLabel.en}
+            </button>
+          </div>
         </div>
       </header>
       <section className="mx-auto grid max-w-6xl gap-12 px-5 py-20 sm:px-8 md:grid-cols-[1.4fr_1fr] md:py-28">
@@ -199,6 +203,7 @@ export function LandingPage({ onSignIn, onSignUp, brand = BUSINESS_BRAND }: Land
           </nav>
 
           <div className="hidden items-center gap-2 md:flex">
+            <ThemeToggle />
             <button type="button" onClick={onSignIn} className="h-9 px-3 text-[13.5px] font-semibold text-ink-900 hover:text-oxblood">
               Sign in
             </button>
@@ -207,9 +212,12 @@ export function LandingPage({ onSignIn, onSignUp, brand = BUSINESS_BRAND }: Land
             </button>
           </div>
 
-          <button type="button" onClick={() => setIsMenuOpen((open) => !open)} className="p-2 text-ink-900 md:hidden" aria-label={isMenuOpen ? 'Close menu' : 'Open menu'} aria-expanded={isMenuOpen}>
-            {isMenuOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
-          </button>
+          <div className="flex items-center gap-1 md:hidden">
+            <ThemeToggle />
+            <button type="button" onClick={() => setIsMenuOpen((open) => !open)} className="p-2 text-ink-900" aria-label={isMenuOpen ? 'Close menu' : 'Open menu'} aria-expanded={isMenuOpen}>
+              {isMenuOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
+            </button>
+          </div>
         </div>
 
         {isMenuOpen && (

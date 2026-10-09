@@ -148,7 +148,20 @@ npx wrangler secret put SUPABASE_SECRET_KEY
 npx wrangler secret put GEMINI_API_KEY
 ```
 
-### 3. Apply database migrations, then build and deploy
+### Automatic deploys from `main`
+
+The `ledgerlink` Worker is connected to this repository through Cloudflare Workers Builds
+(Worker → Settings → Builds): every push to `main` runs `npm run build`, then
+`npx wrangler deploy`, on Cloudflare. The browser build values come from `.env.production`
+(public by design); the Worker's secrets stay in Cloudflare. Build logs are under the Worker's
+Deployments in the dashboard, and each commit on GitHub shows the build as a check.
+
+Supabase applies new migrations from the same push, a few minutes later. A push that adds a
+migration together with code that calls it can therefore reach users before the database has
+it. Push the migration on its own first, confirm it is applied (`supabase migration list`, or
+`supabase_migrations.schema_migrations` in production), then push the code that uses it.
+
+### 3. Apply database migrations, then build and deploy by hand
 
 Apply new migrations first, so the Worker never calls a function the database does not yet have:
 
