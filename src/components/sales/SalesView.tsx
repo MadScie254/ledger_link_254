@@ -9,6 +9,8 @@ import { PrintButton } from '../common/PrintButton';
 import { BulkActionBar } from '../common/BulkActionBar';
 import { useAppStore } from '../../store';
 import { Amount } from '../ledger/Amount';
+import { DataTable, type DataColumn } from '../ledger/DataTable';
+import { MoneyBar } from '../ledger/MoneyBar';
 import { Dialog, Field } from '../ledger/Dialog';
 import { Mark } from '../ledger/Mark';
 import { IndexTabs, PageHeading, PageNote, buttonClass } from '../ledger/Page';
@@ -37,6 +39,7 @@ export function SalesView() {
   const [isCrediting, setIsCrediting] = useState(false);
   const [isScheduling, setIsScheduling] = useState(false);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [invoiceFilter, setInvoiceFilter] = useState('ALL');
   const [selectedInvoice, setSelectedInvoice] = useState<any | null>(null);
   const [paymentInvoice, setPaymentInvoice] = useState<any | null>(null);
   const [paymentAmount, setPaymentAmount] = useState('');
@@ -152,18 +155,6 @@ export function SalesView() {
     }
   });
 
-  const handleSelectAll = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.checked && invoicesData?.invoices) {
-      setSelectedIds(invoicesData.invoices.map((inv: any) => inv.id));
-    } else {
-      setSelectedIds([]);
-    }
-  };
-
-  const handleSelectOne = (id: string) => {
-    setSelectedIds(prev => prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]);
-  };
-
   const handleExportCSV = () => {
     if (!invoicesData?.invoices) return;
     const targetInvoices = selectedIds.length > 0 
@@ -188,8 +179,17 @@ export function SalesView() {
   // Payments land only in money accounts: bank, cash or M-Pesa.
   const depositAccounts: any[] = (accountsData?.accounts || []).filter((account: any) => account.isBankAccount && account.isActive !== false);
   const customerName = (id: string) => customersData?.customers?.find((c: any) => c.id === id)?.displayName;
-  const invoiceTotal = invoices.reduce((sum, inv) => sum + (inv.totalCents || 0), 0);
-  const overdueCount = invoices.filter((inv) => inv.status === 'OVERDUE').length;
+  const today = todayIn(activeCompany?.timeZone);
+  const paidSince = format(new Date(new Date(`${today}T12:00:00Z`).getTime() - 29 * 86400000), 'yyyy-MM-dd');
+  const isOpenInvoice = (inv: any) => ['SENT', 'PARTIALLY_PAID', 'PARTIAL', 'OVERDUE'].includes(inv.status) && Number(inv.amountDueCents || 0) > 0;
+  const isOverdue = (inv: any) => isOpenInvoice(inv) && !!inv.dueDate && inv.dueDate.slice(0, 10) < today;
+  const recentPaid = (inv: any) => (inv.payments || []).reduce((sum: number, payment: any) => !payment.reversedAt && payment.paymentDate >= paidSince && payment.paymentDate <= today ? sum + Number(payment.amountCents || 0) : sum, 0);
+  const overdueInvoices = invoices.filter(isOverdue);
+  const notDueInvoices = invoices.filter((inv) => isOpenInvoice(inv) && !isOverdue(inv));
+  const paidInvoices = invoices.filter((inv) => recentPaid(inv) > 0);
+  const shownInvoices = invoiceFilter === 'OVERDUE' ? overdueInvoices : invoiceFilter === 'NOT_DUE' ? notDueInvoices : invoiceFilter === 'PAID_30' ? paidInvoices : invoices;
+  const shownInvoiceTotal = shownInvoices.reduce((sum, inv) => sum + (inv.totalCents || 0), 0);
+  const overdueCount = overdueInvoices.length;
   const openCount = invoices.filter((inv) => !['PAID', 'DRAFT', 'VOID'].includes(inv.status)).length;
 
   const openPayment = (invoice: any) => {
@@ -244,6 +244,15 @@ export function SalesView() {
         return <span className="text-[12px] text-graphite-600">{status.charAt(0) + status.slice(1).toLowerCase()}</span>;
     }
   };
+
+  const invoiceColumns: DataColumn<any>[] = [
+    { id: 'date', label: 'Date', value: (inv) => inv.issueDate || '', render: (inv) => <span className="whitespace-nowrap text-text-2">{format(new Date(inv.issueDate), 'dd/MM/yyyy')}</span> },
+    { id: 'invoice', label: 'Invoice', value: (inv) => inv.invoiceNo || '', render: (inv) => <span className="font-medium text-text">{inv.invoiceNo}</span> },
+    { id: 'customer', label: 'Customer', value: (inv) => customerName(inv.customerId) || '', render: (inv) => <button type="button" onClick={(event) => { event.stopPropagation(); setSelectedInvoice(inv); }} className="text-left font-medium text-text hover:text-primary-ink">{customerName(inv.customerId) || 'Customer not found'}</button> },
+    { id: 'standing', label: 'Standing', value: (inv) => inv.status || '', render: (inv) => standing(isOverdue(inv) ? 'OVERDUE' : inv.status) },
+    { id: 'due', label: 'Due', value: (inv) => inv.dueDate || '', render: (inv) => inv.dueDate ? format(new Date(inv.dueDate), 'dd/MM/yyyy') : '–' },
+    { id: 'total', label: baseCurrency, value: (inv) => Number(inv.totalCents || 0), render: (inv) => <Amount cents={inv.totalCents || 0} currency={baseCurrency} />, numeric: true },
+  ];
 
   return (
     <div>
@@ -368,11 +377,17 @@ export function SalesView() {
           <PageNote>
             <span>{openCount} open</span>
             {overdueCount > 0 && <Mark kind="circled" label={`${overdueCount} overdue`} />}
-            <span>{invoices.length - openCount} paid or draft</span>
+            <span>{invoices.length - openCount} not open</span>
           </PageNote>
+          <MoneyBar label="Invoice money" active={invoiceFilter} onChange={setInvoiceFilter} currency={baseCurrency} segments={[
+            { id: 'OVERDUE', label: 'Overdue', count: overdueInvoices.length, cents: overdueInvoices.reduce((sum, inv) => sum + Number(inv.amountDueCents || 0), 0), color: 'var(--warning)' },
+            { id: 'NOT_DUE', label: 'Not due', count: notDueInvoices.length, cents: notDueInvoices.reduce((sum, inv) => sum + Number(inv.amountDueCents || 0), 0), color: 'var(--chart-expense)' },
+            { id: 'PAID_30', label: 'Paid in 30 days', count: paidInvoices.length, cents: paidInvoices.reduce((sum, inv) => sum + recentPaid(inv), 0), color: 'var(--positive)' },
+          ]} />
           {/* On a phone each invoice is a ruled entry: who and how much, then its number, date and standing. */}
           <ul className="sm:hidden" aria-label={`Invoices, figures in ${baseCurrency}`}>
-            {invoices.map((inv: any) => (
+            {shownInvoices.length === 0 && <li className="py-6 text-sm text-text-2">No invoices match this filter. Choose All to see every invoice.</li>}
+            {shownInvoices.map((inv: any) => (
               <li key={inv.id} className="border-b border-feint py-3">
                 <div className="flex items-baseline justify-between gap-3">
                   <button type="button" onClick={() => setSelectedInvoice(inv)} className="min-w-0 truncate text-left text-[14.5px] text-ink-900 hover:underline underline-offset-[3px]">
@@ -390,7 +405,7 @@ export function SalesView() {
                 </div>
                 <div className="mt-1.5 flex items-center justify-between gap-3">
                   <span className="flex flex-wrap items-center gap-2">
-                    {standing(inv.status)}
+                    {standing(isOverdue(inv) ? 'OVERDUE' : inv.status)}
                     {Number(inv.amountDueCents || 0) > 0 && inv.status !== 'VOID' && (
                       <button type="button" onClick={() => openPayment(inv)} className={buttonClass.quiet}>Receive payment</button>
                     )}
@@ -398,98 +413,39 @@ export function SalesView() {
                   </span>
                   {inv.dueDate && <span className="text-[12px] text-graphite-600">Due {format(new Date(inv.dueDate), 'dd/MM/yyyy')}</span>}
                 </div>
+                <label className="mt-1 inline-flex min-h-11 items-center gap-2 text-xs text-text-2"><input type="checkbox" aria-label={`Select invoice ${inv.invoiceNo}`} checked={selectedIds.includes(inv.id)} onChange={() => setSelectedIds((current) => current.includes(inv.id) ? current.filter((id) => id !== inv.id) : [...current, inv.id])} />Select</label>
               </li>
             ))}
             <li className="ll-total mt-px flex items-baseline justify-between gap-3 py-2 text-[13.5px]">
-              <span className="font-semibold text-ink-900">Total of {invoices.length} {invoices.length === 1 ? 'invoice' : 'invoices'}</span>
-              <Amount cents={invoiceTotal} currency={baseCurrency} tone="ink" className="font-semibold" />
+                <span className="font-semibold text-ink-900">Total of {shownInvoices.length} {shownInvoices.length === 1 ? 'invoice' : 'invoices'}</span>
+                <Amount cents={shownInvoiceTotal} currency={baseCurrency} tone="ink" className="font-semibold" />
             </li>
           </ul>
-          <div className="hidden sm:block relative overflow-x-auto">
-            <table className="w-full text-[13.5px]">
-              <caption className="sr-only">Invoices, figures in {baseCurrency}</caption>
-              <thead>
-                <tr>
-                  <th scope="col" className="w-8 pr-2 text-left">
-                    <input
-                      type="checkbox"
-                      aria-label="Select all invoices"
-                      className="h-4 w-4"
-                      onChange={handleSelectAll}
-                      checked={selectedIds.length > 0 && invoices.length === selectedIds.length}
-                    />
-                  </th>
-                  <th scope="col" className="pr-4 text-left">Date</th>
-                  <th scope="col" className="pr-4 text-left">Invoice</th>
-                  <th scope="col" className="pr-4 text-left">Customer</th>
-                  <th scope="col" className="pr-4 text-left">Standing</th>
-                  <th scope="col" className="pr-4 text-left">Due</th>
-                  <th scope="col" className="text-right">{baseCurrency}</th>
-                </tr>
-              </thead>
-              <tbody>
-                {invoices.map((inv: any) => (
-                  <tr key={inv.id} onClick={() => setSelectedInvoice(inv)} className="cursor-pointer">
-                    <td className="w-8 pr-2" onClick={(e) => e.stopPropagation()}>
-                      <input
-                        type="checkbox"
-                        aria-label={`Select invoice ${inv.invoiceNo}`}
-                        className="h-4 w-4"
-                        checked={selectedIds.includes(inv.id)}
-                        onChange={() => handleSelectOne(inv.id)}
-                      />
-                    </td>
-                    <td className="pr-4 whitespace-nowrap text-graphite-600">{format(new Date(inv.issueDate), 'dd/MM/yyyy')}</td>
-                    <td className="pr-4 whitespace-nowrap text-graphite-600">{inv.invoiceNo}</td>
-                    <td className="pr-4">
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setSelectedInvoice(inv);
-                        }}
-                        className="text-left text-ink-900 hover:underline underline-offset-[3px]"
-                      >
-                        {customerName(inv.customerId) || 'Customer not found'}
-                      </button>
-                    </td>
-                    <td className="pr-4 whitespace-nowrap">
-                      <div className="flex flex-col items-start gap-1">
-                        {standing(inv.status)}
-                        {Number(inv.amountDueCents || 0) > 0 && inv.status !== 'VOID' && (
-                          <button
-                            type="button"
-                            onClick={(event) => {
-                              event.stopPropagation();
-                              openPayment(inv);
-                            }}
-                            className={buttonClass.quiet}
-                          >
-                            Receive payment
-                          </button>
-                        )}
-                        <PrintButton kind="invoice" id={inv.id} number={inv.invoiceNo} />
-                      </div>
-                    </td>
-                    <td className="pr-4 whitespace-nowrap text-graphite-600">{inv.dueDate ? format(new Date(inv.dueDate), 'dd/MM/yyyy') : '–'}</td>
-                    <td className="text-right whitespace-nowrap">
-                      <Amount cents={inv.totalCents || 0} currency={baseCurrency} />
-                      {inv.currency && inv.currency !== baseCurrency && (
-                        <span className="block mt-1 text-[11.5px] text-graphite-600">
-                          {inv.currency} <Amount cents={inv.foreignAmountCents || inv.totalCents} currency={inv.currency} size="xs" tone="ink" />
-                        </span>
-                      )}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-            <div className="ll-total mt-px flex items-baseline justify-between gap-4 py-2 text-[13.5px]">
-              <span className="font-semibold text-ink-900">Total of {invoices.length} {invoices.length === 1 ? 'invoice' : 'invoices'}</span>
-              <Amount cents={invoiceTotal} currency={baseCurrency} tone="ink" className="font-semibold" />
+          <div className="hidden sm:block">
+            <DataTable
+              records={shownInvoices}
+              columns={invoiceColumns}
+              caption={`Invoices, figures in ${baseCurrency}`}
+              onOpen={setSelectedInvoice}
+              openLabel={(inv) => `Open invoice ${inv.invoiceNo}`}
+              selectedIds={selectedIds}
+              onSelectionChange={setSelectedIds}
+              selectAllLabel="Select all invoices"
+              selectRowLabel={(inv) => `Select invoice ${inv.invoiceNo}`}
+              rowActions={(inv) => (
+                <>
+                  {Number(inv.amountDueCents || 0) > 0 && inv.status !== 'VOID' && (
+                    <button type="button" onClick={() => openPayment(inv)} className={buttonClass.quiet}>Receive payment</button>
+                  )}
+                  <PrintButton kind="invoice" id={inv.id} number={inv.invoiceNo} />
+                </>
+              )}
+            />
+            <div className="flex items-baseline justify-between gap-4 px-4 py-3 text-[13px]">
+              <span className="font-semibold text-text">Total of {shownInvoices.length} {shownInvoices.length === 1 ? 'invoice' : 'invoices'}</span>
+              <Amount cents={shownInvoiceTotal} currency={baseCurrency} tone="ink" className="font-semibold" />
             </div>
-          </div>
-        </>
+          </div>        </>
       )}
 
       {/* Bulk Action Contextual Toolbar */}

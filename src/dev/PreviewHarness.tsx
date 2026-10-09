@@ -349,6 +349,13 @@ const FIXTURES: Record<string, unknown> = {
       { id: 't-4', date: '2026-09-12', description: 'M-Pesa QJH2ZX8M4 from 0733 xxx 101', amountCents: 320_000, direction: 'IN', status: 'MATCHED', bankAccountId: 'a-1010' },
     ],
   },
+  '/api/cash-transactions?kind=EXPENSE': {
+    transactions: [
+      { id: 'ex-1', kind: 'EXPENSE', number: 'EXP-2026-0018', date: '2026-10-02', partyName: 'KPLC', moneyAccountName: '1000 Cash at Bank - KCB', reference: 'KPLC-381', totalCents: 4_650_000, status: 'POSTED', createdAt: '2026-10-02T09:00:00Z', lines: [{ description: 'Electricity and water', amountCents: 4_650_000 }] },
+      { id: 'ex-2', kind: 'EXPENSE', number: 'EXP-2026-0017', date: '2026-09-26', partyName: 'Nairobi Supplies', moneyAccountName: '1010 M-Pesa Till', reference: null, totalCents: 1_850_000, status: 'POSTED', createdAt: '2026-09-26T14:00:00Z', lines: [{ description: 'Cleaning materials', amountCents: 1_850_000 }] },
+      { id: 'ex-3', kind: 'EXPENSE', number: 'EXP-2026-0013', date: '2026-09-04', partyName: 'Office Store', moneyAccountName: '1000 Cash at Bank - KCB', reference: null, totalCents: 980_000, status: 'VOID', voidedAt: '2026-09-05T10:00:00Z', voidReason: 'Entered twice', createdAt: '2026-09-04T08:00:00Z', lines: [{ description: 'Stationery', amountCents: 980_000 }] },
+    ],
+  },
 };
 
 const PAYSLIPS = {
@@ -409,7 +416,7 @@ function installFixtureFetch() {
       return new Response(JSON.stringify(state), { status: 200, headers: { 'Content-Type': 'application/json' } });
     }
     const payslips = /^\/api\/payroll\/runs\/[^/]+\/payslips$/.test(url.pathname) ? PAYSLIPS : undefined;
-    const body = method === 'GET' ? payslips ?? FIXTURES[url.pathname] ?? {} : previewWrite(url.pathname, init?.body);
+    const body = method === 'GET' ? payslips ?? FIXTURES[url.pathname + url.search] ?? FIXTURES[url.pathname] ?? {} : previewWrite(url.pathname, init?.body);
     await new Promise((resolve) => setTimeout(resolve, 120));
     return new Response(JSON.stringify(body), { status: 200, headers: { 'Content-Type': 'application/json' } });
   };

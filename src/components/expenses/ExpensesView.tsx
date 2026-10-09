@@ -14,6 +14,8 @@ import { DynamicQuickAddModal } from '../common/DynamicQuickAddModal';
 import { EntityDrillDownModal } from '../common/EntityDrillDownModal';
 import { BulkActionBar } from '../common/BulkActionBar';
 import { Amount } from '../ledger/Amount';
+import { DataTable, type DataColumn } from '../ledger/DataTable';
+import { MoneyBar } from '../ledger/MoneyBar';
 import { Mark } from '../ledger/Mark';
 import { PageHeading, IndexTabs, buttonClass } from '../ledger/Page';
 import { Field } from '../ledger/Dialog';
@@ -46,6 +48,7 @@ export function ExpensesView() {
   const [scannedData, setScannedData] = useState<{ vendor: string; amount: number; date: string; receipt?: File } | null>(null);
   const [selectedEntity, setSelectedEntity] = useState<{ type: 'VENDOR' | 'BILL'; id: string; data: any } | null>(null);
   const [selectedBillIds, setSelectedBillIds] = useState<string[]>([]);
+  const [billFilter, setBillFilter] = useState('ALL');
   const [selectedVendorIds, setSelectedVendorIds] = useState<string[]>([]);
   const [batchPaymentAccountId, setBatchPaymentAccountId] = useState('');
   const { confirm, confirmDialog } = useConfirm();
@@ -192,7 +195,6 @@ export function ExpensesView() {
   const needsApproval = (bill: any) =>
     approvalThreshold != null && bill.status !== 'VOID' && !bill.approvedAt && Number(bill.totalCents || 0) >= approvalThreshold;
 
-  const isAllBillsSelected = bills.length > 0 && selectedBillIds.length === bills.length;
   const isAllVendorsSelected = vendors.length > 0 && selectedVendorIds.length === vendors.length;
 
   const vendorName = (id: string) => vendors.find((v: any) => v.id === id)?.displayName;
@@ -200,9 +202,13 @@ export function ExpensesView() {
   const awaitingApproval = unpaidBills.filter(needsApproval);
   const openBills = unpaidBills.filter((b: any) => !needsApproval(b));
   const openBillsTotal = openBills.reduce((sum: number, b: any) => sum + (b.amountDueCents || 0), 0);
-  const billsTotal = bills.reduce((sum: number, b: any) => sum + (b.totalCents || 0), 0);
   const vendorsTotal = vendors.reduce((sum: number, v: any) => sum + (v.balance || 0), 0);
   const today = todayIn(activeCompany?.timeZone);
+  const overdueBills = bills.filter((bill: any) => Number(bill.amountDueCents || 0) > 0 && bill.status !== 'VOID' && !!bill.dueDate && bill.dueDate < today);
+  const notDueBills = bills.filter((bill: any) => Number(bill.amountDueCents || 0) > 0 && bill.status !== 'VOID' && !overdueBills.includes(bill));
+  const paidBills = bills.filter((bill: any) => bill.status === 'PAID');
+  const shownBills = billFilter === 'OVERDUE' ? overdueBills : billFilter === 'NOT_DUE' ? notDueBills : billFilter === 'PAID' ? paidBills : bills;
+  const shownBillsTotal = shownBills.reduce((sum: number, bill: any) => sum + Number(bill.totalCents || 0), 0);
   const billStanding = (bill: any) => {
     if (bill.status === 'VOID') return <Mark kind="query" label="Void" />;
     if (bill.status === 'PAID') return <Mark kind="tick" label="Paid" />;
@@ -210,6 +216,13 @@ export function ExpensesView() {
     if (bill.status === 'OVERDUE' || (bill.dueDate && bill.dueDate < today)) return <Mark kind="circled" label="Overdue" />;
     return <Mark kind="query" label={bill.dueDate ? 'Not due' : 'To pay'} />;
   };
+  const billColumns: DataColumn<any>[] = [
+    { id: 'bill', label: 'Bill', value: (bill) => bill.billNo || '', render: (bill) => <span className="font-medium text-text">{bill.billNo}{bill.supplierReference && <span className="block text-xs font-normal text-text-2">{bill.supplierReference}</span>}</span> },
+    { id: 'vendor', label: 'Vendor', value: (bill) => vendorName(bill.vendorId) || '', render: (bill) => <button type="button" onClick={(event) => { event.stopPropagation(); setSelectedEntity({ type: 'BILL', id: bill.id, data: bill }); }} className="text-left font-medium text-text hover:text-primary-ink">{vendorName(bill.vendorId) || 'Vendor not found'}</button> },
+    { id: 'dated', label: 'Dated', value: (bill) => bill.billDate || '', render: (bill) => format(new Date(bill.billDate), 'dd/MM/yyyy') },
+    { id: 'standing', label: 'Standing', value: (bill) => bill.status || '', render: billStanding },
+    { id: 'total', label: baseCurrency, value: (bill) => Number(bill.totalCents || 0), render: (bill) => <Amount cents={bill.totalCents || 0} currency={baseCurrency} />, numeric: true },
+  ];
   const skeleton = (label: string) => (
     <div aria-busy="true" aria-label={label} className="mt-2">
       {Array.from({ length: 6 }).map((_, i) => (
@@ -288,8 +301,14 @@ export function ExpensesView() {
           </div>
         ) : (
           <>
+            <MoneyBar label="Bill money" active={billFilter} onChange={setBillFilter} currency={baseCurrency} segments={[
+              { id: 'OVERDUE', label: 'Overdue', count: overdueBills.length, cents: overdueBills.reduce((sum: number, bill: any) => sum + Number(bill.amountDueCents || 0), 0), color: 'var(--warning)' },
+              { id: 'NOT_DUE', label: 'Not due', count: notDueBills.length, cents: notDueBills.reduce((sum: number, bill: any) => sum + Number(bill.amountDueCents || 0), 0), color: 'var(--chart-expense)' },
+              { id: 'PAID', label: 'Paid', count: paidBills.length, cents: paidBills.reduce((sum: number, bill: any) => sum + Number(bill.totalCents || 0), 0), color: 'var(--positive)' },
+            ]} />
             <ul className="sm:hidden" aria-label={`Bills, figures in ${baseCurrency}`}>
-              {bills.map((bill: any) => (
+              {shownBills.length === 0 && <li className="py-6 text-sm text-text-2">No bills match this filter. Choose All to see every bill.</li>}
+              {shownBills.map((bill: any) => (
                 <li key={bill.id} className="border-b border-feint py-3">
                   <div className="flex items-baseline justify-between gap-3">
                     <button type="button" onClick={() => setSelectedEntity({ type: 'BILL', id: bill.id, data: bill })} className="min-w-0 truncate text-left text-[14.5px] text-ink-900 hover:underline underline-offset-[3px]">
@@ -299,79 +318,32 @@ export function ExpensesView() {
                   </div>
                   <p className="mt-1 text-[12.5px] text-graphite-600">{bill.billNo}{bill.supplierReference ? ` · ${bill.supplierReference}` : ''} · {format(new Date(bill.billDate), 'dd/MM/yyyy')}</p>
                   <div className="mt-1.5">{billStanding(bill)}</div>
+                  <label className="mt-1 inline-flex min-h-11 items-center gap-2 text-xs text-text-2"><input type="checkbox" aria-label={`Select bill ${bill.billNo}`} checked={selectedBillIds.includes(bill.id)} onChange={() => setSelectedBillIds((current) => current.includes(bill.id) ? current.filter((id) => id !== bill.id) : [...current, bill.id])} />Select</label>
                 </li>
               ))}
               <li className="ll-total mt-px flex items-baseline justify-between gap-3 py-2 text-[13.5px]">
-                <span className="font-semibold text-ink-900">Total of {bills.length} bills</span>
-                <Amount cents={billsTotal} currency={baseCurrency} tone="ink" className="font-semibold" />
+                <span className="font-semibold text-ink-900">Total of {shownBills.length} bills</span>
+                <Amount cents={shownBillsTotal} currency={baseCurrency} tone="ink" className="font-semibold" />
               </li>
             </ul>
-            <div className="hidden sm:block relative overflow-x-auto">
-              <table className="w-full text-[13.5px]">
-                <caption className="sr-only">Bills, figures in {baseCurrency}</caption>
-                <thead>
-                  <tr>
-                    <th scope="col" className="w-8 pr-2 text-left">
-                      <input
-                        type="checkbox"
-                        aria-label="Select all bills"
-                        checked={isAllBillsSelected}
-                        onChange={(e) => setSelectedBillIds(e.target.checked ? bills.map((b: any) => b.id) : [])}
-                        className="h-4 w-4"
-                      />
-                    </th>
-                    <th scope="col" className="pr-4 text-left">Bill</th>
-                    <th scope="col" className="pr-4 text-left">Vendor</th>
-                    <th scope="col" className="pr-4 text-left">Dated</th>
-                    <th scope="col" className="pr-4 text-left">Standing</th>
-                    <th scope="col" className="text-right">{baseCurrency}</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {bills.map((bill: any) => (
-                    <tr key={bill.id} onClick={() => setSelectedEntity({ type: 'BILL', id: bill.id, data: bill })} className="cursor-pointer">
-                      <td className="w-8 pr-2" onClick={(e) => e.stopPropagation()}>
-                        <input
-                          type="checkbox"
-                          aria-label={`Select bill ${bill.billNo}`}
-                          checked={selectedBillIds.includes(bill.id)}
-                          onChange={() =>
-                            setSelectedBillIds((prev) => (prev.includes(bill.id) ? prev.filter((id) => id !== bill.id) : [...prev, bill.id]))
-                          }
-                          className="h-4 w-4"
-                        />
-                      </td>
-                      <td className="pr-4 whitespace-nowrap text-graphite-600">
-                        {bill.billNo}
-                        {bill.supplierReference && <span className="block text-[12px]">{bill.supplierReference}</span>}
-                      </td>
-                      <td className="pr-4">
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setSelectedEntity({ type: 'BILL', id: bill.id, data: bill });
-                          }}
-                          className="text-left text-ink-900 hover:underline underline-offset-[3px]"
-                        >
-                          {vendorName(bill.vendorId) || 'Vendor not found'}
-                        </button>
-                      </td>
-                      <td className="pr-4 whitespace-nowrap text-graphite-600">{format(new Date(bill.billDate), 'dd/MM/yyyy')}</td>
-                      <td className="pr-4 whitespace-nowrap">{billStanding(bill)}</td>
-                      <td className="text-right whitespace-nowrap"><Amount cents={bill.totalCents || 0} currency={baseCurrency} /></td>
-                    </tr>
-                  ))}
-                </tbody>
-                <tfoot>
-                  <tr>
-                    <th scope="row" colSpan={5} className="ll-total py-2 pr-4 text-left font-semibold text-ink-900">Total of {bills.length} bills</th>
-                    <td className="ll-total py-2 text-right whitespace-nowrap"><Amount cents={billsTotal} currency={baseCurrency} tone="ink" className="font-semibold" /></td>
-                  </tr>
-                </tfoot>
-              </table>
-            </div>
-          </>
+            <div className="hidden sm:block">
+              <DataTable
+                records={shownBills}
+                columns={billColumns}
+                caption={`Bills, figures in ${baseCurrency}`}
+                onOpen={(bill) => setSelectedEntity({ type: 'BILL', id: bill.id, data: bill })}
+                openLabel={(bill) => `Open bill ${bill.billNo}`}
+                selectedIds={selectedBillIds}
+                onSelectionChange={setSelectedBillIds}
+                selectAllLabel="Select all bills"
+                selectRowLabel={(bill) => `Select bill ${bill.billNo}`}
+                rowActions={(bill) => <button type="button" onClick={() => setSelectedEntity({ type: 'BILL', id: bill.id, data: bill })} className={buttonClass.quiet}>Open</button>}
+              />
+              <div className="flex items-baseline justify-between gap-4 px-4 py-3 text-[13px]">
+                <span className="font-semibold text-text">Total of {shownBills.length} bills</span>
+                <Amount cents={shownBillsTotal} currency={baseCurrency} tone="ink" className="font-semibold" />
+              </div>
+            </div>          </>
         )
       )}
 

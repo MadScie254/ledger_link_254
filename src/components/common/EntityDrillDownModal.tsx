@@ -68,9 +68,9 @@ const dateText = (d?: string) => {
 /** A labelled line in the record. Missing values say so rather than inventing one. */
 function Line({ label, value, figure = false, copy }: { label: string; value: Value; figure?: boolean; copy?: React.ReactNode }) {
   return (
-    <div className="flex items-baseline justify-between gap-4 border-b border-feint py-2">
-      <dt className="text-[13px] text-graphite-600">{label}</dt>
-      <dd className={`flex items-baseline gap-1.5 text-right text-[13.5px] ${blank(value) ? 'text-graphite-500' : 'text-ink-900'} ${figure ? 'll-figure' : ''}`}>
+    <div className="flex items-baseline justify-between gap-4 py-2">
+      <dt className="text-[13px] text-text-2">{label}</dt>
+      <dd className={`flex items-baseline gap-1.5 text-right text-[13.5px] ${blank(value) ? 'text-text-3' : 'text-text'} ${figure ? 'tabular-nums' : ''}`}>
         {blank(value) ? 'Not recorded' : value}
         {copy && !blank(value) && copy}
       </dd>
@@ -80,8 +80,8 @@ function Line({ label, value, figure = false, copy }: { label: string; value: Va
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <section>
-      <h3 className="ll-printed border-b border-ink-900 pb-1 text-[11px] text-graphite-600">{title}</h3>
+    <section className="rounded-xl border border-border bg-surface p-4">
+      <h3 className="mb-2 text-[13px] font-semibold text-text">{title}</h3>
       <dl>{children}</dl>
     </section>
   );
@@ -380,12 +380,24 @@ export function EntityDrillDownModal({ isOpen, onClose, entityType, entityId, in
       : [];
 
   const documentsTotal = transactions.reduce((s, t) => s + (t.totalCents || 0), 0);
+  const activity: Array<{ key: string; date?: string; label: string; detail?: string }> = [];
+  if (entityType === 'INVOICE' || entityType === 'BILL') {
+    const documentDate = data.issueDate || data.billDate || data.date;
+    if (documentDate) activity.push({ key: 'document', date: documentDate, label: `${NOUN[entityType]} dated`, detail: data.invoiceNumber || data.billNumber });
+    for (const payment of data.payments || []) {
+      if (payment.paymentDate) activity.push({ key: payment.id || `payment-${activity.length}`, date: payment.paymentDate, label: entityType === 'INVOICE' ? 'Payment received' : 'Payment recorded', detail: `${currency} ${(Number(payment.amountCents || 0) / 100).toLocaleString('en-KE', { minimumFractionDigits: 2 })}` });
+      if (payment.reversedAt) activity.push({ key: `reversal-${payment.id}`, date: payment.reversedAt, label: 'Payment reversed', detail: payment.reversalReason || undefined });
+    }
+  } else if (entityType === 'CUSTOMER' || entityType === 'VENDOR') {
+    for (const record of transactions.slice(0, 6)) activity.push({ key: record.id, date: record.issueDate || record.billDate || record.date, label: entityType === 'CUSTOMER' ? 'Invoice' : 'Bill', detail: record.invoiceNumber || record.billNumber });
+  }
+  activity.sort((a, b) => String(b.date || '').localeCompare(String(a.date || '')));
 
   return (
     <Dialog
       open={isOpen}
       onClose={onClose}
-      width="xl"
+      placement="right"
       title={title}
       note={NOUN[entityType]}
       footer={
@@ -416,11 +428,11 @@ export function EntityDrillDownModal({ isOpen, onClose, entityType, entityId, in
         </>
       }
     >
-      <dl className="-mx-5 -mt-4 mb-4 grid grid-cols-2 border-b border-feint-strong sm:grid-flow-col sm:auto-cols-fr sm:grid-cols-none">
-        {figures.map((f, i) => (
-          <div key={f.label} className={`px-5 py-3 ${i > 0 ? 'sm:border-l' : ''} ${i % 2 === 1 ? 'border-l sm:border-l' : ''} ${i >= 2 ? 'border-t sm:border-t-0' : ''} border-feint`}>
-            <dt className="ll-printed text-[10.5px] text-graphite-600">{f.label}</dt>
-            <dd className="mt-1 text-[15px] text-ink-900">{f.value}</dd>
+      <dl className="mb-6 grid grid-cols-2 gap-3 sm:grid-cols-3">
+        {figures.map((f) => (
+          <div key={f.label} className="rounded-xl bg-surface-2 p-3">
+            <dt className="text-[12px] font-medium text-text-2">{f.label}</dt>
+            <dd className="mt-1 font-display text-[16px] font-bold text-text tabular-nums">{f.value}</dd>
           </div>
         ))}
       </dl>
@@ -448,6 +460,19 @@ export function EntityDrillDownModal({ isOpen, onClose, entityType, entityId, in
       {activeTab === 'details' || !hasTransactions ? (
         <>
           <div className="grid grid-cols-1 gap-x-8 gap-y-5 md:grid-cols-2">{details}</div>
+          {['INVOICE', 'BILL', 'CUSTOMER', 'VENDOR'].includes(entityType) && (
+            <section aria-label="Activity timeline" className="mt-6">
+              <h3 className="mb-3 text-[13px] font-semibold text-text">Activity</h3>
+              {activity.length === 0 ? <p className="rounded-lg bg-surface-2 p-4 text-[13px] text-text-2">No dated activity is available for this record.</p> : (
+                <ol className="border-l border-border-strong pl-4">
+                  {activity.map((item) => <li key={item.key} className="relative pb-5 last:pb-0 before:absolute before:-left-[21px] before:top-1.5 before:size-2.5 before:rounded-full before:bg-primary">
+                    <p className="text-[13px] font-medium text-text">{item.label}</p>
+                    <p className="text-xs text-text-2">{dateText(item.date)}{item.detail ? ` · ${item.detail}` : ''}</p>
+                  </li>)}
+                </ol>
+              )}
+            </section>
+          )}
           {entityId && ['INVOICE', 'BILL', 'CUSTOMER', 'VENDOR'].includes(entityType) && (
             <div className="mt-5 border-t border-feint pt-4">
               <AttachmentsPanel recordType={entityType as 'INVOICE' | 'BILL' | 'CUSTOMER' | 'VENDOR'} recordId={entityId} />
