@@ -106,10 +106,11 @@ async function selectOrganization(c: Context<{ Variables: Variables }>, next: Ne
   }
 
   // A read-only member may leave the organization, and may ask a question
-  // about the books (a POST only because the question is in the body).
+  // about the books, typed or spoken (a POST only because the question is
+  // in the body).
   const pathname = new URL(c.req.url).pathname;
   const isMemberPost = c.req.method === 'POST' && (
-    pathname === '/api/membership/leave' || pathname === '/api/ai/ask'
+    pathname === '/api/membership/leave' || pathname === '/api/ai/ask' || pathname === '/api/ai/transcribe'
     || pathname === '/api/court-events/calendar-token'
   );
   if (!['GET', 'HEAD', 'OPTIONS'].includes(c.req.method) && !writeRoles.has(role) && !isMemberPost) {

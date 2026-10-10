@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { UserError } from './errors';
+import { UserError, type UserErrorStatus } from './errors';
 
 // Postgres's own wording for constraint failures names tables, columns and
 // constraints. Those are replaced with a plain sentence for the SQLSTATE;
@@ -36,7 +36,7 @@ function errorMessage(err: unknown): string {
  * PostgREST internals and programming errors are replaced with plain
  * sentences; validation and business-rule messages pass through.
  */
-export function publicError(err: unknown): { status: 400 | 403 | 404 | 409 | 429 | 500; message: string } {
+export function publicError(err: unknown): { status: UserErrorStatus | 500; message: string } {
   if (err instanceof UserError) return { status: err.status, message: err.message };
   if (err instanceof z.ZodError) {
     return {

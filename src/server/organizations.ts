@@ -211,7 +211,7 @@ export class OrganizationService {
     if (data.businessType) await this.seedDefaultAccounts(orgId, data.businessType);
   }
 
-  /** Whether the organization has agreed to send receipts and figures to Google Gemini. */
+  /** Whether the organization has agreed to send receipts, figures and record text to Cloudflare Workers AI. */
   static async aiEnabled(orgId: string): Promise<boolean> {
     const supabase = getSupabase();
     const { data, error } = await supabase.from('organizations').select('ai_enabled').eq('id', orgId).maybeSingle();
