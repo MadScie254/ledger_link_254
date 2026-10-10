@@ -1,11 +1,42 @@
 import React, { useState, useRef, useEffect } from 'react';
+import type { ScannedReceipt } from '../../utils/aiReceipt';
 import { Dialog } from '../ledger/Dialog';
 import { buttonClass } from '../ledger/Page';
+import type { ScannedForBill } from './BillBuilder';
 
 interface ReceiptScannerProps {
   /** What was read, and the photo itself, to keep with the expense. */
-  onScanComplete: (data: { vendor: string; amount: number; date: string; receipt?: File }) => void;
+  onScanComplete: (data: ScannedForBill) => void;
   onClose: () => void;
+}
+
+/** The longest side a photo is sent at: enough to read a receipt, and fewer AI units than a full-size photo. */
+const MAX_SIDE = 1600;
+
+/**
+ * The photo as a JPEG no larger than MAX_SIDE. Phones save HEIC and very
+ * large images; the reading model takes JPEG, PNG or WebP, and a smaller
+ * photo is read faster. A photo the browser cannot open is refused here.
+ */
+function asJpeg(source: Blob): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const url = URL.createObjectURL(source);
+    const image = new Image();
+    image.onload = () => {
+      const scale = Math.min(1, MAX_SIDE / Math.max(image.naturalWidth, image.naturalHeight));
+      const canvas = document.createElement('canvas');
+      canvas.width = Math.max(1, Math.round(image.naturalWidth * scale));
+      canvas.height = Math.max(1, Math.round(image.naturalHeight * scale));
+      canvas.getContext('2d')?.drawImage(image, 0, 0, canvas.width, canvas.height);
+      URL.revokeObjectURL(url);
+      resolve(canvas.toDataURL('image/jpeg', 0.85).split(',')[1]);
+    };
+    image.onerror = () => {
+      URL.revokeObjectURL(url);
+      reject(new Error('This photo cannot be opened here. Take the photo with the camera, or upload a JPEG or PNG.'));
+    };
+    image.src = url;
+  });
 }
 
 export function ReceiptScanner({ onScanComplete, onClose }: ReceiptScannerProps) {
@@ -43,24 +74,32 @@ export function ReceiptScanner({ onScanComplete, onClose }: ReceiptScannerProps)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const processImage = async (base64Data: string, mimeType: string, original?: File) => {
+  const processImage = async (photo: Blob, original?: File) => {
     setIsScanning(true);
     setError('');
     stopCamera();
     try {
+      const base64Data = await asJpeg(photo);
       const res = await fetch('/api/expenses/scan', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ image: base64Data, mimeType }),
+        body: JSON.stringify({ image: base64Data, mimeType: 'image/jpeg' }),
       });
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
-        // 403 (AI features off) and 429 (limit reached) explain themselves.
-        throw new Error([403, 429].includes(res.status) && data.error ? data.error : 'The receipt could not be read. Try a sharper, well-lit photo.');
+        // The Worker's own sentences (AI off, limits, a photo it could not read) explain themselves.
+        throw new Error(data.error || 'The receipt could not be read. Try a sharper, well-lit photo.');
       }
-      const bytes = Uint8Array.from(atob(base64Data), (char) => char.charCodeAt(0));
-      const receipt = original || new File([bytes], `receipt-${new Date().toISOString().slice(0, 10)}.jpg`, { type: mimeType });
-      onScanComplete({ ...(await res.json()), receipt });
+      const read = (await res.json()) as ScannedReceipt;
+      const receipt = original || new File([photo], `receipt-${new Date().toISOString().slice(0, 10)}.jpg`, { type: photo.type || 'image/jpeg' });
+      onScanComplete({
+        vendor: read.vendorName,
+        amountCents: read.totalAmountCents,
+        taxCents: read.taxAmountCents,
+        currency: read.currency,
+        date: read.date || '',
+        receipt,
+      });
     } catch (err: any) {
       setError(err.message || 'The receipt could not be read.');
       setIsScanning(false);
@@ -77,15 +116,13 @@ export function ReceiptScanner({ onScanComplete, onClose }: ReceiptScannerProps)
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
     ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-    processImage(canvas.toDataURL('image/jpeg').split(',')[1], 'image/jpeg');
+    canvas.toBlob((blob) => { if (blob) processImage(blob); }, 'image/jpeg', 0.9);
   };
 
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    const reader = new FileReader();
-    reader.onload = (event) => processImage((event.target?.result as string).split(',')[1], file.type || 'image/jpeg', file);
-    reader.readAsDataURL(file);
+    processImage(file, file);
   };
 
   return (

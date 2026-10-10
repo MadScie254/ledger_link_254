@@ -24,8 +24,8 @@ function knownZones(): string[] {
 
 /**
  * The organization's controls: the closing date, the bill approval limit,
- * its time zone, and whether AI features may send data to Google. Owners and
- * administrators change them; everyone else reads them.
+ * its time zone, and whether AI features may send data to Cloudflare Workers
+ * AI. Owners and administrators change them; everyone else reads them.
  */
 export function ControlsPanel({ company, onSaved }: { company: OrganizationData; onSaved: () => void }) {
   const canChange = company.role === 'owner' || company.role === 'admin';
@@ -51,6 +51,12 @@ export function ControlsPanel({ company, onSaved }: { company: OrganizationData;
       payables: { ledgerCents: number; documentsCents: number; differenceCents: number };
       agrees: boolean;
     }>('/api/reports/control-check'),
+  });
+
+  const usage = useQuery({
+    queryKey: ['ai-usage', company.id],
+    queryFn: () => apiRequest<AiUsage>('/api/ai/usage'),
+    enabled: Boolean(company.aiEnabled),
   });
 
   const save = useMutation({
@@ -140,12 +146,13 @@ export function ControlsPanel({ company, onSaved }: { company: OrganizationData;
         <section aria-labelledby="ai-heading" className="space-y-2">
           <h2 id="ai-heading" className="ll-heading border-b-2 border-ink-900 pb-1.5 text-[20px] text-ink-900">AI features</h2>
           <p className="text-[13.5px] text-graphite-600">
-            Reading receipts from a photo and answering questions about the books send the photo, or a summary of this company’s figures, to Google Gemini. They stay off until an owner or admin turns them on.
+            Reading receipts, answering questions about the books, suggesting accounts for statement lines and drafting reminders, fee note narratives and treasurer’s remarks send the photo, the figures or the text involved to Cloudflare Workers AI, which runs the models on Cloudflare’s network. Phone numbers, email addresses and ID numbers are removed from text first. They stay off until an owner or admin turns them on.
           </p>
           <label className="flex items-start gap-2 text-[13.5px] text-ink-900">
             <input type="checkbox" checked={aiEnabled} disabled={!canChange} onChange={(e) => setAiEnabled(e.target.checked)} className="mt-0.5" />
             <span>Allow AI features for {company.name}</span>
           </label>
+          {company.aiEnabled && usage.data && <AiUsageTable usage={usage.data} />}
         </section>
 
         {canChange ? (
@@ -184,6 +191,56 @@ export function ControlsPanel({ company, onSaved }: { company: OrganizationData;
           </dl>
         ) : null}
       </section>
+    </div>
+  );
+}
+
+interface AiUsage {
+  dailyUnits: number;
+  unitsLeftToday: number;
+  features: Array<{ feature: string; calls: number; failed: number; units: number }>;
+}
+
+const FEATURE_NAMES: Record<string, string> = {
+  'ask.plan': 'Questions: choosing the report',
+  'ask.answer': 'Questions: writing the answer',
+  'ask.voice': 'Spoken questions',
+  'receipt.read': 'Receipts read',
+  'bank.suggest': 'Statement line suggestions',
+  'draft.reminder': 'Payment reminders',
+  'draft.fee_note': 'Fee note narratives',
+  'draft.treasurer': 'Treasurer’s remarks',
+};
+
+/** This month's AI use, and what is left of today's allowance. */
+function AiUsageTable({ usage }: { usage: AiUsage }) {
+  const used = Math.max(usage.dailyUnits - usage.unitsLeftToday, 0);
+  return (
+    <div className="pt-1">
+      <p className="text-[13px] text-graphite-600">
+        Today: <span className="ll-figure text-ink-900">{Math.round(used).toLocaleString('en-KE')}</span> of <span className="ll-figure">{usage.dailyUnits.toLocaleString('en-KE')}</span> AI units used. The allowance renews at 03:00 Nairobi time.
+      </p>
+      {usage.features.length > 0 && (
+        <table className="mt-2 w-full max-w-xl text-[13px]">
+          <caption className="sr-only">AI use this month</caption>
+          <thead>
+            <tr className="border-b border-feint-strong text-left text-graphite-600">
+              <th scope="col" className="py-1.5 pr-4 font-normal">This month</th>
+              <th scope="col" className="py-1.5 pr-4 text-right font-normal">Calls</th>
+              <th scope="col" className="py-1.5 text-right font-normal">Units</th>
+            </tr>
+          </thead>
+          <tbody>
+            {usage.features.map((row) => (
+              <tr key={row.feature} className="border-b border-feint">
+                <td className="py-1.5 pr-4 text-ink-900">{FEATURE_NAMES[row.feature] || row.feature}{row.failed > 0 && <span className="text-graphite-600"> · {row.failed} did not finish</span>}</td>
+                <td className="py-1.5 pr-4 text-right ll-figure">{row.calls.toLocaleString('en-KE')}</td>
+                <td className="py-1.5 text-right ll-figure">{Math.round(row.units).toLocaleString('en-KE')}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
     </div>
   );
 }

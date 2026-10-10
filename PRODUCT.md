@@ -44,9 +44,9 @@ Success is a Kenyan bookkeeper using a feature for a full working day without su
 
 ## Capabilities and Constraints
 
-**Stack (fixed):** React 19, Vite, TypeScript, Tailwind CSS v4, Hono on Cloudflare Workers, Supabase (Postgres with row-level security, Auth with email and password), Zustand, TanStack Query, Recharts, Gemini for receipt OCR only. Do not port frameworks or add a component library.
+**Stack (fixed):** React 19, Vite, TypeScript, Tailwind CSS v4, Hono on Cloudflare Workers, Supabase (Postgres with row-level security, Auth with email and password), Zustand, TanStack Query, Recharts, Cloudflare Workers AI (the Worker's AI binding) for the AI features: receipt reading, questions about the books, statement line suggestions and drafts. Every AI result is a suggestion a person checks; none posts to the books on its own. Do not port frameworks or add a component library.
 
-**Must survive any redesign, extended but not replaced:** the Zustand store, TanStack Query setup, RLS policies, the double-entry Postgres function, the currency service and its unrealised-FX calculation, the audit log, the eTIMS submission log (the KRA integration itself is not built), the Gemini receipt scanner, the dashboard widget picker (drag, pin, reset), the command palette architecture, the dark mode implementation, the print CSS, and the name.
+**Must survive any redesign, extended but not replaced:** the Zustand store, TanStack Query setup, RLS policies, the double-entry Postgres function, the currency service and its unrealised-FX calculation, the audit log, the eTIMS submission log (the KRA integration itself is not built), the receipt scanner (on Workers AI since 10 October 2026), the dashboard widget picker (drag, pin, reset), the command palette architecture, the dark mode implementation, the print CSS, and the name.
 
 **Authentication:** email and password only. Magic links are out and must not be reintroduced.
 

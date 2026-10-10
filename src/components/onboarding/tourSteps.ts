@@ -364,8 +364,8 @@ export const TOUR_STEPS: TourStep[] = [
     target: '[data-tour="feed-overview"]',
     title: { en: 'Business feed: ask in plain words', sw: 'Business feed: uliza kwa maneno rahisi' },
     body: {
-      en: 'Type a question about your business, such as how much profit you made this quarter. Gemini, an AI service, writes the answer from your posted figures. It can be wrong, so check any figure in Reports before you act on it.',
-      sw: 'Andika swali kuhusu biashara yako, kama faida uliyopata robo hii. Gemini, huduma ya AI, inaandika jibu kutoka takwimu zako zilizowekwa. Inaweza kukosea, kwa hiyo kagua takwimu yoyote kwenye Reports kabla ya kuchukua hatua.',
+      en: 'Type or speak a question about your business, such as how much profit you made this quarter. Cloudflare Workers AI, an AI service, picks the report that answers it and explains the figures, which are listed under the answer. The explanation can be wrong, so check the figures before you act on it.',
+      sw: 'Andika au sema swali kuhusu biashara yako, kama faida uliyopata robo hii. Cloudflare Workers AI, huduma ya AI, inachagua ripoti inayojibu swali na kueleza takwimu, ambazo zinaonyeshwa chini ya jibu. Maelezo yanaweza kukosea, kwa hiyo kagua takwimu kabla ya kuchukua hatua.',
     },
   },
   {
