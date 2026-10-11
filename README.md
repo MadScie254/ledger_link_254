@@ -25,7 +25,7 @@ enterprises operating across multiple currencies (KES, USD, EUR, GBP, UGX, TZS).
 - 📎 **Attachments** — receipts, PDFs and documents on any record; a scanned receipt stays with its expense
 - 🖨️ **Printable documents** — invoices, credit notes, estimates, sales receipts, sales orders and purchase orders saved as PDFs, carrying the company's KRA PIN, how to pay (bank or M-Pesa) and its own footer; a foreign-currency invoice prints in its own currency
 - 📥 **Imports** — customers, suppliers and stock items from a spreadsheet
-- 🤖 **Receipt scanner** — AI-powered OCR via Gemini (vendor, amount, date extraction), opt-in per organization
+- 🤖 **AI features on Cloudflare Workers AI** — opt-in per organization, each suggestion or draft checked by a person: receipt reading (supplier, date, total, VAT, currency); questions about the books, typed or spoken, in English or Kiswahili, answered from fixed reports with the figures shown; account suggestions for unmatched statement lines; payment reminders; fee note narratives (Mizani); the treasurer's remarks (Kundi). Use is recorded and capped per organization each day
 - 📈 **Reports** — P&L (and by month, class or location), Balance Sheet, Cash Flow, Trial Balance, General Ledger, aging, sales by customer and item, spending by supplier, VAT and eTIMS summary
 - 🔐 **Email/password auth** — Supabase Auth with row-level security
 - 🌙 **Light/dark theme** — corporate light default, toggleable dark mode
@@ -41,7 +41,7 @@ enterprises operating across multiple currencies (KES, USD, EUR, GBP, UGX, TZS).
 | Backend | Hono, TypeScript, Cloudflare Workers |
 | Database | Supabase (PostgreSQL), Row Level Security |
 | Auth | Supabase Auth (email / password) |
-| AI | Google Gemini API (`@google/genai`) — server-side only |
+| AI | Cloudflare Workers AI through the Worker's `AI` binding — Llama 3.3 70B, Gemma 4, Mistral Small 3.1 and Whisper; server-side only |
 | Charts | Recharts |
 | PDF/CSV | jsPDF, PapaParse, SheetJS |
 
@@ -52,7 +52,7 @@ enterprises operating across multiple currencies (KES, USD, EUR, GBP, UGX, TZS).
 - **Node.js** v18 or later
 - **npm** v9 or later
 - A **Supabase** project (free tier is fine for development)
-- A **Gemini API key** (from [Google AI Studio](https://aistudio.google.com/apikey)) — server-only, never committed
+- A **Cloudflare account** for the AI features: the Worker's `AI` binding (`wrangler.jsonc`) runs Workers AI on it, with no API key. Locally, `npx wrangler login` once; AI calls from `npm run dev` then run on that account and count against its daily allowance
 
 ---
 
@@ -82,7 +82,6 @@ SUPABASE_ANON_KEY=your-anon-key
 SUPABASE_SECRET_KEY=sb_secret_your-secret-key     # backend only, never expose to client
 # SUPABASE_SERVICE_ROLE_KEY still works as a fallback, but Supabase retires
 # legacy service_role keys at the end of 2026.
-GEMINI_API_KEY=your-gemini-api-key                 # backend only, never expose to client
 PORT=3001
 NODE_ENV=development
 ENABLE_SEED_DATA=false                              # set to true for dev/staging demo data
@@ -141,12 +140,13 @@ npx wrangler login
 ### 2. Set secrets
 
 Non-secret config (`SUPABASE_URL`, `ALLOWED_ORIGINS`, `NODE_ENV`) lives in `wrangler.jsonc`.
-Set the two real secrets once per environment:
+Set the real secret once per environment:
 
 ```bash
 npx wrangler secret put SUPABASE_SECRET_KEY
-npx wrangler secret put GEMINI_API_KEY
 ```
+
+The AI features need no secret: the `ai` binding in `wrangler.jsonc` gives the Worker Workers AI on its own Cloudflare account. The Workers Free plan includes 10,000 Neurons a day across the account; each organization may use 4,000 of them a day unless `AI_DAILY_UNITS_PER_ORG` is set.
 
 ### Automatic deploys from `main`
 

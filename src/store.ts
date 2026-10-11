@@ -49,7 +49,7 @@ export interface OrganizationData {
   booksClosedThrough?: string | null;
   /** Bills at or over this amount need an owner's or admin's approval before payment. */
   approvalThresholdCents?: number | null;
-  /** Whether receipts and figures may be sent to Google Gemini. */
+  /** Whether receipts, figures and record text may be sent to Cloudflare Workers AI. */
   aiEnabled?: boolean;
   timeZone?: string;
   /** The signed-in person's role in this organization. */

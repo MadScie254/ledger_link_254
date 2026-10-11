@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useEffect, useState } from 'react';
+import { useMutation, useQuery } from '@tanstack/react-query';
 import { useAppStore } from '../../store';
 import { apiRequest } from '../../utils/apiRequest';
 import { FinancialPDFEngine } from '../../utils/pdfExport';
@@ -23,13 +23,22 @@ type Report = TreasurerReport & { month: string; awaitingSecondCount: number };
 
 /** The monthly report the treasurer reads to the church council. Printable, and exported to PDF. */
 export function TreasurerReportView() {
-  const { orgId, today, currency, companyName, kraPin } = useChurchOrg();
+  const { orgId, today, currency, companyName, kraPin, canPost } = useChurchOrg();
+  const aiEnabled = Boolean(useAppStore((state) => state.activeCompany?.aiEnabled));
   const [month, setMonth] = useState(today.slice(0, 7));
   const report = useQuery({
     queryKey: ['treasurer-report', orgId, month],
     queryFn: () => apiRequest<Report>(`/api/church-reports/treasurer?month=${month}`, { fallback: "The treasurer's report could not be loaded." }),
   });
   const data = report.data;
+  // The treasurer's own remarks, which Cloudflare Workers AI can draft from the figures.
+  const [remarks, setRemarks] = useState('');
+  const [remarksLanguage, setRemarksLanguage] = useState<'en' | 'sw'>('en');
+  useEffect(() => setRemarks(''), [month]);
+  const draftRemarks = useMutation({
+    mutationFn: () => apiRequest<{ text: string }>('/api/ai/treasurer-remarks', { body: { month, language: remarksLanguage }, fallback: 'No remarks came back. Try again.' }),
+    onSuccess: (result) => setRemarks(result.text),
+  });
   const exportPdf = () => {
     if (!data) return;
     const kes = (cents: number) => figureText(cents);
@@ -56,6 +65,7 @@ export function TreasurerReportView() {
           ['M-Pesa receipts not yet placed', `${data.unmatchedCount} (${currency} ${kes(data.unmatchedCents)})`],
           ['Counted cash not yet banked', `${currency} ${kes(data.cashNotBankedCents)}`],
         ] },
+        ...(remarks.trim() ? [{ title: "Treasurer's remarks", headers: [''], rows: [[remarks.trim()]] }] : []),
       ],
     );
   };
@@ -109,6 +119,30 @@ export function TreasurerReportView() {
               <p className="py-2">{data.unmatchedCount === 0 ? 'Every M-Pesa receipt has been placed.' : <>{data.unmatchedCount} M-Pesa {data.unmatchedCount === 1 ? 'receipt is' : 'receipts are'} not yet placed (<Amount cents={data.unmatchedCents} currency={currency} />). They are not in the income above.</>}</p>
               <p className="py-1">{data.cashNotBankedCents === 0 ? 'All counted cash has been banked.' : <>Counted cash not yet banked: <Amount cents={data.cashNotBankedCents} currency={currency} />.</>}
                 {data.awaitingSecondCount > 0 && ` ${data.awaitingSecondCount} cash ${data.awaitingSecondCount === 1 ? 'count waits' : 'counts wait'} for a second counter and ${data.awaitingSecondCount === 1 ? 'is' : 'are'} not in the income above.`}</p>
+            </section>
+            <section aria-labelledby="tr-remarks">
+              <h2 id="tr-remarks" className="ll-heading border-b border-feint-strong pb-1 text-[17px] text-ink-900">Treasurer’s remarks</h2>
+              {remarks.trim() && <p className="print-only whitespace-pre-wrap py-2">{remarks}</p>}
+              <div className="no-print space-y-2 py-2">
+                <textarea rows={remarks ? 7 : 3} value={remarks} maxLength={3000} onChange={(e) => setRemarks(e.target.value)}
+                  aria-label="Treasurer’s remarks" aria-busy={draftRemarks.isPending} className="w-full border p-2"
+                  placeholder="What the treasurer says about the month. Printed and exported with the report." />
+                {aiEnabled && canPost && (
+                  <div className="flex flex-wrap items-end gap-3">
+                    <label className="text-[12.5px]">Language{' '}
+                      <select value={remarksLanguage} onChange={(e) => setRemarksLanguage(e.target.value as 'en' | 'sw')} className="ml-1 h-9 border px-2">
+                        <option value="en">English</option>
+                        <option value="sw">Kiswahili</option>
+                      </select>
+                    </label>
+                    <button type="button" className={buttonClass.secondary} onClick={() => draftRemarks.mutate()} disabled={draftRemarks.isPending}>
+                      {draftRemarks.isPending ? 'Drafting the remarks' : remarks.trim() ? 'Draft the remarks again' : 'Draft the remarks from the figures'}
+                    </button>
+                  </div>
+                )}
+                {draftRemarks.isSuccess && <p className="text-[12.5px] text-graphite-600">Drafted by Cloudflare Workers AI from this report’s figures. Read it and change anything before it is printed or read out.</p>}
+                {draftRemarks.isError && <p role="alert" className="text-[12.5px] text-ledger-red">{(draftRemarks.error as Error).message}</p>}
+              </div>
             </section>
             <p className="text-[12px] text-graphite-600">Prepared from the books on {shortDate(today)}. Journal entries and the trial balance are in Full books.</p>
           </div>

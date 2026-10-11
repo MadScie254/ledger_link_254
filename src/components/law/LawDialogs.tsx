@@ -444,6 +444,14 @@ export function FeeNoteBuilderDialog({ matter, onClose, onDone }: { matter: Matt
   const [notes, setNotes] = useState('');
   const [problem, setProblem] = useState('');
   const post = useLawPost<{ id: string }>(onDone);
+  // The narrative of services, drafted by Cloudflare Workers AI from the work chosen below.
+  const narrative = useMutation({
+    mutationFn: () => apiRequest<{ text: string }>('/api/ai/fee-note-narrative', {
+      body: { matterId: matter.id, timeEntryIds: chosenTime, disbursementIds: chosenCosts },
+      fallback: 'No narrative came back. Try again.',
+    }),
+    onSuccess: (result) => setNotes(result.text),
+  });
   const time = unbilled.data?.timeEntries || [];
   const costs = unbilled.data?.disbursements || [];
   const chosenTime = timeIds ?? time.map((entry) => entry.id);
@@ -512,7 +520,17 @@ export function FeeNoteBuilderDialog({ matter, onClose, onDone }: { matter: Matt
                   <input name="vatRatePercent" inputMode="decimal" value={vatRate} disabled={!vatRegistered} onChange={(e) => setVatRate(e.target.value)} />
                 </Field>
               </div>
-              <Field label="Notes on the fee note" hint="Optional"><textarea name="notes" rows={2} value={notes} onChange={(e) => setNotes(e.target.value)} /></Field>
+              <Field label="Notes on the fee note" hint={narrative.isSuccess ? 'Drafted by Cloudflare Workers AI from the chosen work. Read it and change anything before raising the fee note.' : 'Optional'}>
+                <textarea name="notes" rows={notes.length > 160 ? 6 : 2} maxLength={4000} value={notes} onChange={(e) => setNotes(e.target.value)} aria-busy={narrative.isPending} />
+              </Field>
+              {activeCompany?.aiEnabled && (
+                <div className="-mt-2 flex flex-wrap items-baseline gap-3">
+                  <button type="button" onClick={() => narrative.mutate()} disabled={narrative.isPending || chosenTime.length + chosenCosts.length === 0} className={buttonClass.quiet}>
+                    {narrative.isPending ? 'Drafting the narrative' : notes.trim() ? 'Draft the narrative again' : 'Draft the narrative from the chosen work'}
+                  </button>
+                  {narrative.isError && <span role="alert" className="text-[12.5px] text-ledger-red">{(narrative.error as Error).message}</span>}
+                </div>
+              )}
               <dl className="ml-auto max-w-xs text-[13.5px]">
                 <div className="flex justify-between border-b border-feint py-1"><dt>Professional fees</dt><dd><Amount cents={totals.fees} currency={currency} tone="ink" size="sm" /></dd></div>
                 <div className="flex justify-between border-b border-feint py-1"><dt>Disbursements</dt><dd><Amount cents={totals.disbursed} currency={currency} tone="ink" size="sm" /></dd></div>

@@ -1,3 +1,6 @@
+/** 502 and 503 are for a service the app depends on (Workers AI) that failed or is not set up. */
+export type UserErrorStatus = 400 | 403 | 404 | 409 | 429 | 502 | 503;
+
 /**
  * An error whose message is written for the person using the app: a rule
  * they broke ("Choose the customer"), not an internal failure. The Worker
@@ -5,8 +8,8 @@
  * sentence (worker/http.ts).
  */
 export class UserError extends Error {
-  status: 400 | 403 | 404 | 409 | 429;
-  constructor(message: string, status: 400 | 403 | 404 | 409 | 429 = 400) {
+  status: UserErrorStatus;
+  constructor(message: string, status: UserErrorStatus = 400) {
     super(message);
     this.name = 'UserError';
     this.status = status;

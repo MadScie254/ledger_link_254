@@ -3,6 +3,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { X } from 'lucide-react';
 import { useAppStore } from '../../store';
 import { SUPPORTED_CURRENCIES } from '../../utils/currency';
+import { matchVendorName, receiptExpenseLine } from '../../utils/aiReceipt';
 import { apiRequest, newIdempotencyKey } from '../../utils/apiRequest';
 import { addDaysIso, todayIn } from '../../utils/dates';
 import { centsFromAmountText } from '../../utils/salesOrders';
@@ -34,11 +35,21 @@ const emptyLine = (key: number, accountId = ''): Line => ({ key, itemId: '', des
  * stock item and the quantity received, which the bill counts in. Saving
  * posts the expenses, the recoverable VAT and the amount owed in one entry.
  */
+/** A receipt as the reader found it, in hundredths. */
+export interface ScannedForBill {
+  vendor: string;
+  amountCents: number;
+  taxCents: number | null;
+  currency: string;
+  date: string;
+  receipt?: File;
+}
+
 export function BillBuilder({ open, onClose, scanned, mode = 'bill' }: {
   open: boolean;
   onClose: () => void;
   /** What the receipt reader found, for the person to check. */
-  scanned?: { vendor: string; amount: number; date: string; receipt?: File } | null;
+  scanned?: ScannedForBill | null;
   /**
    * 'bill': owed to the supplier, paid later. 'expense': paid on the spot
    * from a bank, cash or M-Pesa account, with no amount left owing.
@@ -101,23 +112,34 @@ export function BillBuilder({ open, onClose, scanned, mode = 'bill' }: {
     setBillDate(scanned?.date && /^\d{4}-\d{2}-\d{2}$/.test(scanned.date) ? scanned.date : today);
     setDueDate(addDaysIso(today, 30));
     setSupplierReference('');
-    setCurrency(base);
-    setRate('1');
+    // A receipt in another supported currency opens in that currency, at today's rate.
+    const scannedCurrency = scanned?.currency && scanned.currency !== base && SUPPORTED_CURRENCIES.some((c) => c.code === scanned.currency) ? scanned.currency : base;
+    setCurrency(scannedCurrency);
+    setRate(scannedCurrency === base ? '1' : String(exchangeRates[scannedCurrency] || 1));
     setNotes('');
     setPayeeName(scanned?.vendor || '');
     setPaidFromId('');
     setAgainstBillId('');
     setTags(NO_TAGS);
-    const match = (vendors.data?.vendors || []).find((v: any) => v.displayName === scanned?.vendor);
-    setVendorId(match?.id || '');
+    setVendorId(scanned?.vendor ? matchVendorName((vendors.data?.vendors || []) as Array<{ id: string; displayName: string }>, scanned.vendor)?.id || '' : '');
+    // The line is before VAT: a receipt showing 16% VAT goes in at its net amount at 16%.
+    const read = scanned ? receiptExpenseLine({ totalAmountCents: scanned.amountCents, taxAmountCents: scanned.taxCents }) : null;
     setLines([{
       ...emptyLine(1),
       description: scanned?.vendor ? `Receipt from ${scanned.vendor}` : '',
-      amount: scanned?.amount ? String(scanned.amount) : '',
-      taxRate: scanned ? '0' : '16',
+      amount: read && read.netCents > 0 ? (read.netCents / 100).toFixed(2) : '',
+      taxRate: read ? read.taxRate : '16',
     }]);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
+
+  // The vendor list may arrive after the dialog opens: match the receipt's supplier then.
+  useEffect(() => {
+    if (!open || !scanned?.vendor || vendorId) return;
+    const match = matchVendorName((vendors.data?.vendors || []) as Array<{ id: string; displayName: string }>, scanned.vendor);
+    if (match) setVendorId(match.id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, vendors.data]);
 
   // Lines without an account take the supplier's usual account once it is known.
   useEffect(() => {
@@ -263,7 +285,7 @@ export function BillBuilder({ open, onClose, scanned, mode = 'bill' }: {
       placement="page"
       title={scanned ? 'Check the receipt' : isCredit ? 'New supplier credit' : isExpense ? 'New expense' : 'New bill'}
       note={scanned
-        ? 'Read from the photo. Correct anything misread before saving.'
+        ? `Read from the photo by Cloudflare Workers AI${scanned.taxCents ? ', with the VAT it shows' : ''}. Correct anything misread before saving.`
         : isCredit
           ? 'What the supplier owes back, for goods returned or an overcharge. Payables go down, the lines and recoverable VAT are credited, and stock items on it leave stock. Choose a bill to apply it to that bill now.'
           : isExpense

@@ -17,6 +17,7 @@ import { useConfirm } from '../../hooks/useConfirm';
 import { downloadCsv } from '../../utils/exportCsv';
 import { Dialog, Field } from '../ledger/Dialog';
 import { BulkActionBar } from '../common/BulkActionBar';
+import { apiRequest } from '../../utils/apiRequest';
 
 const tabs = ['Bank transactions', 'AI Match Assistant', 'Transfers', 'Rules', 'Reconcile', 'Bank connections'];
 
@@ -324,6 +325,22 @@ export function BankingView() {
   // Lines matched during this visit get the auditor's tick drawn once, as the
   // pen makes it; lines already matched on load show it at rest.
   const [justMatched, setJustMatched] = useState<Set<string>>(() => new Set());
+  // Account suggestions from Workers AI, stored on the lines (ai_category_code).
+  const [aiReasons, setAiReasons] = useState<Record<string, string>>({});
+  const [aiNote, setAiNote] = useState('');
+  const suggestMutation = useMutation({
+    mutationFn: () => apiRequest<{ suggestions: Array<{ transactionId: string; code: string; reason: string }>; considered: number; remaining: number }>(
+      '/api/ai/bank-suggestions', { body: {}, fallback: 'No suggestions came back. Try again.' }),
+    onSuccess: (result) => {
+      setAiReasons((prev) => ({ ...prev, ...Object.fromEntries(result.suggestions.map((s) => [s.transactionId, s.reason])) }));
+      setAiNote(result.considered === 0
+        ? 'Every line that is not matched has been looked at already.'
+        : `${result.suggestions.length} of ${result.considered} ${result.considered === 1 ? 'line has' : 'lines have'} a suggested account.${result.remaining ? ` ${result.remaining} more ${result.remaining === 1 ? 'line' : 'lines'} can be looked at.` : ''}`);
+      queryClient.invalidateQueries({ queryKey: ['bank_transactions', currentOrgId] });
+    },
+    onError: (err: Error) => setAiNote(err.message),
+  });
+
   const reconcile = (payload: MatchPayload) => {
     matchMutation.mutate(payload, {
       onSuccess: () => setJustMatched((prev) => new Set(prev).add(payload.transactionId)),
@@ -399,6 +416,9 @@ export function BankingView() {
   const chosenManualAccountId = manualAccountId || suggestedManualAccount || '';
 
   const highConfidenceCount = aiMatches.filter((m: any) => m.confidence >= 85).length;
+  const canPost = activeCompany?.role !== 'member';
+  const aiAccountLines = rawTx.filter((tx: any) => tx.status !== 'MATCHED' && tx.aiCategoryCode && !aiMatchesMap.has(tx.id));
+  const accountIdForCode = (code: string) => postableAccounts.find((a: any) => a.code === code)?.id as string | undefined;
   const unreviewedCount = rawTx.filter((t: any) => t.status !== 'MATCHED').length;
 
   const baseCurrency = activeCompany?.baseCurrency || 'KES';
@@ -453,7 +473,7 @@ export function BankingView() {
         onChange={(tab) => { setActiveTab(tab); setSelectedTxIds([]); }}
         tabs={[
           { id: 'Bank transactions', name: 'Statement lines', count: rawTx.length },
-          { id: 'AI Match Assistant', name: 'Suggested matches', count: aiMatches.length },
+          { id: 'AI Match Assistant', name: 'Suggested matches', count: aiMatches.length + aiAccountLines.length },
           { id: 'Transfers', name: 'Transfers' },
           { id: 'Rules', name: 'Rules' },
           { id: 'Reconcile', name: 'Reconcile' },
@@ -701,6 +721,67 @@ export function BankingView() {
               })}
             </ul>
           )}
+
+          <section aria-labelledby="ai-accounts" className="border-t border-feint-strong pt-4">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+              <div>
+                <h3 id="ai-accounts" className="text-[14px] font-semibold text-ink-900">Accounts suggested by AI</h3>
+                <p className="mt-0.5 max-w-2xl text-[12.5px] text-graphite-600">
+                  For lines nothing above matches, Cloudflare Workers AI suggests an account from the chart by the line’s wording, 20 lines at a time. Phone numbers are removed from the particulars first. Each one is posted only if you post it.
+                </p>
+              </div>
+              {canPost && activeCompany?.aiEnabled && (
+                <button type="button" onClick={() => { setAiNote(''); suggestMutation.mutate(); }} disabled={suggestMutation.isPending} className={buttonClass.secondary}>
+                  {suggestMutation.isPending ? 'Reading the lines' : 'Suggest accounts'}
+                </button>
+              )}
+            </div>
+            {!activeCompany?.aiEnabled && (
+              <p className="mt-2 text-[13px] text-graphite-600">AI features are off for this company. An owner or admin can turn them on in Settings, Closing and controls.</p>
+            )}
+            {aiNote && <p role="status" className="mt-2 text-[13.5px] text-ink-900">{aiNote}</p>}
+            {aiAccountLines.length > 0 && (
+              <ul className="mt-3 border-t border-feint-strong">
+                {aiAccountLines.map((tx: any) => {
+                  const accountId = accountIdForCode(tx.aiCategoryCode);
+                  return (
+                    <li key={tx.id} className="grid grid-cols-1 gap-3 border-b border-feint py-3.5 md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_9rem_12rem] md:items-start md:gap-5">
+                      <div className="min-w-0">
+                        <p className="ll-printed text-[10.5px] text-graphite-600">Statement line</p>
+                        <p className="mt-0.5 text-[14px] text-ink-900">{tx.description}</p>
+                        <p className="mt-0.5 text-[12.5px] text-graphite-600">{tx.direction === 'IN' ? 'Money in' : 'Money out'}{tx.date ? ` · ${format(new Date(tx.date), 'dd/MM/yyyy')}` : ''}</p>
+                      </div>
+                      <div className="min-w-0">
+                        <p className="ll-printed text-[10.5px] text-graphite-600">AI suggests</p>
+                        <p className="mt-0.5 text-[14px] text-ink-900"><span className="mr-1.5 ll-figure font-semibold">{tx.aiCategoryCode}</span>{tx.aiCategoryName}</p>
+                        <p className="mt-0.5 text-[12.5px] text-graphite-600">{aiReasons[tx.id] || 'From the wording of the line.'}</p>
+                      </div>
+                      <div className="md:text-right">
+                        <Amount cents={tx.amountCents} currency={baseCurrency} tone="ink" />
+                      </div>
+                      <div className="flex flex-wrap gap-2 md:justify-end">
+                        {canPost && (
+                          <button
+                            type="button"
+                            onClick={() => accountId
+                              ? reconcile({ transactionId: tx.id, targetAccountId: accountId })
+                              : setMatchProblem(`Account ${tx.aiCategoryCode} is no longer in the chart of accounts. Choose another for this line.`)}
+                            disabled={matchMutation.isPending}
+                            className={buttonClass.secondary}
+                          >
+                            Post
+                          </button>
+                        )}
+                        {canPost && (
+                          <button type="button" onClick={() => setMatchingTx(tx)} className={buttonClass.quiet}>Choose another</button>
+                        )}
+                      </div>
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
+          </section>
         </div>
       )}
 

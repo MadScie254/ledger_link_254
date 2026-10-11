@@ -2,7 +2,7 @@ import React from 'react';
 import { useEffect, useState } from 'react';
 import { format } from 'date-fns';
 import { ReceiptScanner } from './ReceiptScanner';
-import { BillBuilder } from './BillBuilder';
+import { BillBuilder, type ScannedForBill } from './BillBuilder';
 import { CashTransactionsPanel } from '../common/CashTransactionsPanel';
 import { CreditsPanel } from '../common/CreditsPanel';
 import { PurchaseOrdersPanel } from './PurchaseOrdersPanel';
@@ -45,7 +45,7 @@ export function ExpensesView() {
   const [isScheduling, setIsScheduling] = useState(false);
   const [isImportingVendors, setIsImportingVendors] = useState(false);
   const [importNotice, setImportNotice] = useState('');
-  const [scannedData, setScannedData] = useState<{ vendor: string; amount: number; date: string; receipt?: File } | null>(null);
+  const [scannedData, setScannedData] = useState<ScannedForBill | null>(null);
   const [selectedEntity, setSelectedEntity] = useState<{ type: 'VENDOR' | 'BILL'; id: string; data: any } | null>(null);
   const [selectedBillIds, setSelectedBillIds] = useState<string[]>([]);
   const [billFilter, setBillFilter] = useState('ALL');
@@ -444,7 +444,7 @@ export function ExpensesView() {
             </p>
             {!activeCompany?.aiEnabled && (
               <p className="text-[13px] text-graphite-600">
-                Reading receipts sends the photo to Google Gemini, so it is off until an owner or admin turns on AI features in Settings, Closing and controls.
+                Reading receipts sends the photo to Cloudflare Workers AI, so it is off until an owner or admin turns on AI features in Settings, Closing and controls.
               </p>
             )}
             <button type="button" onClick={() => setIsScanningReceipt(true)} disabled={!activeCompany?.aiEnabled} className={buttonClass.secondary}>

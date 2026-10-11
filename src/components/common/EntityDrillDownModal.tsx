@@ -13,6 +13,7 @@ import { DocumentPayments } from './DocumentPayments';
 import { DynamicQuickAddModal } from './DynamicQuickAddModal';
 import { AttachmentsPanel } from './AttachmentsPanel';
 import { PrintButton } from './PrintButton';
+import { ReminderDraftDialog } from '../sales/ReminderDraftDialog';
 
 export type DrillDownEntityType = 'ITEM' | 'VENDOR' | 'CUSTOMER' | 'EMPLOYEE' | 'ACCOUNT' | 'INVOICE' | 'BILL';
 
@@ -91,6 +92,7 @@ export function EntityDrillDownModal({ isOpen, onClose, entityType, entityId, in
   const [activeTab, setActiveTab] = useState<'details' | 'transactions'>('details');
   const [copiedField, setCopiedField] = useState<string | null>(null);
   const [isEditing, setIsEditing] = useState(false);
+  const [isDraftingReminder, setIsDraftingReminder] = useState(false);
   const { currentOrgId, activeCompany } = useAppStore();
   const currency = activeCompany?.baseCurrency || 'KES';
   // Customers, suppliers, stock items and employees are edited here by anyone who may post.
@@ -405,6 +407,12 @@ export function EntityDrillDownModal({ isOpen, onClose, entityType, entityId, in
           {entityType === 'INVOICE' && entityId && (
             <PrintButton kind="invoice" id={entityId} number={data.invoiceNumber || data.invoiceNo || 'this invoice'} variant="secondary" />
           )}
+          {entityType === 'INVOICE' && entityId && activeCompany?.aiEnabled && activeCompany?.role !== 'member'
+            && Number(data.amountDueCents) > 0 && !['VOID', 'DRAFT', 'PAID'].includes(data.status) && (
+            <button type="button" onClick={() => setIsDraftingReminder(true)} className={buttonClass.secondary}>
+              Draft a reminder
+            </button>
+          )}
           {canEdit && !onEdit && (
             <button type="button" onClick={() => setIsEditing(true)} className={buttonClass.secondary}>
               Edit
@@ -561,6 +569,9 @@ export function EntityDrillDownModal({ isOpen, onClose, entityType, entityId, in
           onClose={() => setIsEditing(false)}
           editing={isEditing ? { type: entityType as 'ITEM' | 'VENDOR' | 'CUSTOMER' | 'EMPLOYEE', id: entityId, data: raw } : null}
         />
+      )}
+      {isDraftingReminder && entityType === 'INVOICE' && entityId && (
+        <ReminderDraftDialog invoiceId={entityId} invoiceNumber={data.invoiceNumber || data.invoiceNo || 'this invoice'} onClose={() => setIsDraftingReminder(false)} />
       )}
     </Dialog>
   );

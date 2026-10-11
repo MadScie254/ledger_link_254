@@ -282,6 +282,23 @@ export const receiptScanSchema = z.object({
   mimeType: z.enum(['image/jpeg', 'image/png', 'image/webp', 'image/heic', 'image/heif']).default('image/jpeg'),
 }).refine((body) => Boolean(body.image || body.imageBase64), 'A photo of the receipt is required.');
 export const askSchema = z.object({ question: requiredText(500, 'A question') });
+/** About a minute of compressed speech; a spoken question is a few seconds. */
+export const MAX_AUDIO_BASE64_LENGTH = 1_500_000;
+export const transcribeSchema = z.object({
+  // Length only: a pattern test over 1.5 MB would spend the Worker's CPU time, and Workers AI refuses audio it cannot read.
+  audio: z.string().min(100, 'The recording is empty.').max(MAX_AUDIO_BASE64_LENGTH, 'The recording is too long; keep a question under a minute.'),
+});
+const draftLanguage = z.enum(['en', 'sw']).default('en');
+export const reminderDraftSchema = z.object({ invoiceId: uuid, language: draftLanguage });
+export const feeNoteNarrativeSchema = z.object({
+  matterId: uuid,
+  timeEntryIds: z.array(uuid).max(200).default([]),
+  disbursementIds: z.array(uuid).max(100).default([]),
+});
+export const treasurerRemarksSchema = z.object({
+  month: z.string().regex(/^\d{4}-(0[1-9]|1[0-2])$/, 'Choose a month as YYYY-MM.'),
+  language: draftLanguage,
+});
 
 // --- Reversals -----------------------------------------------------------------------------
 

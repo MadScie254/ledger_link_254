@@ -16,9 +16,15 @@
   "triggers": {
     "crons": ["17 0 * * *"]
   },
-  // Secrets (SUPABASE_SECRET_KEY, GEMINI_API_KEY) are set via
-  // `wrangler secret put <NAME>` — never committed here. Non-secret vars
-  // below are safe to keep in source control.
+  // Cloudflare Workers AI, for the AI features (src/server/workersAi.ts).
+  // It runs on this Cloudflare account; no API key is needed.
+  "ai": {
+    "binding": "AI"
+  },
+  // Secrets (SUPABASE_SECRET_KEY) are set via `wrangler secret put <NAME>` —
+  // never committed here. Non-secret vars below are safe to keep in source
+  // control. AI_DAILY_UNITS_PER_ORG may be added to change each
+  // organization's daily AI ceiling in Neurons (4000 when unset).
   "vars": {
     "NODE_ENV": "production",
     "SUPABASE_URL": "https://jhmlkcuqsmynnkqgfisf.supabase.co",

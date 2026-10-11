@@ -7,6 +7,7 @@
  *   /__preview/lock
  *   /__preview/ledger
  *   /__preview/tour?step=0        the product tour (add &tour=ask for the welcome dialog)
+ *   ...&ai=on                     as an organization with AI features turned on
  *   ...&fail=/api/dashboard/metrics   make those routes answer 500
  *
  * The figures follow the seeded Riverside Hardware demo tenant. Customer and
@@ -343,10 +344,20 @@ const FIXTURES: Record<string, unknown> = {
   },
   '/api/banking/transactions': {
     transactions: [
-      { id: 't-1', date: '2026-09-15', description: 'M-Pesa QJK4XS2L1 from 0712 xxx 234', amountCents: 450_000, direction: 'IN', status: 'UNMATCHED', bankAccountId: 'a-1010' },
+      { id: 't-1', date: '2026-09-15', description: 'M-Pesa QJK4XS2L1 from 0712 xxx 234', amountCents: 450_000, direction: 'IN', status: 'UNMATCHED', bankAccountId: 'a-1010', aiCategoryCode: '4000', aiCategoryName: 'Sales Revenue' },
       { id: 't-2', date: '2026-09-15', description: 'M-Pesa QJK7PL9A2 from Kiambu Contractors, 0722 xxx 918', amountCents: 14_500_000, direction: 'IN', status: 'UNMATCHED', bankAccountId: 'a-1010' },
       { id: 't-3', date: '2026-09-14', description: 'KCB transfer, Nairobi Steel Supplies', amountCents: 5_000_000, direction: 'OUT', status: 'UNMATCHED', bankAccountId: 'a-1000' },
       { id: 't-4', date: '2026-09-12', description: 'M-Pesa QJH2ZX8M4 from 0733 xxx 101', amountCents: 320_000, direction: 'IN', status: 'MATCHED', bankAccountId: 'a-1010' },
+    ],
+  },
+  '/api/ai/usage': {
+    since: '2026-10-01T00:00:00Z', dailyUnits: 4000, unitsLeftToday: 3_712,
+    features: [
+      { feature: 'ask.answer', calls: 41, failed: 0, units: 352 },
+      { feature: 'ask.plan', calls: 41, failed: 1, units: 701 },
+      { feature: 'bank.suggest', calls: 3, failed: 0, units: 70 },
+      { feature: 'draft.reminder', calls: 6, failed: 0, units: 48 },
+      { feature: 'receipt.read', calls: 12, failed: 0, units: 598 },
     ],
   },
   '/api/cash-transactions?kind=EXPENSE': {
@@ -386,6 +397,25 @@ function previewWrite(pathname: string, rawBody: BodyInit | null | undefined) {
   const order = /^\/api\/sales-orders\/([^/]+)\/(status|invoice)$/.exec(pathname);
   const number = (id: string) => (FIXTURES['/api/sales-orders'] as any).orders.find((o: any) => o.id === id)?.orderNumber;
   if (pathname === '/api/sales-orders') return { id: 'so-8', orderNumber: 'SO-2026-00008', totalCents: 0 };
+  // The AI features, answering as Workers AI did against the demo companies.
+  if (pathname === '/api/ai/ask') {
+    return {
+      answer: 'Kiambu Contractors owes KES 540,000.00, of which KES 145,000.00 is 38 days overdue. Mombasa Builders owes KES 214,000.00, none of it overdue yet.',
+      question: 'who_owes_us', title: 'Who owes us', scope: 'today, 10 October 2026',
+      columns: ['Customer', 'Owed (KES)', 'Overdue (KES)', 'Oldest, days late'],
+      rows: [['Kiambu Contractors', '540,000.00', '145,000.00', 38], ['Mombasa Builders', '214,000.00', '0.00', '']],
+    };
+  }
+  if (pathname === '/api/ai/transcribe') return { text: 'Which customers owe us money?' };
+  if (pathname === '/api/ai/bank-suggestions') {
+    return { suggestions: [{ transactionId: 't-1', code: '4000', reason: 'Money received by M-Pesa for a sale' }], considered: 1, remaining: 0 };
+  }
+  if (pathname === '/api/ai/invoice-reminder') {
+    return {
+      text: 'Dear Kiambu Contractors,\n\nThis is a reminder that invoice INV-2026-0041 for KES 285,000.00 was due on 14 April 2026 and is now 179 days overdue. Please pay through M-Pesa Paybill 522522, account INV-2026-0041.\n\nRiverside Hardware Ltd',
+      subject: 'Invoice INV-2026-0041: payment reminder', email: 'accounts@kiambu-contractors.example',
+    };
+  }
   if (/^\/api\/inventory\/[^/]+\/adjustments$/.test(pathname)) {
     const counted = JSON.parse(typeof rawBody === 'string' ? rawBody : '{}').countedQuantity;
     return { quantity: counted - 9, quantityOnHand: counted };
@@ -449,8 +479,10 @@ function PreviewApp() {
   const [ready, setReady] = useState(false);
 
   useEffect(() => {
-    store.setOrganizations([ORG] as any);
-    store.setActiveCompany(ORG as any);
+    // ?ai=on shows the AI features as an organization that has turned them on.
+    const org = params.get('ai') === 'on' ? { ...ORG, aiEnabled: true } : ORG;
+    store.setOrganizations([org] as any);
+    store.setActiveCompany(org as any);
     store.setCurrentOrgId(ORG.id);
     store.setDisplayCurrency('KES');
     store.setTheme(params.get('theme') === 'dark' ? 'dark' : 'light');
