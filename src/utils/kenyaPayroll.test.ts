@@ -1,15 +1,34 @@
 /// <reference types="node" />
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import {
   calculatePayslip,
   findRateTable,
   isIsoCalendarDate,
   STATUTORY_RATE_TABLES,
+  rateTableFromRow,
+  type StatutoryRateRow,
 } from './kenyaPayroll.ts';
 
 const KES = (shillings: number) => Math.round(shillings * 100);
 const SEPTEMBER_2026 = '2026-09-30';
+
+test('the database seed exactly matches the three coded rate fixtures', () => {
+  const migration = readFileSync(new URL('../../supabase/migrations/20261011000100_statutory_rate_tables.sql', import.meta.url), 'utf8');
+  const rows = [...migration.matchAll(/\('([^']+)', '(\d{4}-\d{2}-\d{2})', '([^']+)', \$rates\$([\s\S]*?)\$rates\$::jsonb\)/g)]
+    .map((match) => rateTableFromRow({
+      version: match[1], effective_from: match[2], source: match[3], rates: JSON.parse(match[4]),
+    } as StatutoryRateRow));
+  assert.deepEqual(rows, STATUTORY_RATE_TABLES);
+  for (const [date, gross] of [
+    ['2025-01-31', KES(48_000)], ['2025-06-30', KES(85_000)],
+    ['2026-01-31', KES(150_000)], [SEPTEMBER_2026, KES(1_000_000)],
+  ] as const) {
+    const databaseVersion = rows.filter((row) => row.effectiveFrom <= date).at(-1)!;
+    assert.deepEqual(calculatePayslip(gross, date, databaseVersion), calculatePayslip(gross, date));
+  }
+});
 
 test('calculates a worked KES 48,000 example using the 2026 table', () => {
   assert.deepEqual(calculatePayslip(KES(48_000), SEPTEMBER_2026), {

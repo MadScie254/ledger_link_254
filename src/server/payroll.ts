@@ -1,7 +1,7 @@
 import { getSupabase } from './supabase';
 import { UserError } from './errors';
 import { fetchAllRows } from './pagination';
-import { calculatePayslip, isIsoCalendarDate, monthlyGrossCents, parsePayPeriod } from '../utils/kenyaPayroll';
+import { calculatePayslip, isIsoCalendarDate, monthlyGrossCents, parsePayPeriod, rateTableFromRow, type StatutoryRateTable, type StatutoryRateRow } from '../utils/kenyaPayroll';
 
 export { calculatePayslip } from '../utils/kenyaPayroll';
 export type { PayslipBreakdown } from '../utils/kenyaPayroll';
@@ -101,6 +101,20 @@ function centsOrZero(value: unknown, label: string): number {
 }
 
 export class PayrollService {
+  static async getStatutoryRateTable(date: string): Promise<StatutoryRateTable> {
+    if (!isIsoCalendarDate(date)) throw new Error('Choose a real date in YYYY-MM-DD form.');
+    const { data, error } = await getSupabase()
+      .from('statutory_rate_tables')
+      .select('version, effective_from, source, rates')
+      .lte('effective_from', date)
+      .order('effective_from', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    if (error) throw error;
+    if (!data) throw new Error(`No statutory rate table is available for ${date}.`);
+    return rateTableFromRow(data as StatutoryRateRow);
+  }
+
   static async getEmployees(orgId: string) {
     const supabase = getSupabase();
     const data = await fetchAllRows<any>((from, to) => supabase
@@ -241,9 +255,8 @@ export class PayrollService {
     const normalizedPeriod = payPeriod.label;
     if (!createdBy?.trim()) throw new Error('A payroll actor is required.');
 
-    // Selects the rate table for the period before any remote work. The same
-    // shared function calculates every employee below.
-    const rateProbe = calculatePayslip(0, payPeriod.rateDate);
+    // Preview and posting both use the database version for the month earned.
+    const rates = await PayrollService.getStatutoryRateTable(payPeriod.rateDate);
     const supabase = getSupabase();
     const [employees, accountIds] = await Promise.all([
       fetchAllRows<any>((from, to) => supabase
@@ -263,7 +276,7 @@ export class PayrollService {
         baseSalaryCents: employee.base_salary,
         housingAllowanceCents: employee.housing_allowance_cents,
         transportAllowanceCents: employee.transport_allowance_cents,
-      }), payPeriod.rateDate);
+      }), payPeriod.rateDate, rates);
       if (breakdown.netCents < 0) {
         // The SHIF minimum can exceed very small pay; say who, instead of the
         // database refusing the whole run with an unexplained total.
@@ -290,7 +303,7 @@ export class PayrollService {
       p_org_id: orgId,
       p_period: normalizedPeriod,
       p_pay_date: payDate,
-      p_rate_version: rateProbe.rateVersion,
+      p_rate_version: rates.version,
       p_created_by: createdBy,
       p_idempotency_key: effectiveIdempotencyKey,
       p_salary_expense_account_id: accountIds.salaryExpense,

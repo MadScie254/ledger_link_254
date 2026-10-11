@@ -36,6 +36,23 @@ export interface StatutoryRateTable {
   readonly pensionDeductionCapCents: number;
 }
 
+/** Reference row returned by the database; rates hold the calculator fields. */
+export interface StatutoryRateRow {
+  readonly version: string;
+  readonly effective_from: string;
+  readonly source: string;
+  readonly rates: Omit<StatutoryRateTable, 'version' | 'effectiveFrom' | 'source'>;
+}
+
+export function rateTableFromRow(row: StatutoryRateRow): StatutoryRateTable {
+  return {
+    version: row.version,
+    effectiveFrom: row.effective_from,
+    source: row.source,
+    ...row.rates,
+  };
+}
+
 export interface PayslipBreakdown {
   readonly grossCents: number;
   readonly nssfCents: number;
@@ -173,18 +190,21 @@ function taxOnBands(taxableCents: number, bands: readonly PayeBand[]): number {
  * date. Invalid dates, unsupported historical dates and imprecise cent values
  * are rejected rather than silently coerced.
  */
-export function calculatePayslip(grossCents: number, payDate: string): PayslipBreakdown {
+export function calculatePayslip(grossCents: number, payDate: string, suppliedRates?: StatutoryRateTable): PayslipBreakdown {
   assertValidCents(grossCents);
 
   if (!isIsoCalendarDate(payDate)) {
     throw new RangeError(`payDate must be a real calendar date in YYYY-MM-DD form; received "${payDate}".`);
   }
 
-  const rates = findRateTable(payDate);
+  const rates = suppliedRates ?? findRateTable(payDate);
   if (!rates) {
     throw new RangeError(
       `No statutory rates are coded for ${payDate}. Rates begin on ${STATUTORY_RATE_TABLES[0].effectiveFrom}.`,
     );
+  }
+  if (rates.effectiveFrom > payDate) {
+    throw new RangeError(`Rate table ${rates.version} is not in force on ${payDate}.`);
   }
 
   if (grossCents === 0) {

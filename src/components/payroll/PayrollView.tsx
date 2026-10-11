@@ -10,7 +10,7 @@ import { Mark } from '../ledger/Mark';
 import { PageHeading, IndexTabs, PageNote, SkeletonRows, EmptyNote, buttonClass } from '../ledger/Page';
 import { payrollReturnsDue } from '../../utils/statutory';
 import { PayrollRunReversal } from './PayrollRunReversal';
-import { calculatePayslip, findRateTable, isIsoCalendarDate, UNSUPPORTED_EMPLOYEE_ADJUSTMENTS, type PayslipBreakdown, monthlyGrossCents, parsePayPeriod } from '../../utils/kenyaPayroll';
+import { calculatePayslip, isIsoCalendarDate, UNSUPPORTED_EMPLOYEE_ADJUSTMENTS, type PayslipBreakdown, type StatutoryRateTable, monthlyGrossCents, parsePayPeriod } from '../../utils/kenyaPayroll';
 
 const tabs = ['Employees', 'Run payroll', 'Payslips', 'Statutory filings (PAYE/NSSF/SHA)'];
 
@@ -135,7 +135,19 @@ export function PayrollView() {
   const baseCurrency = activeCompany?.baseCurrency || 'KES';
   // Rates follow the month earned, not the pay date, exactly as the posting does.
   const previewPeriod = parsePayPeriod(payPeriod);
-  const previewRates = previewPeriod ? findRateTable(previewPeriod.rateDate) : null;
+  const rateQuery = useQuery({
+    queryKey: ['payroll_rates', currentOrgId, previewPeriod?.rateDate],
+    queryFn: async (): Promise<StatutoryRateTable> => {
+      const res = await fetch(`/api/payroll/rates?date=${previewPeriod!.rateDate}`, { headers: { 'x-org-id': currentOrgId } });
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        throw new Error(body.error || 'The statutory rate table could not be loaded.');
+      }
+      return (await res.json()).rates;
+    },
+    enabled: !!previewPeriod && !payrollRestricted,
+  });
+  const previewRates = rateQuery.data ?? null;
   const preview = (() => {
     if (!isIsoCalendarDate(payDate)) {
       return { rows: [] as { emp: any; p: PayslipBreakdown }[], error: 'Choose a valid pay date to calculate this preview.' };
@@ -144,7 +156,7 @@ export function PayrollView() {
       return { rows: [] as { emp: any; p: PayslipBreakdown }[], error: 'Write the pay period as a month and year, such as September 2026.' };
     }
     if (!previewRates) {
-      return { rows: [] as { emp: any; p: PayslipBreakdown }[], error: `No statutory rate table is coded for ${previewPeriod.label}.` };
+      return { rows: [] as { emp: any; p: PayslipBreakdown }[], error: rateQuery.error?.message || 'Loading the statutory rate table.' };
     }
 
     try {
@@ -152,7 +164,7 @@ export function PayrollView() {
         rows: activeEmployees.map((emp: any) => ({
           emp,
           // Base salary plus housing and transport allowances.
-          p: calculatePayslip(monthlyGrossCents(emp), previewPeriod.rateDate),
+          p: calculatePayslip(monthlyGrossCents(emp), previewPeriod.rateDate, previewRates),
         })),
         error: '',
       };
@@ -478,11 +490,9 @@ export function PayrollView() {
                   <Mark
                     kind="query"
                     label={(() => {
-                      const runPeriod = selectedRun?.period ? parsePayPeriod(selectedRun.period) : null;
-                      const table = runPeriod ? findRateTable(runPeriod.rateDate) : selectedRun?.payDate ? findRateTable(selectedRun.payDate) : null;
-                      return table
-                        ? `This run's pay period maps to rate table ${table.version}, effective ${table.effectiveFrom}. Review employee-specific adjustments before filing.`
-                        : 'This run has no supported rate-table match. Check the posted figures before filing.';
+                      return selectedRun?.rateVersion
+                        ? `This run used rate table ${selectedRun.rateVersion}. Review employee-specific adjustments before filing.`
+                        : 'This run has no recorded rate table. Check the posted figures before filing.';
                     })()}
                   />
                 </p>

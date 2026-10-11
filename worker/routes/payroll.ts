@@ -1,10 +1,17 @@
 import { PayrollService } from '../../src/server/payroll';
 import { bodyOf, respondError } from '../http';
-import { employeeSchema, employeeUpdateSchema, payrollRunSchema, reversalSchema, uuid } from '../schemas';
+import { employeeSchema, employeeUpdateSchema, isoDate, payrollRunSchema, reversalSchema, uuid } from '../schemas';
 import type { Api } from './types';
 
 /** Employee and payroll records: personal data, open to owner, admin and accountant only (see worker/index.ts). */
 export function registerPayrollRoutes(api: Api) {
+  api.get('/payroll/rates', async (c) => {
+    try {
+      const date = isoDate.parse(c.req.query('date'));
+      return c.json({ rates: await PayrollService.getStatutoryRateTable(date) });
+    } catch (err) { return respondError(c, err); }
+  });
+
   api.get('/employees', async (c) => {
     try {
       return c.json({ employees: await PayrollService.getEmployees(c.get('orgId')) });
