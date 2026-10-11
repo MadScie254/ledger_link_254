@@ -2,6 +2,7 @@ import { getSupabase } from './supabase';
 import { UserError } from './errors';
 import { fetchAllRows } from './pagination';
 import { calculatePayslip, isIsoCalendarDate, monthlyGrossCents, parsePayPeriod, rateTableFromRow, type StatutoryRateTable, type StatutoryRateRow } from '../utils/kenyaPayroll';
+import type { EmployeeAdjustment, AppliedAdjustment, AdjustmentType } from '../utils/employeeAdjustments.ts';
 
 export { calculatePayslip } from '../utils/kenyaPayroll';
 export type { PayslipBreakdown } from '../utils/kenyaPayroll';
@@ -30,6 +31,7 @@ interface PayrollRpcPayslip {
   employerAhlCents: number;
   netCents: number;
   rateVersion: string;
+  appliedAdjustments: readonly AppliedAdjustment[];
 }
 
 export interface RunPayrollRpcPayload {
@@ -112,7 +114,42 @@ export class PayrollService {
       .maybeSingle();
     if (error) throw error;
     if (!data) throw new Error(`No statutory rate table is available for ${date}.`);
-    return rateTableFromRow(data as StatutoryRateRow);
+    const { data: rules, error: rulesError } = await getSupabase().from('statutory_adjustment_rules')
+      .select('adjustment_type, monthly_cap_cents, relief_rate, source, verified')
+      .eq('version', data.version).lte('effective_from', date);
+    if (rulesError) throw rulesError;
+    return { ...rateTableFromRow(data as StatutoryRateRow), adjustmentRules: (rules ?? []).map((rule: any) => ({
+      type: rule.adjustment_type, monthlyCapCents: Number(rule.monthly_cap_cents), rate: Number(rule.relief_rate),
+      source: rule.source, verified: rule.verified,
+    })) };
+  }
+
+  static async getEmployeeAdjustments(orgId: string, employeeId?: string): Promise<(EmployeeAdjustment & { employeeId: string })[]> {
+    const rows = await fetchAllRows<any>((from, to) => {
+      let query = getSupabase().from('employee_adjustments').select('*').eq('org_id', orgId);
+      if (employeeId) query = query.eq('employee_id', employeeId);
+      return query.order('id').range(from, to);
+    });
+    return rows.map((row: any) => ({ id: row.id, employeeId: row.employee_id, type: row.adjustment_type as AdjustmentType,
+      amountCents: Number(row.amount_cents), validFrom: row.valid_from, validTo: row.valid_to,
+      referenceNumber: row.reference_number, attachmentId: row.attachment_id }));
+  }
+
+  static async addEmployeeAdjustment(orgId: string, employeeId: string, input: Omit<EmployeeAdjustment, 'id'>, actor: string) {
+    const { data, error } = await getSupabase().from('employee_adjustments').insert({
+      org_id: orgId, employee_id: employeeId, adjustment_type: input.type, amount_cents: input.amountCents,
+      valid_from: input.validFrom, valid_to: input.validTo, reference_number: input.referenceNumber,
+      attachment_id: input.attachmentId, created_by: actor,
+    }).select('id').single();
+    if (error) throw error;
+    return data.id as string;
+  }
+
+  static async endEmployeeAdjustment(orgId: string, employeeId: string, id: string, validTo: string) {
+    const { data, error } = await getSupabase().from('employee_adjustments').update({ valid_to: validTo })
+      .eq('org_id', orgId).eq('employee_id', employeeId).eq('id', id).select('id').maybeSingle();
+    if (error) throw error;
+    if (!data) throw new UserError('Adjustment not found for this employee.', 404);
   }
 
   static async getEmployees(orgId: string) {
@@ -248,17 +285,16 @@ export class PayrollService {
     idempotencyKey?: string,
   ): Promise<string> {
     // One canonical label per month, so "Aug 2026" and "August 2026" cannot
-    // both be run, and rates read for the month earned rather than the day paid.
+    // both be run. Statutory rates and evidence follow the pay date.
     const payPeriod = parsePayPeriod(String(period ?? ''));
     if (!payPeriod) throw new Error('Write the payroll period as a month and year, such as September 2026.');
     if (!isIsoCalendarDate(payDate)) throw new Error('The pay date must be a real date in YYYY-MM-DD form.');
     const normalizedPeriod = payPeriod.label;
     if (!createdBy?.trim()) throw new Error('A payroll actor is required.');
 
-    // Preview and posting both use the database version for the month earned.
-    const rates = await PayrollService.getStatutoryRateTable(payPeriod.rateDate);
+    const rates = await PayrollService.getStatutoryRateTable(payDate);
     const supabase = getSupabase();
-    const [employees, accountIds] = await Promise.all([
+    const [employees, accountIds, adjustments] = await Promise.all([
       fetchAllRows<any>((from, to) => supabase
         .from('employees')
         .select('id, first_name, last_name, base_salary, housing_allowance_cents, transport_allowance_cents')
@@ -267,6 +303,7 @@ export class PayrollService {
         .order('id')
         .range(from, to)),
       getPayrollAccountIds(orgId),
+      PayrollService.getEmployeeAdjustments(orgId),
     ]);
 
     if (employees.length === 0) throw new Error('No active employees to run payroll for.');
@@ -276,7 +313,7 @@ export class PayrollService {
         baseSalaryCents: employee.base_salary,
         housingAllowanceCents: employee.housing_allowance_cents,
         transportAllowanceCents: employee.transport_allowance_cents,
-      }), payPeriod.rateDate, rates);
+      }), payDate, rates, adjustments.filter((record) => record.employeeId === employee.id));
       if (breakdown.netCents < 0) {
         // The SHIF minimum can exceed very small pay; say who, instead of the
         // database refusing the whole run with an unexplained total.
@@ -294,6 +331,7 @@ export class PayrollService {
         employerAhlCents: breakdown.ahlCents,
         netCents: breakdown.netCents,
         rateVersion: breakdown.rateVersion,
+        appliedAdjustments: breakdown.appliedAdjustments,
       };
     });
 
@@ -378,6 +416,7 @@ export class PayrollService {
       .from('payslips')
       .select('*, payroll_runs!inner(org_id), employees(first_name, last_name)')
       .eq('payroll_run_id', payrollRunId)
+      .eq('org_id', orgId)
       .eq('payroll_runs.org_id', orgId)
       .order('id')
       .range(from, to));
@@ -395,7 +434,8 @@ export class PayrollService {
       employerNssfCents: row.employer_nssf_cents,
       employerAhlCents: row.employer_ahl_cents,
       rateVersion: row.rate_version,
-      netCents: row.net_cents
+      netCents: row.net_cents,
+      appliedAdjustments: row.applied_adjustments ?? []
     }));
   }
 }

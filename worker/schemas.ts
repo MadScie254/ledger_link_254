@@ -183,6 +183,15 @@ export const payrollRunSchema = z.object({
   payDate: isoDate,
   idempotencyKey: uuid.optional(),
 });
+export const employeeAdjustmentSchema = z.object({
+  type: z.enum(['REGISTERED_PENSION', 'MORTGAGE_INTEREST', 'POST_RETIREMENT_MEDICAL', 'INSURANCE_PREMIUM', 'DISABILITY_EXEMPTION']),
+  amountCents: cents,
+  validFrom: isoDate,
+  validTo: isoDate.nullable(),
+  referenceNumber: requiredText(100, 'A certificate or policy reference'),
+  attachmentId: uuid.nullable(),
+}).refine((value) => value.validTo === null || value.validTo >= value.validFrom, 'The end date must be on or after the start date.');
+export const endEmployeeAdjustmentSchema = z.object({ validTo: isoDate });
 
 // --- Accounts and budgets ---------------------------------------------------------
 

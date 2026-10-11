@@ -41,6 +41,7 @@ test('calculates a worked KES 48,000 example using the 2026 table', () => {
     netCents: KES(37_772.65),
     rateVersion: 'KE-2026-02',
     ratesEffectiveFrom: '2026-02-01',
+    appliedAdjustments: [],
   });
 });
 
@@ -117,6 +118,7 @@ test('returns zero deductions for zero gross while preserving rate provenance', 
     netCents: 0,
     rateVersion: 'KE-2026-02',
     ratesEffectiveFrom: '2026-02-01',
+    appliedAdjustments: [],
   });
 });
 
@@ -227,9 +229,9 @@ test('pay periods read several spellings and always label the month the same way
   }
 });
 
-test('rates follow the month earned, not the pay date', async () => {
+test('the period end and pay date can select different historical versions', async () => {
   const { parsePayPeriod } = await import('./kenyaPayroll.ts');
-  // January 2026 paid on 2 February 2026: Year 3 NSSF limits, not Year 4.
+  // Payroll posting chooses the pay date; the period end remains calendar data.
   const january = parsePayPeriod('January 2026')!;
   assert.equal(findRateTable(january.rateDate)?.version, 'KE-2025-02');
   assert.equal(findRateTable('2026-02-02')?.version, 'KE-2026-02');

@@ -9,7 +9,7 @@ import { buttonClass } from '../ledger/Page';
 
 export type AttachmentRecordType =
   | 'INVOICE' | 'BILL' | 'CASH_TRANSACTION' | 'CREDIT_NOTE' | 'PURCHASE_ORDER' | 'ESTIMATE' | 'SALES_ORDER'
-  | 'JOURNAL_ENTRY' | 'CUSTOMER' | 'VENDOR' | 'BANK_TRANSACTION';
+  | 'JOURNAL_ENTRY' | 'CUSTOMER' | 'VENDOR' | 'BANK_TRANSACTION' | 'EMPLOYEE';
 
 const ACCEPT = '.pdf,.jpg,.jpeg,.png,.webp,.heic,.xlsx,.csv,.docx,.txt,application/pdf,image/*';
 
@@ -21,7 +21,7 @@ export async function attachFile(recordType: AttachmentRecordType, recordId: str
   form.set('recordType', recordType);
   form.set('recordId', recordId);
   form.set('file', file);
-  const response = await fetch('/api/attachments', { method: 'POST', body: form });
+  const response = await fetch('/api/attachments', { method: 'POST', body: form, headers: { 'x-org-id': useAppStore.getState().currentOrgId } });
   const data = await response.json().catch(() => ({}));
   if (!response.ok) throw new Error(data.error || 'The file could not be attached.');
   return data.attachment;
@@ -58,7 +58,7 @@ export function AttachmentsPanel({ recordType, recordId, label = 'Files' }: { re
 
   const download = async (attachment: any) => {
     setProblem('');
-    const response = await fetch(`/api/attachments/${attachment.id}/download`);
+    const response = await fetch(`/api/attachments/${attachment.id}/download`, { headers: { 'x-org-id': currentOrgId } });
     if (!response.ok) {
       const data = await response.json().catch(() => ({}));
       setProblem(data.error || 'The file could not be downloaded.');

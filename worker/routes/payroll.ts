@@ -1,10 +1,32 @@
 import { PayrollService } from '../../src/server/payroll';
 import { bodyOf, respondError } from '../http';
-import { employeeSchema, employeeUpdateSchema, isoDate, payrollRunSchema, reversalSchema, uuid } from '../schemas';
+import { employeeSchema, employeeUpdateSchema, employeeAdjustmentSchema, endEmployeeAdjustmentSchema, isoDate, payrollRunSchema, reversalSchema, uuid } from '../schemas';
 import type { Api } from './types';
+import type { EmployeeAdjustment } from '../../src/utils/employeeAdjustments';
 
 /** Employee and payroll records: personal data, open to owner, admin and accountant only (see worker/index.ts). */
 export function registerPayrollRoutes(api: Api) {
+  api.get('/payroll/adjustments', async (c) => {
+    try { return c.json({ adjustments: await PayrollService.getEmployeeAdjustments(c.get('orgId')) }); }
+    catch (err) { return respondError(c, err); }
+  });
+  api.get('/employees/:id/adjustments', async (c) => {
+    try { return c.json({ adjustments: await PayrollService.getEmployeeAdjustments(c.get('orgId'), uuid.parse(c.req.param('id'))) }); }
+    catch (err) { return respondError(c, err); }
+  });
+  api.post('/employees/:id/adjustments', async (c) => {
+    try {
+      const input = employeeAdjustmentSchema.parse(await bodyOf(c));
+      return c.json({ id: await PayrollService.addEmployeeAdjustment(c.get('orgId'), uuid.parse(c.req.param('id')), input as Omit<EmployeeAdjustment, 'id'>, c.get('userId')) }, 201);
+    } catch (err) { return respondError(c, err); }
+  });
+  api.patch('/employees/:id/adjustments/:adjustmentId', async (c) => {
+    try {
+      const input = endEmployeeAdjustmentSchema.parse(await bodyOf(c));
+      await PayrollService.endEmployeeAdjustment(c.get('orgId'), uuid.parse(c.req.param('id')), uuid.parse(c.req.param('adjustmentId')), input.validTo);
+      return c.json({ success: true });
+    } catch (err) { return respondError(c, err); }
+  });
   api.get('/payroll/rates', async (c) => {
     try {
       const date = isoDate.parse(c.req.query('date'));
