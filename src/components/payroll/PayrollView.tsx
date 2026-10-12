@@ -10,6 +10,7 @@ import { Mark } from '../ledger/Mark';
 import { PageHeading, IndexTabs, PageNote, SkeletonRows, EmptyNote, buttonClass } from '../ledger/Page';
 import { payrollReturnsDue } from '../../utils/statutory';
 import { PayrollRunReversal } from './PayrollRunReversal';
+import { SalaryPayment } from './SalaryPayment';
 import { calculatePayslip, isIsoCalendarDate, UNSUPPORTED_EMPLOYEE_ADJUSTMENTS, type PayslipBreakdown, type StatutoryRateTable, monthlyGrossCents, parsePayPeriod } from '../../utils/kenyaPayroll';
 import { ADJUSTMENT_LABELS, type EmployeeAdjustment, type AppliedAdjustment } from '../../utils/employeeAdjustments';
 
@@ -446,6 +447,7 @@ export function PayrollView() {
               </select>
             </label>
 
+            {selectedRun && <SalaryPayment key={selectedRun.id} run={selectedRun} />}
             {selectedRun && <PayrollRunReversal run={selectedRun} />}
 
             {payslipsLoading ? (

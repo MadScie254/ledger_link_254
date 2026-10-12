@@ -10,7 +10,7 @@ export type { PayslipBreakdown } from '../utils/kenyaPayroll';
 const PAYROLL_ACCOUNT_CODES = {
   salaryExpense: '6100',
   employerExpense: '6110',
-  cash: '1000',
+  netSalariesPayable: '2165',
   payePayable: '2110',
   nssfPayable: '2120',
   shifPayable: '2130',
@@ -346,7 +346,8 @@ export class PayrollService {
       p_idempotency_key: effectiveIdempotencyKey,
       p_salary_expense_account_id: accountIds.salaryExpense,
       p_employer_expense_account_id: accountIds.employerExpense,
-      p_cash_account_id: accountIds.cash,
+      // The RPC retains its original parameter name for compatibility.
+      p_cash_account_id: accountIds.netSalariesPayable,
       p_paye_payable_account_id: accountIds.payePayable,
       p_nssf_payable_account_id: accountIds.nssfPayable,
       p_shif_payable_account_id: accountIds.shifPayable,
@@ -386,6 +387,7 @@ export class PayrollService {
       totalEmployerNssfCents: row.total_employer_nssf_cents,
       totalEmployerAhlCents: row.total_employer_ahl_cents,
       rateVersion: row.rate_version,
+      netPayAccountId: row.net_pay_account_id ?? null,
       reversedAt: row.reversed_at ?? null,
       reversalReason: row.reversal_reason ?? null,
       createdAt: row.created_at
@@ -408,6 +410,28 @@ export class PayrollService {
     });
     if (error) throw error;
     return data as { reversalJournalEntryId: string; period: string };
+  }
+
+  static async getSalaryPayments(orgId: string, runId: string) {
+    const data = await fetchAllRows<any>((from, to) => getSupabase().from('salary_payments')
+      .select('*').eq('org_id', orgId).eq('payroll_run_id', runId).order('created_at').order('id').range(from, to));
+    return data.map((row) => ({ id: row.id, paymentDate: row.payment_date, amountCents: row.amount_cents,
+      bankAccountId: row.bank_account_id, journalEntryId: row.journal_entry_id,
+      reversedAt: row.reversed_at, reversalReason: row.reversal_reason }));
+  }
+
+  static async paySalaries(orgId: string, runId: string, bankAccountId: string, paymentDate: string, actor: string, idempotencyKey: string) {
+    const { data, error } = await getSupabase().rpc('pay_salaries', { p_org_id: orgId, p_run_id: runId,
+      p_bank_account_id: bankAccountId, p_payment_date: paymentDate, p_actor: actor, p_idempotency_key: idempotencyKey });
+    if (error) throw error;
+    return data as { id: string; journalEntryId: string };
+  }
+
+  static async reverseSalaryPayment(orgId: string, runId: string, paymentId: string, reversalDate: string, reason: string, actor: string) {
+    const { data, error } = await getSupabase().rpc('reverse_salary_payment', { p_org_id: orgId, p_run_id: runId,
+      p_payment_id: paymentId, p_reversal_date: reversalDate, p_reason: reason, p_actor: actor });
+    if (error) throw error;
+    return data as { reversalJournalEntryId: string };
   }
 
   static async getPayslips(orgId: string, payrollRunId: string) {

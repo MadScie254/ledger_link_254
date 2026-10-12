@@ -69,7 +69,7 @@ export function PayrollRunReversal({ run }: { run: { id: string; period: string;
           }}
         >
           <p className="text-[13.5px] text-ink-900">
-            Reverse the {run.period} run paid on {format(new Date(run.payDate), 'dd/MM/yyyy')}? Salaries, PAYE, NSSF, SHA and Housing Levy for it are taken back out of the books on the date below.
+            Reverse the {run.period} run posted on {format(new Date(run.payDate), 'dd/MM/yyyy')}? The accrued salaries and statutory balances are reversed on the date below. Any salary payment has its own reversal.
           </p>
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-[10rem_minmax(0,1fr)]">
             <Field label="Reversal date">

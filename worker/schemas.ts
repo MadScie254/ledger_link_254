@@ -183,6 +183,7 @@ export const payrollRunSchema = z.object({
   payDate: isoDate,
   idempotencyKey: uuid.optional(),
 });
+export const salaryPaymentSchema = z.object({ bankAccountId: uuid, paymentDate: isoDate, idempotencyKey: uuid });
 export const employeeAdjustmentSchema = z.object({
   type: z.enum(['REGISTERED_PENSION', 'MORTGAGE_INTEREST', 'POST_RETIREMENT_MEDICAL', 'INSURANCE_PREMIUM', 'DISABILITY_EXEMPTION']),
   amountCents: cents,

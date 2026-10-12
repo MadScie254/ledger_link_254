@@ -9,7 +9,7 @@ const CREDIT_NORMAL_TYPES = new Set(['LIABILITY', 'EQUITY', 'INCOME']);
  * Accounts the posting workflows look up by code: they cannot be switched
  * off, and receivables and VAT can never be money accounts.
  */
-export const SYSTEM_ACCOUNT_CODES = new Set(['1000', '1100', '1150', '2000', '2100', '2110', '2120', '2130', '2140', '6100', '6110']);
+export const SYSTEM_ACCOUNT_CODES = new Set(['1000', '1100', '1150', '2000', '2100', '2110', '2120', '2130', '2140', '2165', '6100', '6110']);
 const NEVER_MONEY_CODES = new Set(['1100', '1150']);
 
 /** Summed debits and credits for one account, in cents. */
