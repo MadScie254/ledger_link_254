@@ -127,6 +127,13 @@ function accountMapRows(map: Map<string, { code: string; amountCents: number }>)
 /** Resolve the labels emitted by the report controls, plus YYYY-MM API periods. */
 export function resolveReportDateRange(label: string, now: Date = new Date()): ReportDateRange {
   const value = label.trim();
+  const explicitRange = value.match(/^(\d{4}-\d{2}-\d{2})\.\.(\d{4}-\d{2}-\d{2})$/);
+  if (explicitRange) {
+    const start = normalizeAsOfDate(explicitRange[1]);
+    const end = normalizeAsOfDate(explicitRange[2]);
+    if (start > end) throw new Error('The report start date must be on or before its end date.');
+    return { start, end };
+  }
   const normalized = value.toLowerCase().replace(/\s+/g, ' ');
   const year = now.getUTCFullYear();
   const month = now.getUTCMonth();

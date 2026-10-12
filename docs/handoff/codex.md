@@ -6,17 +6,18 @@
 - Package 1: seeded three effective-dated statutory rate versions, locked used versions, loaded the effective database version for posting and preview, and added a payroll-gated GET route. Commit `ae0929faf45406198a5df0db6947d2f99dd266d2`. Added one unit seed/equivalence test, one SQL immutability and access test, and one integration service test. `npm run lint` passed; `npm test` passed, 202 tests. SQL and integration tests were not run because local Postgres 16 is unavailable.
 - Package 2: employee evidence records, sourced unverified relief rules linked to each rate version, a pure calculation with dated evidence and shared caps, atomic payslip snapshots, employee evidence UI, and payroll access checks for employee files. Commit `a1004b5e4933c1a37926954dcccddd7ba1d82fff`. Added six unit tests, a SQL suite and service/API integration coverage. `npm run lint` passed; `npm test` passed, 208 tests. Database and integration suites remain unrun because local Postgres 16 is unavailable.
 - Package 3: account `2165` Net Salaries Payable added to the standard chart and backfilled for existing organizations. New pay runs credit it while earlier runs retain their cash posting. A separate dated payment debits payable and credits bank, and its own reversal uses a reversing entry. Salary payment UI, SQL tests and integration tests added. Commit `1aea8051d4866aead83d7432abb981790690173d`. `npm run lint` passed; `npm test` passed, 208 tests. SQL and integration suites were not run because this Windows host lacks local Postgres 16.
-- Package 4: saved CSV column layout per organization and money account, prefilled when the next file has those columns, with manual editing before import. Existing OFX and QFX import remains. Added a unit fit test, a SQL table access test and an integration import/read test. Commit: this package commit, titled `Remember statement import columns per money account`. `npm run lint` passed; `npm test` passed, 209 tests. SQL and integration suites were not run because local Postgres 16 is unavailable.
+- Package 4: saved CSV column layout per organization and money account, prefilled when the next file has those columns, with manual editing before import. Existing OFX and QFX import remains. Added a unit fit test, a SQL table access test and an integration import/read test. Commit `b2107ca5d49bbcd32a2ecc503602b45cb7af5fb4`. `npm run lint` passed; `npm test` passed, 209 tests. SQL and integration suites were not run because local Postgres 16 is unavailable.
+- Package 5: owner/admin year-end close and reopening post a closing entry and its reversal in one SQL call each; active closes guard the manual closing date and fiscal year start. P&L and monthly totals leave out close and reopen entries, and the balance sheet includes the transfer to Retained Earnings (3100). Settings provides close and reopen controls and closed-year report selection. Added one report-range unit test, a SQL close/reopen suite and an integration service/report/role suite. Commit: this package commit, titled `Post year-end close and reopening entries`. `npm run lint` passed; `npm test` passed, 210 tests. SQL and integration suites were not run because local Postgres 16 is unavailable.
 
 ## In progress
 
-- SQL and integration checks for packages 1 through 4 need local Postgres 16.
+- SQL and integration checks for packages 1 through 5 need local Postgres 16.
 - Corrected package 1 rate selection to use the pay date in the Worker and preview, as requested. Earlier code used the month earned.
 
 ## Next
 
 - Run `npm run test:db` and `npm run test:integration` on a host with local Postgres 16. Review the package 1 migration result before production use.
-- Package 5: implement atomic year-end close and reversal, income statement treatment, balance sheet check, Settings controls UI and tests. Then packages 6 and 7.
+- Package 6: eTIMS purchase evidence on bills and expenses, Input VAT at risk report, receipt reader hint and confirmation. Then package 7 and branch review.
 
 ## Open questions and unverified figures
 
@@ -32,3 +33,4 @@
 - The statutory rate table is shared reference data, so its read policy is global for signed-in users. The Worker route remains behind organization authentication and `requirePayrollAccess`.
 - Package 2 records tax evidence for amounts paid outside the pay run; it does not add payroll cash withholding or remittance liabilities for those amounts. The employee form states this. Additional pension deductions share the monthly ceiling with NSSF.
 - Package 3 uses account code `2165` because `2150` already holds withholding tax and `2160` holds tips and service charge. The payroll RPC keeps its original `p_cash_account_id` parameter name for compatibility, but new calls pass the `2165` account. Existing custom `2165` accounts are left intact by the backfill and will have to be an active liability in the base currency before a new run can post.
+- Package 5 leaves the existing manual closing date for periods without an active year-end close. Once a recorded close exists, moving the date or fiscal year start requires reopening the latest close. Reopening posts its reversal on the original year-end date after moving the closing date back inside the same SQL call.

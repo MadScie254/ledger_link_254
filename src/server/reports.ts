@@ -63,10 +63,17 @@ export function normalizeLedgerLines(rows: unknown[] | null): ReportLedgerLine[]
  * trial balance). Postgres adds the lines up, so the report costs two queries
  * however long the ledger is, instead of one query per thousand lines.
  */
-async function accountTotalLines(orgId: string, range: { from?: string; to?: string }): Promise<ReportLedgerLine[]> {
+async function accountTotalLines(orgId: string, range: { from?: string; to?: string }, excludeYearEnd = false): Promise<ReportLedgerLine[]> {
   const supabase = getSupabase();
+  const profitTotals = async () => {
+    const rows = await fetchAllRows<{ account_id: string; debit_cents: number | string; credit_cents: number | string }>((from, to) => supabase
+      .rpc('profit_and_loss_account_totals', { p_org_id: orgId, p_from: range.from, p_to: range.to }).range(from, to));
+    return new Map(rows.map((row) => [row.account_id, {
+      debitCents: Math.round(Number(row.debit_cents) || 0), creditCents: Math.round(Number(row.credit_cents) || 0),
+    }]));
+  };
   const [totals, accounts] = await Promise.all([
-    AccountService.getAccountTotals(orgId, range),
+    excludeYearEnd ? profitTotals() : AccountService.getAccountTotals(orgId, range),
     fetchAllRows<{ id: string; code: string | null; name: string | null; type: string; subtype: string | null }>((from, to) => supabase
       .from('accounts')
       .select('id, code, name, type, subtype')
@@ -96,7 +103,7 @@ async function accountTotalLines(orgId: string, range: { from?: string; to?: str
 export class ReportsService {
   static async getProfitAndLoss(orgId: string, dateRange: string) {
     const range = resolveReportDateRange(dateRange, await organizationNow(orgId));
-    return aggregateProfitAndLoss(await accountTotalLines(orgId, { from: range.start, to: range.end }));
+    return aggregateProfitAndLoss(await accountTotalLines(orgId, { from: range.start, to: range.end }, true));
   }
 
   static async getBalanceSheet(orgId: string, asOfDate: string) {
@@ -130,7 +137,8 @@ export class ReportsService {
       accountTotalLines(orgId, { to: addDaysIso(range.start, -1) }),
     ]);
 
-    return aggregateCashFlow(normalizeLedgerLines(periodLines), openingLines);
+    return aggregateCashFlow(normalizeLedgerLines(periodLines).filter((line) =>
+      line.journalEntry?.sourceType !== 'YEAR_END_CLOSE' && line.journalEntry?.sourceType !== 'YEAR_END_REOPEN'), openingLines);
   }
 
   static async getTrialBalance(orgId: string) {

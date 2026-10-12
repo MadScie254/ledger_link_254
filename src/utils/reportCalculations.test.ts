@@ -43,6 +43,11 @@ test('resolves every period format used by the report screens', () => {
   assert.throws(() => resolveReportDateRange('All time', now), /Unsupported report period/);
 });
 
+test('accepts a closed financial year as an exact inclusive report range', () => {
+  assert.deepEqual(resolveReportDateRange('2025-10-01..2026-09-30'), { start: '2025-10-01', end: '2026-09-30' });
+  assert.throws(() => resolveReportDateRange('2026-10-01..2026-09-30'), /start date/i);
+});
+
 test('validates and normalizes balance-sheet dates', () => {
   assert.equal(normalizeAsOfDate('2026-09-17'), '2026-09-17');
   assert.equal(normalizeAsOfDate('2026-09-17T12:00:00.000Z'), '2026-09-17');

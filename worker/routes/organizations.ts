@@ -1,13 +1,30 @@
 import { OrganizationService } from '../../src/server/organizations';
 import { OnboardingService } from '../../src/server/onboarding';
 import { TeamService } from '../../src/server/team';
+import { YearEndService } from '../../src/server/yearEnd';
 import { bodyOf, DAY, enforceRateLimits, respondError } from '../http';
-import { onboardingSchema, organizationCreateSchema, organizationUpdateSchema, uuid } from '../schemas';
+import { onboardingSchema, organizationCreateSchema, organizationUpdateSchema, yearEndCloseSchema, yearEndReopenSchema, uuid } from '../schemas';
 import { requireOrganizationAdministrator, requireRequestedOrganization } from '../auth';
 import type { Api } from './types';
 
 /** The signed-in person's own state: onboarding, organizations, invitations, membership. */
 export function registerOrganizationRoutes(api: Api) {
+  api.get('/organizations/:id/year-end', requireRequestedOrganization, async (c) => {
+    try { return c.json({ closes: await YearEndService.list(c.get('orgId')) }); }
+    catch (err) { return respondError(c, err); }
+  });
+  api.post('/organizations/:id/year-end', requireRequestedOrganization, requireOrganizationAdministrator, async (c) => {
+    try {
+      const { yearEnd } = yearEndCloseSchema.parse(await bodyOf(c));
+      return c.json(await YearEndService.close(c.get('orgId'), yearEnd, c.get('userId')), 201);
+    } catch (err) { return respondError(c, err); }
+  });
+  api.post('/organizations/:id/year-end/reopen', requireRequestedOrganization, requireOrganizationAdministrator, async (c) => {
+    try {
+      const { closeId, reason } = yearEndReopenSchema.parse(await bodyOf(c));
+      return c.json(await YearEndService.reopen(c.get('orgId'), closeId, reason, c.get('userId')));
+    } catch (err) { return respondError(c, err); }
+  });
   api.get('/onboarding', async (c) => {
     try {
       return c.json(await OnboardingService.getState(c.get('userId')));

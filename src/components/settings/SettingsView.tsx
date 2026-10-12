@@ -80,7 +80,7 @@ export function SettingsView() {
     if (orgsData && orgsData.length > 0) {
       setOrganizations(orgsData);
       const current = orgsData.find((o) => o.id === currentOrgId) || orgsData[0];
-      if (current && (!activeCompany || activeCompany.id !== current.id)) {
+      if (current && (!activeCompany || activeCompany.id !== current.id || activeCompany.booksClosedThrough !== current.booksClosedThrough)) {
         setActiveCompany(current);
       }
     }
