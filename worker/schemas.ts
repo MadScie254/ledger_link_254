@@ -672,9 +672,22 @@ export const recurringRunSchema = z.object({ documentDate: isoDate });
 
 // --- Statements and reconciliation -------------------------------------------------
 
+const columnIndex = z.number().int().min(0).max(100);
+export const csvLayoutSchema = z.object({
+  headerRow: z.number().int().min(0).max(10000),
+  mapping: z.object({
+    date: columnIndex, description: columnIndex, reference: columnIndex.optional(),
+    amount: columnIndex.optional(), moneyIn: columnIndex.optional(), moneyOut: columnIndex.optional(),
+    dateFormat: z.enum(['DMY', 'MDY', 'YMD']),
+  }).refine((value) => value.amount !== undefined
+    ? value.moneyIn === undefined && value.moneyOut === undefined
+    : value.moneyIn !== undefined && value.moneyOut !== undefined,
+  'Choose one amount column or both money in and money out.'),
+});
 export const statementImportSchema = z.object({
   accountId: uuid,
   fileName: text(255),
+  layout: csvLayoutSchema.optional(),
   lines: z.array(z.object({
     date: isoDate,
     description: z.string().trim().max(500).default(''),
