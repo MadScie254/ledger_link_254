@@ -1,11 +1,13 @@
 import { VendorService } from '../../src/server/vendors';
 import { BillService, type BillBatchPaymentInput, type BillInput, type BillPaymentInput } from '../../src/server/bills';
+import { PurchaseEvidenceService } from '../../src/server/purchaseEvidence';
 import { bodyOf, respondError } from '../http';
 import {
   batchBillPaymentSchema,
   billPaymentSchema,
   billUpdateSchema,
   createBillSchema,
+  purchaseEvidenceSchema,
   reversalSchema,
   uuid,
   vendorSchema,
@@ -62,6 +64,14 @@ export function registerPurchaseRoutes(api: Api) {
   api.patch('/bills/:id', async (c) => {
     try {
       await BillService.updateBill(c.get('orgId'), uuid.parse(c.req.param('id')), billUpdateSchema.parse(await bodyOf(c)));
+      return c.json({ success: true });
+    } catch (err) { return respondError(c, err); }
+  });
+
+  api.patch('/bills/:id/etims-evidence', async (c) => {
+    try {
+      await PurchaseEvidenceService.set(c.get('orgId'), 'BILL', uuid.parse(c.req.param('id')),
+        c.get('userId'), purchaseEvidenceSchema.parse(await bodyOf(c)));
       return c.json({ success: true });
     } catch (err) { return respondError(c, err); }
   });

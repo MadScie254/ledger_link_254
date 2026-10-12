@@ -148,6 +148,24 @@ export class BusinessReportService {
     return { range, rows, totalCents: rows.reduce((sum, r) => sum + r.netCents, 0) };
   }
 
+  /** VAT on posted purchases missing both a CU invoice number and an exemption reason. */
+  static async inputVatAtRisk(orgId: string, dateRange: string) {
+    const range = resolveReportDateRange(dateRange, await organizationNow(orgId));
+    const { data, error } = await getSupabase().rpc('input_vat_at_risk', {
+      p_org_id: orgId, p_from: range.start, p_to: range.end,
+    });
+    if (error) throw error;
+    const rows = ((data || []) as any[]).map((row) => ({
+      period: row.period as string,
+      supplierId: row.supplier_id as string | null,
+      name: row.supplier_name as string,
+      billCount: Number(row.bill_count) || 0,
+      expenseCount: Number(row.expense_count) || 0,
+      vatCents: Number(row.vat_cents) || 0,
+    }));
+    return { range, rows, totalCents: rows.reduce((sum, row) => sum + row.vatCents, 0) };
+  }
+
   /** Income, cost of sales and expenses for each month of a period, by account. */
   static async monthlyProfitAndLoss(orgId: string, dateRange: string) {
     const range = resolveReportDateRange(dateRange, await organizationNow(orgId));

@@ -345,11 +345,24 @@ export const createInvoiceSchema = documentBaseSchema.extend({
   customerId: uuid,
   issueDate: isoDate,
 }).refine((doc) => doc.dueDate >= doc.issueDate, { message: 'The due date cannot be before the issue date.' });
+const purchaseEvidenceFields = {
+  etimsInvoiceNumber: text(100),
+  etimsInvoiceDate: isoDate.optional(),
+  etimsExemptionReason: text(500),
+};
+const validPurchaseEvidence = (doc: { etimsInvoiceNumber?: string; etimsInvoiceDate?: string; etimsExemptionReason?: string }) =>
+  Boolean(doc.etimsInvoiceNumber) === Boolean(doc.etimsInvoiceDate)
+  && !(doc.etimsInvoiceNumber && doc.etimsExemptionReason);
+export const purchaseEvidenceSchema = z.object(purchaseEvidenceFields)
+  .refine(validPurchaseEvidence, { message: 'Enter both the CU invoice number and date, or an exemption reason.' });
+
 export const createBillSchema = documentBaseSchema.extend({
   vendorId: uuid,
   billDate: isoDate,
   supplierReference: text(100),
-}).refine((doc) => doc.dueDate >= doc.billDate, { message: 'The due date cannot be before the bill date.' });
+  ...purchaseEvidenceFields,
+}).refine((doc) => doc.dueDate >= doc.billDate, { message: 'The due date cannot be before the bill date.' })
+  .refine(validPurchaseEvidence, { message: 'Enter both the CU invoice number and date, or an exemption reason.' });
 export const invoiceUpdateSchema = z.object({
   dueDate: isoDate.optional(),
   notes: z.string().trim().max(4000).optional(),
@@ -556,7 +569,8 @@ export const expenseSchema = z.object({
     quantity: z.number().positive().max(1_000_000_000).optional(),
   })).min(1).max(200),
   ...partyChoice,
-});
+  ...purchaseEvidenceFields,
+}).refine(validPurchaseEvidence, { message: 'Enter both the CU invoice number and date, or an exemption reason.' });
 export const transferSchema = z.object({
   date: isoDate,
   fromAccountId: uuid,

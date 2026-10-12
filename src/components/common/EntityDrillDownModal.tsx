@@ -14,6 +14,7 @@ import { DynamicQuickAddModal } from './DynamicQuickAddModal';
 import { AttachmentsPanel } from './AttachmentsPanel';
 import { EmployeeAdjustmentsPanel } from '../payroll/EmployeeAdjustmentsPanel';
 import { PrintButton } from './PrintButton';
+import { PurchaseEvidencePanel } from './PurchaseEvidencePanel';
 import { ReminderDraftDialog } from '../sales/ReminderDraftDialog';
 
 export type DrillDownEntityType = 'ITEM' | 'VENDOR' | 'CUSTOMER' | 'EMPLOYEE' | 'ACCOUNT' | 'INVOICE' | 'BILL';
@@ -369,6 +370,12 @@ export function EntityDrillDownModal({ isOpen, onClose, entityType, entityId, in
             {entityType === 'BILL' && data.supplierReference && (
               <Section title="Supplier">
                 <Line label="Supplier's invoice number" value={data.supplierReference} figure />
+              </Section>
+            )}
+            {entityType === 'BILL' && data.id && (
+              <Section title="eTIMS purchase evidence">
+                <PurchaseEvidencePanel key={data.id} kind="BILL" id={data.id} evidence={data}
+                  canEdit={activeCompany?.role !== 'member'} />
               </Section>
             )}
             {data.id && <DocumentPayments kind={entityType} document={data} />}

@@ -3,7 +3,8 @@ import { CashTransactionService, type CashKind } from '../../src/server/cashTran
 type Input<K extends 'recordSalesReceipt' | 'recordExpense' | 'recordTransfer'> =
   Omit<Parameters<(typeof CashTransactionService)[K]>[0], 'orgId' | 'actor'>;
 import { bodyOf, respondError, UserError } from '../http';
-import { expenseSchema, salesReceiptSchema, transferSchema, uuid, voidSchema } from '../schemas';
+import { expenseSchema, purchaseEvidenceSchema, salesReceiptSchema, transferSchema, uuid, voidSchema } from '../schemas';
+import { PurchaseEvidenceService } from '../../src/server/purchaseEvidence';
 import type { Api } from './types';
 
 const KINDS: CashKind[] = ['SALES_RECEIPT', 'EXPENSE', 'TRANSFER'];
@@ -29,6 +30,14 @@ export function registerCashRoutes(api: Api) {
     try {
       const body = expenseSchema.parse(await bodyOf(c)) as Input<'recordExpense'>;
       return c.json(await CashTransactionService.recordExpense({ ...body, orgId: c.get('orgId'), actor: c.get('userId') }), 201);
+    } catch (err) { return respondError(c, err); }
+  });
+
+  api.patch('/expenses/:id/etims-evidence', async (c) => {
+    try {
+      await PurchaseEvidenceService.set(c.get('orgId'), 'EXPENSE', uuid.parse(c.req.param('id')),
+        c.get('userId'), purchaseEvidenceSchema.parse(await bodyOf(c)));
+      return c.json({ success: true });
     } catch (err) { return respondError(c, err); }
   });
 
