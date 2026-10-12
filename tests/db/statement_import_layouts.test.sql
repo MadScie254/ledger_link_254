@@ -22,7 +22,7 @@ BEGIN
   BEGIN
     INSERT INTO public.statement_import_layouts(org_id, bank_account_id, header_row, mapping)
       VALUES('00000000-0000-0000-0000-0000000000bb', v_bank, 0, '{"date":0}');
-  EXCEPTION WHEN foreign_key_violation THEN v_failed := true; END;
+  EXCEPTION WHEN check_violation THEN v_failed := true; END;
   IF NOT v_failed THEN RAISE EXCEPTION 'A cross-organization layout was accepted.'; END IF;
   IF has_table_privilege('authenticated', 'public.statement_import_layouts', 'SELECT') THEN
     RAISE EXCEPTION 'Saved layouts bypass organization API access.';

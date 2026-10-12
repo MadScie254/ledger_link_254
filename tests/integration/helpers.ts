@@ -16,9 +16,14 @@ export const CEMENT = '00000000-0000-0000-0000-0000000000e1'; // Physical Produc
 export const DELIVERY = '00000000-0000-0000-0000-0000000000e2'; // Digital Service
 
 const PSQL = process.env.PSQL || 'su postgres -c';
+const PSQL_BIN = process.env.PSQL_BIN;
 
 /** Runs one statement against the test database and returns its output. */
 export function sql(statement: string): string {
+  if (PSQL_BIN) {
+    // Local Windows runs pass the psql executable directly, without a shell.
+    return execFileSync(PSQL_BIN, ['-X', '-q', '-t', '-A', '-d', 'lltest', '-c', statement.replace(/\\\$/g, '$')]).toString().trim();
+  }
   const [command, ...args] = PSQL.split(' ');
   return execFileSync(command, [...args, `psql -X -q -t -A -d lltest -c "${statement.replace(/"/g, '\\"')}"`]).toString().trim();
 }
