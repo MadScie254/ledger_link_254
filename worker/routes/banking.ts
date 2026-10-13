@@ -6,8 +6,13 @@ import {
   reconciliationLinesSchema, reconciliationStartSchema, reconciliationUndoSchema, statementImportSchema, uuid,
 } from '../schemas';
 import type { Api } from './types';
+import type { SavedCsvLayout } from '../../src/utils/statementImport';
 
 export function registerBankingRoutes(api: Api) {
+  api.get('/banking/statements/layout', async (c) => {
+    try { return c.json({ layout: await BankingService.getStatementLayout(c.get('orgId'), uuid.parse(c.req.query('accountId'))) }); }
+    catch (err) { return respondError(c, err); }
+  });
   api.get('/banking/transactions', async (c) => {
     try {
       return c.json({ transactions: await BankingService.getTransactions(c.get('orgId'), optionalUuid.parse(c.req.query('accountId'))) });
@@ -17,7 +22,7 @@ export function registerBankingRoutes(api: Api) {
   api.post('/banking/statements', async (c) => {
     try {
       const body = statementImportSchema.parse(await bodyOf(c));
-      return c.json(await BankingService.importStatement(c.get('orgId'), body.accountId, body.fileName, body.lines as StatementLineInput[], c.get('userId')), 201);
+      return c.json(await BankingService.importStatement(c.get('orgId'), body.accountId, body.fileName, body.lines as StatementLineInput[], c.get('userId'), body.layout as SavedCsvLayout | undefined), 201);
     } catch (err) { return respondError(c, err); }
   });
 

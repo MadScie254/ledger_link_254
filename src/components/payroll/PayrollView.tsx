@@ -10,7 +10,9 @@ import { Mark } from '../ledger/Mark';
 import { PageHeading, IndexTabs, PageNote, SkeletonRows, EmptyNote, buttonClass } from '../ledger/Page';
 import { payrollReturnsDue } from '../../utils/statutory';
 import { PayrollRunReversal } from './PayrollRunReversal';
-import { calculatePayslip, findRateTable, isIsoCalendarDate, UNSUPPORTED_EMPLOYEE_ADJUSTMENTS, type PayslipBreakdown, monthlyGrossCents, parsePayPeriod } from '../../utils/kenyaPayroll';
+import { SalaryPayment } from './SalaryPayment';
+import { calculatePayslip, isIsoCalendarDate, UNSUPPORTED_EMPLOYEE_ADJUSTMENTS, type PayslipBreakdown, type StatutoryRateTable, monthlyGrossCents, parsePayPeriod } from '../../utils/kenyaPayroll';
+import { ADJUSTMENT_LABELS, type EmployeeAdjustment, type AppliedAdjustment } from '../../utils/employeeAdjustments';
 
 const tabs = ['Employees', 'Run payroll', 'Payslips', 'Statutory filings (PAYE/NSSF/SHA)'];
 
@@ -133,9 +135,30 @@ export function PayrollView() {
   };
 
   const baseCurrency = activeCompany?.baseCurrency || 'KES';
-  // Rates follow the month earned, not the pay date, exactly as the posting does.
+  // Rates and evidence are selected on the pay date, as in the posting service.
   const previewPeriod = parsePayPeriod(payPeriod);
-  const previewRates = previewPeriod ? findRateTable(previewPeriod.rateDate) : null;
+  const rateQuery = useQuery({
+    queryKey: ['payroll_rates', currentOrgId, payDate],
+    queryFn: async (): Promise<StatutoryRateTable> => {
+      const res = await fetch(`/api/payroll/rates?date=${payDate}`, { headers: { 'x-org-id': currentOrgId } });
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        throw new Error(body.error || 'The statutory rate table could not be loaded.');
+      }
+      return (await res.json()).rates;
+    },
+    enabled: isIsoCalendarDate(payDate) && !payrollRestricted,
+  });
+  const adjustmentQuery = useQuery({
+    queryKey: ['payroll_adjustments', currentOrgId],
+    queryFn: async (): Promise<(EmployeeAdjustment & { employeeId: string })[]> => {
+      const res = await fetch('/api/payroll/adjustments', { headers: { 'x-org-id': currentOrgId } });
+      if (!res.ok) throw new Error('Employee relief evidence could not be loaded.');
+      return (await res.json()).adjustments;
+    },
+    enabled: !payrollRestricted,
+  });
+  const previewRates = rateQuery.data ?? null;
   const preview = (() => {
     if (!isIsoCalendarDate(payDate)) {
       return { rows: [] as { emp: any; p: PayslipBreakdown }[], error: 'Choose a valid pay date to calculate this preview.' };
@@ -144,15 +167,16 @@ export function PayrollView() {
       return { rows: [] as { emp: any; p: PayslipBreakdown }[], error: 'Write the pay period as a month and year, such as September 2026.' };
     }
     if (!previewRates) {
-      return { rows: [] as { emp: any; p: PayslipBreakdown }[], error: `No statutory rate table is coded for ${previewPeriod.label}.` };
+      return { rows: [] as { emp: any; p: PayslipBreakdown }[], error: rateQuery.error?.message || 'Loading the statutory rate table.' };
     }
+    if (!adjustmentQuery.data) return { rows: [] as { emp: any; p: PayslipBreakdown }[], error: adjustmentQuery.error?.message || 'Loading employee relief evidence.' };
 
     try {
       return {
         rows: activeEmployees.map((emp: any) => ({
           emp,
           // Base salary plus housing and transport allowances.
-          p: calculatePayslip(monthlyGrossCents(emp), previewPeriod.rateDate),
+          p: calculatePayslip(monthlyGrossCents(emp), payDate, previewRates, adjustmentQuery.data.filter((record) => record.employeeId === emp.id)),
         })),
         error: '',
       };
@@ -333,7 +357,7 @@ export function PayrollView() {
             {previewRates ? (
               <>
                 Preview and posting use rate table <strong>{previewRates.version}</strong>, effective{' '}
-                {format(parse(previewRates.effectiveFrom, 'yyyy-MM-dd', new Date()), 'd MMMM yyyy')}, selected from the pay period (the month earned).
+                {format(parse(previewRates.effectiveFrom, 'yyyy-MM-dd', new Date()), 'd MMMM yyyy')}, selected from the pay date. Employee relief limits are sourced and marked unverified.
               </>
             ) : (
               <>Choose a supported pay date to select a statutory rate table.</>
@@ -423,6 +447,7 @@ export function PayrollView() {
               </select>
             </label>
 
+            {selectedRun && <SalaryPayment key={selectedRun.id} run={selectedRun} />}
             {selectedRun && <PayrollRunReversal run={selectedRun} />}
 
             {payslipsLoading ? (
@@ -448,7 +473,11 @@ export function PayrollView() {
                   <tbody>
                     {payslips.map((p: any) => (
                       <tr key={p.id}>
-                        <td className="pr-4 text-ink-900">{p.employeeName}</td>
+                        <td className="pr-4 text-ink-900">{p.employeeName}
+                          {p.appliedAdjustments?.length > 0 && <details className="mt-1 text-xs text-text-2"><summary className="cursor-pointer">Applied relief evidence</summary>
+                            <ul>{p.appliedAdjustments.map((record: AppliedAdjustment) => <li key={record.id}>{ADJUSTMENT_LABELS[record.type]} · {record.referenceNumber} · <Amount cents={record.appliedCents} currency={baseCurrency} size="xs" />{record.verified ? '' : ' · unverified rate limit'}</li>)}</ul>
+                          </details>}
+                        </td>
                         <td className="pr-4 text-right whitespace-nowrap"><Amount cents={p.grossCents} currency={baseCurrency} tone="ink" /></td>
                         <td className="pr-4 text-right whitespace-nowrap"><Amount cents={p.payeCents} currency={baseCurrency} tone="ink" /></td>
                         <td className="pr-4 text-right whitespace-nowrap"><Amount cents={p.nssfCents} currency={baseCurrency} tone="ink" /></td>
@@ -478,11 +507,9 @@ export function PayrollView() {
                   <Mark
                     kind="query"
                     label={(() => {
-                      const runPeriod = selectedRun?.period ? parsePayPeriod(selectedRun.period) : null;
-                      const table = runPeriod ? findRateTable(runPeriod.rateDate) : selectedRun?.payDate ? findRateTable(selectedRun.payDate) : null;
-                      return table
-                        ? `This run's pay period maps to rate table ${table.version}, effective ${table.effectiveFrom}. Review employee-specific adjustments before filing.`
-                        : 'This run has no supported rate-table match. Check the posted figures before filing.';
+                      return selectedRun?.rateVersion
+                        ? `This run used rate table ${selectedRun.rateVersion}. Review employee-specific adjustments before filing.`
+                        : 'This run has no recorded rate table. Check the posted figures before filing.';
                     })()}
                   />
                 </p>

@@ -9,8 +9,10 @@ import {
   linesFromCsv,
   linesFromOfx,
   parseCsv,
+  savedLayoutFits,
   type CsvMapping,
   type DateFormat,
+  type SavedCsvLayout,
   type StatementLine,
 } from '../../utils/statementImport';
 import { Amount } from '../ledger/Amount';
@@ -36,11 +38,26 @@ export function ImportStatementDialog({ open, onClose, onDone }: { open: boolean
   const [ofxLines, setOfxLines] = useState<StatementLine[] | null>(null);
   const [headerRow, setHeaderRow] = useState(0);
   const [mapping, setMapping] = useState<CsvMapping | null>(null);
+  const [mappingTouched, setMappingTouched] = useState(false);
   const [amountMode, setAmountMode] = useState<'single' | 'split'>('single');
   const [problem, setProblem] = useState('');
 
   const accounts = useQuery({ queryKey: ['accounts', currentOrgId], queryFn: () => apiRequest('/api/accounts'), enabled: open });
   const moneyAccounts: any[] = (accounts.data?.accounts || []).filter((a: any) => a.isBankAccount && a.isActive !== false);
+  const savedLayout = useQuery({
+    queryKey: ['statement_layout', currentOrgId, accountId],
+    queryFn: () => apiRequest<{ layout: SavedCsvLayout | null }>(`/api/banking/statements/layout?accountId=${accountId}`),
+    enabled: open && Boolean(accountId),
+  });
+
+  useEffect(() => {
+    const layout = savedLayout.data?.layout;
+    if (!rows || !layout || mappingTouched || !savedLayoutFits(rows, layout)) return;
+    setHeaderRow(layout.headerRow);
+    setMapping(layout.mapping);
+    setAmountMode(layout.mapping.moneyIn !== undefined ? 'split' : 'single');
+    setMappingTouched(true);
+  }, [rows, savedLayout.data, mappingTouched]);
 
   useEffect(() => {
     if (!open) return;
@@ -49,6 +66,7 @@ export function ImportStatementDialog({ open, onClose, onDone }: { open: boolean
     setRows(null);
     setOfxLines(null);
     setMapping(null);
+    setMappingTouched(false);
     setProblem('');
   }, [open]);
 
@@ -57,6 +75,7 @@ export function ImportStatementDialog({ open, onClose, onDone }: { open: boolean
     setRows(null);
     setOfxLines(null);
     setMapping(null);
+    setMappingTouched(false);
     if (!file) return;
     if (file.size > MAX_FILE_BYTES) return setProblem('That file is over 5 MB. Export a shorter period from the bank.');
     setFileName(file.name);
@@ -99,8 +118,9 @@ export function ImportStatementDialog({ open, onClose, onDone }: { open: boolean
       if (!accountId) throw new Error('Choose the account this statement is for.');
       if (found.length === 0) throw new Error('No lines were read from the file.');
       if (found.length > 5000) throw new Error('Import at most 5,000 lines at a time; export one month at a time.');
-      return apiRequest<{ imported: number; skipped: number }>('/api/banking/statements', {
-        body: { accountId, fileName: fileName || undefined, lines: found },
+      return apiRequest<{ imported: number; skipped: number; layoutSaved?: boolean }>('/api/banking/statements', {
+        body: { accountId, fileName: fileName || undefined, lines: found,
+          ...(rows && effectiveMapping ? { layout: { headerRow, mapping: effectiveMapping } } : {}) },
         fallback: 'The statement could not be imported.',
       });
     },
@@ -108,12 +128,15 @@ export function ImportStatementDialog({ open, onClose, onDone }: { open: boolean
       for (const key of ['bank_transactions', 'banking_ai_matches', 'banking_reconciliation', 'bank-statements', 'reconciliations']) {
         queryClient.invalidateQueries({ queryKey: [key, currentOrgId] });
       }
+      queryClient.invalidateQueries({ queryKey: ['statement_layout', currentOrgId, accountId] });
       const account = moneyAccounts.find((a) => a.id === accountId);
-      onDone?.(`${res.imported} ${res.imported === 1 ? 'line' : 'lines'} imported to ${account?.name || 'the account'}${res.skipped ? `; ${res.skipped} already there and skipped` : ''}.`);
+      onDone?.(`${res.imported} ${res.imported === 1 ? 'line' : 'lines'} imported to ${account?.name || 'the account'}${res.skipped ? `; ${res.skipped} already there and skipped` : ''}.${res.layoutSaved === false ? ' The column mapping could not be saved.' : ''}`);
       onClose();
     },
     onError: (err: Error) => setProblem(err.message),
   });
+
+  const editMapping = (next: CsvMapping) => { setMapping(next); setMappingTouched(true); };
 
   const columnSelect = (label: string, value: number | undefined, onChange: (index: number | undefined) => void, optional = false) => (
     <Field label={label}>
@@ -144,7 +167,17 @@ export function ImportStatementDialog({ open, onClose, onDone }: { open: boolean
       <div className="space-y-4">
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <Field label="Statement for" hint={moneyAccounts.length === 0 && !accounts.isLoading ? 'Mark a bank, cash or M-Pesa account as holding money (Accounting, Edit) first.' : undefined}>
-            <select name="accountId" value={accountId} onChange={(e) => setAccountId(e.target.value)}>
+            <select name="accountId" value={accountId} onChange={(e) => {
+              setAccountId(e.target.value);
+              setMappingTouched(false);
+              if (rows) {
+                const detected = detectCsvLayout(rows);
+                const guessed = detected.mapping || { date: 0, description: 1, amount: 2, dateFormat: 'DMY' as DateFormat };
+                setHeaderRow(detected.headerRow);
+                setMapping(guessed);
+                setAmountMode(guessed.moneyIn !== undefined ? 'split' : 'single');
+              }
+            }}>
               <option value="">Choose an account</option>
               {moneyAccounts.map((a) => <option key={a.id} value={a.id}>{a.code} · {a.name}</option>)}
             </select>
@@ -159,30 +192,30 @@ export function ImportStatementDialog({ open, onClose, onDone }: { open: boolean
             <legend className="text-[13px] font-semibold text-ink-900">Columns</legend>
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
               <Field label="Header row" hint="The row naming the columns">
-                <input type="number" min={1} max={rows.length} value={headerRow + 1} onChange={(e) => setHeaderRow(Math.max(0, Math.min(rows.length - 1, Number(e.target.value) - 1)))} />
+                <input type="number" min={1} max={rows.length} value={headerRow + 1} onChange={(e) => { setHeaderRow(Math.max(0, Math.min(rows.length - 1, Number(e.target.value) - 1))); setMappingTouched(true); }} />
               </Field>
-              {columnSelect('Date', mapping.date, (index) => setMapping({ ...mapping, date: index ?? 0 }))}
+              {columnSelect('Date', mapping.date, (index) => editMapping({ ...mapping, date: index ?? 0 }))}
               <Field label="Dates written">
-                <select value={mapping.dateFormat} onChange={(e) => setMapping({ ...mapping, dateFormat: e.target.value as DateFormat })}>
+                <select value={mapping.dateFormat} onChange={(e) => editMapping({ ...mapping, dateFormat: e.target.value as DateFormat })}>
                   <option value="DMY">Day first, 15/09/2026</option>
                   <option value="MDY">Month first, 09/15/2026</option>
                   <option value="YMD">Year first, 2026-09-15</option>
                 </select>
               </Field>
-              {columnSelect('Particulars', mapping.description, (index) => setMapping({ ...mapping, description: index ?? 0 }))}
-              {columnSelect('Reference', mapping.reference, (index) => setMapping({ ...mapping, reference: index }), true)}
+              {columnSelect('Particulars', mapping.description, (index) => editMapping({ ...mapping, description: index ?? 0 }))}
+              {columnSelect('Reference', mapping.reference, (index) => editMapping({ ...mapping, reference: index }), true)}
               <Field label="Amounts">
-                <select value={amountMode} onChange={(e) => setAmountMode(e.target.value as 'single' | 'split')}>
+                <select value={amountMode} onChange={(e) => { setAmountMode(e.target.value as 'single' | 'split'); setMappingTouched(true); }}>
                   <option value="single">One column, money out negative</option>
                   <option value="split">Money in and money out columns</option>
                 </select>
               </Field>
               {amountMode === 'single'
-                ? columnSelect('Amount', effectiveMapping?.amount, (index) => setMapping({ ...mapping, amount: index ?? 0 }))
+                ? columnSelect('Amount', effectiveMapping?.amount, (index) => editMapping({ ...mapping, amount: index ?? 0 }))
                 : (
                   <>
-                    {columnSelect('Money in', effectiveMapping?.moneyIn, (index) => setMapping({ ...mapping, moneyIn: index ?? 0 }))}
-                    {columnSelect('Money out', effectiveMapping?.moneyOut, (index) => setMapping({ ...mapping, moneyOut: index ?? 0 }))}
+                    {columnSelect('Money in', effectiveMapping?.moneyIn, (index) => editMapping({ ...mapping, moneyIn: index ?? 0 }))}
+                    {columnSelect('Money out', effectiveMapping?.moneyOut, (index) => editMapping({ ...mapping, moneyOut: index ?? 0 }))}
                   </>
                 )}
             </div>

@@ -11,6 +11,8 @@
  * Act. This calculator is an implementation aid, not filing advice.
  */
 
+import { applyEmployeeAdjustments, type EmployeeAdjustment, type AdjustmentRule, type AppliedAdjustment } from './employeeAdjustments.ts';
+
 export interface PayeBand {
   /** Inclusive upper boundary for this band in cents; null is unbounded. */
   readonly upToCents: number | null;
@@ -34,6 +36,24 @@ export interface StatutoryRateTable {
   readonly housingLevyRate: number;
   /** Monthly ceiling for deductible pension/social-security contributions. */
   readonly pensionDeductionCapCents: number;
+  readonly adjustmentRules?: readonly AdjustmentRule[];
+}
+
+/** Reference row returned by the database; rates hold the calculator fields. */
+export interface StatutoryRateRow {
+  readonly version: string;
+  readonly effective_from: string;
+  readonly source: string;
+  readonly rates: Omit<StatutoryRateTable, 'version' | 'effectiveFrom' | 'source'>;
+}
+
+export function rateTableFromRow(row: StatutoryRateRow): StatutoryRateTable {
+  return {
+    version: row.version,
+    effectiveFrom: row.effective_from,
+    source: row.source,
+    ...row.rates,
+  };
 }
 
 export interface PayslipBreakdown {
@@ -47,14 +67,11 @@ export interface PayslipBreakdown {
   readonly netCents: number;
   readonly rateVersion: string;
   readonly ratesEffectiveFrom: string;
+  readonly appliedAdjustments: readonly AppliedAdjustment[];
 }
 
 export const UNSUPPORTED_EMPLOYEE_ADJUSTMENTS = [
-  'additional registered-pension contributions',
-  'mortgage-interest deductions',
-  'post-retirement medical-fund contributions',
   'taxable non-cash benefits',
-  'employee-specific exemptions and reliefs',
 ] as const;
 
 const KES = (shillings: number) => shillings * 100;
@@ -173,18 +190,21 @@ function taxOnBands(taxableCents: number, bands: readonly PayeBand[]): number {
  * date. Invalid dates, unsupported historical dates and imprecise cent values
  * are rejected rather than silently coerced.
  */
-export function calculatePayslip(grossCents: number, payDate: string): PayslipBreakdown {
+export function calculatePayslip(grossCents: number, payDate: string, suppliedRates?: StatutoryRateTable, adjustments: readonly EmployeeAdjustment[] = []): PayslipBreakdown {
   assertValidCents(grossCents);
 
   if (!isIsoCalendarDate(payDate)) {
     throw new RangeError(`payDate must be a real calendar date in YYYY-MM-DD form; received "${payDate}".`);
   }
 
-  const rates = findRateTable(payDate);
+  const rates = suppliedRates ?? findRateTable(payDate);
   if (!rates) {
     throw new RangeError(
       `No statutory rates are coded for ${payDate}. Rates begin on ${STATUTORY_RATE_TABLES[0].effectiveFrom}.`,
     );
+  }
+  if (rates.effectiveFrom > payDate) {
+    throw new RangeError(`Rate table ${rates.version} is not in force on ${payDate}.`);
   }
 
   if (grossCents === 0) {
@@ -198,6 +218,7 @@ export function calculatePayslip(grossCents: number, payDate: string): PayslipBr
       netCents: 0,
       rateVersion: rates.version,
       ratesEffectiveFrom: rates.effectiveFrom,
+      appliedAdjustments: [],
     };
   }
 
@@ -219,14 +240,21 @@ export function calculatePayslip(grossCents: number, payDate: string): PayslipBr
   const ahlCents = Math.round(grossCents * rates.housingLevyRate);
 
   const pensionDeductionCents = Math.min(nssfCents, rates.pensionDeductionCapCents);
-  const taxablePayCents = Math.max(
+  const taxableBeforeAdjustments = Math.max(
     grossCents - pensionDeductionCents - shifCents - ahlCents,
     0,
   );
-  const payeCents = Math.max(
-    Math.round(taxOnBands(taxablePayCents, rates.payeBands)) - rates.personalReliefCents,
-    0,
+  const { taxablePayCents, insuranceReliefCents, appliedAdjustments } = applyEmployeeAdjustments(
+    adjustments, payDate, rates.adjustmentRules ?? [], taxableBeforeAdjustments, pensionDeductionCents,
   );
+  const taxAfterPersonalRelief = Math.max(Math.round(taxOnBands(taxablePayCents, rates.payeBands)) - rates.personalReliefCents, 0);
+  let insuranceRemaining = taxAfterPersonalRelief;
+  for (const record of appliedAdjustments) {
+    if (record.type !== 'INSURANCE_PREMIUM') continue;
+    record.appliedCents = Math.min(record.appliedCents, insuranceRemaining);
+    insuranceRemaining -= record.appliedCents;
+  }
+  const payeCents = Math.max(taxAfterPersonalRelief - insuranceReliefCents, 0);
 
   return {
     grossCents,
@@ -238,6 +266,7 @@ export function calculatePayslip(grossCents: number, payDate: string): PayslipBr
     netCents: grossCents - nssfCents - shifCents - ahlCents - payeCents,
     rateVersion: rates.version,
     ratesEffectiveFrom: rates.effectiveFrom,
+    appliedAdjustments,
   };
 }
 
@@ -265,11 +294,11 @@ const PERIOD_MONTHS = [
   'july', 'august', 'september', 'october', 'november', 'december',
 ];
 
-/** A monthly pay period: its one canonical label and the date its rates are read on. */
+/** A monthly pay period and its calendar end date. Rates use the separate pay date. */
 export interface PayPeriod {
   /** "September 2026"; the same month always gets the same label. */
   readonly label: string;
-  /** Last day of the month, YYYY-MM-DD. Statutory rates are those in force for the month earned. */
+  /** Last day of the month, YYYY-MM-DD. The field name is kept for compatibility. */
   readonly rateDate: string;
 }
 

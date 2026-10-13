@@ -33,6 +33,9 @@ function mapTransaction(row: any) {
     toAccountId: row.to_account_id,
     toAccountName: toAccount ? `${toAccount.code} ${toAccount.name}` : null,
     reference: row.reference,
+    etimsInvoiceNumber: row.etims_invoice_number ?? null,
+    etimsInvoiceDate: row.etims_invoice_date ?? null,
+    etimsExemptionReason: row.etims_exemption_reason ?? null,
     memo: row.memo,
     subtotalCents: Number(row.subtotal_cents) || 0,
     taxCents: Number(row.tax_cents) || 0,
@@ -116,8 +119,9 @@ export class CashTransactionService {
   static async recordExpense(input: {
     orgId: string; vendorId?: string; payeeName?: string; date: string; paidFromAccountId: string;
     reference?: string; memo?: string; lines: ExpenseLineInput[]; actor: string; idempotencyKey: string;
+    etimsInvoiceNumber?: string; etimsInvoiceDate?: string; etimsExemptionReason?: string;
   }): Promise<Posted> {
-    const { data, error } = await getSupabase().rpc('record_expense', {
+    const { data, error } = await getSupabase().rpc('record_expense_with_evidence', {
       p_org_id: input.orgId,
       p_vendor_id: input.vendorId || null,
       p_payee_name: input.payeeName?.trim() || null,
@@ -135,6 +139,9 @@ export class CashTransactionService {
       })),
       p_actor: input.actor,
       p_idempotency_key: input.idempotencyKey,
+      p_etims_invoice_number: input.etimsInvoiceNumber?.trim() || null,
+      p_etims_invoice_date: input.etimsInvoiceDate || null,
+      p_etims_exemption_reason: input.etimsExemptionReason?.trim() || null,
     });
     if (error) throw error;
     return data as Posted;

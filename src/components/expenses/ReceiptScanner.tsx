@@ -98,6 +98,7 @@ export function ReceiptScanner({ onScanComplete, onClose }: ReceiptScannerProps)
         taxCents: read.taxAmountCents,
         currency: read.currency,
         date: read.date || '',
+        cuInvoiceNumber: read.cuInvoiceNumber,
         receipt,
       });
     } catch (err: any) {

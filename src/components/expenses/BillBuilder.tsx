@@ -42,6 +42,7 @@ export interface ScannedForBill {
   taxCents: number | null;
   currency: string;
   date: string;
+  cuInvoiceNumber?: string | null;
   receipt?: File;
 }
 
@@ -68,6 +69,9 @@ export function BillBuilder({ open, onClose, scanned, mode = 'bill' }: {
   const [billDate, setBillDate] = useState(today);
   const [dueDate, setDueDate] = useState(addDaysIso(today, 30));
   const [supplierReference, setSupplierReference] = useState('');
+  const [etimsInvoiceNumber, setEtimsInvoiceNumber] = useState('');
+  const [etimsInvoiceDate, setEtimsInvoiceDate] = useState('');
+  const [etimsExemptionReason, setEtimsExemptionReason] = useState('');
   const [currency, setCurrency] = useState(base);
   const [rate, setRate] = useState('1');
   const [notes, setNotes] = useState('');
@@ -112,6 +116,9 @@ export function BillBuilder({ open, onClose, scanned, mode = 'bill' }: {
     setBillDate(scanned?.date && /^\d{4}-\d{2}-\d{2}$/.test(scanned.date) ? scanned.date : today);
     setDueDate(addDaysIso(today, 30));
     setSupplierReference('');
+    setEtimsInvoiceNumber('');
+    setEtimsInvoiceDate('');
+    setEtimsExemptionReason('');
     // A receipt in another supported currency opens in that currency, at today's rate.
     const scannedCurrency = scanned?.currency && scanned.currency !== base && SUPPORTED_CURRENCIES.some((c) => c.code === scanned.currency) ? scanned.currency : base;
     setCurrency(scannedCurrency);
@@ -221,6 +228,9 @@ export function BillBuilder({ open, onClose, scanned, mode = 'bill' }: {
         paidFromAccountId: paidFromId || moneyAccounts[0]?.id,
         reference: supplierReference.trim() || undefined,
         memo: notes.trim() || undefined,
+        etimsInvoiceNumber: etimsInvoiceNumber.trim() || undefined,
+        etimsInvoiceDate: etimsInvoiceDate || undefined,
+        etimsExemptionReason: etimsExemptionReason.trim() || undefined,
         idempotencyKey,
         lines: lines.filter((l) => lineCents(l) > 0).map((l) => ({
           description: l.description.trim(),
@@ -238,6 +248,9 @@ export function BillBuilder({ open, onClose, scanned, mode = 'bill' }: {
         billDate,
         dueDate,
         supplierReference: supplierReference.trim() || undefined,
+        etimsInvoiceNumber: etimsInvoiceNumber.trim() || undefined,
+        etimsInvoiceDate: etimsInvoiceDate || undefined,
+        etimsExemptionReason: etimsExemptionReason.trim() || undefined,
         currency,
         exchangeRate: rateNum,
         notes: notes.trim() || undefined,
@@ -274,6 +287,10 @@ export function BillBuilder({ open, onClose, scanned, mode = 'bill' }: {
     if (!isExpense && !isCredit && dueDate < billDate) return setProblem('The due date cannot be before the bill date.');
     if (isCredit && !vendorId) return setProblem('Choose the supplier giving the credit.');
     if (isExpense && !(paidFromId || moneyAccounts[0]?.id)) return setProblem('Choose the account it was paid from.');
+    if (!isCredit && (Boolean(etimsInvoiceNumber.trim()) !== Boolean(etimsInvoiceDate)
+      || (etimsInvoiceNumber.trim() && etimsExemptionReason.trim()))) {
+      return setProblem('Enter both the CU invoice number and date, or an exemption reason.');
+    }
     post.mutate();
   };
 
@@ -349,6 +366,29 @@ export function BillBuilder({ open, onClose, scanned, mode = 'bill' }: {
             >
               <input name="supplierReference" maxLength={100} autoComplete="off" value={supplierReference} onChange={(e) => setSupplierReference(e.target.value)} />
             </Field>
+            {!isCredit && (
+              <>
+                {scanned?.cuInvoiceNumber && (
+                  <div className="sm:col-span-2 lg:col-span-3 rounded-xl bg-surface-2 p-3 text-sm">
+                    The receipt reader found CU number {scanned.cuInvoiceNumber}. Check it against the receipt before using it.
+                    <button type="button" className={`${buttonClass.secondary} ml-3`} onClick={() => {
+                      setEtimsInvoiceNumber(scanned.cuInvoiceNumber || '');
+                      setEtimsInvoiceDate(scanned.date || '');
+                      setEtimsExemptionReason('');
+                    }}>Use checked number</button>
+                  </div>
+                )}
+                <Field label="Supplier CU invoice number" hint="From the supplier's eTIMS invoice. Leave blank if unavailable.">
+                  <input name="etimsInvoiceNumber" maxLength={100} value={etimsInvoiceNumber} onChange={(e) => setEtimsInvoiceNumber(e.target.value)} />
+                </Field>
+                <Field label="CU invoice date" hint="Required when a CU invoice number is entered.">
+                  <input type="date" name="etimsInvoiceDate" value={etimsInvoiceDate} onChange={(e) => setEtimsInvoiceDate(e.target.value)} />
+                </Field>
+                <Field label="eTIMS exemption reason" hint="For example, supplier not VAT-registered or exempt supply. Leave blank when a CU number is entered.">
+                  <input name="etimsExemptionReason" maxLength={500} value={etimsExemptionReason} onChange={(e) => setEtimsExemptionReason(e.target.value)} />
+                </Field>
+              </>
+            )}
             {!isExpense && !isCredit && (
               <Field label="Currency">
                 <select value={currency} onChange={(e) => { setCurrency(e.target.value); setRate(e.target.value === base ? '1' : String(exchangeRates[e.target.value] || 1)); }}>

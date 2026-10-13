@@ -30,7 +30,7 @@ Success is a Kenyan bookkeeper using a feature for a full working day without su
 - M-Pesa is treated as a payment rail, not a bank statement import.
 - Kenyan statutory rules (PAYE bands, NSSF tiers, SHIF, Housing Levy, VAT, eTIMS) are the core of the product, not a localisation layer.
 - Double entry is enforced in Postgres through `post_journal_entry()`. The database refuses unbalanced entries, so no frontend bug can put the books out of balance.
-- Multi-currency (KES base; USD, UGX, TZS, RWF and others) holds invoices at the issue-date rate and calculates unrealised FX on open foreign invoices and bills against live rates. Posting that revaluation to account 8000, and realised FX on settlement, are not built yet.
+- Multi-currency (KES base; USD, UGX, TZS, RWF and others) holds invoices at the issue-date rate and calculates unrealised FX on open foreign invoices and bills against live rates. Settlement posts realised FX. Posting the open-balance revaluation to account 8000 is not built yet.
 - Planned and not yet built: WhatsApp Business invoicing with an M-Pesa STK push payment link and auto-reconciliation (section 3.6).
 
 ## Operating Context
@@ -38,7 +38,7 @@ Success is a Kenyan bookkeeper using a feature for a full working day without su
 - Money arrives through M-Pesa tills and paybills (Safaricom Daraja C2B/B2C) and Kenyan banks. KCB, Equity, Co-op and Absa arrive as CSV or OFX imports, not live feeds.
 - Tax runs against a KRA PIN. eTIMS submission needs the business's own OSCU or VSCU device registration.
 - The monthly statutory calendar: PAYE, NSSF and SHIF by the 9th; the Housing Levy by the ninth working day; VAT by the 20th.
-- Reports are printed, exported to Excel and PDF, and handed to auditors who have never seen the product.
+- Reports can be printed or exported to CSV and PDF for review outside the product.
 - Android is 92.93% of Kenyan mobile traffic (StatCounter, August 2026). The target device for acceptance testing is a Tecno Spark 20 on Android 14. Connectivity is mobile data.
 - Accountants are expected to learn keyboard shortcuts: a command palette on Ctrl+K today, with Vim-style leader sequences and row navigation specified in section 4.
 
@@ -50,9 +50,11 @@ Success is a Kenyan bookkeeper using a feature for a full working day without su
 
 **Authentication:** email and password only. Magic links are out and must not be reintroduced.
 
-**Built today:** accounts, journals, invoices, sales orders (recorded by staff; started, completed, reopened or cancelled; invoiced in one step; completing one counts its stock items out of inventory but posts no cost-of-goods entry), bills, vendors, customers, banking with match suggestions (posted entries, open invoices and bills, the company's rules, then keyword guesses) and rules, payroll runs and payslips (posted atomically, with statutory rate tables coded in src/utils/kenyaPayroll.ts by effective date), inventory, projects and time entries, budgets, team roles (owner, admin, accountant, member), audit log, reports, multi-org switching, demo tenant, onboarding tour and business-type customization, a public landing page, an accent color per organization, mobile bottom navigation. An accountant serves several client organizations from one login: the same membership and company-switcher mechanism as any other role, granted a role that posts to the books without administering the organization.
+**Built today:** accounts, journals, invoices, estimates, sales orders (recorded by staff; started, completed, reopened or cancelled; invoiced in one step; completing one counts its stock items out of inventory but posts no cost-of-goods entry), bills, purchase orders, recurring invoices and bills, vendors, customers, banking with match suggestions (posted entries, open invoices and bills, the company's rules, then keyword guesses) and rules, CSV/OFX/QFX bank statement import with saved CSV mappings per money account, inventory, projects and time entries, budgets, team roles (owner, admin, accountant, member), audit log, reports, multi-org switching, demo tenant, onboarding tour and business-type customization, a public landing page, an accent color per organization, mobile bottom navigation. An accountant serves several client organizations from one login: the same membership and company-switcher mechanism as any other role, granted a role that posts to the books without administering the organization.
 
-**Specified but not built:** Daraja polling and live M-Pesa sync (3.3), CSV/OFX bank import with saved mappings (3.3), statutory rate tables held in the database rather than in code (3.4), recurring invoices, estimates and purchase orders (3.5), WhatsApp invoicing (3.6), ledger book view (3.8), react-hook-form and zod forms (3.9), keyboard leader sequences (4), onboarding wizard (3.2). The interface must never present these as working.
+Payroll runs and payslips post atomically using effective-dated statutory rate versions stored in the database; the coded tables in `src/utils/kenyaPayroll.ts` remain a test fixture. Dated employee relief evidence and applied-amount snapshots explain payslips. New runs credit Net Salaries Payable; a separate dated bank payment and its own reversal record settlement. Owners and admins can close and reopen a financial year with journal entries. Bills and expenses hold supplier CU invoice evidence or an exemption reason, with an Input VAT at risk report for posted purchases missing both. The receipt reader can suggest a CU number for a person to confirm.
+
+**Specified but not built:** Daraja polling and live M-Pesa sync (3.3), KRA eTIMS submission and verification, WhatsApp invoicing (3.6), the dedicated ledger book view (3.8), react-hook-form-based client forms (3.9), keyboard leader sequences (4), and the onboarding wizard (3.2). CSV/OFX/QFX statement files are imported by a person; saved column mappings apply to CSV. The interface must never present the unbuilt capabilities as working.
 
 **Terminology:** invoice, bill, vendor, customer, journal entry, chart of accounts, till, paybill, KRA PIN, PAYE, NSSF, SHIF, Housing Levy, eTIMS, trial balance, carried forward and brought forward.
 

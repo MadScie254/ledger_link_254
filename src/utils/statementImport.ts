@@ -27,6 +27,20 @@ export interface CsvMapping {
   dateFormat: DateFormat;
 }
 
+export interface SavedCsvLayout { headerRow: number; mapping: CsvMapping }
+
+/** A saved column index is only usable when this file has that column. */
+export function savedLayoutFits(rows: string[][], layout: SavedCsvLayout): boolean {
+  const header = rows[layout.headerRow];
+  if (!header) return false;
+  const fits = (index: number | undefined) => index === undefined ||
+    (Number.isInteger(index) && index >= 0 && index < header.length);
+  const mapping = layout.mapping;
+  return fits(mapping.date) && fits(mapping.description) && fits(mapping.reference) &&
+    (mapping.amount !== undefined ? fits(mapping.amount) :
+      mapping.moneyIn !== undefined && mapping.moneyOut !== undefined && fits(mapping.moneyIn) && fits(mapping.moneyOut));
+}
+
 /** Splits CSV text into rows, honouring quotes, doubled quotes and newlines inside quotes. */
 export function parseCsv(text: string): string[][] {
   const source = text.replace(/^﻿/, '');

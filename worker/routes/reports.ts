@@ -35,6 +35,12 @@ export function registerReportRoutes(api: Api) {
     } catch (err) { return respondError(c, err); }
   });
 
+  api.get('/reports/input-vat-at-risk', async (c) => {
+    try {
+      return c.json(await BusinessReportService.inputVatAtRisk(c.get('orgId'), c.req.query('dateRange') || 'This Year-to-date'));
+    } catch (err) { return respondError(c, err); }
+  });
+
   api.get('/reports/pnl-monthly', async (c) => {
     try {
       return c.json(await BusinessReportService.monthlyProfitAndLoss(c.get('orgId'), c.req.query('dateRange') || 'This Year-to-date'));

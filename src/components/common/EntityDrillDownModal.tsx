@@ -12,7 +12,9 @@ import { buttonClass } from '../ledger/Page';
 import { DocumentPayments } from './DocumentPayments';
 import { DynamicQuickAddModal } from './DynamicQuickAddModal';
 import { AttachmentsPanel } from './AttachmentsPanel';
+import { EmployeeAdjustmentsPanel } from '../payroll/EmployeeAdjustmentsPanel';
 import { PrintButton } from './PrintButton';
+import { PurchaseEvidencePanel } from './PurchaseEvidencePanel';
 import { ReminderDraftDialog } from '../sales/ReminderDraftDialog';
 
 export type DrillDownEntityType = 'ITEM' | 'VENDOR' | 'CUSTOMER' | 'EMPLOYEE' | 'ACCOUNT' | 'INVOICE' | 'BILL';
@@ -370,6 +372,12 @@ export function EntityDrillDownModal({ isOpen, onClose, entityType, entityId, in
                 <Line label="Supplier's invoice number" value={data.supplierReference} figure />
               </Section>
             )}
+            {entityType === 'BILL' && data.id && (
+              <Section title="eTIMS purchase evidence">
+                <PurchaseEvidencePanel key={data.id} kind="BILL" id={data.id} evidence={data}
+                  canEdit={activeCompany?.role !== 'member'} />
+              </Section>
+            )}
             {data.id && <DocumentPayments kind={entityType} document={data} />}
           </>
         );
@@ -468,6 +476,7 @@ export function EntityDrillDownModal({ isOpen, onClose, entityType, entityId, in
       {activeTab === 'details' || !hasTransactions ? (
         <>
           <div className="grid grid-cols-1 gap-x-8 gap-y-5 md:grid-cols-2">{details}</div>
+          {entityType === 'EMPLOYEE' && entityId && <EmployeeAdjustmentsPanel employeeId={entityId} />}
           {['INVOICE', 'BILL', 'CUSTOMER', 'VENDOR'].includes(entityType) && (
             <section aria-label="Activity timeline" className="mt-6">
               <h3 className="mb-3 text-[13px] font-semibold text-text">Activity</h3>

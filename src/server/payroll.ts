@@ -1,7 +1,8 @@
 import { getSupabase } from './supabase';
 import { UserError } from './errors';
 import { fetchAllRows } from './pagination';
-import { calculatePayslip, isIsoCalendarDate, monthlyGrossCents, parsePayPeriod } from '../utils/kenyaPayroll';
+import { calculatePayslip, isIsoCalendarDate, monthlyGrossCents, parsePayPeriod, rateTableFromRow, type StatutoryRateTable, type StatutoryRateRow } from '../utils/kenyaPayroll';
+import type { EmployeeAdjustment, AppliedAdjustment, AdjustmentType } from '../utils/employeeAdjustments.ts';
 
 export { calculatePayslip } from '../utils/kenyaPayroll';
 export type { PayslipBreakdown } from '../utils/kenyaPayroll';
@@ -9,7 +10,7 @@ export type { PayslipBreakdown } from '../utils/kenyaPayroll';
 const PAYROLL_ACCOUNT_CODES = {
   salaryExpense: '6100',
   employerExpense: '6110',
-  cash: '1000',
+  netSalariesPayable: '2165',
   payePayable: '2110',
   nssfPayable: '2120',
   shifPayable: '2130',
@@ -30,6 +31,7 @@ interface PayrollRpcPayslip {
   employerAhlCents: number;
   netCents: number;
   rateVersion: string;
+  appliedAdjustments: readonly AppliedAdjustment[];
 }
 
 export interface RunPayrollRpcPayload {
@@ -101,6 +103,55 @@ function centsOrZero(value: unknown, label: string): number {
 }
 
 export class PayrollService {
+  static async getStatutoryRateTable(date: string): Promise<StatutoryRateTable> {
+    if (!isIsoCalendarDate(date)) throw new Error('Choose a real date in YYYY-MM-DD form.');
+    const { data, error } = await getSupabase()
+      .from('statutory_rate_tables')
+      .select('version, effective_from, source, rates')
+      .lte('effective_from', date)
+      .order('effective_from', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    if (error) throw error;
+    if (!data) throw new Error(`No statutory rate table is available for ${date}.`);
+    const { data: rules, error: rulesError } = await getSupabase().from('statutory_adjustment_rules')
+      .select('adjustment_type, monthly_cap_cents, relief_rate, source, verified')
+      .eq('version', data.version).lte('effective_from', date);
+    if (rulesError) throw rulesError;
+    return { ...rateTableFromRow(data as StatutoryRateRow), adjustmentRules: (rules ?? []).map((rule: any) => ({
+      type: rule.adjustment_type, monthlyCapCents: Number(rule.monthly_cap_cents), rate: Number(rule.relief_rate),
+      source: rule.source, verified: rule.verified,
+    })) };
+  }
+
+  static async getEmployeeAdjustments(orgId: string, employeeId?: string): Promise<(EmployeeAdjustment & { employeeId: string })[]> {
+    const rows = await fetchAllRows<any>((from, to) => {
+      let query = getSupabase().from('employee_adjustments').select('*').eq('org_id', orgId);
+      if (employeeId) query = query.eq('employee_id', employeeId);
+      return query.order('id').range(from, to);
+    });
+    return rows.map((row: any) => ({ id: row.id, employeeId: row.employee_id, type: row.adjustment_type as AdjustmentType,
+      amountCents: Number(row.amount_cents), validFrom: row.valid_from, validTo: row.valid_to,
+      referenceNumber: row.reference_number, attachmentId: row.attachment_id }));
+  }
+
+  static async addEmployeeAdjustment(orgId: string, employeeId: string, input: Omit<EmployeeAdjustment, 'id'>, actor: string) {
+    const { data, error } = await getSupabase().from('employee_adjustments').insert({
+      org_id: orgId, employee_id: employeeId, adjustment_type: input.type, amount_cents: input.amountCents,
+      valid_from: input.validFrom, valid_to: input.validTo, reference_number: input.referenceNumber,
+      attachment_id: input.attachmentId, created_by: actor,
+    }).select('id').single();
+    if (error) throw error;
+    return data.id as string;
+  }
+
+  static async endEmployeeAdjustment(orgId: string, employeeId: string, id: string, validTo: string) {
+    const { data, error } = await getSupabase().from('employee_adjustments').update({ valid_to: validTo })
+      .eq('org_id', orgId).eq('employee_id', employeeId).eq('id', id).select('id').maybeSingle();
+    if (error) throw error;
+    if (!data) throw new UserError('Adjustment not found for this employee.', 404);
+  }
+
   static async getEmployees(orgId: string) {
     const supabase = getSupabase();
     const data = await fetchAllRows<any>((from, to) => supabase
@@ -234,18 +285,16 @@ export class PayrollService {
     idempotencyKey?: string,
   ): Promise<string> {
     // One canonical label per month, so "Aug 2026" and "August 2026" cannot
-    // both be run, and rates read for the month earned rather than the day paid.
+    // both be run. Statutory rates and evidence follow the pay date.
     const payPeriod = parsePayPeriod(String(period ?? ''));
     if (!payPeriod) throw new Error('Write the payroll period as a month and year, such as September 2026.');
     if (!isIsoCalendarDate(payDate)) throw new Error('The pay date must be a real date in YYYY-MM-DD form.');
     const normalizedPeriod = payPeriod.label;
     if (!createdBy?.trim()) throw new Error('A payroll actor is required.');
 
-    // Selects the rate table for the period before any remote work. The same
-    // shared function calculates every employee below.
-    const rateProbe = calculatePayslip(0, payPeriod.rateDate);
+    const rates = await PayrollService.getStatutoryRateTable(payDate);
     const supabase = getSupabase();
-    const [employees, accountIds] = await Promise.all([
+    const [employees, accountIds, adjustments] = await Promise.all([
       fetchAllRows<any>((from, to) => supabase
         .from('employees')
         .select('id, first_name, last_name, base_salary, housing_allowance_cents, transport_allowance_cents')
@@ -254,6 +303,7 @@ export class PayrollService {
         .order('id')
         .range(from, to)),
       getPayrollAccountIds(orgId),
+      PayrollService.getEmployeeAdjustments(orgId),
     ]);
 
     if (employees.length === 0) throw new Error('No active employees to run payroll for.');
@@ -263,7 +313,7 @@ export class PayrollService {
         baseSalaryCents: employee.base_salary,
         housingAllowanceCents: employee.housing_allowance_cents,
         transportAllowanceCents: employee.transport_allowance_cents,
-      }), payPeriod.rateDate);
+      }), payDate, rates, adjustments.filter((record) => record.employeeId === employee.id));
       if (breakdown.netCents < 0) {
         // The SHIF minimum can exceed very small pay; say who, instead of the
         // database refusing the whole run with an unexplained total.
@@ -281,6 +331,7 @@ export class PayrollService {
         employerAhlCents: breakdown.ahlCents,
         netCents: breakdown.netCents,
         rateVersion: breakdown.rateVersion,
+        appliedAdjustments: breakdown.appliedAdjustments,
       };
     });
 
@@ -290,12 +341,13 @@ export class PayrollService {
       p_org_id: orgId,
       p_period: normalizedPeriod,
       p_pay_date: payDate,
-      p_rate_version: rateProbe.rateVersion,
+      p_rate_version: rates.version,
       p_created_by: createdBy,
       p_idempotency_key: effectiveIdempotencyKey,
       p_salary_expense_account_id: accountIds.salaryExpense,
       p_employer_expense_account_id: accountIds.employerExpense,
-      p_cash_account_id: accountIds.cash,
+      // The RPC retains its original parameter name for compatibility.
+      p_cash_account_id: accountIds.netSalariesPayable,
       p_paye_payable_account_id: accountIds.payePayable,
       p_nssf_payable_account_id: accountIds.nssfPayable,
       p_shif_payable_account_id: accountIds.shifPayable,
@@ -335,6 +387,7 @@ export class PayrollService {
       totalEmployerNssfCents: row.total_employer_nssf_cents,
       totalEmployerAhlCents: row.total_employer_ahl_cents,
       rateVersion: row.rate_version,
+      netPayAccountId: row.net_pay_account_id ?? null,
       reversedAt: row.reversed_at ?? null,
       reversalReason: row.reversal_reason ?? null,
       createdAt: row.created_at
@@ -359,12 +412,35 @@ export class PayrollService {
     return data as { reversalJournalEntryId: string; period: string };
   }
 
+  static async getSalaryPayments(orgId: string, runId: string) {
+    const data = await fetchAllRows<any>((from, to) => getSupabase().from('salary_payments')
+      .select('*').eq('org_id', orgId).eq('payroll_run_id', runId).order('created_at').order('id').range(from, to));
+    return data.map((row) => ({ id: row.id, paymentDate: row.payment_date, amountCents: row.amount_cents,
+      bankAccountId: row.bank_account_id, journalEntryId: row.journal_entry_id,
+      reversedAt: row.reversed_at, reversalReason: row.reversal_reason }));
+  }
+
+  static async paySalaries(orgId: string, runId: string, bankAccountId: string, paymentDate: string, actor: string, idempotencyKey: string) {
+    const { data, error } = await getSupabase().rpc('pay_salaries', { p_org_id: orgId, p_run_id: runId,
+      p_bank_account_id: bankAccountId, p_payment_date: paymentDate, p_actor: actor, p_idempotency_key: idempotencyKey });
+    if (error) throw error;
+    return data as { id: string; journalEntryId: string };
+  }
+
+  static async reverseSalaryPayment(orgId: string, runId: string, paymentId: string, reversalDate: string, reason: string, actor: string) {
+    const { data, error } = await getSupabase().rpc('reverse_salary_payment', { p_org_id: orgId, p_run_id: runId,
+      p_payment_id: paymentId, p_reversal_date: reversalDate, p_reason: reason, p_actor: actor });
+    if (error) throw error;
+    return data as { reversalJournalEntryId: string };
+  }
+
   static async getPayslips(orgId: string, payrollRunId: string) {
     const supabase = getSupabase();
     const data = await fetchAllRows<any>((from, to) => supabase
       .from('payslips')
       .select('*, payroll_runs!inner(org_id), employees(first_name, last_name)')
       .eq('payroll_run_id', payrollRunId)
+      .eq('org_id', orgId)
       .eq('payroll_runs.org_id', orgId)
       .order('id')
       .range(from, to));
@@ -382,7 +458,8 @@ export class PayrollService {
       employerNssfCents: row.employer_nssf_cents,
       employerAhlCents: row.employer_ahl_cents,
       rateVersion: row.rate_version,
-      netCents: row.net_cents
+      netCents: row.net_cents,
+      appliedAdjustments: row.applied_adjustments ?? []
     }));
   }
 }

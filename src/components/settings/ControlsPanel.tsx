@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { format } from 'date-fns';
-import { useMutation, useQuery } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type { OrganizationData } from '../../store';
 import { apiRequest } from '../../utils/apiRequest';
 import { centsFromAmountText } from '../../utils/salesOrders';
@@ -29,7 +29,12 @@ function knownZones(): string[] {
  */
 export function ControlsPanel({ company, onSaved }: { company: OrganizationData; onSaved: () => void }) {
   const canChange = company.role === 'owner' || company.role === 'admin';
+  const queryClient = useQueryClient();
   const [closedThrough, setClosedThrough] = useState('');
+  const [yearEndDate, setYearEndDate] = useState('');
+  const [reopenReason, setReopenReason] = useState('');
+  const [yearEndMessage, setYearEndMessage] = useState('');
+  const [yearEndProblem, setYearEndProblem] = useState('');
   const [threshold, setThreshold] = useState('');
   const [timeZone, setTimeZone] = useState(DEFAULT_TIME_ZONE);
   const [aiEnabled, setAiEnabled] = useState(false);
@@ -51,6 +56,43 @@ export function ControlsPanel({ company, onSaved }: { company: OrganizationData;
       payables: { ledgerCents: number; documentsCents: number; differenceCents: number };
       agrees: boolean;
     }>('/api/reports/control-check'),
+  });
+  const yearEnds = useQuery({
+    queryKey: ['year-end-closes', company.id],
+    queryFn: () => apiRequest<{ closes: { id: string; yearStart: string; yearEnd: string; journalEntryId: string; reopenedAt: string | null }[] }>(`/api/organizations/${company.id}/year-end`),
+  });
+  const latestClose = yearEnds.data?.closes.find((close) => !close.reopenedAt);
+  const refreshYearEnd = () => {
+    queryClient.invalidateQueries({ queryKey: ['year-end-closes', company.id] });
+    queryClient.invalidateQueries({ queryKey: ['accounts', company.id] });
+    queryClient.invalidateQueries({ queryKey: ['journal-entries', company.id] });
+    queryClient.invalidateQueries({ queryKey: ['control-check', company.id] });
+    queryClient.invalidateQueries({ queryKey: ['reports'] });
+    onSaved();
+  };
+  const closeYear = useMutation({
+    mutationFn: () => apiRequest<{ journalEntryId: string }>(`/api/organizations/${company.id}/year-end`, {
+      body: { yearEnd: yearEndDate }, fallback: 'The financial year could not be closed.',
+    }),
+    onSuccess: (result) => {
+      setYearEndMessage(`Financial year ending ${yearEndDate} closed. Journal entry ${result.journalEntryId}.`);
+      setYearEndProblem('');
+      setYearEndDate('');
+      refreshYearEnd();
+    },
+    onError: (error: Error) => setYearEndProblem(error.message),
+  });
+  const reopenYear = useMutation({
+    mutationFn: () => apiRequest<{ reversalJournalEntryId: string }>(`/api/organizations/${company.id}/year-end/reopen`, {
+      body: { closeId: latestClose?.id, reason: reopenReason.trim() }, fallback: 'The financial year could not be reopened.',
+    }),
+    onSuccess: (result) => {
+      setYearEndMessage(`Financial year reopened. Reversal journal entry ${result.reversalJournalEntryId}.`);
+      setYearEndProblem('');
+      setReopenReason('');
+      refreshYearEnd();
+    },
+    onError: (error: Error) => setYearEndProblem(error.message),
   });
 
   const usage = useQuery({
@@ -103,15 +145,30 @@ export function ControlsPanel({ company, onSaved }: { company: OrganizationData;
           </p>
           <div className="flex flex-wrap items-end gap-3">
             <Field label="Books closed through">
-              <input type="date" value={closedThrough} disabled={!canChange} onChange={(e) => setClosedThrough(e.target.value)} />
+              <input type="date" value={closedThrough} disabled={!canChange || Boolean(latestClose)} onChange={(e) => setClosedThrough(e.target.value)} />
             </Field>
-            {closedThrough && canChange && (
+            {closedThrough && canChange && !latestClose && (
               <button type="button" className={`${buttonClass.quiet} mb-2.5`} onClick={() => setClosedThrough('')}>Reopen all periods</button>
             )}
           </div>
           <p className="text-[12.5px] text-graphite-600">
             {company.booksClosedThrough ? `Closed through ${format(new Date(company.booksClosedThrough), 'dd/MM/yyyy')}.` : 'No period is closed.'}
           </p>
+          {latestClose && <p className="text-[12.5px] text-text-2">A year-end entry closed the year ending {latestClose.yearEnd}. Reopen that entry before changing the closing date or financial year start.</p>}
+          {canChange && <div className="space-y-3 rounded-xl border border-border bg-surface-2 p-4">
+            <h3 className="text-sm font-semibold text-text">Financial year close</h3>
+            <p className="text-sm text-text-2">Transfer the year’s income and expense balances to Retained Earnings (3100). The closing entry and a later reopening remain in the ledger.</p>
+            <div className="flex flex-wrap items-end gap-3">
+              <Field label="Financial year ending"><input type="date" value={yearEndDate} onChange={(e) => setYearEndDate(e.target.value)} /></Field>
+              <button type="button" className={buttonClass.primary} disabled={!yearEndDate || closeYear.isPending || reopenYear.isPending} onClick={() => { setYearEndProblem(''); closeYear.mutate(); }}>Close financial year</button>
+            </div>
+            {latestClose && <div className="flex flex-wrap items-end gap-3">
+              <Field label="Reason for reopening"><input type="text" maxLength={500} value={reopenReason} onChange={(e) => setReopenReason(e.target.value)} /></Field>
+              <button type="button" className={buttonClass.secondary} disabled={!reopenReason.trim() || reopenYear.isPending || closeYear.isPending} onClick={() => { setYearEndProblem(''); reopenYear.mutate(); }}>Reopen year ending {latestClose.yearEnd}</button>
+            </div>}
+            {yearEndProblem && <p role="alert" className="text-sm text-negative">{yearEndProblem}</p>}
+            {yearEndMessage && <p role="status" className="text-sm text-text">{yearEndMessage}</p>}
+          </div>}
         </section>
 
         <section aria-labelledby="approval-heading" className="space-y-2">

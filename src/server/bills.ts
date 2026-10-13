@@ -29,6 +29,9 @@ export interface BillInput {
   createdBy: string;
   /** The supplier's own invoice number; one per supplier. */
   supplierReference?: string;
+  etimsInvoiceNumber?: string;
+  etimsInvoiceDate?: string;
+  etimsExemptionReason?: string;
 }
 
 export interface BillPaymentInput {
@@ -104,6 +107,9 @@ function mapBill(row: any) {
     totalCents: Number(row.total_cents) || 0,
     amountDueCents: Number(row.amount_due_cents) || 0,
     supplierReference: row.supplier_reference ?? null,
+    etimsInvoiceNumber: row.etims_invoice_number ?? null,
+    etimsInvoiceDate: row.etims_invoice_date ?? null,
+    etimsExemptionReason: row.etims_exemption_reason ?? null,
     purchaseOrderId: row.purchase_order_id ?? null,
     approvedAt: row.approved_at ?? null,
     approvedBy: row.approved_by ?? null,
@@ -199,7 +205,7 @@ export class BillService {
     }));
 
     const supabase = getSupabase();
-    const { data, error } = await supabase.rpc('create_bill_with_journal', {
+    const { data, error } = await supabase.rpc('create_bill_with_evidence', {
       p_org_id: input.orgId,
       p_vendor_id: input.vendorId,
       p_bill_date: input.billDate,
@@ -211,6 +217,9 @@ export class BillService {
       p_idempotency_key: input.idempotencyKey,
       p_lines: lines,
       p_supplier_reference: input.supplierReference?.trim() || null,
+      p_etims_invoice_number: input.etimsInvoiceNumber?.trim() || null,
+      p_etims_invoice_date: input.etimsInvoiceDate || null,
+      p_etims_exemption_reason: input.etimsExemptionReason?.trim() || null,
     });
 
     if (error) throw error;
