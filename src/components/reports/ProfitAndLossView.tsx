@@ -13,6 +13,15 @@ export function ProfitAndLossView({ onBack }: { onBack: () => void }) {
   const { currentOrgId, activeCompany } = useAppStore();
   const [dateRange, setDateRange] = useState('This Year-to-date');
   const [drillDownAccount, setDrillDownAccount] = useState<string | null>(null);
+  const yearEnds = useQuery({
+    queryKey: ['year-end-closes', currentOrgId],
+    queryFn: async () => {
+      const res = await fetch(`/api/organizations/${currentOrgId}/year-end`, { headers: { 'x-org-id': currentOrgId } });
+      if (!res.ok) throw new Error('Could not read financial years.');
+      return res.json() as Promise<{ closes: { id: string; yearStart: string; yearEnd: string }[] }>;
+    },
+  });
+  const periodLabel = dateRange.includes('..') ? `Financial year ending ${dateRange.slice(-10)}` : dateRange;
 
   const report = useQuery({
     queryKey: ['reports_pl', currentOrgId, dateRange],
@@ -49,7 +58,7 @@ export function ProfitAndLossView({ onBack }: { onBack: () => void }) {
       {
         title: 'Profit & Loss Statement',
         subtitle: 'Statement of Comprehensive Income',
-        period: dateRange,
+        period: periodLabel,
         companyName: activeCompany?.legalName || activeCompany?.name,
         kraPin: activeCompany?.taxId,
         currency: 'KES',
@@ -100,7 +109,7 @@ export function ProfitAndLossView({ onBack }: { onBack: () => void }) {
   return (
     <StatementPage
       title="Profit and loss"
-      period={dateRange}
+      period={periodLabel}
       onBack={onBack}
       loading={report.isLoading}
       problem={report.isError ? { what: 'the profit and loss statement', path: '/api/reports/pnl', onRetry: () => report.refetch() } : null}
@@ -114,6 +123,7 @@ export function ProfitAndLossView({ onBack }: { onBack: () => void }) {
             <option>This Quarter</option>
             <option>This Year-to-date</option>
             <option>Last Year</option>
+            {yearEnds.data?.closes.map((close) => <option key={close.id} value={`${close.yearStart}..${close.yearEnd}`}>Financial year ending {close.yearEnd}</option>)}
           </select>
         </label>
       }

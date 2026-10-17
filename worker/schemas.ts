@@ -183,6 +183,18 @@ export const payrollRunSchema = z.object({
   payDate: isoDate,
   idempotencyKey: uuid.optional(),
 });
+export const yearEndCloseSchema = z.object({ yearEnd: isoDate });
+export const yearEndReopenSchema = z.object({ closeId: uuid, reason: requiredText(500, 'A reopening reason') });
+export const salaryPaymentSchema = z.object({ bankAccountId: uuid, paymentDate: isoDate, idempotencyKey: uuid });
+export const employeeAdjustmentSchema = z.object({
+  type: z.enum(['REGISTERED_PENSION', 'MORTGAGE_INTEREST', 'POST_RETIREMENT_MEDICAL', 'INSURANCE_PREMIUM', 'DISABILITY_EXEMPTION']),
+  amountCents: cents,
+  validFrom: isoDate,
+  validTo: isoDate.nullable(),
+  referenceNumber: requiredText(100, 'A certificate or policy reference'),
+  attachmentId: uuid.nullable(),
+}).refine((value) => value.validTo === null || value.validTo >= value.validFrom, 'The end date must be on or after the start date.');
+export const endEmployeeAdjustmentSchema = z.object({ validTo: isoDate });
 
 // --- Accounts and budgets ---------------------------------------------------------
 
@@ -333,11 +345,24 @@ export const createInvoiceSchema = documentBaseSchema.extend({
   customerId: uuid,
   issueDate: isoDate,
 }).refine((doc) => doc.dueDate >= doc.issueDate, { message: 'The due date cannot be before the issue date.' });
+const purchaseEvidenceFields = {
+  etimsInvoiceNumber: text(100),
+  etimsInvoiceDate: isoDate.optional(),
+  etimsExemptionReason: text(500),
+};
+const validPurchaseEvidence = (doc: { etimsInvoiceNumber?: string; etimsInvoiceDate?: string; etimsExemptionReason?: string }) =>
+  Boolean(doc.etimsInvoiceNumber) === Boolean(doc.etimsInvoiceDate)
+  && !(doc.etimsInvoiceNumber && doc.etimsExemptionReason);
+export const purchaseEvidenceSchema = z.object(purchaseEvidenceFields)
+  .refine(validPurchaseEvidence, { message: 'Enter both the CU invoice number and date, or an exemption reason.' });
+
 export const createBillSchema = documentBaseSchema.extend({
   vendorId: uuid,
   billDate: isoDate,
   supplierReference: text(100),
-}).refine((doc) => doc.dueDate >= doc.billDate, { message: 'The due date cannot be before the bill date.' });
+  ...purchaseEvidenceFields,
+}).refine((doc) => doc.dueDate >= doc.billDate, { message: 'The due date cannot be before the bill date.' })
+  .refine(validPurchaseEvidence, { message: 'Enter both the CU invoice number and date, or an exemption reason.' });
 export const invoiceUpdateSchema = z.object({
   dueDate: isoDate.optional(),
   notes: z.string().trim().max(4000).optional(),
@@ -544,7 +569,8 @@ export const expenseSchema = z.object({
     quantity: z.number().positive().max(1_000_000_000).optional(),
   })).min(1).max(200),
   ...partyChoice,
-});
+  ...purchaseEvidenceFields,
+}).refine(validPurchaseEvidence, { message: 'Enter both the CU invoice number and date, or an exemption reason.' });
 export const transferSchema = z.object({
   date: isoDate,
   fromAccountId: uuid,
@@ -662,9 +688,22 @@ export const recurringRunSchema = z.object({ documentDate: isoDate });
 
 // --- Statements and reconciliation -------------------------------------------------
 
+const columnIndex = z.number().int().min(0).max(100);
+export const csvLayoutSchema = z.object({
+  headerRow: z.number().int().min(0).max(10000),
+  mapping: z.object({
+    date: columnIndex, description: columnIndex, reference: columnIndex.optional(),
+    amount: columnIndex.optional(), moneyIn: columnIndex.optional(), moneyOut: columnIndex.optional(),
+    dateFormat: z.enum(['DMY', 'MDY', 'YMD']),
+  }).refine((value) => value.amount !== undefined
+    ? value.moneyIn === undefined && value.moneyOut === undefined
+    : value.moneyIn !== undefined && value.moneyOut !== undefined,
+  'Choose one amount column or both money in and money out.'),
+});
 export const statementImportSchema = z.object({
   accountId: uuid,
   fileName: text(255),
+  layout: csvLayoutSchema.optional(),
   lines: z.array(z.object({
     date: isoDate,
     description: z.string().trim().max(500).default(''),

@@ -32,10 +32,10 @@ interface Column<Row> { label: string; cents?: (row: Row) => number; text?: (row
 
 /** A ranked table of names with amount columns and a total foot, for the sales and spending reports. */
 function RankedReport<Row extends { name: string }>({
-  onBack, title, endpoint, queryKey, columns, nameLabel, empty, totalLabel, totalOf,
+  onBack, title, endpoint, queryKey, columns, nameLabel, empty, totalLabel, totalOf, note,
 }: {
   onBack: () => void; title: string; endpoint: string; queryKey: string; columns: Column<Row>[];
-  nameLabel: string; empty: string; totalLabel: string; totalOf: (data: any) => number;
+  nameLabel: string; empty: string; totalLabel: string; totalOf: (data: any) => number; note?: string;
 }) {
   const { currentOrgId, activeCompany } = useAppStore();
   const { currency, shown } = useStatementFigures();
@@ -76,7 +76,7 @@ function RankedReport<Row extends { name: string }>({
       ) : (
         <div className="relative overflow-x-auto">
           <table className="w-full min-w-[34rem] text-[13.5px]">
-            <caption className="sr-only">{title}, {rangeText(report.data?.range)}, figures in {currency} before VAT</caption>
+            <caption className="sr-only">{title}, {rangeText(report.data?.range)}, figures in {currency}</caption>
             <thead>
               <tr>
                 <th scope="col" className="pr-4 text-left">{nameLabel}</th>
@@ -106,7 +106,7 @@ function RankedReport<Row extends { name: string }>({
               </tr>
             </tfoot>
           </table>
-          <p className="mt-2 text-[12.5px] text-graphite-600">Figures before VAT. Void documents are left out.</p>
+          <p className="mt-2 text-[12.5px] text-graphite-600">{note || 'Figures before VAT. Void documents are left out.'}</p>
         </div>
       )}
     </StatementPage>
@@ -169,6 +169,28 @@ export function ExpensesBySupplierView({ onBack }: { onBack: () => void }) {
         { label: 'Paid on the spot', cents: (r) => r.paidNowCents },
         { label: 'Credited', cents: (r) => -r.creditedCents },
         { label: 'Net spending', cents: (r) => r.netCents, total: true },
+      ]}
+    />
+  );
+}
+
+export function InputVatAtRiskView({ onBack }: { onBack: () => void }) {
+  return (
+    <RankedReport<{ name: string; period: string; billCount: number; expenseCount: number; vatCents: number }>
+      onBack={onBack}
+      title="Input VAT at risk"
+      endpoint="/api/reports/input-vat-at-risk"
+      queryKey="reports_input_vat_at_risk"
+      nameLabel="Supplier"
+      totalLabel="VAT missing evidence"
+      totalOf={(data) => data?.totalCents || 0}
+      empty="No posted bills or expenses with claimed VAT are missing both a CU number and an exemption reason in this period."
+      note="VAT on posted bills and expenses with neither a supplier CU invoice number nor an exemption reason. Review the purchase evidence before relying on the claim. Void documents are left out."
+      columns={[
+        { label: 'Month', text: (row) => row.period },
+        { label: 'Bills', text: (row) => String(row.billCount) },
+        { label: 'Expenses', text: (row) => String(row.expenseCount) },
+        { label: 'VAT at risk', cents: (row) => row.vatCents, total: true },
       ]}
     />
   );

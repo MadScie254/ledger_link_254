@@ -12,6 +12,7 @@ import { Mark } from '../ledger/Mark';
 import { EmptyNote, LoadProblem, SkeletonRows, buttonClass } from '../ledger/Page';
 import { AttachmentsButton } from './AttachmentsPanel';
 import { PrintButton } from './PrintButton';
+import { PurchaseEvidencePanel } from './PurchaseEvidencePanel';
 import { BulkActionBar } from './BulkActionBar';
 import { downloadCsv } from '../../utils/exportCsv';
 
@@ -213,6 +214,11 @@ export function CashTransactionsPanel({ kind, onCreate, createLabel }: { kind: C
         {selectedExpense && <div className="space-y-6">
           <dl className="grid grid-cols-2 gap-3"><div className="rounded-xl bg-surface-2 p-4"><dt className="text-xs text-text-2">Amount paid</dt><dd className="mt-1 font-display text-lg font-bold"><Amount cents={selectedExpense.totalCents} currency={currency} tone="ink" /></dd></div><div className="rounded-xl bg-surface-2 p-4"><dt className="text-xs text-text-2">Standing</dt><dd className="mt-1 text-sm font-semibold text-text">{selectedExpense.status === 'VOID' ? 'Void' : 'Posted'}</dd></div></dl>
           <section><h3 className="mb-3 text-sm font-semibold text-text">Summary</h3><dl className="space-y-2 text-[13px]"><div className="flex justify-between gap-4"><dt className="text-text-2">Payee</dt><dd>{selectedExpense.partyName || 'Not recorded'}</dd></div><div className="flex justify-between gap-4"><dt className="text-text-2">Paid from</dt><dd>{selectedExpense.moneyAccountName || 'Not recorded'}</dd></div><div className="flex justify-between gap-4"><dt className="text-text-2">Reference</dt><dd>{selectedExpense.reference || 'Not recorded'}</dd></div></dl>{selectedExpense.lines?.length > 0 && <ul className="mt-4 divide-y divide-border rounded-lg border border-border px-3">{selectedExpense.lines.map((line: any, index: number) => <li key={line.id || index} className="flex justify-between gap-4 py-2 text-[13px]"><span>{line.description}</span><Amount cents={line.amountCents || 0} currency={currency} size="xs" tone="ink" /></li>)}</ul>}</section>
+          <section><h3 className="mb-3 text-sm font-semibold text-text">eTIMS purchase evidence</h3>
+            <PurchaseEvidencePanel key={selectedExpense.id} kind="EXPENSE" id={selectedExpense.id}
+              evidence={selectedExpense} canEdit={canPost}
+              onSaved={(next) => setSelectedExpense({ ...selectedExpense, ...next })} />
+          </section>
           <section aria-label="Activity timeline"><h3 className="mb-3 text-sm font-semibold text-text">Activity</h3><ol className="border-l border-border-strong pl-4 text-[13px]"><li className="relative pb-4 before:absolute before:-left-[21px] before:top-1.5 before:size-2.5 before:rounded-full before:bg-primary"><span className="font-medium text-text">Expense dated</span><span className="block text-xs text-text-2">{shortDate(selectedExpense.date)}</span></li>{selectedExpense.createdAt && <li className="relative pb-4 before:absolute before:-left-[21px] before:top-1.5 before:size-2.5 before:rounded-full before:bg-primary"><span className="font-medium text-text">Recorded</span><span className="block text-xs text-text-2">{shortDate(selectedExpense.createdAt)}</span></li>}{selectedExpense.voidedAt && <li className="relative before:absolute before:-left-[21px] before:top-1.5 before:size-2.5 before:rounded-full before:bg-negative"><span className="font-medium text-text">Voided</span><span className="block text-xs text-text-2">{shortDate(selectedExpense.voidedAt)}{selectedExpense.voidReason ? ` · ${selectedExpense.voidReason}` : ''}</span></li>}</ol></section>
         </div>}
       </Dialog>

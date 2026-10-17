@@ -16,6 +16,7 @@ export const ATTACHMENT_RECORDS = {
   CUSTOMER: 'customers',
   VENDOR: 'vendors',
   BANK_TRANSACTION: 'bank_transactions',
+  EMPLOYEE: 'employees',
 } as const;
 export type AttachmentRecordType = keyof typeof ATTACHMENT_RECORDS;
 
@@ -79,6 +80,11 @@ function mapAttachment(row: any) {
 
 /** Files attached to the organization's records, kept in Postgres. */
 export class AttachmentService {
+  static async recordTypeForId(orgId: string, id: string) {
+    const { data, error } = await getSupabase().from('attachments').select('record_type').eq('org_id', orgId).eq('id', id).maybeSingle();
+    if (error) throw error;
+    return data?.record_type as AttachmentRecordType | undefined;
+  }
   static async list(orgId: string, recordType: AttachmentRecordType, recordId: string) {
     const { data, error } = await getSupabase()
       .from('attachments')

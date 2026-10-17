@@ -31,6 +31,7 @@ import { registerLawRoutes } from './routes/law';
 import { registerMpesaPublicRoutes, registerMpesaRoutes } from './routes/mpesa';
 import { registerChurchRoutes } from './routes/church';
 import { CourtEventService } from '../src/server/courtEvents';
+import { AttachmentService } from '../src/server/attachments';
 import { RecurringService } from '../src/server/recurring';
 import { allowedOriginsForBrands, brandForHost, configuredBrandHosts } from '../src/utils/publicBrand';
 
@@ -85,6 +86,17 @@ api.use('*', requireAuthenticationAndOrganization);
 api.use('/employees', requirePayrollAccess);
 api.use('/employees/*', requirePayrollAccess);
 api.use('/payroll/*', requirePayrollAccess);
+api.use('/attachments', async (c, next) => {
+  const type = c.req.method === 'POST' ? (await c.req.parseBody()).recordType : c.req.query('recordType');
+  if (type === 'EMPLOYEE') return requirePayrollAccess(c, next);
+  await next();
+});
+for (const path of ['/attachments/:id', '/attachments/:id/download']) {
+  api.use(path, async (c, next) => {
+    if (await AttachmentService.recordTypeForId(c.get('orgId'), c.req.param('id')!) === 'EMPLOYEE') return requirePayrollAccess(c, next);
+    await next();
+  });
+}
 
 registerOrganizationRoutes(api);
 registerTeamRoutes(api);

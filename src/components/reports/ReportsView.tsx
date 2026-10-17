@@ -10,6 +10,7 @@ import { ARAgingView, APAgingView } from './ARAgingView';
 import { GeneralLedgerView } from './GeneralLedgerView';
 import {
   ExpensesBySupplierView,
+  InputVatAtRiskView,
   MonthlyProfitAndLossView,
   PartyStatementView,
   ProfitAndLossByTagView,
@@ -62,6 +63,7 @@ const CONTENTS = [
     section: 'Tax',
     reports: [
       { id: 'Tax Summary (KRA VAT & eTIMS)', name: 'VAT and eTIMS summary', desc: 'Output and input VAT for the period, the net due to KRA, and the eTIMS invoice queue.' },
+      { id: 'Input VAT at risk', name: 'Input VAT at risk', desc: 'Posted purchase VAT with no supplier CU number or exemption reason, by month and supplier.' },
     ],
   },
 ];
@@ -83,6 +85,8 @@ export function ReportsView() {
       return <TrialBalanceView onBack={back} />;
     case 'Tax Summary (KRA VAT & eTIMS)':
       return <TaxSummaryView onBack={back} />;
+    case 'Input VAT at risk':
+      return <InputVatAtRiskView onBack={back} />;
     case 'A/R Aging Summary':
       return <ARAgingView onBack={back} />;
     case 'A/P Aging Summary':

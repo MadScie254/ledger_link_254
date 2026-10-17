@@ -230,7 +230,7 @@ test('a budget measures spending in its own period', async () => {
 });
 
 
-test('payroll taxes allowances, reads rates for the month earned, and refuses a second run of the same month', async () => {
+test('payroll taxes allowances, reads rates for the pay date, and refuses a second run of the same month', async () => {
   const employeeId = await PayrollService.addEmployee(ORG, {
     firstName: 'Wanjiru', lastName: 'Kamau', baseSalaryCents: 5_000_000,
     housingAllowanceCents: 1_000_000, transportAllowanceCents: 500_000, nationalId: '12345678', mpesaNumber: '254700000000',
@@ -241,12 +241,12 @@ test('payroll taxes allowances, reads rates for the month earned, and refuses a 
 
   await refused(PayrollService.addEmployee(ORG, { firstName: 'A', lastName: 'B', housingAllowanceCents: -5 }), /non-negative/);
 
-  // January 2026 paid on 2 February: January's rates (NSSF Year 3), on 65,000 gross.
+  // January 2026 paid on 2 February: the rates in force on the pay date, on 65,000 gross.
   const runId = await PayrollService.runPayroll(ORG, 'jan 2026', '2026-02-02', OWNER);
   const [slip] = await PayrollService.getPayslips(ORG, runId);
-  const expected = calculatePayslip(6_500_000, '2026-01-31');
+  const expected = calculatePayslip(6_500_000, '2026-02-02');
   assert.equal(slip.grossCents, 6_500_000);
-  assert.equal(slip.rateVersion, 'KE-2025-02');
+  assert.equal(slip.rateVersion, 'KE-2026-02');
   assert.equal(slip.payeCents, expected.payeCents);
   assert.equal(slip.nssfCents, expected.nssfCents);
   const [run] = await PayrollService.getPayrollRuns(ORG);

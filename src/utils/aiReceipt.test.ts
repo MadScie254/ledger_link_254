@@ -4,11 +4,11 @@ import { currencyCode, matchVendorName, receiptExpenseLine, receiptFromModel } f
 
 test('a model reply becomes a receipt in hundredths', () => {
   const receipt = receiptFromModel({
-    vendorName: 'MLANGO SUPERMARKET LTD', date: '2026-09-14', total: 1752.5, tax: 241.72, currency: 'KES',
+    vendorName: 'MLANGO SUPERMARKET LTD', date: '2026-09-14', total: 1752.5, tax: 241.72, currency: 'KES', cuInvoiceNumber: 'CU-771',
     items: [{ description: 'Jogoo Maize Flour 2kg', quantity: 2, unitPrice: 189, lineTotal: 378 }],
   }, 'KES');
   assert.deepEqual(receipt, {
-    vendorName: 'MLANGO SUPERMARKET LTD', date: '2026-09-14', totalAmountCents: 175250, taxAmountCents: 24172, currency: 'KES',
+    vendorName: 'MLANGO SUPERMARKET LTD', date: '2026-09-14', totalAmountCents: 175250, taxAmountCents: 24172, currency: 'KES', cuInvoiceNumber: 'CU-771',
     items: [{ description: 'Jogoo Maize Flour 2kg', quantity: 2, unitPriceCents: 18900, totalPriceCents: 37800 }],
   });
 });
@@ -28,6 +28,7 @@ test('a reply without a usable total is refused, and doubtful fields are dropped
   assert.equal(odd.totalAmountCents, 50_000);
   assert.equal(odd.taxAmountCents, null, 'tax larger than the total is not believed');
   assert.equal(odd.currency, 'KES');
+  assert.equal(odd.cuInvoiceNumber, null);
   assert.deepEqual(odd.items, []);
 });
 

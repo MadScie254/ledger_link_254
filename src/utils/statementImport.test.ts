@@ -9,7 +9,16 @@ import {
   parseCsv,
   parseStatementAmount,
   parseStatementDate,
+  savedLayoutFits,
 } from './statementImport.ts';
+
+test('a saved CSV layout applies only when its columns exist in the new file', () => {
+  const rows = parseCsv('Account statement\nDate,Details,Money in,Money out,Ref\n2026-09-15,Deposit,100,,ABC');
+  const saved = { headerRow: 1, mapping: { date: 0, description: 1, moneyIn: 2, moneyOut: 3, reference: 4, dateFormat: 'YMD' as const } };
+  assert.equal(savedLayoutFits(rows, saved), true);
+  assert.equal(savedLayoutFits(rows, { ...saved, headerRow: 0 }), false);
+  assert.equal(savedLayoutFits(rows, { ...saved, mapping: { ...saved.mapping, reference: 5 } }), false);
+});
 
 test('CSV rows keep quoted commas, doubled quotes and line breaks', () => {
   const rows = parseCsv('Date,Details,Amount\r\n15/09/2026,"Payment, ""Acme"" Ltd",1250.00\n16/09/2026,"Two\nlines",-50\n\n');

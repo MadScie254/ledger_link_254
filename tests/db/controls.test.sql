@@ -206,17 +206,17 @@ SELECT pg_temp.expect_err(format($$SELECT public.create_bill_with_journal(%L, %L
 
 -- Payroll: a reversed run frees its month for a corrected run -----------------------
 SELECT public.run_payroll_with_journal(:'org', 'September 2026', '2026-09-30', 'KE-2026-07', :'owner', 'payroll:sep',
-  '00000000-0000-0000-0000-00000000a610', '00000000-0000-0000-0000-00000000a611', :'bank',
+  '00000000-0000-0000-0000-00000000a610', '00000000-0000-0000-0000-00000000a611', '00000000-0000-0000-0000-00000000a216',
   '00000000-0000-0000-0000-00000000a211', '00000000-0000-0000-0000-00000000a212', '00000000-0000-0000-0000-00000000a213', '00000000-0000-0000-0000-00000000a214',
   jsonb_build_array(jsonb_build_object('employeeId', '00000000-0000-0000-0000-0000000000f1', 'grossCents', 100000, 'taxablePayCents', 100000,
     'payeCents', 0, 'nssfCents', 6000, 'shifCents', 2750, 'ahlCents', 1500, 'employerNssfCents', 6000, 'employerAhlCents', 1500,
     'netCents', 89750, 'rateVersion', 'KE-2026-07'))) AS run1 \gset
 SELECT pg_temp.expect_err(format($$SELECT public.run_payroll_with_journal(%L, 'September 2026', '2026-09-30', 'KE-2026-07', %L, 'payroll:other',
-  %L, %L, %L, %L, %L, %L, %L, '[]')$$, :'org', :'owner', '00000000-0000-0000-0000-00000000a610', '00000000-0000-0000-0000-00000000a611', :'bank',
+  %L, %L, %L, %L, %L, %L, %L, '[]')$$, :'org', :'owner', '00000000-0000-0000-0000-00000000a610', '00000000-0000-0000-0000-00000000a611', '00000000-0000-0000-0000-00000000a216',
   '00000000-0000-0000-0000-00000000a211', '00000000-0000-0000-0000-00000000a212', '00000000-0000-0000-0000-00000000a213', '00000000-0000-0000-0000-00000000a214'), 'already been run');
 SELECT public.reverse_payroll_run(:'org', :'run1', '2026-09-30', 'Wrong allowances', :'owner');
 SELECT public.run_payroll_with_journal(:'org', 'September 2026', '2026-09-30', 'KE-2026-07', :'owner', 'payroll:sep',
-  '00000000-0000-0000-0000-00000000a610', '00000000-0000-0000-0000-00000000a611', :'bank',
+  '00000000-0000-0000-0000-00000000a610', '00000000-0000-0000-0000-00000000a611', '00000000-0000-0000-0000-00000000a216',
   '00000000-0000-0000-0000-00000000a211', '00000000-0000-0000-0000-00000000a212', '00000000-0000-0000-0000-00000000a213', '00000000-0000-0000-0000-00000000a214',
   jsonb_build_array(jsonb_build_object('employeeId', '00000000-0000-0000-0000-0000000000f1', 'grossCents', 110000, 'taxablePayCents', 110000,
     'payeCents', 0, 'nssfCents', 6600, 'shifCents', 3025, 'ahlCents', 1650, 'employerNssfCents', 6600, 'employerAhlCents', 1650,

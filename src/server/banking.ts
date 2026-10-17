@@ -3,6 +3,7 @@ import { AccountService } from './accounts';
 import { UserError } from './errors';
 import { publicMessage } from './publicMessage';
 import { fetchAllRows } from './pagination';
+import type { SavedCsvLayout } from '../utils/statementImport';
 import {
   AUTO_ACCEPT_CONFIDENCE,
   CONTROL_ACCOUNT_CODES,
@@ -147,7 +148,14 @@ export class BankingService {
    * (public.import_bank_statement). Lines the account already has, by the
    * bank's reference or by date, amount and particulars, are skipped.
    */
-  static async importStatement(orgId: string, accountId: string, fileName: string | undefined, lines: StatementLineInput[], actor: string) {
+  static async getStatementLayout(orgId: string, accountId: string) {
+    const { data, error } = await getSupabase().from('statement_import_layouts')
+      .select('header_row, mapping').eq('org_id', orgId).eq('bank_account_id', accountId).maybeSingle();
+    if (error) throw error;
+    return data ? { headerRow: data.header_row, mapping: data.mapping } : null;
+  }
+
+  static async importStatement(orgId: string, accountId: string, fileName: string | undefined, lines: StatementLineInput[], actor: string, layout?: SavedCsvLayout) {
     const { data, error } = await getSupabase().rpc('import_bank_statement', {
       p_org_id: orgId,
       p_bank_account_id: accountId,
@@ -161,7 +169,15 @@ export class BankingService {
       p_actor: actor,
     });
     if (error) throw error;
-    return data as { importId: string; lines: number; imported: number; skipped: number; firstDate: string | null; lastDate: string | null };
+    let layoutSaved: boolean | undefined;
+    if (layout) {
+      const saved = await getSupabase().from('statement_import_layouts').upsert({
+        org_id: orgId, bank_account_id: accountId, header_row: layout.headerRow,
+        mapping: layout.mapping, updated_by: actor, updated_at: new Date().toISOString(),
+      }, { onConflict: 'org_id,bank_account_id' });
+      layoutSaved = !saved.error;
+    }
+    return { ...(data as { importId: string; lines: number; imported: number; skipped: number; firstDate: string | null; lastDate: string | null }), layoutSaved };
   }
 
   static async getImports(orgId: string) {
