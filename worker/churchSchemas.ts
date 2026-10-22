@@ -8,11 +8,13 @@ const isoTime = z.string().trim().refine((value) => /^\d{4}-\d{2}-\d{2}T\d{2}:\d
 // --- M-Pesa ----------------------------------------------------------------
 
 export const mpesaIntegrationSchema = z.object({
-  shortcode: z.string().trim().regex(/^[0-9]{5,10}$/, 'Enter the paybill or till number Safaricom gave the church (5 to 10 digits).'),
+  shortcode: z.string().trim().regex(/^[0-9]{5,10}$/, 'Enter the paybill or till number Safaricom gave the organization (5 to 10 digits).'),
   environment: z.enum(['SANDBOX', 'PRODUCTION']),
   consumerKey: text(200),
   consumerSecret: text(200),
   integrationActorId: optionalUuid.nullable(),
+  // A business's M-Pesa money account; account 1050 when left out. Churches send none.
+  moneyAccountId: optionalUuid.nullable(),
 });
 
 export const mpesaStatementSchema = z.object({

@@ -35,6 +35,13 @@ export function SettingsView() {
 
   const queryClient = useQueryClient();
   const [activeTab, setActiveTab] = useState<Tab>('companies');
+  const { settingsTabIntent, setSettingsTabIntent } = useAppStore();
+  // Another page (Integrations) can ask for a tab to open.
+  React.useEffect(() => {
+    if (!settingsTabIntent) return;
+    setActiveTab(settingsTabIntent as Tab);
+    setSettingsTabIntent(null);
+  }, [settingsTabIntent, setSettingsTabIntent]);
   const [isCompanyModalOpen, setIsCompanyModalOpen] = useState(false);
   const [editingOrg, setEditingOrg] = useState<OrganizationData | null>(null);
   const [isRefreshingRates, setIsRefreshingRates] = useState(false);
@@ -43,7 +50,9 @@ export function SettingsView() {
   const [customRateValue, setCustomRateValue] = useState('');
   const [exportProblem, setExportProblem] = useState('');
   const base = activeCompany?.baseCurrency || 'KES';
-  const canManageIntegrations = activeCompany?.edition === 'church' && (activeCompany.role === 'owner' || activeCompany.role === 'admin');
+  // Businesses and Kundi churches link an M-Pesa paybill or till; law organizations have none.
+  const mpesaEdition = activeCompany?.edition === 'church' ? 'church' : (!activeCompany?.edition || activeCompany.edition === 'business') ? 'business' : null;
+  const canManageIntegrations = Boolean(mpesaEdition) && (activeCompany?.role === 'owner' || activeCompany?.role === 'admin');
   const { restartTutorial, isReady: isOnboardingReady } = useOnboarding();
 
   React.useEffect(() => {
@@ -300,7 +309,7 @@ export function SettingsView() {
 
       {activeTab === 'plan' && activeCompany?.edition && activeCompany.edition !== 'business' && <PlanPanel orgId={currentOrgId} />}
 
-      {activeTab === 'integrations' && canManageIntegrations && <IntegrationsPanel orgId={currentOrgId} />}
+      {activeTab === 'integrations' && canManageIntegrations && mpesaEdition && <IntegrationsPanel orgId={currentOrgId} edition={mpesaEdition} baseCurrency={base} />}
 
       {activeTab === 'controls' && activeCompany && <ControlsPanel company={activeCompany} onSaved={() => refetchOrgs()} />}
 

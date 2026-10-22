@@ -19,6 +19,7 @@ enterprises operating across multiple currencies (KES, USD, EUR, GBP, UGX, TZS).
 - 🧾 **Sales** — estimates, sales orders, invoices, sales receipts, credit notes and refunds, recurring invoices on a daily schedule, customer statements
 - 🛒 **Purchases** — purchase orders billed as goods arrive, multi-line bills with stock items, expenses paid on the spot, supplier credits, bill approval, recurring bills
 - 🏦 **Banking** — statement import (CSV with M-Pesa layouts, OFX, QFX) for every bank, cash and M-Pesa account, AI-assisted matching, transfers, and reconciliation to statement balances
+- 📲 **M-Pesa payments (pilot)** — a business's paybill or till linked through Daraja C2B: each payment lands once on the M-Pesa account and settles the open invoice whose number the customer typed; the rest wait in Banking with the reason
 - 💰 **Payroll** — Kenyan PAYE, NSSF, SHA and Housing Levy, with reversible runs
 - 📦 **Inventory** — every stock change recorded as a movement; purchases, returns, sales and counts
 - 🏷️ **Classes and locations** — tag postings by line of business or branch and cut the P&L by either

@@ -3,6 +3,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { apiRequest } from '../../utils/apiRequest';
 import { EmptyNote, buttonClass } from '../ledger/Page';
 import { Field } from '../ledger/Dialog';
+import { Amount } from '../ledger/Amount';
 
 interface MpesaSettings {
   configured: boolean;
@@ -14,13 +15,32 @@ interface MpesaSettings {
   hasCredentials: boolean;
   hasCallbackUrls: boolean;
   integrationActorId: string | null;
+  /** A business's M-Pesa money account. */
+  moneyAccountId?: string | null;
 }
 
+interface MpesaPayment {
+  id: string;
+  transId: string;
+  transTime: string;
+  amountCents: number;
+  accountNumber: string | null;
+  payerName: string | null;
+  outcome: 'WAITING' | 'SETTLED';
+  note: string | null;
+  invoiceNumber: string | null;
+}
+
+type Edition = 'business' | 'church';
+
 const copy = {
-  heading: { en: 'M-Pesa giving', sw: 'TODO-SW' },
+  heading: { church: { en: 'M-Pesa giving', sw: 'TODO-SW' }, business: { en: 'M-Pesa payments', sw: 'TODO-SW' } },
   save: { en: 'Save M-Pesa settings', sw: 'TODO-SW' },
   register: { en: 'Register URLs with Safaricom', sw: 'TODO-SW' },
-  empty: { en: 'No M-Pesa settings yet. Enter the church\'s paybill and Daraja keys to start.', sw: 'TODO-SW' },
+  empty: {
+    church: { en: 'No M-Pesa settings yet. Enter the church\'s paybill and Daraja keys to start.', sw: 'TODO-SW' },
+    business: { en: 'No M-Pesa settings yet. Enter the business\'s paybill or till and Daraja keys to start.', sw: 'TODO-SW' },
+  },
 };
 
 const when = (value: string) => new Intl.DateTimeFormat('en-KE', {
@@ -28,11 +48,14 @@ const when = (value: string) => new Intl.DateTimeFormat('en-KE', {
 }).format(new Date(value));
 
 /**
- * Settings, Integrations: the church's Daraja C2B link. Owners and admins
- * only. The consumer key and secret are sent once, kept in Supabase Vault
- * and never shown again; Safaricom is called from the server.
+ * Settings, Integrations: the organization's Daraja C2B link. Owners and
+ * admins only. The consumer key and secret are sent once, kept in Supabase
+ * Vault and never shown again; Safaricom is called from the server. A
+ * church's payments are gifts placed by its giving rules; a business's land
+ * on its M-Pesa account and settle the invoice their account number names.
  */
-export function IntegrationsPanel({ orgId }: { orgId: string }) {
+export function IntegrationsPanel({ orgId, edition, baseCurrency }: { orgId: string; edition: Edition; baseCurrency: string }) {
+  const isBusiness = edition === 'business';
   const queryClient = useQueryClient();
   const settings = useQuery({
     queryKey: ['mpesa-integration', orgId],
@@ -42,27 +65,47 @@ export function IntegrationsPanel({ orgId }: { orgId: string }) {
     queryKey: ['team', orgId],
     queryFn: () => apiRequest<{ members: Array<{ userId: string; email: string; role: string }> }>('/api/team', { fallback: 'The team could not be loaded.' }),
   });
+  const accounts = useQuery({
+    queryKey: ['accounts', orgId],
+    queryFn: () => apiRequest<{ accounts: Array<{ id: string; code: string; name: string; currency: string; isBankAccount: boolean; isActive: boolean }> }>('/api/accounts'),
+    enabled: isBusiness,
+  });
   const [shortcode, setShortcode] = useState('');
   const [environment, setEnvironment] = useState<'SANDBOX' | 'PRODUCTION'>('SANDBOX');
   const [consumerKey, setConsumerKey] = useState('');
   const [consumerSecret, setConsumerSecret] = useState('');
   const [actor, setActor] = useState('');
+  const [moneyAccountId, setMoneyAccountId] = useState('');
   const [notice, setNotice] = useState('');
   const [problem, setProblem] = useState('');
   const [urls, setUrls] = useState<{ confirmationUrl: string; validationUrl: string } | null>(null);
+
+  const moneyAccounts = (accounts.data?.accounts || [])
+    .filter((account) => account.isBankAccount && account.isActive && account.currency.toUpperCase() === baseCurrency.toUpperCase());
 
   useEffect(() => {
     if (!settings.data) return;
     setShortcode(settings.data.shortcode || '');
     setEnvironment(settings.data.environment);
     setActor(settings.data.integrationActorId || '');
+    setMoneyAccountId(settings.data.moneyAccountId || '');
   }, [settings.data]);
+
+  // Before anything is saved, a business's payments go to account 1050 if it has one.
+  useEffect(() => {
+    if (!isBusiness || moneyAccountId || settings.data?.moneyAccountId) return;
+    const mpesa = moneyAccounts.find((account) => account.code === '1050');
+    if (mpesa) setMoneyAccountId(mpesa.id);
+  }, [isBusiness, moneyAccountId, settings.data?.moneyAccountId, moneyAccounts]);
 
   const refresh = () => queryClient.invalidateQueries({ queryKey: ['mpesa-integration', orgId] });
   const save = useMutation({
     mutationFn: () => apiRequest<MpesaSettings>('/api/integrations/mpesa', {
       method: 'PUT',
-      body: { shortcode, environment, consumerKey, consumerSecret, integrationActorId: actor || null },
+      body: {
+        shortcode, environment, consumerKey, consumerSecret, integrationActorId: actor || null,
+        ...(isBusiness ? { moneyAccountId: moneyAccountId || null } : {}),
+      },
       fallback: 'The M-Pesa settings were not saved.',
     }),
     onSuccess: () => {
@@ -102,19 +145,25 @@ export function IntegrationsPanel({ orgId }: { orgId: string }) {
 
   return <section aria-labelledby="mpesa-heading" className="max-w-3xl space-y-5">
     <div className="border-t-2 border-ink-900 pt-5">
-      <h2 id="mpesa-heading" className="ll-heading text-[22px] text-ink-900">{copy.heading.en}</h2>
-      <p className="mt-2 text-[13.5px] text-graphite-600">
+      <h2 id="mpesa-heading" className="ll-heading text-[22px] text-ink-900">{copy.heading[edition].en}</h2>
+      {isBusiness ? <p className="mt-2 text-[13.5px] text-graphite-600">
+        When a customer pays the business&apos;s paybill or till, Safaricom sends the payment here. Ledger Link adds it once to the
+        M-Pesa account&apos;s statement lines; the same receipt in a statement uploaded later is skipped. When the account number
+        the customer typed is an open invoice&apos;s number (INV-2026-00042, or INV202600042), the payment settles that invoice.
+        Any other payment, and any till payment, waits in Banking for a person to match. Matching reads the account number only:
+        Safaricom masks the payer&apos;s phone number.
+      </p> : <p className="mt-2 text-[13.5px] text-graphite-600">
         When someone pays the church&apos;s paybill, Safaricom sends the payment here. Ledger Link keeps the receipt and posts it
         to the member and fund its account reference names. A receipt the giving rules cannot place waits in Giving, Queue.
         Matching reads the account reference only: Safaricom masks the payer&apos;s phone number.
-      </p>
+      </p>}
       <p className="mt-2 text-[13px] text-ink-900"><span className="font-semibold">Status:</span> {status}</p>
       {current.lastError && <p className="mt-1 text-[13px] text-ledger-red">Last attempt: {current.lastError}</p>}
     </div>
-    {!current.configured && <EmptyNote>{copy.empty.en}</EmptyNote>}
+    {!current.configured && <EmptyNote>{copy.empty[edition].en}</EmptyNote>}
 
     <form className="grid gap-4 sm:grid-cols-2" onSubmit={(event) => { event.preventDefault(); save.mutate(); }}>
-      <Field label="Paybill or till number" hint="The shortcode Safaricom gave the church.">
+      <Field label="Paybill or till number" hint={`The shortcode Safaricom gave the ${isBusiness ? 'business' : 'church'}.`}>
         <input value={shortcode} onChange={(e) => setShortcode(e.target.value)} inputMode="numeric" required />
       </Field>
       <Field label="Daraja environment" hint="Try a sandbox payment before switching to production.">
@@ -123,16 +172,29 @@ export function IntegrationsPanel({ orgId }: { orgId: string }) {
           <option value="PRODUCTION">Production (live payments)</option>
         </select>
       </Field>
-      <Field label="Consumer key" hint={current.hasCredentials ? 'Saved. Leave blank to keep it.' : 'From the church\'s app on the Daraja portal.'}>
+      <Field label="Consumer key" hint={current.hasCredentials ? 'Saved. Leave blank to keep it.' : `From the ${isBusiness ? 'business' : 'church'}'s app on the Daraja portal.`}>
         <input value={consumerKey} onChange={(e) => setConsumerKey(e.target.value)} autoComplete="off" type="password" />
       </Field>
       <Field label="Consumer secret" hint="Kept in Supabase Vault and never shown again.">
         <input value={consumerSecret} onChange={(e) => setConsumerSecret(e.target.value)} autoComplete="off" type="password" />
       </Field>
+      {isBusiness && <div className="sm:col-span-2">
+        <Field label="Payments land in" hint={`A bank, cash or M-Pesa account in ${baseCurrency}. Import this account's M-Pesa statements here too.`}>
+          <select value={moneyAccountId} onChange={(e) => setMoneyAccountId(e.target.value)} required>
+            <option value="">Choose an account</option>
+            {moneyAccounts.map((account) => <option key={account.id} value={account.id}>{account.code} · {account.name}</option>)}
+          </select>
+        </Field>
+      </div>}
       <div className="sm:col-span-2">
-        <Field label="Post M-Pesa giving in the name of" hint="An owner, admin or accountant. With no one named, every receipt waits in the queue.">
+        <Field
+          label={isBusiness ? 'Settle invoices in the name of' : 'Post M-Pesa giving in the name of'}
+          hint={isBusiness
+            ? 'An owner, admin or accountant. With no one named, every payment waits in Banking.'
+            : 'An owner, admin or accountant. With no one named, every receipt waits in the queue.'}
+        >
           <select value={actor} onChange={(e) => setActor(e.target.value)}>
-            <option value="">No one: every receipt waits in the queue</option>
+            <option value="">{isBusiness ? 'No one: every payment waits in Banking' : 'No one: every receipt waits in the queue'}</option>
             {posters.map((member) => <option key={member.userId} value={member.userId}>{member.email} ({member.role})</option>)}
           </select>
         </Field>
@@ -164,7 +226,77 @@ export function IntegrationsPanel({ orgId }: { orgId: string }) {
     </div>}
     <p className="text-[12.5px] text-graphite-600">
       In production Safaricom registers a paybill&apos;s URLs once; changing them later goes through Safaricom.
-      Churches without Daraja access can upload the M-Pesa statement in Giving instead.
+      {isBusiness
+        ? ' A business without Daraja access can import its M-Pesa statement in Banking, Import statement.'
+        : ' Churches without Daraja access can upload the M-Pesa statement in Giving instead.'}
     </p>
+    {isBusiness && current.configured && <RecentPayments orgId={orgId} currency={baseCurrency} />}
   </section>;
+}
+
+/** What Safaricom sent, newest first, with the invoice each settled or why it waits. */
+function RecentPayments({ orgId, currency }: { orgId: string; currency: string }) {
+  const queryClient = useQueryClient();
+  const payments = useQuery({
+    queryKey: ['mpesa-payments', orgId],
+    queryFn: () => apiRequest<{ payments: MpesaPayment[] }>('/api/integrations/mpesa/payments', { fallback: 'The M-Pesa payments could not be loaded.' }),
+  });
+  const [message, setMessage] = useState('');
+  const settle = useMutation({
+    mutationFn: (id: string) => apiRequest<{ outcome: 'SETTLED' | 'WAITING'; invoiceNumber?: string; journalEntryId?: string; note?: string }>(
+      `/api/integrations/mpesa/payments/${id}/settle`, { method: 'POST', body: {}, fallback: 'The payment was not settled.' }),
+    onSuccess: (result) => {
+      setMessage(result.outcome === 'SETTLED'
+        ? `${result.invoiceNumber} settled. Journal entry ${result.journalEntryId}.`
+        : result.note || 'The payment still waits in Banking.');
+      queryClient.invalidateQueries({ queryKey: ['mpesa-payments', orgId] });
+      queryClient.invalidateQueries({ queryKey: ['invoices', orgId] });
+      queryClient.invalidateQueries({ queryKey: ['bank_transactions', orgId] });
+      queryClient.invalidateQueries({ queryKey: ['banking-transactions', orgId] });
+    },
+    onError: (err: Error) => setMessage(err.message),
+  });
+
+  return <div className="space-y-2 border-t border-feint-strong pt-4">
+    <h3 className="text-sm font-semibold text-text">Payments received</h3>
+    {payments.isLoading && <p role="status" className="text-[13px] text-graphite-600">Loading payments</p>}
+    {payments.isError && <p className="text-[13px] text-ledger-red">{(payments.error as Error).message}</p>}
+    {payments.data && payments.data.payments.length === 0 && (
+      <p className="text-[13px] text-graphite-600">No M-Pesa payments have arrived yet. The first one appears here and in Banking.</p>
+    )}
+    {payments.data && payments.data.payments.length > 0 && <div className="overflow-x-auto">
+      <table className="w-full min-w-[40rem] text-[13px]">
+        <caption className="sr-only">M-Pesa payments received</caption>
+        <thead>
+          <tr className="border-b border-feint-strong text-left text-graphite-600">
+            <th scope="col" className="py-1.5 pr-3 font-normal">Received</th>
+            <th scope="col" className="py-1.5 pr-3 font-normal">Receipt</th>
+            <th scope="col" className="py-1.5 pr-3 font-normal">From and account number</th>
+            <th scope="col" className="py-1.5 pr-3 text-right font-normal">Amount</th>
+            <th scope="col" className="py-1.5 font-normal">Outcome</th>
+          </tr>
+        </thead>
+        <tbody>
+          {payments.data.payments.map((payment) => <tr key={payment.id} className="border-b border-feint align-top">
+            <td className="py-1.5 pr-3 whitespace-nowrap">{when(payment.transTime)}</td>
+            <td className="py-1.5 pr-3 font-mono text-[12px]">{payment.transId}</td>
+            <td className="py-1.5 pr-3">{payment.payerName || 'Name not sent'}{payment.accountNumber ? ` · ${payment.accountNumber}` : ''}</td>
+            <td className="py-1.5 pr-3 text-right"><Amount cents={payment.amountCents} currency={currency} tone="ink" /></td>
+            <td className="py-1.5">
+              {payment.outcome === 'SETTLED'
+                ? <span className="text-ink-900">Settled {payment.invoiceNumber}</span>
+                : <span className="text-graphite-600">
+                    {payment.note || 'Waits in Banking.'}{' '}
+                    <button type="button" className={buttonClass.quiet} disabled={settle.isPending}
+                      onClick={() => { setMessage(''); settle.mutate(payment.id); }}>
+                      Settle from the account number
+                    </button>
+                  </span>}
+            </td>
+          </tr>)}
+        </tbody>
+      </table>
+    </div>}
+    <div aria-live="polite">{message && <p className="text-[13px] text-ink-900">{message}</p>}</div>
+  </div>;
 }

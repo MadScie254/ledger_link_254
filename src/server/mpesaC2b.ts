@@ -1,8 +1,9 @@
 import { getSupabase } from './supabase';
 import { UserError } from './errors';
 import { GivingService, type AutoPostResult, type KeptReceipt } from './giving';
+import { MpesaPaymentService, type KeptPayment, type SettleOutcome } from './mpesaPayments';
 import {
-  CALLBACK_TOKEN_PATTERN, callbackUrls, constantTimeEqual, forbiddenUrlWords, parseC2bConfirmation,
+  CALLBACK_TOKEN_PATTERN, callbackUrls, constantTimeEqual, forbiddenUrlWords, parseC2bConfirmation, type MpesaEdition,
 } from '../utils/mpesaC2b';
 import type { StatementCharge, StatementGift } from '../utils/mpesaStatement';
 
@@ -25,12 +26,20 @@ export interface CallbackTarget {
   orgId: string;
   shortcode: string | null;
   integrationActorId: string | null;
+  edition: MpesaEdition;
+  moneyAccountId: string | null;
 }
 
+/**
+ * A church's confirmation is a gift receipt (kept); a business's is a
+ * payment on its M-Pesa account (kept-payment). Either is kept before
+ * Safaricom is answered; process() places or settles it afterwards.
+ */
 export type ConfirmationOutcome =
   | { status: 'unknown-token' }
   | { status: 'unreadable'; reason: string }
-  | { status: 'kept'; orgId: string; receipt: KeptReceipt; process: () => Promise<AutoPostResult> };
+  | { status: 'kept'; orgId: string; receipt: KeptReceipt; process: () => Promise<AutoPostResult> }
+  | { status: 'kept-payment'; orgId: string; payment: KeptPayment; process: () => Promise<SettleOutcome> };
 
 export interface IntegrationSettingsInput {
   shortcode: string;
@@ -38,6 +47,18 @@ export interface IntegrationSettingsInput {
   consumerKey?: string;
   consumerSecret?: string;
   integrationActorId: string | null;
+  /** A business's M-Pesa money account; account 1050 when left out. */
+  moneyAccountId?: string | null;
+}
+
+/** The organization's edition, for the URLs Safaricom is given; law organizations have no M-Pesa link. */
+export async function mpesaEdition(orgId: string): Promise<MpesaEdition> {
+  const { data, error } = await getSupabase().from('organizations').select('edition').eq('id', orgId).maybeSingle();
+  if (error) throw error;
+  if (data?.edition !== 'business' && data?.edition !== 'church') {
+    throw new UserError('M-Pesa links are available to business and Kundi church organizations.', 403);
+  }
+  return data.edition;
 }
 
 async function withTimeout(url: string, init: RequestInit): Promise<Response> {
@@ -54,7 +75,7 @@ const darajaMessage = (body: any, fallback: string) =>
   String(body?.errorMessage || body?.ResponseDescription || body?.error_description || fallback).slice(0, 300);
 
 export class MpesaC2bService {
-  /** The church a callback token belongs to, or null. Only the token's SHA-256 is stored. */
+  /** The organization a callback token belongs to, or null. Only the token's SHA-256 is stored. */
   static async target(token: string): Promise<CallbackTarget | null> {
     if (!CALLBACK_TOKEN_PATTERN.test(token)) return null;
     const hash = await sha256(token);
@@ -62,13 +83,18 @@ export class MpesaC2bService {
     if (error) throw error;
     const row = Array.isArray(data) ? data[0] : data;
     if (!row || !constantTimeEqual(String(row.token_hash ?? ''), hash)) return null;
-    return { orgId: row.org_id, shortcode: row.shortcode, integrationActorId: row.integration_actor_id };
+    return {
+      orgId: row.org_id, shortcode: row.shortcode, integrationActorId: row.integration_actor_id,
+      edition: row.edition === 'business' ? 'business' : 'church', moneyAccountId: row.money_account_id ?? null,
+    };
   }
 
   /**
-   * A C2B confirmation: the receipt is kept before Safaricom is answered, so
-   * nothing is lost if posting fails; matching and posting run afterwards
-   * (process), and a receipt they cannot place waits in the queue.
+   * A C2B confirmation: the receipt or payment is kept before Safaricom is
+   * answered, so nothing is lost if posting fails; matching and posting run
+   * afterwards (process). A church's receipt the rules cannot place waits in
+   * the giving queue; a business's payment that settles no invoice waits in
+   * Banking.
    */
   static async receiveConfirmation(token: string, body: unknown): Promise<ConfirmationOutcome> {
     const target = await MpesaC2bService.target(token);
@@ -76,6 +102,19 @@ export class MpesaC2bService {
     const parsed = parseC2bConfirmation(body);
     if ('reason' in parsed) return { status: 'unreadable', reason: parsed.reason };
     const { receipt } = parsed;
+    if (target.edition === 'business') {
+      const payment = await MpesaPaymentService.keep(target.orgId, 'C2B_CALLBACK', {
+        transId: receipt.transId, transTime: receipt.transTime, amountCents: receipt.amountCents,
+        billRefNumber: receipt.billRefNumber, msisdn: receipt.msisdn, payerName: receipt.firstName,
+        shortcode: receipt.shortcode, transactionType: receipt.transactionType, raw: body,
+      });
+      return {
+        status: 'kept-payment',
+        orgId: target.orgId,
+        payment,
+        process: () => MpesaPaymentService.settle(target.orgId, payment.id, target.integrationActorId),
+      };
+    }
     const { data, error } = await getSupabase().rpc('ingest_mpesa_receipts', {
       p_org_id: target.orgId,
       p_source: 'C2B_CALLBACK',
@@ -136,14 +175,17 @@ export class MpesaC2bService {
     };
   }
 
-  /** What the Settings page shows. Never the consumer key or secret. */
+  /**
+   * What the Settings page shows. Never the consumer key or secret. A
+   * business also sees the money account its payments land in.
+   */
   static async settings(orgId: string) {
     const supabase = getSupabase();
     const [integration, organization] = await Promise.all([
       supabase.from('org_integrations')
-        .select('id,shortcode,environment,status,registered_at,last_error,vault_secret_id,callback_token_hash,updated_at')
+        .select('id,shortcode,environment,status,registered_at,last_error,vault_secret_id,callback_token_hash,money_account_id,updated_at')
         .eq('org_id', orgId).eq('kind', 'MPESA_C2B').maybeSingle(),
-      supabase.from('organizations').select('integration_actor_id').eq('id', orgId).maybeSingle(),
+      supabase.from('organizations').select('integration_actor_id, edition').eq('id', orgId).maybeSingle(),
     ]);
     if (integration.error) throw integration.error;
     if (organization.error) throw organization.error;
@@ -158,6 +200,7 @@ export class MpesaC2bService {
       hasCredentials: Boolean(row?.vault_secret_id),
       hasCallbackUrls: Boolean(row?.callback_token_hash),
       integrationActorId: organization.data?.integration_actor_id ?? null,
+      ...(organization.data?.edition === 'business' ? { moneyAccountId: (row?.money_account_id ?? null) as string | null } : {}),
     };
   }
 
@@ -170,6 +213,7 @@ export class MpesaC2bService {
       p_consumer_secret: input.consumerSecret || null,
       p_integration_actor_id: input.integrationActorId,
       p_created_by: userId,
+      p_money_account_id: input.moneyAccountId || null,
     });
     if (error) throw error;
     return data as { id: string; hasCredentials: boolean };
@@ -181,26 +225,29 @@ export class MpesaC2bService {
   }
 
   /**
-   * New callback URLs, shown once, for a church that registers them with
-   * Safaricom itself. The URLs carry a fresh token; the old ones stop working.
+   * New callback URLs, shown once, for an organization that registers them
+   * with Safaricom itself. The URLs carry a fresh token; the old ones stop
+   * working.
    */
   static async issueCallbackUrls(orgId: string, userId: string, origin: string) {
+    const edition = await mpesaEdition(orgId);
     const token = newToken();
     const { error } = await getSupabase().rpc('set_mpesa_callback_token', {
       p_org_id: orgId, p_token_hash: await sha256(token), p_created_by: userId,
     });
     if (error) throw error;
-    return callbackUrls(origin, token);
+    return callbackUrls(origin, token, edition);
   }
 
   /**
-   * Registers the church's confirmation and validation URLs with Daraja
-   * (C2B Register URL), with the consumer key and secret read from Vault
-   * here in the Worker. A fresh token goes into the URLs; it replaces the
-   * old one only when Safaricom accepts them.
+   * Registers the organization's confirmation and validation URLs with
+   * Daraja (C2B Register URL), with the consumer key and secret read from
+   * Vault here in the Worker. A fresh token goes into the URLs; it replaces
+   * the old one only when Safaricom accepts them.
    */
   static async register(orgId: string, userId: string, origin: string) {
     const supabase = getSupabase();
+    const edition = await mpesaEdition(orgId);
     const { data, error } = await supabase.rpc('mpesa_integration_credentials', { p_org_id: orgId });
     if (error) throw error;
     const credentials = (Array.isArray(data) ? data[0] : data) as
@@ -208,12 +255,12 @@ export class MpesaC2bService {
     if (!credentials?.consumer_key || !credentials.consumer_secret) {
       throw new UserError('Save the Daraja consumer key and secret first.', 409);
     }
-    if (!credentials.shortcode) throw new UserError('Save the church\'s paybill or till number first.', 409);
+    if (!credentials.shortcode) throw new UserError('Save the paybill or till number first.', 409);
     if (credentials.environment === 'PRODUCTION' && !origin.startsWith('https://')) {
       throw new UserError('Safaricom only calls https:// addresses in production. Set PUBLIC_API_ORIGIN to the https address of this app.', 409);
     }
     const token = newToken();
-    const urls = callbackUrls(origin, token);
+    const urls = callbackUrls(origin, token, edition);
     const refused = forbiddenUrlWords(urls.confirmationUrl);
     if (refused.length) {
       throw new UserError(`Daraja refuses URLs containing ${refused.join(', ')}. Serve the app from an address without ${refused.length === 1 ? 'that word' : 'those words'}.`, 409);

@@ -1,10 +1,13 @@
 import type { Context, Hono, Next } from 'hono';
-import { MpesaC2bService } from '../../src/server/mpesaC2b';
+import { MpesaC2bService, mpesaEdition } from '../../src/server/mpesaC2b';
+import { MpesaPaymentService } from '../../src/server/mpesaPayments';
 import { assertChurchEdition } from '../../src/server/churchAccess';
+import { UserError } from '../../src/server/errors';
 import { C2B_ACCEPTED, C2B_MAX_BODY_BYTES, C2B_REJECTED } from '../../src/utils/mpesaC2b';
 import { requireOrganizationAdministrator, type Variables } from '../auth';
 import { bodyOf, logError, respondError } from '../http';
 import { mpesaIntegrationSchema, mpesaStatementSchema } from '../churchSchemas';
+import { uuid } from '../schemas';
 import type { Api } from './types';
 
 type Input<F extends (...args: any[]) => any, N extends number> = Parameters<F>[N];
@@ -12,6 +15,22 @@ type Input<F extends (...args: any[]) => any, N extends number> = Parameters<F>[
 export async function requireChurchEdition(c: Context<{ Variables: Variables }>, next: Next) {
   try { await assertChurchEdition(c.get('orgId')); }
   catch (err) { return respondError(c, err); }
+  await next();
+}
+
+/** Businesses and Kundi churches link an M-Pesa paybill or till; law organizations do not. */
+export async function requireMpesaEdition(c: Context<{ Variables: Variables }>, next: Next) {
+  try { await mpesaEdition(c.get('orgId')); }
+  catch (err) { return respondError(c, err); }
+  await next();
+}
+
+async function requireBusinessEdition(c: Context<{ Variables: Variables }>, next: Next) {
+  try {
+    if (await mpesaEdition(c.get('orgId')) !== 'business') {
+      throw new UserError('M-Pesa payments are kept for business organizations. A church reads its receipts in Giving.', 403);
+    }
+  } catch (err) { return respondError(c, err); }
   await next();
 }
 
@@ -33,11 +52,13 @@ function callerAllowed(c: Context) {
 
 /**
  * Safaricom's C2B callbacks, outside sign-in: the token in the path names
- * the church. Validation always accepts (Kundi takes every gift). The
- * confirmation is kept, answered, then matched and posted.
+ * the organization, whichever of the paths it arrives on. Validation always
+ * accepts (a church takes every gift; a business takes every payment and
+ * sorts it afterwards). The confirmation is kept, answered, then matched
+ * and posted.
  */
 export function registerMpesaPublicRoutes(app: Hono<any>) {
-  for (const base of ['/api/public/mpesa/c2b/:token', '/api/public/giving/c2b/:token']) {
+  for (const base of ['/api/public/mpesa/c2b/:token', '/api/public/giving/c2b/:token', '/api/public/payments/c2b/:token']) {
     app.post(`${base}/validation`, (c) => c.json(C2B_ACCEPTED));
     app.post(`${base}/confirmation`, async (c) => {
       try {
@@ -63,9 +84,21 @@ export function registerMpesaPublicRoutes(app: Hono<any>) {
 }
 
 export function registerMpesaRoutes(api: Api) {
-  api.use('/integrations/mpesa', requireChurchEdition);
-  api.use('/integrations/mpesa/*', requireChurchEdition);
+  api.use('/integrations/mpesa', requireMpesaEdition);
+  api.use('/integrations/mpesa/*', requireMpesaEdition);
   api.use('/mpesa/*', requireChurchEdition);
+
+  // A business's payments: what arrived, and why any waits in Banking.
+  api.get('/integrations/mpesa/payments', requireOrganizationAdministrator, requireBusinessEdition, async (c) => {
+    try { return c.json({ payments: await MpesaPaymentService.recent(c.get('orgId')) }); }
+    catch (err) { return respondError(c, err); }
+  });
+  // Try again once the invoice exists or the books allow it, in the asker's name.
+  api.post('/integrations/mpesa/payments/:id/settle', requireOrganizationAdministrator, requireBusinessEdition, async (c) => {
+    try {
+      return c.json(await MpesaPaymentService.settle(c.get('orgId'), uuid.parse(c.req.param('id')), c.get('userId')));
+    } catch (err) { return respondError(c, err); }
+  });
 
   api.get('/integrations/mpesa', requireOrganizationAdministrator, async (c) => {
     try { return c.json(await MpesaC2bService.settings(c.get('orgId'))); }

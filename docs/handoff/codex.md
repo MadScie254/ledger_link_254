@@ -23,6 +23,15 @@
   - New SQL suite `tests/db/payroll_and_close_review.test.sql`; it fails against the migration stack without this migration. `npm run lint` and `npm test` (210 tests) passed. On local PostgreSQL 16.15 (Ubuntu 24.04 package) with PostgREST 12.2.3, `npm run test:db` passed all 35 SQL files and `npm run test:integration` passed all 16 suites.
   - Checked and left as they are: the payroll arithmetic for reliefs and caps (insurance relief is 15 percent of premiums with the relief capped at KES 5,000 a month), Input VAT at risk sums base-currency tax (bill `tax_cents` is stored in the base currency), statement layouts, account 2165 in the standard chart for new organizations, and the payroll and year-end routes' access checks.
 
+- Package 9 (Claude, 22 October 2026): live M-Pesa for business organizations, roadmap "Next" item 2 and spec section 3.3. Migration `20261022000200_business_mpesa_payments.sql`:
+  - The church-only Daraja C2B link now serves businesses too: `org_integrations` gains `money_account_id`, its edition trigger admits `business` and `church`, `save_mpesa_integration` gains `p_money_account_id` (default account 1050, which must be an active money account in the base currency), and `mpesa_callback_target` returns the edition and money account. Law organizations have no M-Pesa link.
+  - `public.mpesa_payments` keeps each business confirmation once per `TransID`, with the body as sent, and links the statement line it made or found on the money account. The line uses the receipt number as an uploaded M-Pesa statement does (`reference`, import key `ref:` + code), so the same receipt is never added twice in either order.
+  - `public.settle_mpesa_payment` settles through `match_bank_transaction` only when the account number, with spaces, hyphens and case ignored, is exactly one open base-currency invoice's number and the payment is no more than its amount due. Otherwise the payment waits in Banking with its reason in `outcome_note`. It runs in the name of `organizations.integration_actor_id`; with no actor every payment waits.
+  - Worker: `MpesaC2bService.receiveConfirmation` branches by edition (`kept` for churches, `kept-payment` for businesses); `src/server/mpesaPayments.ts` keeps, settles and lists payments; businesses register `/api/public/payments/c2b/<token>/...`, and the Worker answers all three callback paths. Routes: the M-Pesa settings routes admit business and church; `GET /api/integrations/mpesa/payments` and `POST /api/integrations/mpesa/payments/:id/settle` (owners and admins of a business).
+  - Interface: Settings, Integrations opens for business owners and admins, with the money account, the posting member and the latest payments with their outcome and a "Settle from the account number" action. Integrations lists M-Pesa Business as built and opens that Settings tab (`settingsTabIntent` in the store). PRODUCT.md, the README, the landing page (marked pilot) and `docs/mpesa-c2b-fields.md` describe what is built.
+  - Tests: `tests/db/business_mpesa.test.sql`, `tests/integration/business_mpesa.test.ts` (callbacks through the Worker's public routes), and unit tests for the business URL and account-number compaction. `npm run lint` and `npm test` (212 tests) passed; on PostgreSQL 16.15 with PostgREST 12.2.3, `npm run test:db` passed all 36 SQL files and the 17 integration suites passed (the run was interrupted once by a file move in this session and the remaining 8 suites were rerun by name).
+  - Not checked in the Daraja sandbox: this session cannot reach Safaricom and has no Daraja keys. `docs/mpesa-c2b-fields.md` lists the sandbox steps, now for businesses too.
+
 ## In progress
 
 - No code is half done. GitHub Actions remain locked by the account's billing issue, so no CI job has run on PR #11 or on this branch. The local runs above stand in for CI until the lock is lifted.
@@ -31,6 +40,8 @@
 
 - Lift the GitHub Actions billing lock and let CI run on the review branch before merging it.
 - Production already holds migrations 20261011000100 to 000700 if Supabase applied them with the merge of PR #11. `supabase migration list` shows whether it did; the review migration then applies on top.
+- Before telling a business that invoices settle on their own: run the Daraja sandbox check in `docs/mpesa-c2b-fields.md` for a business, and set `MPESA_CALLBACK_IPS` from Safaricom's current list. Safaricom does not sign callbacks, so a forged confirmation with a valid token could settle an invoice; reconciling the M-Pesa account shows it.
+- The Integrations settings copy keeps its `sw: 'TODO-SW'` placeholders; real Swahili has to come from a person (PRODUCT.md, Brand Commitments).
 
 ## Open questions and unverified figures
 

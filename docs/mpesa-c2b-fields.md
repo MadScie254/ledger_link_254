@@ -92,6 +92,43 @@ in the queue.
   callers from any other address are refused. Get the current list from
   Safaricom rather than from memory.
 
+## Businesses (from 22 October 2026)
+
+A business links its paybill or till the same way, in Settings, Integrations,
+and also chooses the money account its payments land in (account 1050 unless
+another is chosen). The same sandbox check applies before a business is told
+invoices will settle on their own; the `raw` column of `public.mpesa_payments`
+keeps each body as Safaricom sent it.
+
+- Registered URLs are `/api/public/payments/c2b/<token>/confirmation` and
+  `/validation`. The Worker answers every one of the three paths for any
+  token; the token alone names the organization.
+- `public.receive_mpesa_payment` keeps each confirmation once per business per
+  `TransID` (`mpesa_payments`) and adds one statement line to the chosen
+  account, with `reference` = `TransID` and the import key a statement upload
+  gives the same receipt number (`ref:` + the code in lower case). The same
+  payment in a later M-Pesa statement CSV is skipped; a line uploaded before
+  the callback is the one the payment links to. The line is dated in Nairobi
+  time.
+- `public.settle_mpesa_payment` settles an invoice only when `BillRefNumber`,
+  with spaces, hyphens and case ignored, is exactly one open invoice's number
+  (`INV-2026-00042`, `inv 2026 00042` and `INV202600042` all fit), the invoice
+  is in the base currency and the payment is no more than the amount due. It
+  calls `match_bank_transaction`, so the payment, the receivable and the
+  statement line move together, in the name of the organization's integration
+  actor. Anything else waits in Banking, unmatched, with the reason in
+  `mpesa_payments.outcome_note`: no one named to post, no account number (every
+  till payment), no open invoice with that number, more than the amount due, a
+  foreign-currency invoice, or a refusal from the books such as the closing
+  date. Settings, Integrations lists the latest payments and can settle a
+  waiting one again in the asker's name, for example once the invoice exists.
+- A forged confirmation carrying a valid token and an open invoice's number
+  would mark that invoice paid and add a line to the M-Pesa account that the
+  real M-Pesa statement does not have; reconciling the account shows it. Set
+  `MPESA_CALLBACK_IPS` in production, as for churches, and keep the integration
+  actor blank until the sandbox check above is done if automatic settlement is
+  not yet wanted.
+
 ## Still to confirm with Safaricom
 
 - Whether production uses `/mpesa/c2b/v1/registerurl` or a newer version.

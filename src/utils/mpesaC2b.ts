@@ -93,14 +93,25 @@ export function constantTimeEqual(a: string, b: string): boolean {
   return difference === 0;
 }
 
+/** Where an edition's C2B callbacks are registered. */
+export type MpesaEdition = 'business' | 'church';
+
 /**
  * The URLs registered with Safaricom. Daraja refuses URLs containing words
- * such as M-Pesa or Safaricom, so the registered path says "giving"; the
- * Worker also answers on /api/public/mpesa/c2b/... for the same token.
+ * such as M-Pesa or Safaricom, so the registered path says "giving" for a
+ * church and "payments" for a business; the Worker answers on every one of
+ * these paths, and on /api/public/mpesa/c2b/..., for any token, since the
+ * token alone names the organization.
  */
-export function callbackUrls(origin: string, token: string) {
-  const base = `${origin.replace(/\/+$/, '')}/api/public/giving/c2b/${token}`;
+export function callbackUrls(origin: string, token: string, edition: MpesaEdition = 'church') {
+  const path = edition === 'business' ? 'payments' : 'giving';
+  const base = `${origin.replace(/\/+$/, '')}/api/public/${path}/c2b/${token}`;
   return { confirmationUrl: `${base}/confirmation`, validationUrl: `${base}/validation` };
+}
+
+/** An account number reduced as the database compares it: letters and digits, upper case. */
+export function compactAccountNumber(value: string | null | undefined): string {
+  return String(value ?? '').replace(/[^A-Za-z0-9]/g, '').toUpperCase();
 }
 
 const FORBIDDEN_URL_WORDS = ['m-pesa', 'mpesa', 'safaricom', 'exec', 'exe', 'cmd', 'sql', 'query'];

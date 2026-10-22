@@ -89,6 +89,9 @@ interface AppState {
   setNewMenuOpen: (isOpen: boolean) => void;
   createIntent: CreateIntent | null;
   setCreateIntent: (intent: CreateIntent | null) => void;
+  /** A Settings tab to open next, read once by the Settings page. */
+  settingsTabIntent: string | null;
+  setSettingsTabIntent: (tab: string | null) => void;
   
   // Undo Stack
   undoStack: Array<{ id: string, message: string, revertEndpoint: string, data: any }>;
@@ -138,6 +141,8 @@ export const useAppStore = create<AppState>((set) => ({
   setNewMenuOpen: (isOpen) => set({ isNewMenuOpen: isOpen }),
   createIntent: null,
   setCreateIntent: (intent) => set({ createIntent: intent }),
+  settingsTabIntent: null,
+  setSettingsTabIntent: (tab) => set({ settingsTabIntent: tab }),
   
   undoStack: [],
   pushUndoAction: (action) => set((state) => ({ undoStack: [...state.undoStack, action] })),
