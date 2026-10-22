@@ -43,10 +43,12 @@
   - Safaricom's result can arrive before Daraja's answer to the push is recorded: the result is kept (with its checkout request id) and the late answer only adds its ids. A request whose result never arrives stays `SENT`; the dialog says a payment that arrives later still settles the invoice. Querying Daraja for a request's status (STK Query) is not built.
   - `tests/e2e/operations.e2e.mjs`, "a read-only member sees the books and is told AI is off": since 5b5ce05 the Ask button is disabled while AI is off, so the flow now checks the notice and the disabled button instead of a refused request. With that change all 33 browser flows passed.
   - Checks for this package: `npm run lint`; `npm test` (217 tests); on PostgreSQL 16.15 with PostgREST 12.2.3, `npm run test:db` (37 SQL files) and `npm run test:integration` (18 suites); `npm run test:e2e` in Chromium 1194 (33 flows, the last run of `mpesa` after the final change).
+  - Follow-up commit: the request dialog reads the invoice from the refreshed list, follows the amount due and says when nothing is left to ask for; the browser flow checks it.
 
 ## In progress
 
-- No code is half done. GitHub Actions remain locked by the account's billing issue, so no CI job has run on PR #11 or on this branch. The local runs above stand in for CI until the lock is lifted.
+- No code is half done. Packages 8 to 10 are on branch `claude/payroll-close-review-and-live-mpesa`, made in a session that could not push to GitHub (the repository was not among its authorised sources); they were handed over as a git bundle and a patch series. GitHub Actions remain locked by the account's billing issue, so no CI job has run on PR #11 or on this branch. The local runs above stand in for CI until the lock is lifted.
+- Deploying: `main` deploys the Worker on every push while Supabase applies migrations a few minutes later (README, Automatic deploys). Apply `20261022000100`, `000200` and `000300` before the code that calls them, as the README says.
 
 ## Next
 
