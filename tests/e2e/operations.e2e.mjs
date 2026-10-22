@@ -264,11 +264,11 @@ test('a read-only member sees the books and is told AI is off', async () => {
   const { page, api, problems } = session;
   await flow('member', session, async () => {
     await openView(page, 'Business feed');
+    // Since the move to Workers AI (5b5ce05) the page says AI is off and does not offer to ask.
+    await page.getByText(/so they are off until an owner or admin turns on AI features/).first().waitFor({ timeout: 10_000 });
     await page.getByLabel('Your question').fill('What do we owe suppliers?');
-    await page.getByRole('button', { name: 'Ask' }).click();
-    await page.getByText(/AI features are off for this organization/).first().waitFor({ timeout: 10_000 });
-    const ask = api.find((call) => call.path === '/api/ai/ask');
-    assert.equal(ask?.status, 403, 'refused for AI being off, not for the member role');
+    assert.equal(await page.getByRole('button', { name: 'Ask' }).isDisabled(), true, 'asking waits for AI to be turned on');
+    assert.equal(api.find((call) => call.path === '/api/ai/ask'), undefined);
     assert.deepEqual(problems, []);
   });
 });

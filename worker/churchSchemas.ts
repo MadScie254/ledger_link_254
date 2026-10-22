@@ -17,6 +17,17 @@ export const mpesaIntegrationSchema = z.object({
   moneyAccountId: optionalUuid.nullable(),
 });
 
+// M-Pesa Express: the passkey, and an invoice's request to the customer's phone.
+export const mpesaExpressSchema = z.object({
+  passkey: z.string().trim().max(200, 'The M-Pesa Express passkey is at most 200 characters.'),
+});
+
+export const mpesaPaymentRequestSchema = z.object({
+  phone: z.string().trim().min(9, 'Enter the customer\'s Safaricom number, such as 0712 345 678.').max(20),
+  amountCents: z.number().int().min(100, 'M-Pesa takes whole shillings, at least 1.')
+    .refine((cents) => cents % 100 === 0, 'M-Pesa takes whole shillings.'),
+});
+
 export const mpesaStatementSchema = z.object({
   gifts: z.array(z.object({
     transId,

@@ -18,7 +18,7 @@ interface Integration {
 const integrations: Integration[] = [
   {
     name: 'M-Pesa Business',
-    desc: 'Paybill and till payments arrive through Safaricom\'s Daraja C2B API as M-Pesa statement lines. A payment whose account number is an open invoice\'s number settles that invoice; the rest wait in Banking.',
+    desc: 'Paybill and till payments arrive through Safaricom\'s Daraja C2B API as M-Pesa statement lines. A payment whose account number is an open invoice\'s number settles that invoice; the rest wait in Banking. With the paybill\'s M-Pesa Express passkey, an invoice can ask the customer\'s phone to pay.',
     requires: 'An owner or admin enters the paybill or till number, the Daraja app\'s consumer key and secret and the account payments land in, in Settings, Integrations, then registers the URLs with Safaricom. Live payments need the Daraja app taken live for that paybill or till on the Daraja portal. Without Daraja, M-Pesa statements exported as CSV import in Banking, Import statement.',
     completedBy: 'Going live is done with Safaricom on the Daraja portal; the rest is set up in Settings, Integrations.',
     state: 'mpesa',

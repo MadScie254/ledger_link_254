@@ -31,7 +31,7 @@ Success is a Kenyan bookkeeper using a feature for a full working day without su
 - Kenyan statutory rules (PAYE bands, NSSF tiers, SHIF, Housing Levy, VAT, eTIMS) are the core of the product, not a localisation layer.
 - Double entry is enforced in Postgres through `post_journal_entry()`. The database refuses unbalanced entries, so no frontend bug can put the books out of balance.
 - Multi-currency (KES base; USD, UGX, TZS, RWF and others) holds invoices at the issue-date rate and calculates unrealised FX on open foreign invoices and bills against live rates. Settlement posts realised FX. Posting the open-balance revaluation to account 8000 is not built yet.
-- Planned and not yet built: WhatsApp Business invoicing with an M-Pesa STK push payment link and auto-reconciliation (section 3.6).
+- Planned and not yet built: WhatsApp Business invoicing (section 3.6). The M-Pesa STK push it would carry is built, in pilot: an open invoice asks the customer's phone to pay, and Safaricom's result settles it.
 
 ## Operating Context
 
@@ -54,7 +54,7 @@ Success is a Kenyan bookkeeper using a feature for a full working day without su
 
 Payroll runs and payslips post atomically using effective-dated statutory rate versions stored in the database; the coded tables in `src/utils/kenyaPayroll.ts` remain a test fixture. Dated employee relief evidence and applied-amount snapshots explain payslips. New runs credit Net Salaries Payable; a separate dated bank payment and its own reversal record settlement. Owners and admins can close and reopen a financial year with journal entries; after a close the closing date can still move later, or back to the closed year-end, never earlier. Bills and expenses hold supplier CU invoice evidence or an exemption reason, with an Input VAT at risk report for posted purchases missing both. The receipt reader can suggest a CU number for a person to confirm.
 
-A business can link its paybill or till through Daraja C2B (in pilot: tested against simulated callbacks, not yet in the Daraja sandbox). Each confirmation becomes one statement line on its M-Pesa account and settles the open invoice whose number the customer typed as the account number, when one fits in the base currency and the amount is no more than what is due; every other payment waits in Banking with its reason.
+A business can link its paybill or till through Daraja C2B (in pilot: tested against simulated callbacks, not yet in the Daraja sandbox). Each confirmation becomes one statement line on its M-Pesa account and settles the open invoice whose number the customer typed as the account number, when one fits in the base currency and the amount is no more than what is due; every other payment waits in Banking with its reason. With the M-Pesa Express passkey for the paybill, a person who posts can send an STK push from an open base-currency invoice for whole shillings; the paid result is kept as the same kind of M-Pesa payment and settles the invoice in that person's name.
 
 **Specified but not built:** Daraja polling, the Pull Transactions backfill and account balance checks (3.3), KRA eTIMS submission and verification, WhatsApp invoicing (3.6), the dedicated ledger book view (3.8), react-hook-form-based client forms (3.9), keyboard leader sequences (4), and the onboarding wizard (3.2). CSV/OFX/QFX statement files are imported by a person; saved column mappings apply to CSV. The interface must never present the unbuilt capabilities as working.
 

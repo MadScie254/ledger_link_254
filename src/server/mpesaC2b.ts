@@ -6,21 +6,9 @@ import {
   CALLBACK_TOKEN_PATTERN, callbackUrls, constantTimeEqual, forbiddenUrlWords, parseC2bConfirmation, type MpesaEdition,
 } from '../utils/mpesaC2b';
 import type { StatementCharge, StatementGift } from '../utils/mpesaStatement';
+import { darajaAccessToken, darajaBase, darajaMessage, newToken, sha256, unreachable, withTimeout } from './daraja';
 
-const hex = (bytes: Uint8Array) => [...bytes].map((byte) => byte.toString(16).padStart(2, '0')).join('');
-const sha256 = async (value: string) => hex(new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(value))));
-const newToken = () => hex(crypto.getRandomValues(new Uint8Array(32)));
-
-const DARAJA_BASE: Record<'SANDBOX' | 'PRODUCTION', string> = {
-  SANDBOX: 'https://sandbox.safaricom.co.ke',
-  PRODUCTION: 'https://api.safaricom.co.ke',
-};
-// Overridable so the register call can be tried against a stand-in.
-const darajaBase = (environment: 'SANDBOX' | 'PRODUCTION') =>
-  (environment === 'SANDBOX' ? process.env.DARAJA_SANDBOX_BASE_URL : process.env.DARAJA_PRODUCTION_BASE_URL)
-  || DARAJA_BASE[environment];
 const REGISTER_PATH = '/mpesa/c2b/v1/registerurl';
-const DARAJA_TIMEOUT_MS = 15_000;
 
 export interface CallbackTarget {
   orgId: string;
@@ -60,19 +48,6 @@ export async function mpesaEdition(orgId: string): Promise<MpesaEdition> {
   }
   return data.edition;
 }
-
-async function withTimeout(url: string, init: RequestInit): Promise<Response> {
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), DARAJA_TIMEOUT_MS);
-  try {
-    return await fetch(url, { ...init, signal: controller.signal });
-  } finally {
-    clearTimeout(timer);
-  }
-}
-
-const darajaMessage = (body: any, fallback: string) =>
-  String(body?.errorMessage || body?.ResponseDescription || body?.error_description || fallback).slice(0, 300);
 
 export class MpesaC2bService {
   /** The organization a callback token belongs to, or null. Only the token's SHA-256 is stored. */
@@ -183,7 +158,7 @@ export class MpesaC2bService {
     const supabase = getSupabase();
     const [integration, organization] = await Promise.all([
       supabase.from('org_integrations')
-        .select('id,shortcode,environment,status,registered_at,last_error,vault_secret_id,callback_token_hash,money_account_id,updated_at')
+        .select('id,shortcode,environment,status,registered_at,last_error,vault_secret_id,callback_token_hash,money_account_id,express_secret_id,updated_at')
         .eq('org_id', orgId).eq('kind', 'MPESA_C2B').maybeSingle(),
       supabase.from('organizations').select('integration_actor_id, edition').eq('id', orgId).maybeSingle(),
     ]);
@@ -200,7 +175,10 @@ export class MpesaC2bService {
       hasCredentials: Boolean(row?.vault_secret_id),
       hasCallbackUrls: Boolean(row?.callback_token_hash),
       integrationActorId: organization.data?.integration_actor_id ?? null,
-      ...(organization.data?.edition === 'business' ? { moneyAccountId: (row?.money_account_id ?? null) as string | null } : {}),
+      ...(organization.data?.edition === 'business' ? {
+        moneyAccountId: (row?.money_account_id ?? null) as string | null,
+        hasExpressPasskey: Boolean(row?.express_secret_id),
+      } : {}),
     };
   }
 
@@ -275,26 +253,14 @@ export class MpesaC2bService {
       return { registered: false as const, message };
     };
 
-    let accessToken = '';
-    try {
-      const basic = btoa(`${credentials.consumer_key}:${credentials.consumer_secret}`);
-      const response = await withTimeout(`${base}/oauth/v1/generate?grant_type=client_credentials`, {
-        method: 'GET', headers: { Authorization: `Basic ${basic}` },
-      });
-      const body: any = await response.json().catch(() => ({}));
-      if (!response.ok || !body?.access_token) {
-        return fail(`Daraja did not accept the consumer key and secret: ${darajaMessage(body, `HTTP ${response.status}`)}`);
-      }
-      accessToken = String(body.access_token);
-    } catch (err) {
-      return fail(`Daraja could not be reached: ${err instanceof Error ? err.message.slice(0, 200) : 'no answer'}`);
-    }
+    const access = await darajaAccessToken(credentials.environment, credentials.consumer_key, credentials.consumer_secret);
+    if ('message' in access) return fail(access.message);
 
     let answer: any = {};
     try {
       const response = await withTimeout(`${base}${REGISTER_PATH}`, {
         method: 'POST',
-        headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
+        headers: { Authorization: `Bearer ${access.token}`, 'Content-Type': 'application/json' },
         body: JSON.stringify({
           ShortCode: credentials.shortcode,
           // Complete the payment if the validation URL cannot be reached.
@@ -307,7 +273,7 @@ export class MpesaC2bService {
       const accepted = response.ok && (String(answer?.ResponseCode ?? '') === '0' || /success/i.test(String(answer?.ResponseDescription ?? '')));
       if (!accepted) return fail(`Safaricom did not register the URLs: ${darajaMessage(answer, `HTTP ${response.status}`)}`);
     } catch (err) {
-      return fail(`Daraja could not be reached: ${err instanceof Error ? err.message.slice(0, 200) : 'no answer'}`);
+      return fail(unreachable(err));
     }
 
     const message = darajaMessage(answer, 'Registered');

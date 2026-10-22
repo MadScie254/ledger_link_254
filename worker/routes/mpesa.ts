@@ -1,12 +1,14 @@
 import type { Context, Hono, Next } from 'hono';
 import { MpesaC2bService, mpesaEdition } from '../../src/server/mpesaC2b';
 import { MpesaPaymentService } from '../../src/server/mpesaPayments';
+import { MpesaExpressService } from '../../src/server/mpesaExpress';
+import { STK_ACCEPTED } from '../../src/utils/mpesaExpress';
 import { assertChurchEdition } from '../../src/server/churchAccess';
 import { UserError } from '../../src/server/errors';
 import { C2B_ACCEPTED, C2B_MAX_BODY_BYTES, C2B_REJECTED } from '../../src/utils/mpesaC2b';
 import { requireOrganizationAdministrator, type Variables } from '../auth';
-import { bodyOf, logError, respondError } from '../http';
-import { mpesaIntegrationSchema, mpesaStatementSchema } from '../churchSchemas';
+import { bodyOf, enforceRateLimits, HOUR, logError, respondError } from '../http';
+import { mpesaExpressSchema, mpesaIntegrationSchema, mpesaPaymentRequestSchema, mpesaStatementSchema } from '../churchSchemas';
 import { uuid } from '../schemas';
 import type { Api } from './types';
 
@@ -81,6 +83,29 @@ export function registerMpesaPublicRoutes(app: Hono<any>) {
       }
     });
   }
+
+  // The result of one invoice's payment request (M-Pesa Express). The token
+  // in the path names that request alone.
+  app.post('/api/public/payments/stk/:token', async (c) => {
+    try {
+      if (!callerAllowed(c)) return c.json(C2B_REJECTED, 403);
+      const raw = await c.req.text();
+      if (raw.length > C2B_MAX_BODY_BYTES) return c.json(C2B_REJECTED, 413);
+      let body: unknown;
+      try { body = JSON.parse(raw); } catch { return c.json(C2B_REJECTED, 400); }
+      const outcome = await MpesaExpressService.receiveCallback(c.req.param('token') || '', body);
+      if (outcome.status === 'unknown-token') return c.json(C2B_REJECTED, 404);
+      if (outcome.status === 'unreadable') {
+        console.warn('[M-Pesa] Payment request result not read:', outcome.reason);
+        return c.json(C2B_REJECTED, 400);
+      }
+      await afterResponse(c, outcome.process);
+      return c.json(STK_ACCEPTED);
+    } catch (err) {
+      logError('M-Pesa payment request result failed', err);
+      return c.json(C2B_REJECTED, 500);
+    }
+  });
 }
 
 export function registerMpesaRoutes(api: Api) {
@@ -91,6 +116,33 @@ export function registerMpesaRoutes(api: Api) {
   // A business's payments: what arrived, and why any waits in Banking.
   api.get('/integrations/mpesa/payments', requireOrganizationAdministrator, requireBusinessEdition, async (c) => {
     try { return c.json({ payments: await MpesaPaymentService.recent(c.get('orgId')) }); }
+    catch (err) { return respondError(c, err); }
+  });
+  // The M-Pesa Express passkey; blank stops payment requests.
+  api.put('/integrations/mpesa/express', requireOrganizationAdministrator, requireBusinessEdition, async (c) => {
+    try {
+      const { passkey } = mpesaExpressSchema.parse(await bodyOf(c));
+      await MpesaExpressService.savePasskey(c.get('orgId'), c.get('userId'), passkey);
+      return c.json(await MpesaC2bService.settings(c.get('orgId')));
+    } catch (err) { return respondError(c, err); }
+  });
+  // Whether invoices can ask for payment, for every role that sees invoices.
+  api.get('/integrations/mpesa/express-status', requireBusinessEdition, async (c) => {
+    try { return c.json({ ready: await MpesaExpressService.ready(c.get('orgId')) }); }
+    catch (err) { return respondError(c, err); }
+  });
+  // An open invoice asks the customer's phone to pay (owners, admins and accountants: a write).
+  api.post('/invoices/:id/mpesa-request', requireBusinessEdition, async (c) => {
+    try {
+      const input = mpesaPaymentRequestSchema.parse(await bodyOf(c));
+      await enforceRateLimits([{ key: `mpesa-request:${c.get('orgId')}`, limit: 60, windowSeconds: HOUR }],
+        'Sixty payment requests an hour is the limit for one organization. Try again later.');
+      return c.json(await MpesaExpressService.requestPayment(c.get('orgId'), uuid.parse(c.req.param('id')), input as Input<typeof MpesaExpressService.requestPayment, 2>,
+        c.get('userId'), MpesaC2bService.callbackOrigin(c.req.url)), 201);
+    } catch (err) { return respondError(c, err); }
+  });
+  api.get('/invoices/:id/mpesa-requests', requireBusinessEdition, async (c) => {
+    try { return c.json({ requests: await MpesaExpressService.requestsFor(c.get('orgId'), uuid.parse(c.req.param('id'))) }); }
     catch (err) { return respondError(c, err); }
   });
   // Try again once the invoice exists or the books allow it, in the asker's name.

@@ -17,6 +17,8 @@ interface MpesaSettings {
   integrationActorId: string | null;
   /** A business's M-Pesa money account. */
   moneyAccountId?: string | null;
+  /** Whether a business saved its M-Pesa Express passkey. */
+  hasExpressPasskey?: boolean;
 }
 
 interface MpesaPayment {
@@ -230,8 +232,55 @@ export function IntegrationsPanel({ orgId, edition, baseCurrency }: { orgId: str
         ? ' A business without Daraja access can import its M-Pesa statement in Banking, Import statement.'
         : ' Churches without Daraja access can upload the M-Pesa statement in Giving instead.'}
     </p>
+    {isBusiness && current.configured && <ExpressPasskey orgId={orgId} saved={Boolean(current.hasExpressPasskey)} />}
     {isBusiness && current.configured && <RecentPayments orgId={orgId} currency={baseCurrency} />}
   </section>;
+}
+
+/**
+ * The M-Pesa Express passkey Safaricom issues for a paybill. With it, an
+ * open invoice can ask the customer's phone to pay (Sales, Invoices, Ask by
+ * M-Pesa). It is kept in Vault and never shown again.
+ */
+function ExpressPasskey({ orgId, saved }: { orgId: string; saved: boolean }) {
+  const queryClient = useQueryClient();
+  const [passkey, setPasskey] = useState('');
+  const [message, setMessage] = useState('');
+  const [problem, setProblem] = useState('');
+  const save = useMutation({
+    mutationFn: (value: string) => apiRequest('/api/integrations/mpesa/express', {
+      method: 'PUT', body: { passkey: value }, fallback: 'The passkey was not saved.',
+    }),
+    onSuccess: (_result, value) => {
+      setPasskey(''); setProblem('');
+      setMessage(value ? 'Passkey saved in Vault. Open invoices can ask for payment by M-Pesa.' : 'Passkey removed. Invoices no longer ask for payment.');
+      queryClient.invalidateQueries({ queryKey: ['mpesa-integration', orgId] });
+      queryClient.invalidateQueries({ queryKey: ['mpesa-express-status', orgId] });
+    },
+    onError: (err: Error) => { setMessage(''); setProblem(err.message); },
+  });
+  return <div className="space-y-3 border-t border-feint-strong pt-4">
+    <h3 className="text-sm font-semibold text-text">Ask for payment from an invoice</h3>
+    <p className="text-[13px] text-graphite-600">
+      With the M-Pesa Express passkey Safaricom issues for the paybill, an open invoice can send a payment request to the
+      customer&apos;s phone, showing the paybill with the invoice&apos;s number as the account. Paybills only: a till has no account number.
+      {saved ? ' A passkey is saved.' : ' No passkey is saved, so invoices cannot ask for payment.'}
+    </p>
+    <form className="flex flex-wrap items-end gap-3" onSubmit={(event) => { event.preventDefault(); save.mutate(passkey.trim()); }}>
+      <Field label="M-Pesa Express passkey" hint={saved ? 'Saved. Enter a new one to replace it.' : 'From the Daraja portal, for this paybill.'}>
+        <input value={passkey} onChange={(e) => setPasskey(e.target.value)} autoComplete="off" type="password" />
+      </Field>
+      <button type="submit" className={buttonClass.secondary} disabled={save.isPending || !passkey.trim()}>Save passkey</button>
+      {saved && <button type="button" className={buttonClass.quiet} disabled={save.isPending}
+        onClick={() => { if (window.confirm('Remove the passkey? Invoices stop asking for payment by M-Pesa.')) save.mutate(''); }}>
+        Remove passkey
+      </button>}
+    </form>
+    <div aria-live="polite">
+      {message && <p className="text-[13px] text-ink-900">{message}</p>}
+      {problem && <p role="alert" className="text-[13px] text-ledger-red">{problem}</p>}
+    </div>
+  </div>;
 }
 
 /** What Safaricom sent, newest first, with the invoice each settled or why it waits. */
