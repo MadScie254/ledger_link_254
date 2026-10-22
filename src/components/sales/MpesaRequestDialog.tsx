@@ -50,10 +50,13 @@ export function MpesaRequestDialog({ invoice, customerName, customerPhone, curre
   useEffect(() => {
     if (!invoice) return;
     setPhone(customerPhone || '');
-    setAmount(wholeDue > 0 ? String(wholeDue) : '');
     setProblem('');
     setWatchUntil(0);
   }, [invoice?.id]); // eslint-disable-line react-hooks/exhaustive-deps
+  // What is due changes when a payment lands; the amount follows it.
+  useEffect(() => {
+    if (invoice) setAmount(wholeDue > 0 ? String(wholeDue) : '');
+  }, [invoice?.id, wholeDue]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const requests = useQuery({
     queryKey: ['mpesa-requests', invoice?.id],
@@ -135,6 +138,7 @@ export function MpesaRequestDialog({ invoice, customerName, customerPhone, curre
           The customer&apos;s phone shows the paybill with this invoice&apos;s number as the account. Once they enter their PIN, the payment
           lands on the M-Pesa account and settles the invoice.
         </p>
+        {wholeDue < 1 && <p className="text-[13px] text-ink-900">Nothing is left to ask for on this invoice.</p>}
         {problem && <p role="alert" className="text-[13px] text-ledger-red">{problem}</p>}
         <div aria-live="polite" className="space-y-1.5 border-t border-feint pt-3">
           {(requests.data?.requests || []).length === 0 && <p className="text-[13px] text-graphite-600">No requests sent for this invoice yet.</p>}

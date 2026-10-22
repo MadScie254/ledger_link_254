@@ -559,7 +559,8 @@ export function SalesView() {
       )}
 
       <MpesaRequestDialog
-        invoice={mpesaInvoice}
+        // The list's copy, so a payment that settles it shows at once.
+        invoice={mpesaInvoice ? invoices.find((inv: any) => inv.id === mpesaInvoice.id) || mpesaInvoice : null}
         customerName={mpesaInvoice ? customerName(mpesaInvoice.customerId) || 'Customer' : ''}
         customerPhone={mpesaInvoice ? customersData?.customers?.find((c: any) => c.id === mpesaInvoice.customerId)?.phone || null : null}
         currency={baseCurrency}

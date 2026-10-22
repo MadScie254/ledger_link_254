@@ -91,6 +91,8 @@ test('a business links its paybill, and an invoice asks the customer\'s phone to
     });
     assert.equal(result.status, 200);
     await dialog.getByText(/paid, receipt TKE2E00001, invoice settled\./).waitFor({ timeout: 15_000 });
+    await dialog.getByText('Nothing is left to ask for on this invoice.').waitFor({ timeout: 10_000 });
+    assert.equal(await dialog.getByRole('button', { name: 'Send to the phone' }).isDisabled(), true);
     assert.equal(sql(`SELECT status || ' ' || amount_due_cents FROM public.invoices WHERE id = '${invoice}'`), 'PAID 0');
     assert.equal(sql(`SELECT status FROM public.bank_transactions WHERE org_id = '${ORG}' AND reference = 'TKE2E00001'`), 'MATCHED');
     assert.deepEqual(refusedWrites(api), []);
