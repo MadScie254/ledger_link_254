@@ -56,9 +56,16 @@ BEGIN
     PERFORM public.pay_salaries(v_org, v_run, v_bank, DATE '2026-10-02', v_owner, 'salary-duplicate');
   EXCEPTION WHEN unique_violation THEN v_failed := true; END;
   IF NOT v_failed THEN RAISE EXCEPTION 'Second active salary payment was accepted.'; END IF;
-  PERFORM public.reverse_payroll_run(v_org, v_run, DATE '2026-10-02', 'Wrong salary', v_owner);
-  IF (SELECT reversed_at FROM public.salary_payments WHERE id = (v_payment->>'id')::UUID) IS NOT NULL THEN
-    RAISE EXCEPTION 'Run reversal also reversed its payment.';
+  -- A paid run is reversed only after its salary payment (as a paid invoice is
+  -- voided only after its payments), so 2165 never carries a debit.
+  v_failed := false;
+  BEGIN
+    PERFORM public.reverse_payroll_run(v_org, v_run, DATE '2026-10-02', 'Wrong salary', v_owner);
+  EXCEPTION WHEN check_violation THEN v_failed := true; END;
+  IF NOT v_failed THEN RAISE EXCEPTION 'A paid pay run was reversed while its salary payment stood.'; END IF;
+  IF (SELECT reversed_at FROM public.payroll_runs WHERE id = v_run) IS NOT NULL
+     OR (SELECT reversed_at FROM public.salary_payments WHERE id = (v_payment->>'id')::UUID) IS NOT NULL THEN
+    RAISE EXCEPTION 'A refused run reversal changed the run or its payment.';
   END IF;
   v_reversal := public.reverse_salary_payment(v_org, v_run, (v_payment->>'id')::UUID,
     DATE '2026-10-03', 'Bank payment was wrong', v_owner);
@@ -74,6 +81,19 @@ BEGIN
     DATE '2026-10-03', 'Retry', v_owner))->>'reversalJournalEntryId' <> v_reversal->>'reversalJournalEntryId' THEN
     RAISE EXCEPTION 'Payment reversal retry created a second journal.';
   END IF;
+  PERFORM public.reverse_payroll_run(v_org, v_run, DATE '2026-10-03', 'Wrong salary', v_owner);
+  IF (SELECT reversed_at FROM public.payroll_runs WHERE id = v_run) IS NULL THEN
+    RAISE EXCEPTION 'The run was not reversed once its payment was.';
+  END IF;
+  IF (SELECT COALESCE(sum(credit - debit), 0) FROM public.journal_lines WHERE org_id = v_org AND account_id = v_payable) <> 0 THEN
+    RAISE EXCEPTION 'Net salaries payable does not clear after the payment and the run are reversed.';
+  END IF;
+  v_failed := false;
+  BEGIN
+    INSERT INTO public.payroll_runs (org_id, period, pay_date, rate_version)
+      VALUES (v_org, 'Unstored rates', DATE '2026-09-30', 'KE-1999-01');
+  EXCEPTION WHEN foreign_key_violation THEN v_failed := true; END;
+  IF NOT v_failed THEN RAISE EXCEPTION 'A pay run was stored with an unknown rate version.'; END IF;
   IF has_table_privilege('authenticated', 'public.salary_payments', 'SELECT') THEN
     RAISE EXCEPTION 'Salary payments bypass Worker payroll access.';
   END IF;
