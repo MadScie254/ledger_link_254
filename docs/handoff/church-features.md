@@ -1,6 +1,6 @@
 # Kundi feature handoff
 
-Branch: `codex/church-features`, based on `origin/main` at `02ffe2b`.
+Branch: `codex/church-features`, based on `origin/main` at `02ffe2b`, merged with `main` at `fd06fe8`.
 
 ## Done in this branch
 
@@ -30,5 +30,7 @@ Branch: `codex/church-features`, based on `origin/main` at `02ffe2b`.
 
 ## Deployment
 
-- No changes have been pushed or deployed from this branch.
-- Payroll PR #11 remains separate. Its production migration order is unresolved, so it has not been merged.
+- Claude, 24 October 2026: the five migrations were renamed from `20261013000100`-`000500` to `20261024000100`-`000500` before anything applied them, because production already held `20261022000300` and Supabase applies migrations in order. Their SQL is unchanged.
+- Shipped in two steps, as the README asks: the migrations and their SQL tests first, then the code that calls them once production held them.
+- Checks on `main` with this branch merged: `npm run lint`; `npm test` (223); `npm run test:db` (40 files) and `npm run test:integration` (22 suites) on PostgreSQL 16 with PostgREST 12.2.3. GitHub Actions remains locked by billing.
+- Payroll PRs #11 to #13 are merged and their migrations are applied in production.
