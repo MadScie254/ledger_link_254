@@ -116,8 +116,8 @@ export function useMoneyAccounts() {
 }
 
 export function refreshChurch(queryClient: QueryClient, orgId: string) {
-  for (const key of ['members', 'member', 'households', 'funds', 'giving-rules', 'giving-queue', 'giving-day', 'collections',
-    'treasurer-report', 'fund-balances', 'church-dashboard', 'accounts', 'journal-entries', 'dashboard-metrics']) {
+  for (const key of ['members', 'member', 'households', 'funds', 'giving-rules', 'giving-queue', 'giving-day', 'church-campaigns', 'church-giving-plans', 'collections',
+    'treasurer-report', 'fund-balances', 'fund-detail', 'fund-budgets', 'church-dashboard', 'accounts', 'journal-entries', 'dashboard-metrics']) {
     queryClient.invalidateQueries({ queryKey: [key, orgId] });
   }
 }

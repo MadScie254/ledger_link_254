@@ -29,7 +29,7 @@ const searchTerm = (value: string) => value.replace(/[^\p{L}\p{N}\s-]/gu, ' ').r
 
 function duplicateNumber(err: any, number: string): never {
   if (err?.code === '23505') throw new UserError(`Member number ${number} is already in the register.`, 409);
-  throw err;
+  throw new Error(`duplicate fallback ${JSON.stringify(err)}`);
 }
 
 export class MembersService {
@@ -98,7 +98,13 @@ export class MembersService {
 
   static async create(orgId: string, userId: string, input: MemberInput): Promise<string> {
     const row = MembersService.row(orgId, userId, input);
-    if (COUNTED.includes(row.status)) await PlanService.ensureCanAddMember(orgId, await MembersService.countForPlan(orgId));
+    if (COUNTED.includes(row.status)) {
+      let count: number;
+      try { count = await MembersService.countForPlan(orgId); }
+      catch (err) { throw new Error(`member count diagnostic ${JSON.stringify(err)}`); }
+      try { await PlanService.ensureCanAddMember(orgId, count); }
+      catch (err) { throw new Error(`member plan diagnostic ${JSON.stringify(err)} ${String((err as Error)?.message)} ${String((err as Error)?.name)}`); }
+    }
     const { data, error } = await getSupabase().from('members').insert(row).select('id').single();
     if (error) duplicateNumber(error, row.member_number);
     return data.id;
