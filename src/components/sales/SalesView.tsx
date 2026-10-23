@@ -20,13 +20,14 @@ import { ForeignSettlementFields, foreignBalanceOf, settlementCents } from '../c
 import { useConfirm } from '../../hooks/useConfirm';
 import { downloadCsv } from '../../utils/exportCsv';
 import { todayIn } from '../../utils/dates';
-import { inParts } from '../../utils/apiRequest';
+import { apiRequest, inParts } from '../../utils/apiRequest';
 import { OrdersPanel } from './OrdersPanel';
 import { EstimatesPanel } from './EstimatesPanel';
 import { SalesDocumentBuilder } from './SalesDocumentBuilder';
 import { CashTransactionsPanel } from '../common/CashTransactionsPanel';
 import { CreditsPanel } from '../common/CreditsPanel';
 import { RecurringPanel } from '../common/RecurringPanel';
+import { MpesaRequestDialog } from './MpesaRequestDialog';
 
 type SalesTab = 'Invoices' | 'Payments' | 'Recurring' | 'Receipts' | 'Credits' | 'Estimates' | 'Orders';
 
@@ -47,6 +48,7 @@ export function SalesView() {
   const [invoiceFilter, setInvoiceFilter] = useState('ALL');
   const [selectedInvoice, setSelectedInvoice] = useState<any | null>(null);
   const [paymentInvoice, setPaymentInvoice] = useState<any | null>(null);
+  const [mpesaInvoice, setMpesaInvoice] = useState<any | null>(null);
   const [paymentAmount, setPaymentAmount] = useState('');
   const [paymentWithheld, setPaymentWithheld] = useState<Withheld>(NO_WITHHOLDING);
   const [paymentForeign, setPaymentForeign] = useState({ foreign: '', rate: '', base: '' });
@@ -86,6 +88,18 @@ export function SalesView() {
       return res.json();
     }
   });
+
+  // A business with Daraja keys and the M-Pesa Express passkey can ask a customer's phone to pay.
+  const isBusiness = !activeCompany?.edition || activeCompany.edition === 'business';
+  const canPost = activeCompany?.role === 'owner' || activeCompany?.role === 'admin' || activeCompany?.role === 'accountant';
+  const { data: expressStatus } = useQuery({
+    queryKey: ['mpesa-express-status', currentOrgId],
+    queryFn: () => apiRequest<{ ready: boolean }>('/api/integrations/mpesa/express-status'),
+    enabled: Boolean(currentOrgId) && isBusiness && canPost,
+  });
+  const canAskByMpesa = (inv: any) => Boolean(expressStatus?.ready) && canPost
+    && ['SENT', 'PARTIALLY_PAID'].includes(inv.status) && Number(inv.amountDueCents || 0) >= 100
+    && String(inv.currency || baseCurrency).toUpperCase() === baseCurrency.toUpperCase();
 
   const { data: inventoryData } = useQuery({
     queryKey: ['inventory', currentOrgId],
@@ -478,6 +492,9 @@ export function SalesView() {
                     {Number(inv.amountDueCents || 0) > 0 && inv.status !== 'VOID' && (
                       <button type="button" onClick={() => openPayment(inv)} className={buttonClass.quiet}>Receive payment</button>
                     )}
+                    {canAskByMpesa(inv) && (
+                      <button type="button" onClick={() => setMpesaInvoice(inv)} className={buttonClass.quiet}>Ask by M-Pesa</button>
+                    )}
                     <PrintButton kind="invoice" id={inv.id} number={inv.invoiceNo} />
                   </span>
                   {inv.dueDate && <span className="text-[12px] text-graphite-600">Due {format(new Date(inv.dueDate), 'dd/MM/yyyy')}</span>}
@@ -505,6 +522,9 @@ export function SalesView() {
                 <>
                   {Number(inv.amountDueCents || 0) > 0 && inv.status !== 'VOID' && (
                     <button type="button" onClick={() => openPayment(inv)} className={buttonClass.quiet}>Receive payment</button>
+                  )}
+                  {canAskByMpesa(inv) && (
+                    <button type="button" onClick={() => setMpesaInvoice(inv)} className={buttonClass.quiet}>Ask by M-Pesa</button>
                   )}
                   <PrintButton kind="invoice" id={inv.id} number={inv.invoiceNo} />
                 </>
@@ -537,6 +557,15 @@ export function SalesView() {
       )}
       </>
       )}
+
+      <MpesaRequestDialog
+        // The list's copy, so a payment that settles it shows at once.
+        invoice={mpesaInvoice ? invoices.find((inv: any) => inv.id === mpesaInvoice.id) || mpesaInvoice : null}
+        customerName={mpesaInvoice ? customerName(mpesaInvoice.customerId) || 'Customer' : ''}
+        customerPhone={mpesaInvoice ? customersData?.customers?.find((c: any) => c.id === mpesaInvoice.customerId)?.phone || null : null}
+        currency={baseCurrency}
+        onClose={() => setMpesaInvoice(null)}
+      />
 
       <Dialog
         open={!!paymentInvoice}

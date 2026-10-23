@@ -72,7 +72,7 @@ export function SalaryPayment({ run }: { run: Run }) {
       <Field label="Payment date"><input type="date" required min={run.payDate} value={paymentDate} onChange={(event) => setPaymentDate(event.target.value)} /></Field>
       <button type="submit" className={buttonClass.primary} disabled={pay.isPending || !bankAccountId}>{pay.isPending ? 'Posting' : 'Pay salaries'}</button>
     </form>}
-    {run.reversedAt && activePayment && <p className="text-sm text-text-2">The pay run was reversed. Reverse this payment separately if the bank payment was also in error.</p>}
+    {run.reversedAt && activePayment && <p className="text-sm text-text-2">This pay run was reversed while its salary payment stood. Reverse the payment, then record the corrected run’s payment, so Net Salaries Payable clears.</p>}
     {reverseId && <form className="grid gap-3 sm:grid-cols-[10rem_minmax(0,1fr)_auto] sm:items-end" onSubmit={(event) => { event.preventDefault(); reverse.mutate(); }}>
       <Field label="Reversal date"><input type="date" required min={paymentsData?.payments.find((payment) => payment.id === reverseId)?.paymentDate} value={reversalDate} onChange={(event) => setReversalDate(event.target.value)} /></Field>
       <Field label="Reason"><input type="text" required maxLength={500} value={reason} onChange={(event) => setReason(event.target.value)} /></Field>

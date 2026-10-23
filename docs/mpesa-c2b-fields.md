@@ -92,6 +92,82 @@ in the queue.
   callers from any other address are refused. Get the current list from
   Safaricom rather than from memory.
 
+## Businesses (from 22 October 2026)
+
+A business links its paybill or till the same way, in Settings, Integrations,
+and also chooses the money account its payments land in (account 1050 unless
+another is chosen). The same sandbox check applies before a business is told
+invoices will settle on their own; the `raw` column of `public.mpesa_payments`
+keeps each body as Safaricom sent it.
+
+- Registered URLs are `/api/public/payments/c2b/<token>/confirmation` and
+  `/validation`. The Worker answers every one of the three paths for any
+  token; the token alone names the organization.
+- `public.receive_mpesa_payment` keeps each confirmation once per business per
+  `TransID` (`mpesa_payments`) and adds one statement line to the chosen
+  account, with `reference` = `TransID` and the import key a statement upload
+  gives the same receipt number (`ref:` + the code in lower case). The same
+  payment in a later M-Pesa statement CSV is skipped; a line uploaded before
+  the callback is the one the payment links to. The line is dated in Nairobi
+  time.
+- `public.settle_mpesa_payment` settles an invoice only when `BillRefNumber`,
+  with spaces, hyphens and case ignored, is exactly one open invoice's number
+  (`INV-2026-00042`, `inv 2026 00042` and `INV202600042` all fit), the invoice
+  is in the base currency and the payment is no more than the amount due. It
+  calls `match_bank_transaction`, so the payment, the receivable and the
+  statement line move together, in the name of the organization's integration
+  actor. Anything else waits in Banking, unmatched, with the reason in
+  `mpesa_payments.outcome_note`: no one named to post, no account number (every
+  till payment), no open invoice with that number, more than the amount due, a
+  foreign-currency invoice, or a refusal from the books such as the closing
+  date. Settings, Integrations lists the latest payments and can settle a
+  waiting one again in the asker's name, for example once the invoice exists.
+- A forged confirmation carrying a valid token and an open invoice's number
+  would mark that invoice paid and add a line to the M-Pesa account that the
+  real M-Pesa statement does not have; reconciling the account shows it. Set
+  `MPESA_CALLBACK_IPS` in production, as for churches, and keep the integration
+  actor blank until the sandbox check above is done if automatic settlement is
+  not yet wanted.
+
+## Asking for payment from an invoice (M-Pesa Express, from 22 October 2026)
+
+A business that saves the M-Pesa Express passkey for its paybill (Settings,
+Integrations) can send Daraja's STK push from an open invoice in its base
+currency (Sales, Invoices, Ask by M-Pesa). Paybills only: the push uses
+`CustomerPayBillOnline`, and a till has no account number for the invoice.
+
+- The passkey is kept in its own Vault secret (`org_integrations.express_secret_id`)
+  and read only by the Worker (`mpesa_express_credentials`); saving new Daraja
+  keys leaves it in place.
+- `create_mpesa_payment_request` keeps the request before Daraja is called:
+  the customer's number as `2547XXXXXXXX` or `2541XXXXXXXX`, whole shillings no
+  more than the amount due, and `AccountReference` = the invoice number in
+  letters and digits (`INV-2026-00042` becomes `INV202600042`, Daraja's 12
+  character limit). `TransactionDesc` is `Invoice` (13 characters at most).
+- The push goes to `/mpesa/stkpush/v1/processrequest` with `Password` =
+  base64(shortcode + passkey + `Timestamp`) and `Timestamp` in Nairobi time
+  (`yyyyMMddHHmmss`). The shortcode, amount and numbers go as JSON numbers, as
+  in Daraja's published sample.
+- `CallBackURL` is `/api/public/payments/stk/<token>`, a fresh token for each
+  request, stored as its SHA-256. `complete_mpesa_payment_request` records the
+  result once: `ResultCode` 0 with `MpesaReceiptNumber`, `Amount` and
+  `TransactionDate` becomes an M-Pesa payment (source `STK_CALLBACK`, the
+  account reference as `bill_ref_number`) on the M-Pesa account, then settles
+  the invoice in the name of the person who asked; any other code (1032
+  cancelled on the phone, 1037 phone not reached, and so on) marks the request
+  not paid with Safaricom's words. If Safaricom also sends a C2B confirmation
+  for the same receipt, whichever arrives second finds the payment already kept.
+
+| Field | Expected | Seen in the sandbox |
+| --- | --- | --- |
+| Push answer `CheckoutRequestID`, `ResponseCode` | `ws_CO_...`, `"0"` | not yet checked |
+| Result `Body.stkCallback.ResultCode` | `0` paid, `1032` cancelled | not yet checked |
+| `CallbackMetadata.Item` `MpesaReceiptNumber` | 10-character M-Pesa code | not yet checked |
+| `CallbackMetadata.Item` `Amount` | a number, e.g. `1500` | not yet checked |
+| `CallbackMetadata.Item` `TransactionDate` | `yyyyMMddHHmmss` as a number | not yet checked |
+| `CallbackMetadata.Item` `PhoneNumber` | the payer's number, possibly masked | not yet checked |
+| Whether a paid push also triggers the C2B confirmation | unknown | not yet checked |
+
 ## Still to confirm with Safaricom
 
 - Whether production uses `/mpesa/c2b/v1/registerurl` or a newer version.

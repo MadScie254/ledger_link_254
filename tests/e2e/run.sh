@@ -49,6 +49,8 @@ node "$HERE/supabase-stub.mjs" 54322 3006 & pids+=($!)
 
 cd "$ROOT"
 CLOUDFLARE_INCLUDE_PROCESS_ENV=true \
+LL_REMOTE_BINDINGS=false \
+DARAJA_SANDBOX_BASE_URL="http://127.0.0.1:${DARAJA_STUB_PORT:-5191}" \
 NODE_ENV=development \
 SUPABASE_URL=http://127.0.0.1:54322 \
 SUPABASE_SECRET_KEY="$(jwt service_role)" \

@@ -6,7 +6,10 @@ import {defineConfig} from 'vite';
 
 export default defineConfig(() => {
   return {
-    plugins: [cloudflare(), react(), tailwindcss()],
+    // The AI binding reaches Cloudflare through a remote session, which needs
+    // a Cloudflare login. LL_REMOTE_BINDINGS=false starts without it (the
+    // end-to-end runs do); AI calls then fail and everything else works.
+    plugins: [cloudflare({ remoteBindings: process.env.LL_REMOTE_BINDINGS !== 'false' }), react(), tailwindcss()],
     resolve: {
       alias: {
         '@': path.resolve(__dirname, '.'),

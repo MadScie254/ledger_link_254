@@ -1,7 +1,8 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  amountToCents, C2B_ACCEPTED, callbackUrls, constantTimeEqual, darajaTimeToIso, forbiddenUrlWords, parseC2bConfirmation,
+  amountToCents, C2B_ACCEPTED, callbackUrls, compactAccountNumber, constantTimeEqual, darajaTimeToIso, forbiddenUrlWords,
+  parseC2bConfirmation,
 } from './mpesaC2b.ts';
 
 // The shape of the published Daraja C2B confirmation sample.
@@ -71,4 +72,18 @@ test('the registered URLs avoid the words Daraja refuses', () => {
   assert.deepEqual(forbiddenUrlWords('https://x.org/api/public/mpesa/c2b'), ['mpesa']);
   assert.deepEqual(forbiddenUrlWords('https://safaricom-exec.example/'), ['safaricom', 'exec']);
   assert.deepEqual(C2B_ACCEPTED, { ResultCode: '0', ResultDesc: 'Accepted' });
+});
+
+test('a business registers payments URLs, which Daraja accepts too', () => {
+  const urls = callbackUrls('https://books.example.co.ke', 'cd'.repeat(32), 'business');
+  assert.equal(urls.confirmationUrl, `https://books.example.co.ke/api/public/payments/c2b/${'cd'.repeat(32)}/confirmation`);
+  assert.equal(urls.validationUrl, `https://books.example.co.ke/api/public/payments/c2b/${'cd'.repeat(32)}/validation`);
+  assert.deepEqual(forbiddenUrlWords(urls.confirmationUrl), []);
+});
+
+test('account numbers compare on letters and digits only', () => {
+  assert.equal(compactAccountNumber('inv 2026-00042'), 'INV202600042');
+  assert.equal(compactAccountNumber(' INV-2026-00042 '), 'INV202600042');
+  assert.equal(compactAccountNumber(null), '');
+  assert.equal(compactAccountNumber('--'), '');
 });

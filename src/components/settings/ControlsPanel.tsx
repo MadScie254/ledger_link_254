@@ -145,7 +145,7 @@ export function ControlsPanel({ company, onSaved }: { company: OrganizationData;
           </p>
           <div className="flex flex-wrap items-end gap-3">
             <Field label="Books closed through">
-              <input type="date" value={closedThrough} disabled={!canChange || Boolean(latestClose)} onChange={(e) => setClosedThrough(e.target.value)} />
+              <input type="date" value={closedThrough} min={latestClose?.yearEnd} disabled={!canChange} onChange={(e) => setClosedThrough(e.target.value)} />
             </Field>
             {closedThrough && canChange && !latestClose && (
               <button type="button" className={`${buttonClass.quiet} mb-2.5`} onClick={() => setClosedThrough('')}>Reopen all periods</button>
@@ -154,7 +154,7 @@ export function ControlsPanel({ company, onSaved }: { company: OrganizationData;
           <p className="text-[12.5px] text-graphite-600">
             {company.booksClosedThrough ? `Closed through ${format(new Date(company.booksClosedThrough), 'dd/MM/yyyy')}.` : 'No period is closed.'}
           </p>
-          {latestClose && <p className="text-[12.5px] text-text-2">A year-end entry closed the year ending {latestClose.yearEnd}. Reopen that entry before changing the closing date or financial year start.</p>}
+          {latestClose && <p className="text-[12.5px] text-text-2">A year-end entry closed the year ending {format(new Date(latestClose.yearEnd), 'dd/MM/yyyy')}. The closing date can move later, or back to that date. Moving it earlier, or changing the financial year start, needs that year reopened first.</p>}
           {canChange && <div className="space-y-3 rounded-xl border border-border bg-surface-2 p-4">
             <h3 className="text-sm font-semibold text-text">Financial year close</h3>
             <p className="text-sm text-text-2">Transfer the year’s income and expense balances to Retained Earnings (3100). The closing entry and a later reopening remain in the ledger.</p>
