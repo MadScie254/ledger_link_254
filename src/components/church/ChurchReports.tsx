@@ -2,8 +2,9 @@ import { useEffect, useState } from 'react';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { useAppStore } from '../../store';
 import { apiRequest } from '../../utils/apiRequest';
+import { budgetPeriodRange } from '../../utils/budgetPeriods';
 import { FinancialPDFEngine } from '../../utils/pdfExport';
-import type { TreasurerReport } from '../../utils/churchReports';
+import { monthRange, type FundBalance, type TreasurerReport } from '../../utils/churchReports';
 import { Amount, figureText } from '../ledger/Amount';
 import { EmptyNote, LoadProblem, PageHeading, SkeletonRows, buttonClass } from '../ledger/Page';
 import { Mark } from '../ledger/Mark';
@@ -19,18 +20,26 @@ const COPY = {
 const monthName = (month: string) => new Intl.DateTimeFormat('en-KE', { month: 'long', year: 'numeric', timeZone: 'UTC' })
   .format(new Date(`${month}-01T00:00:00Z`));
 
-type Report = TreasurerReport & { month: string; awaitingSecondCount: number };
+type Report = TreasurerReport & { month: string; awaitingSecondCount: number; funds: FundBalance[] };
+type BudgetPack = { asOf: string; funds: Array<{ name: string; restricted: boolean; budgetId: string | null;
+  incomeTargetCents: number; incomeCents: number; expenseLimitCents: number; expenseCents: number }> };
 
 /** The monthly report the treasurer reads to the church council. Printable, and exported to PDF. */
 export function TreasurerReportView() {
   const { orgId, today, currency, companyName, kraPin, canPost } = useChurchOrg();
   const aiEnabled = Boolean(useAppStore((state) => state.activeCompany?.aiEnabled));
+  const fiscalYearStart = useAppStore((state) => state.activeCompany?.fiscalYearStart);
   const [month, setMonth] = useState(today.slice(0, 7));
+  const reportEnd = monthRange(month)?.to || today;
+  const budgetYear = Number(budgetPeriodRange('YEARLY', `${month}-15`, fiscalYearStart).from.slice(0, 4));
   const report = useQuery({
     queryKey: ['treasurer-report', orgId, month],
     queryFn: () => apiRequest<Report>(`/api/church-reports/treasurer?month=${month}`, { fallback: "The treasurer's report could not be loaded." }),
   });
   const data = report.data;
+  const budgets = useQuery({ queryKey: ['fund-budgets', orgId, budgetYear, reportEnd],
+    queryFn: () => apiRequest<BudgetPack>(`/api/church/fund-budgets?year=${budgetYear}&asOf=${reportEnd}`,
+      { fallback: 'Fund budgets could not be loaded for the council pack.' }) });
   // The treasurer's own remarks, which Cloudflare Workers AI can draft from the figures.
   const [remarks, setRemarks] = useState('');
   const [remarksLanguage, setRemarksLanguage] = useState<'en' | 'sw'>('en');
@@ -69,6 +78,37 @@ export function TreasurerReportView() {
       ],
     );
   };
+  const exportCouncilPack = () => {
+    if (!data || !budgets.data) return;
+    const kes = (cents: number) => figureText(cents);
+    const restrictedRows = data.funds.filter((fund) => fund.restricted).map((fund) => [fund.name, kes(fund.closingCents)]);
+    const budgetRows = budgets.data.funds.filter((fund) => fund.budgetId).map((fund) => [fund.name,
+      `${kes(fund.incomeCents)} / ${kes(fund.incomeTargetCents)}`,
+      `${kes(fund.expenseCents)} / ${kes(fund.expenseLimitCents)}`]);
+    FinancialPDFEngine.exportFinancialStatement(
+      { title: 'Council report pack', period: monthName(month), companyName, kraPin, currency,
+        filename: `council-pack-${month}.pdf` },
+      [
+        { title: 'Monthly result', headers: ['Measure', currency], rows: [
+          ['Opening fund balance', kes(data.openingCents)], ['Income', kes(data.incomeCents)],
+          ['Expenses', kes(data.expenseCents)], ['Closing fund balance', kes(data.closingCents)],
+        ] },
+        { title: 'Restricted funds at period end', headers: ['Fund', `Closing ${currency}`], rows:
+          restrictedRows.length ? restrictedRows : [['No restricted funds', '']] },
+        { title: `Fund budgets, financial year to ${shortDate(budgets.data.asOf)}`,
+          headers: ['Fund', 'Income actual / target', 'Expense actual / limit'],
+          rows: budgetRows.length ? budgetRows : [['No fund budgets set', '', '']] },
+        { title: 'Money accounts at period end', headers: ['Account', currency], rows:
+          data.money.map((account) => [`${account.code} ${account.name}`, kes(account.balanceCents)]) },
+        { title: 'Items needing review', headers: ['Item', 'Position'], rows: [
+          ['M-Pesa receipts not yet placed', `${data.unmatchedCount} · ${currency} ${kes(data.unmatchedCents)}`],
+          ['Counted cash not yet banked', `${currency} ${kes(data.cashNotBankedCents)}`],
+          ['Cash counts waiting for second person', String(data.awaitingSecondCount)],
+        ] },
+        ...(remarks.trim() ? [{ title: "Treasurer's remarks", headers: ['Remarks'], rows: [[remarks.trim()]] }] : []),
+      ],
+    );
+  };
   return (
     <div className="space-y-5 pb-16">
       <PageHeading title={COPY.treasurer.en} note={`${companyName} · ${monthName(month)} · Figures in ${currency}`}
@@ -77,8 +117,11 @@ export function TreasurerReportView() {
             <label className="text-[12.5px]">Month <input type="month" value={month} onChange={(e) => setMonth(e.target.value || today.slice(0, 7))} className="ml-1 h-9 border px-2" name="month" /></label>
             <button type="button" className={buttonClass.secondary} onClick={() => window.print()}>Print</button>
             <button type="button" className={buttonClass.primary} onClick={exportPdf} disabled={!data}>Export PDF</button>
+            <button type="button" className={buttonClass.secondary} onClick={exportCouncilPack}
+              disabled={!data || !budgets.data}>{say('Council pack PDF').en}</button>
           </div>
         } />
+      {budgets.isError && <LoadProblem what="the council pack budgets" path="/api/church/fund-budgets" onRetry={() => budgets.refetch()} />}
       {report.isError ? <LoadProblem what="the treasurer's report" path="/api/church-reports/treasurer" onRetry={() => report.refetch()} />
         : report.isLoading || !data ? <SkeletonRows label="Loading the treasurer's report" rows={10} /> : (
           <div className="max-w-3xl space-y-6 text-[13.5px]">

@@ -5,13 +5,23 @@ import type { Counts } from '../utils/cashCount';
 export class CollectionsService {
   static async list(orgId: string, filters: { status?: 'AWAITING_SECOND_COUNT' | 'COUNTED' | 'BANKED' } = {}) {
     const supabase = getSupabase();
-    return fetchAllRows<any>((from, to) => {
+    const rows = await fetchAllRows<any>((from, to) => {
       let query = supabase.from('collections')
         .select('id,collection_number,service_date,service_name,fund_id,denominations,total_cents,counted_by_1,counted_by_2,confirmed_at,status,journal_entry_id,banked_on,bank_account_id,bank_reference,banked_cents,variance_cents,banking_journal_entry_id,created_at,funds(code,name)')
         .eq('org_id', orgId);
       if (filters.status) query = query.eq('status', filters.status);
       return query.order('service_date', { ascending: false }).order('created_at', { ascending: false }).order('id').range(from, to);
     });
+    const bankedEntries = rows.map((row) => row.banking_journal_entry_id).filter(Boolean) as string[];
+    const matched = new Set<string>();
+    for (let offset = 0; offset < bankedEntries.length; offset += 100) {
+      const batch = bankedEntries.slice(offset, offset + 100);
+      const lines = await fetchAllRows<{ matched_journal_entry_id: string }>((from, to) => supabase.from('bank_transactions')
+        .select('matched_journal_entry_id').eq('org_id', orgId).eq('status', 'MATCHED')
+        .in('matched_journal_entry_id', batch).order('id').range(from, to));
+      for (const line of lines) matched.add(line.matched_journal_entry_id);
+    }
+    return rows.map((row) => ({ ...row, statementMatched: matched.has(row.banking_journal_entry_id) }));
   }
 
   /** The first counter saves the count; nothing posts until a second person confirms it. */

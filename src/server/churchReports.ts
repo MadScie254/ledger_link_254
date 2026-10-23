@@ -2,6 +2,7 @@ import { getSupabase } from './supabase';
 import { fetchAllRows } from './pagination';
 import { UserError } from './errors';
 import { AccountService } from './accounts';
+import { assertChurchEdition } from './churchAccess';
 import {
   ledgerSurplusCents, monthRange, nairobiToday, reconcileFunds, sundayOnOrBefore, treasurerReport,
   type FundBalance, type TreasurerLine,
@@ -14,6 +15,30 @@ const toFund = (row: any): FundBalance => ({
 });
 
 export class ChurchReportService {
+  /** Posted income and expense by account for one fund over a chosen period. */
+  static async fundDetail(orgId: string, fundId: string, from: string, to: string) {
+    await assertChurchEdition(orgId);
+    if (from > to) throw new UserError('The period starts after it ends.');
+    const supabase = getSupabase();
+    const [fund, balances, lines] = await Promise.all([
+      supabase.from('funds').select('id,code,name,restricted').eq('org_id', orgId).eq('id', fundId).maybeSingle(),
+      ChurchReportService.fundRows(orgId, from, to),
+      fetchAllRows<any>((start, end) => supabase.rpc('church_treasurer_lines', { p_org_id: orgId, p_from: from, p_to: to })
+        .range(start, end)),
+    ]);
+    if (fund.error) throw fund.error;
+    if (!fund.data) throw new UserError('Fund not found in this church.', 404);
+    const balance = balances.find((row) => row.fundId === fundId);
+    const accountRows = lines.filter((row) => row.fund_id === fundId && row.kind !== 'MONEY')
+      .map((row) => ({ kind: row.kind, code: row.account_code, name: row.account_name,
+        amountCents: Number(row.amount_cents) || 0 }));
+    return { fund: fund.data, from, to, openingCents: balance?.openingCents || 0,
+      incomeCents: balance?.incomeCents || 0, expenseCents: balance?.expenseCents || 0,
+      closingCents: balance?.closingCents || 0,
+      incomeByAccount: accountRows.filter((row) => row.kind === 'INCOME'),
+      expensesByAccount: accountRows.filter((row) => row.kind === 'EXPENSE') };
+  }
+
   static async fundRows(orgId: string, from: string, to: string): Promise<FundBalance[]> {
     const { data, error } = await getSupabase().rpc('fund_balances', { p_org_id: orgId, p_from: from, p_to: to });
     if (error) throw error;

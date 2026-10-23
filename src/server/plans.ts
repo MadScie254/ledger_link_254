@@ -19,7 +19,7 @@ export class PlanService {
     const supabase = getSupabase();
     const { data: organization, error: organizationError } = await supabase.from('organizations')
       .select('edition').eq('id', orgId).maybeSingle();
-    if (organizationError) throw organizationError;
+    if (organizationError) throw new Error(`snapshot organization diagnostic ${JSON.stringify(organizationError)}`);
     if (!organization) throw new UserError('Organization not found.', 404);
     if (organization.edition === 'business' || !organization.edition) return null;
 
@@ -32,8 +32,8 @@ export class PlanService {
       supabase.from('organization_invitations').select('id', { count: 'exact', head: true })
         .eq('org_id', orgId).eq('status', 'PENDING'),
     ]);
-    for (const result of [subscriptionResult, plansResult, membersResult, invitationsResult]) {
-      if (result.error) throw result.error;
+    for (const [index, result] of [subscriptionResult, plansResult, membersResult, invitationsResult].entries()) {
+      if (result.error) throw new Error(`snapshot result ${index} status ${result.status} text ${result.statusText} diagnostic ${JSON.stringify(result.error)}`);
     }
     const plans: PlanLimits[] = (plansResult.data || []).map((row) => ({
       id: row.id, edition: row.edition as Edition, name: row.name,
