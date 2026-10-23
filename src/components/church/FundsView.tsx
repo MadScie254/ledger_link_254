@@ -1,10 +1,14 @@
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { apiRequest } from '../../utils/apiRequest';
+import { budgetPeriodRange } from '../../utils/budgetPeriods';
 import { monthRange } from '../../utils/churchReports';
+import { centsFromAmountText } from '../../utils/salesOrders';
 import { FinancialPDFEngine } from '../../utils/pdfExport';
 import { Amount, figureText } from '../ledger/Amount';
+import { Dialog, Field } from '../ledger/Dialog';
 import { EmptyNote, LoadProblem, PageHeading, SkeletonRows, buttonClass } from '../ledger/Page';
+import { useAppStore } from '../../store';
 import { FundDialog, GivingRuleDialog } from './ChurchDialogs';
 import { RULE_TYPES, refreshChurch, say, shortDate, useChurchOrg, useFunds } from './churchData';
 
@@ -15,6 +19,16 @@ const COPY = {
   noFunds: say('No funds yet.'),
   noRules: say('No giving rules. Every M-Pesa receipt will wait in the queue.'),
   fundBalances: say('Fund balances'),
+  fundBudgets: say('Fund budgets'),
+  budgetYear: say('Budget year'),
+  incomeTarget: say('Income target'),
+  expenseLimit: say('Spending limit'),
+  actualIncome: say('Income so far'),
+  actualExpense: say('Spent so far'),
+  remaining: say('Remaining'),
+  editBudget: say('Set budget'),
+  saveBudget: say('Save budget'),
+  invalidAmount: say('Enter an amount with up to two decimal places.'),
 };
 
 function Notice({ message }: { message: string }) {
@@ -33,6 +47,13 @@ interface FundRow {
   openingCents: number; incomeCents: number; expenseCents: number; closingCents: number;
 }
 
+interface FundDetail {
+  fund: { id: string; code: string; name: string; restricted: boolean };
+  from: string; to: string; openingCents: number; incomeCents: number; expenseCents: number; closingCents: number;
+  incomeByAccount: Array<{ code: string; name: string; amountCents: number }>;
+  expensesByAccount: Array<{ code: string; name: string; amountCents: number }>;
+}
+
 function useFundBalances(from: string, to: string) {
   const { orgId } = useChurchOrg();
   return useQuery({
@@ -43,13 +64,19 @@ function useFundBalances(from: string, to: string) {
 }
 
 export function FundsView() {
-  const { orgId, today, currency, canPost } = useChurchOrg();
+  const { orgId, today, currency, canPost, isAdmin } = useChurchOrg();
+  const fiscalYearStart = useAppStore((state) => state.activeCompany?.fiscalYearStart);
   const queryClient = useQueryClient();
   const funds = useFunds();
   const year = { from: `${today.slice(0, 4)}-01-01`, to: today };
   const balances = useFundBalances(year.from, year.to);
+  const [budgetYear, setBudgetYear] = useState(Number(budgetPeriodRange('YEARLY', today, fiscalYearStart).from.slice(0, 4)));
+  const budgets = useQuery({ queryKey: ['fund-budgets', orgId, budgetYear],
+    queryFn: () => apiRequest<{ periodStart: string; periodEnd: string; funds: Array<FundRow & {
+      budgetId: string | null; incomeTargetCents: number; expenseLimitCents: number; expenseRemainingCents: number;
+    }> }>(`/api/church/fund-budgets?year=${budgetYear}`, { fallback: 'Fund budgets could not be loaded.' }) });
   const rules = useQuery({ queryKey: ['giving-rules', orgId], queryFn: () => apiRequest<{ rules: any[] }>('/api/giving-rules', { fallback: 'The giving rules could not be loaded.' }) });
-  const [dialog, setDialog] = useState<{ kind: 'fund'; fund?: any } | { kind: 'rule' } | null>(null);
+  const [dialog, setDialog] = useState<{ kind: 'fund'; fund?: any } | { kind: 'rule' } | { kind: 'budget'; fund: any; budget?: any } | null>(null);
   const [notice, setNotice] = useState('');
   const toggleRule = useMutation({
     mutationFn: (rule: any) => apiRequest(`/api/giving-rules/${rule.id}`, { method: 'PATCH', body: { isActive: !rule.is_active } }),
@@ -62,6 +89,35 @@ export function FundsView() {
       <PageHeading title={COPY.funds.en} note="Every gift and every cost belongs to a fund. Money in a restricted fund is spent only on its purpose."
         actions={canPost && <button type="button" className={buttonClass.primary} onClick={() => setDialog({ kind: 'fund' })}>{COPY.addFund.en}</button>} />
       <Notice message={notice} />
+      <section aria-labelledby="fund-budgets" className="space-y-3">
+        <div className="flex flex-wrap items-end justify-between gap-3">
+          <h2 id="fund-budgets" className="ll-heading text-[17px] text-ink-900">{COPY.fundBudgets.en}</h2>
+          <label className="text-[12.5px]">{COPY.budgetYear.en}<input type="number" min="2000" max="2100" name="budget-year" value={budgetYear}
+            onChange={(event) => setBudgetYear(Number(event.target.value) || budgetYear)} className="ml-2 h-9 w-24 rounded-lg border border-border px-2" /></label>
+        </div>
+        {budgets.isError ? <LoadProblem what="fund budgets" path="/api/church/fund-budgets" onRetry={() => budgets.refetch()} />
+          : budgets.isLoading || !budgets.data ? <SkeletonRows label="Loading fund budgets" rows={4} /> : (
+            <>
+              <p className="text-[12.5px] text-text-3">{shortDate(budgets.data.periodStart)} to {shortDate(budgets.data.periodEnd)}</p>
+              <div className="overflow-x-auto"><table className="w-full min-w-[600px] text-[13.5px]">
+                <caption className="sr-only">{COPY.fundBudgets.en}</caption>
+                <thead><tr><th scope="col" className="text-left">Fund</th><th scope="col" className="text-right">{COPY.incomeTarget.en}</th>
+                  <th scope="col" className="text-right">{COPY.actualIncome.en}</th><th scope="col" className="text-right">{COPY.expenseLimit.en}</th>
+                  <th scope="col" className="text-right">{COPY.actualExpense.en}</th><th scope="col" className="text-right">{COPY.remaining.en}</th><th scope="col" className="sr-only">Actions</th></tr></thead>
+                <tbody>{budgets.data.funds.map((row) => <tr key={row.fundId} className="border-b border-border">
+                  <td className="py-2">{row.name}<RestrictedNote restricted={row.restricted} /></td>
+                  <td className="py-2 text-right">{row.budgetId ? <Amount cents={row.incomeTargetCents} currency={currency} /> : 'Not set'}</td>
+                  <td className="py-2 text-right"><Amount cents={row.incomeCents} currency={currency} /></td>
+                  <td className="py-2 text-right">{row.budgetId ? <Amount cents={row.expenseLimitCents} currency={currency} /> : 'Not set'}</td>
+                  <td className="py-2 text-right"><Amount cents={row.expenseCents} currency={currency} /></td>
+                  <td className="py-2 text-right">{row.budgetId ? <Amount cents={row.expenseRemainingCents} currency={currency} /> : '—'}</td>
+                  <td className="py-2 text-right">{isAdmin && row.isActive && <button type="button" className={buttonClass.quiet}
+                    onClick={() => setDialog({ kind: 'budget', fund: row, budget: row })}>{COPY.editBudget.en}</button>}</td>
+                </tr>)}</tbody>
+              </table></div>
+            </>
+          )}
+      </section>
       {funds.isError ? <LoadProblem what="the funds" path="/api/funds" onRetry={() => funds.refetch()} />
         : funds.isLoading ? <SkeletonRows label="Loading the funds" rows={4} />
           : (funds.data?.funds || []).length === 0 ? <EmptyNote>{COPY.noFunds.en}</EmptyNote> : (
@@ -117,19 +173,53 @@ export function FundsView() {
       </section>
       {dialog?.kind === 'fund' && <FundDialog fund={dialog.fund} onClose={() => setDialog(null)} onDone={done} />}
       {dialog?.kind === 'rule' && <GivingRuleDialog onClose={() => setDialog(null)} onDone={done} />}
+      {dialog?.kind === 'budget' && <FundBudgetDialog fund={dialog.fund} budget={dialog.budget} year={budgetYear}
+        onClose={() => setDialog(null)} onDone={done} />}
     </div>
   );
+}
+
+function FundBudgetDialog({ fund, budget, year, onClose, onDone }: { fund: any; budget?: any; year: number; onClose: () => void; onDone: (message: string) => void }) {
+  const { orgId, currency } = useChurchOrg();
+  const queryClient = useQueryClient();
+  const [income, setIncome] = useState(((budget?.incomeTargetCents || 0) / 100).toFixed(2));
+  const [expense, setExpense] = useState(((budget?.expenseLimitCents || 0) / 100).toFixed(2));
+  const [error, setError] = useState('');
+  const save = useMutation({
+    mutationFn: (body: { year: number; incomeTargetCents: number; expenseLimitCents: number }) => apiRequest(`/api/church/fund-budgets/${fund.fundId}`, { method: 'PUT', body }),
+    onSuccess: () => { refreshChurch(queryClient, orgId); onDone(`Fund budget for ${fund.name} saved.`); },
+    onError: (cause) => setError(cause instanceof Error ? cause.message : 'The fund budget could not be saved.'),
+  });
+  return <Dialog open onClose={onClose} title={`${fund.name} · ${year}`} note={`Plan for this fund in ${currency}. No journal entry is posted.`}
+    footer={<><button type="button" className={buttonClass.secondary} onClick={onClose}>Cancel</button>
+      <button type="submit" form="fund-budget-form" className={buttonClass.primary} disabled={save.isPending}>{COPY.saveBudget.en}</button></>}>
+    <form id="fund-budget-form" className="space-y-4" onSubmit={(event) => {
+      event.preventDefault();
+      const incomeTargetCents = centsFromAmountText(income);
+      const expenseLimitCents = centsFromAmountText(expense);
+      if (incomeTargetCents === null || expenseLimitCents === null) { setError(COPY.invalidAmount.en); return; }
+      setError(''); save.mutate({ year, incomeTargetCents, expenseLimitCents });
+    }}>
+      <Field label={`${COPY.incomeTarget.en} (${currency})`}><input required inputMode="decimal" value={income} onChange={(event) => setIncome(event.target.value)} name="income-target" /></Field>
+      <Field label={`${COPY.expenseLimit.en} (${currency})`}><input required inputMode="decimal" value={expense} onChange={(event) => setExpense(event.target.value)} name="expense-limit" /></Field>
+      {error && <p role="alert" className="text-[13px] text-negative">{error}</p>}
+    </form>
+  </Dialog>;
 }
 
 const kes = (cents: number) => figureText(cents);
 
 /** Fund balances for a period, and the check that they come to the trial balance. */
 export function FundBalancesView() {
-  const { today, currency, companyName, kraPin } = useChurchOrg();
+  const { orgId, today, currency, companyName, kraPin } = useChurchOrg();
   const month = monthRange(today.slice(0, 7))!;
   const [from, setFrom] = useState(month.from);
   const [to, setTo] = useState(today);
+  const [selectedFundId, setSelectedFundId] = useState<string | null>(null);
   const balances = useFundBalances(from, to);
+  const detail = useQuery({ queryKey: ['fund-detail', orgId, selectedFundId, from, to], enabled: Boolean(selectedFundId && from && to && from <= to),
+    queryFn: () => apiRequest<FundDetail>(`/api/church-reports/funds/${selectedFundId}?from=${from}&to=${to}`,
+      { fallback: 'The fund report could not be loaded.' }) });
   const rows = balances.data?.funds || [];
   const check = balances.data?.reconciliation;
   const total = (key: keyof FundRow) => rows.reduce((sum, row) => sum + Number(row[key] || 0), 0);
@@ -144,6 +234,24 @@ export function FundBalancesView() {
       columnStyles: { 1: { halign: 'right' }, 2: { halign: 'right' }, 3: { halign: 'right' }, 4: { halign: 'right', fontStyle: 'bold' } },
     }],
   );
+  const exportFundPdf = () => {
+    const data = detail.data;
+    if (!data) return;
+    FinancialPDFEngine.exportFinancialStatement(
+      { title: `${data.fund.name} fund report`, period: `${shortDate(from)} to ${shortDate(to)}`,
+        companyName, kraPin, currency, filename: `fund-report-${data.fund.code}-${from}-${to}.pdf` },
+      [
+        { title: 'Fund movement', headers: ['Measure', currency], rows: [
+          ['Opening', kes(data.openingCents)], ['Income', kes(data.incomeCents)],
+          ['Expenses', kes(data.expenseCents)], ['Closing', kes(data.closingCents)],
+        ] },
+        { title: 'Income by account', headers: ['Account', currency], rows: data.incomeByAccount.length
+          ? data.incomeByAccount.map((row) => [`${row.code} ${row.name}`, kes(row.amountCents)]) : [['No income in this period', '']] },
+        { title: 'Expenses by account', headers: ['Account', currency], rows: data.expensesByAccount.length
+          ? data.expensesByAccount.map((row) => [`${row.code} ${row.name}`, kes(row.amountCents)]) : [['No expenses in this period', '']] },
+      ],
+    );
+  };
   return (
     <div className="space-y-5">
       <PageHeading title={COPY.fundBalances.en} note={`${companyName} · ${shortDate(from)} to ${shortDate(to)} · Figures in ${currency}`}
@@ -172,7 +280,9 @@ export function FundBalancesView() {
               <tbody>
                 {rows.map((row) => (
                   <tr key={row.fundId}>
-                    <th scope="row" className="py-2 pr-3 text-left font-normal">{row.name}<RestrictedNote restricted={row.restricted} /></th>
+                    <th scope="row" className="py-2 pr-3 text-left font-normal">{row.name}<RestrictedNote restricted={row.restricted} />
+                      <button type="button" className={buttonClass.quiet} onClick={() => setSelectedFundId(row.fundId)}
+                        aria-label={`${say('View fund report').en} for ${row.name}`}>{say('View report').en}</button></th>
                     <td className="py-2 pr-3 text-right"><Amount cents={row.openingCents} currency={currency} /></td>
                     <td className="py-2 pr-3 text-right"><Amount cents={row.incomeCents} currency={currency} /></td>
                     <td className="py-2 pr-3 text-right"><Amount cents={row.expenseCents} currency={currency} /></td>
@@ -200,6 +310,19 @@ export function FundBalancesView() {
                 )}
               </section>
             )}
+            {selectedFundId && <section aria-label="Fund project report" className="max-w-4xl space-y-3 rounded-xl border border-border bg-surface p-4">
+              {detail.isError ? <LoadProblem what="the fund report" path="/api/church-reports/funds" onRetry={() => detail.refetch()} />
+                : detail.isLoading || !detail.data ? <SkeletonRows label="Loading the fund report" rows={4} /> : <>
+                  <div className="flex flex-wrap items-center justify-between gap-2"><h2 className="font-semibold">{detail.data.fund.name} · {say('Fund project report').en}</h2>
+                    <button type="button" className={buttonClass.secondary} onClick={exportFundPdf}>{say('Export fund PDF').en}</button></div>
+                  <p className="text-[13px] text-text-2">{say('Posted income and expenses by account for the selected period.').en}</p>
+                  {([['Income', detail.data.incomeByAccount], ['Expenses', detail.data.expensesByAccount]] as const).map(([title, accountRows]) =>
+                    <div key={title}><h3 className="text-[13px] font-semibold">{title}</h3>
+                      {accountRows.length === 0 ? <p className="text-[13px] text-text-2">{say('No posted entries in this period.').en}</p>
+                        : accountRows.map((account) => <div key={account.code} className="flex justify-between border-b border-border py-1 text-[13px]">
+                          <span>{account.code} {account.name}</span><Amount cents={account.amountCents} currency={currency} /></div>)}</div>)}
+                </>}
+            </section>}
           </>
         )}
     </div>
