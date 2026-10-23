@@ -3,11 +3,14 @@ import { FundsService } from '../../src/server/funds';
 import { GivingService } from '../../src/server/giving';
 import { CollectionsService } from '../../src/server/collections';
 import { ChurchReportService } from '../../src/server/churchReports';
+import { FundBudgetService } from '../../src/server/fundBudgets';
+import { ChurchCampaignService } from '../../src/server/churchCampaigns';
+import { GivingPlanService } from '../../src/server/givingPlans';
 import { bodyOf, respondError } from '../http';
 import { uuid } from '../schemas';
 import {
-  collectionBankSchema, collectionConfirmSchema, collectionListSchema, collectionStartSchema, contributionSchema,
-  dayQuerySchema, fundCreateSchema, fundUpdateSchema, givingRuleSchema, givingRuleUpdateSchema, householdSchema,
+  churchCampaignCloseSchema, churchCampaignSchema, churchPledgeSchema, collectionBankSchema, collectionConfirmSchema, collectionListSchema, collectionStartSchema, contributionSchema,
+  dayQuerySchema, fundBudgetSaveSchema, fundBudgetYearSchema, fundCreateSchema, fundUpdateSchema, givingPlanCreateSchema, givingPlanStopSchema, givingRuleSchema, givingRuleUpdateSchema, householdSchema,
   memberCreateSchema, memberImportSchema, memberListSchema, memberUpdateSchema, monthQuerySchema, periodQuerySchema,
   queueAssignSchema, queueIgnoreSchema,
 } from '../churchSchemas';
@@ -82,6 +85,62 @@ export function registerChurchRoutes(api: Api) {
       const body = fundUpdateSchema.parse(await bodyOf(c));
       await FundsService.update(c.get('orgId'), uuid.parse(c.req.param('id')), body);
       return c.json({ ok: true });
+    } catch (err) { return respondError(c, err); }
+  });
+  api.get('/church/fund-budgets', async (c) => {
+    try {
+      const { year, asOf } = fundBudgetYearSchema.parse(c.req.query());
+      return c.json(await FundBudgetService.list(c.get('orgId'), year, asOf));
+    } catch (err) { return respondError(c, err); }
+  });
+  api.put('/church/fund-budgets/:fundId', async (c) => {
+    try {
+      const body = fundBudgetSaveSchema.parse(await bodyOf(c));
+      return c.json(await FundBudgetService.save(c.get('orgId'), c.get('userId'), uuid.parse(c.req.param('fundId')),
+        body.year, body as Input<typeof FundBudgetService.save, 4>));
+    } catch (err) { return respondError(c, err); }
+  });
+  api.get('/church/campaigns', async (c) => {
+    try { return c.json(await ChurchCampaignService.list(c.get('orgId'))); }
+    catch (err) { return respondError(c, err); }
+  });
+  api.post('/church/campaigns', async (c) => {
+    try {
+      const body = churchCampaignSchema.parse(await bodyOf(c));
+      return c.json({ id: await ChurchCampaignService.create(c.get('orgId'), c.get('userId'),
+        body as Input<typeof ChurchCampaignService.create, 2>) }, 201);
+    } catch (err) { return respondError(c, err); }
+  });
+  api.post('/church/campaigns/:id/pledges', async (c) => {
+    try {
+      const body = churchPledgeSchema.parse(await bodyOf(c));
+      return c.json({ id: await ChurchCampaignService.pledge(c.get('orgId'), c.get('userId'), uuid.parse(c.req.param('id')),
+        body as Input<typeof ChurchCampaignService.pledge, 3>) }, 201);
+    } catch (err) { return respondError(c, err); }
+  });
+  api.post('/church/campaigns/:id/close', async (c) => {
+    try {
+      const { endsOn } = churchCampaignCloseSchema.parse(await bodyOf(c));
+      return c.json(await ChurchCampaignService.close(c.get('orgId'), c.get('userId'), uuid.parse(c.req.param('id')), endsOn));
+    } catch (err) { return respondError(c, err); }
+  });
+  api.get('/church/giving-plans', async (c) => {
+    try {
+      const { month } = monthQuerySchema.parse(c.req.query());
+      return c.json(await GivingPlanService.list(c.get('orgId'), month));
+    } catch (err) { return respondError(c, err); }
+  });
+  api.post('/church/giving-plans', async (c) => {
+    try {
+      const body = givingPlanCreateSchema.parse(await bodyOf(c));
+      return c.json({ id: await GivingPlanService.create(c.get('orgId'), c.get('userId'),
+        body as Input<typeof GivingPlanService.create, 2>) }, 201);
+    } catch (err) { return respondError(c, err); }
+  });
+  api.post('/church/giving-plans/:id/stop', async (c) => {
+    try {
+      const { endsOn } = givingPlanStopSchema.parse(await bodyOf(c));
+      return c.json(await GivingPlanService.stop(c.get('orgId'), c.get('userId'), uuid.parse(c.req.param('id')), endsOn));
     } catch (err) { return respondError(c, err); }
   });
   api.get('/giving-rules', async (c) => {
@@ -179,6 +238,12 @@ export function registerChurchRoutes(api: Api) {
     try {
       const { from, to } = periodQuerySchema.parse(c.req.query());
       return c.json(await ChurchReportService.fundBalances(c.get('orgId'), from as string, to as string));
+    } catch (err) { return respondError(c, err); }
+  });
+  api.get('/church-reports/funds/:fundId', async (c) => {
+    try {
+      const { from, to } = periodQuerySchema.parse(c.req.query());
+      return c.json(await ChurchReportService.fundDetail(c.get('orgId'), uuid.parse(c.req.param('fundId')), from, to));
     } catch (err) { return respondError(c, err); }
   });
   api.get('/church/dashboard', async (c) => {

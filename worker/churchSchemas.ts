@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { idempotencyKey, isoDate, optionalUuid, positiveCents, requiredText, text, uuid } from './schemas';
+import { cents, idempotencyKey, isoDate, optionalUuid, positiveCents, requiredText, text, uuid } from './schemas';
 
 const transId = z.string().trim().toUpperCase().regex(/^[A-Z0-9]{6,30}$/, 'An M-Pesa receipt number is 6 to 30 letters and digits.');
 const isoTime = z.string().trim().refine((value) => /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d+)?(Z|[+-]\d{2}:\d{2})$/.test(value)
@@ -79,6 +79,24 @@ export const fundUpdateSchema = z.object({
   name: requiredText(100, 'A fund name').optional(), restricted: z.boolean().optional(),
   isActive: z.boolean().optional(), incomeAccountId: uuid.optional(),
 });
+export const fundBudgetYearSchema = z.object({ year: z.coerce.number().int().min(2000).max(2100), asOf: isoDate.optional() });
+export const fundBudgetSaveSchema = fundBudgetYearSchema.extend({
+  incomeTargetCents: cents, expenseLimitCents: cents,
+});
+export const churchCampaignSchema = z.object({
+  fundId: uuid, name: requiredText(160, 'A campaign name'), goalCents: positiveCents,
+  startsOn: isoDate, endsOn: isoDate.nullable(),
+}).refine((body) => !body.endsOn || body.endsOn >= body.startsOn, 'The campaign end must follow its start.');
+export const churchPledgeSchema = z.object({
+  memberId: uuid, pledgedCents: positiveCents, pledgedOn: isoDate,
+  dueOn: isoDate.nullable(), note: text(500).nullable(),
+}).refine((body) => !body.dueOn || body.dueOn >= body.pledgedOn, 'The pledge due date must follow its date.');
+export const churchCampaignCloseSchema = z.object({ endsOn: isoDate });
+export const givingPlanCreateSchema = z.object({
+  memberId: uuid, fundId: uuid, monthlyCents: positiveCents,
+  startsOn: isoDate.refine((date) => date.endsWith('-01'), 'A giving plan starts on the first day of a month.'),
+});
+export const givingPlanStopSchema = z.object({ endsOn: isoDate });
 export const givingRuleSchema = z.object({
   priority: z.number().int().min(0).max(10000),
   matchType: z.enum(['MEMBER_NUMBER', 'PREFIX', 'EXACT']),

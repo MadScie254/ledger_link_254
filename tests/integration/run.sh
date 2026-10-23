@@ -63,7 +63,7 @@ for suite in "${suites[@]}"; do
     --outfile="$WORK/$name.mjs" \
     --banner:js="import { createRequire } from 'module'; const require = createRequire(import.meta.url);"
   if ! SUPABASE_URL=http://127.0.0.1:54321 SUPABASE_SECRET_KEY="$SERVICE_JWT" \
-      node --test --test-concurrency=1 --test-reporter=dot "$WORK/$name.mjs"; then
+      node --test --test-concurrency=1 --test-reporter=spec "$WORK/$name.mjs"; then
     echo "FAIL $name"; status=1
   else
     echo "ok   $name"

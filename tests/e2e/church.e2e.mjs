@@ -136,12 +136,18 @@ test('a church imports its register, counts and banks a collection, takes M-Pesa
     await page.getByText('Every M-Pesa receipt has been placed.').waitFor();
     const [download] = await Promise.all([page.waitForEvent('download'), page.getByRole('button', { name: 'Export PDF' }).click()]);
     assert.equal(download.suggestedFilename(), 'treasurers-report-2026-10.pdf');
+    const [councilPack] = await Promise.all([page.waitForEvent('download'), page.getByRole('button', { name: 'Council pack PDF' }).click()]);
+    assert.equal(councilPack.suggestedFilename(), 'council-pack-2026-10.pdf');
 
     // Fund balances reconcile to the trial balance.
     await openView(page, 'Fund balances');
     await page.locator('input[name="from"]').fill('2026-10-01');
     await page.locator('input[name="to"]').fill('2026-10-31');
     await page.getByText(/The funds come to the ledger/).waitFor({ timeout: 10_000 });
+    await page.getByRole('button', { name: /View fund report for/ }).first().click();
+    await page.getByText('Posted income and expenses by account for the selected period.').waitFor();
+    const [fundReport] = await Promise.all([page.waitForEvent('download'), page.getByRole('button', { name: 'Export fund PDF' }).click()]);
+    assert.match(fundReport.suggestedFilename(), /^fund-report-.*-2026-10-01-2026-10-31\.pdf$/);
     assert.equal(Number(sql(`SELECT COALESCE(sum(debit - credit), 0) FROM public.journal_lines WHERE org_id = '${church()}'`)), 0);
     assert.equal(sql(`SELECT count(*) FROM public.journal_lines l JOIN public.accounts a ON a.id = l.account_id
       WHERE l.org_id = '${church()}' AND a.type IN ('INCOME','EXPENSE','COGS') AND l.entity_type IS DISTINCT FROM 'FUND'`), '0', 'every income and expense line has a fund');

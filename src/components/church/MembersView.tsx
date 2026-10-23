@@ -5,7 +5,9 @@ import { useAppStore } from '../../store';
 import { apiRequest } from '../../utils/apiRequest';
 import { useCreateIntent } from '../../hooks/useCreateIntent';
 import { MEMBER_STATUSES } from '../../utils/memberImport';
-import { Amount } from '../ledger/Amount';
+import { givingStatement } from '../../utils/memberGiving';
+import { FinancialPDFEngine } from '../../utils/pdfExport';
+import { Amount, figureText } from '../ledger/Amount';
 import { EmptyNote, LoadProblem, PageHeading, SkeletonRows, buttonClass } from '../ledger/Page';
 import { GiftDialog, HouseholdDialog, ImportMembersDialog, MemberDialog } from './ChurchDialogs';
 import {
@@ -22,6 +24,21 @@ const COPY = {
   addHousehold: say('Add a household'),
   noHouseholds: say('No households yet. A household groups members who live together.'),
   noGiving: say('No giving recorded for this member yet.'),
+  statement: say('Giving statement'),
+  receipt: say('Giving receipt'),
+  downloadStatement: say('Download statement PDF'),
+  downloadReceipt: say('Download receipt PDF'),
+  from: say('From'),
+  to: say('To'),
+  postedGifts: say('Posted gifts'),
+  periodTotal: say('Giving in this period'),
+  postedGift: say('Posted gift'),
+  giftId: say('Gift ID'),
+  journalEntry: say('Journal entry'),
+  allTime: say('All time'),
+  receiptColumn: say('Receipt'),
+  invalidPeriod: say('The period starts after it ends.'),
+  noGivingInPeriod: say('No giving in this period.'),
 };
 
 /** A member another screen asked the Members page to open. */
@@ -115,9 +132,11 @@ export function MembersView() {
 }
 
 export function MemberRecord({ memberId, onBack }: { memberId: string; onBack: () => void }) {
-  const { orgId, currency, canPost } = useChurchOrg();
+  const { orgId, currency, canPost, companyName, kraPin, today } = useChurchOrg();
   const [dialog, setDialog] = useState<'edit' | 'gift' | null>(null);
   const [notice, setNotice] = useState('');
+  const [from, setFrom] = useState(`${today.slice(0, 4)}-01-01`);
+  const [to, setTo] = useState(today);
   const record = useQuery({
     queryKey: ['member', orgId, memberId],
     queryFn: () => apiRequest<{ member: Member; giving: any[]; givingTotalCents: number }>(`/api/members/${memberId}`, { fallback: 'The member could not be loaded.' }),
@@ -126,6 +145,28 @@ export function MemberRecord({ memberId, onBack }: { memberId: string; onBack: (
   if (record.isError) return <LoadProblem what="the member" path={`/api/members/${memberId}`} onRetry={() => record.refetch()} />;
   if (record.isLoading || !record.data) return <SkeletonRows label="Loading the member" />;
   const { member, giving, givingTotalCents } = record.data;
+  const validPeriod = from <= to;
+  const statement = validPeriod ? givingStatement(giving, from, to) : { gifts: [], totalCents: 0 };
+  const downloadStatement = () => FinancialPDFEngine.exportFinancialStatement(
+    { title: COPY.statement.en, subtitle: memberName(member), period: `${shortDate(from)} to ${shortDate(to)}`,
+      companyName, kraPin, currency, filename: `giving-statement-${member.member_number}-${from}-${to}.pdf` },
+    [
+      { title: COPY.postedGifts.en, headers: ['Received', 'Fund', 'How', 'Reference', currency],
+        rows: statement.gifts.map((gift: any) => [shortDate(gift.received_on), gift.funds?.name || '',
+          GIFT_METHODS[gift.method]?.en || gift.method, gift.reference || '', figureText(Number(gift.amount_cents))]) },
+      { title: 'Total', headers: ['', currency], rows: [[COPY.periodTotal.en, figureText(statement.totalCents)]] },
+    ],
+  );
+  const downloadReceipt = (gift: any) => FinancialPDFEngine.exportFinancialStatement(
+    { title: COPY.receipt.en, subtitle: memberName(member), period: shortDate(gift.received_on),
+      companyName, kraPin, currency, filename: `giving-receipt-${gift.id}.pdf` },
+    [{ title: COPY.postedGift.en, headers: ['Detail', 'Value'], rows: [
+      ['Member', `${member.member_number} · ${memberName(member)}`],
+      ['Fund', gift.funds?.name || ''], ['Method', GIFT_METHODS[gift.method]?.en || gift.method],
+      ['Reference', gift.reference || 'Not recorded'], [COPY.giftId.en, gift.id],
+      [COPY.journalEntry.en, gift.journal_entry_id], ['Amount', `${currency} ${figureText(Number(gift.amount_cents))}`],
+    ] }],
+  );
   return (
     <div className="space-y-5">
       <button type="button" className={buttonClass.quiet} onClick={onBack}>All members</button>
@@ -153,19 +194,27 @@ export function MemberRecord({ memberId, onBack }: { memberId: string; onBack: (
       <section aria-labelledby="member-giving">
         <div className="flex items-baseline justify-between border-b border-feint-strong pb-1">
           <h2 id="member-giving" className="ll-heading text-[17px] text-ink-900">Giving</h2>
-          <span className="text-[13px] text-graphite-600">Total <Amount cents={givingTotalCents} currency={currency} /></span>
+          <span className="text-[13px] text-graphite-600">{COPY.allTime.en} <Amount cents={givingTotalCents} currency={currency} /></span>
         </div>
-        {giving.length === 0 ? <p className="py-3 text-[13.5px] text-graphite-600">{COPY.noGiving.en}</p> : (
+        <div className="my-3 flex flex-wrap items-end gap-3 no-print">
+          <label className="text-[12.5px]">{COPY.from.en}<input type="date" name="statement-from" value={from} onChange={(event) => setFrom(event.target.value || from)} className="mt-1 block h-9 rounded-lg border border-border px-2" /></label>
+          <label className="text-[12.5px]">{COPY.to.en}<input type="date" name="statement-to" value={to} onChange={(event) => setTo(event.target.value || to)} className="mt-1 block h-9 rounded-lg border border-border px-2" /></label>
+          {canPost && <button type="button" className={buttonClass.secondary} onClick={downloadStatement} disabled={!validPeriod || !statement.gifts.length}>{COPY.downloadStatement.en}</button>}
+          <span className="text-[13px]">{COPY.statement.en}: <Amount cents={statement.totalCents} currency={currency} /></span>
+        </div>
+        {!validPeriod && <p role="alert" className="text-[13px] text-negative">{COPY.invalidPeriod.en}</p>}
+        {statement.gifts.length === 0 ? <p className="py-3 text-[13.5px] text-graphite-600">{giving.length ? COPY.noGivingInPeriod.en : COPY.noGiving.en}</p> : (
           <table className="w-full text-[13.5px]">
             <caption className="sr-only">Giving by this member</caption>
-            <thead><tr><th scope="col" className="text-left">Received</th><th scope="col" className="text-left">Fund</th><th scope="col" className="text-left">How</th><th scope="col" className="text-right">Amount</th></tr></thead>
+            <thead><tr><th scope="col" className="text-left">Received</th><th scope="col" className="text-left">Fund</th><th scope="col" className="text-left">How</th><th scope="col" className="text-right">Amount</th><th scope="col" className="text-right no-print">{COPY.receiptColumn.en}</th></tr></thead>
             <tbody>
-              {giving.map((gift) => (
+              {statement.gifts.map((gift) => (
                 <tr key={gift.id}>
                   <td className="py-1.5 ll-figure">{shortDate(gift.received_on)}</td>
                   <td className="py-1.5">{gift.funds?.name}</td>
                   <td className="py-1.5">{GIFT_METHODS[gift.method]?.en}{gift.reference ? ` · ${gift.reference}` : ''}</td>
                   <td className="py-1.5 text-right"><Amount cents={Number(gift.amount_cents)} currency={currency} /></td>
+                  <td className="py-1.5 text-right no-print">{canPost && <button type="button" className={buttonClass.quiet} onClick={() => downloadReceipt(gift)} aria-label={`${COPY.downloadReceipt.en} for ${shortDate(gift.received_on)}`}>{COPY.downloadReceipt.en}</button>}</td>
                 </tr>
               ))}
             </tbody>
