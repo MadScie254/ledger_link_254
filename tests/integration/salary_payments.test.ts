@@ -27,11 +27,13 @@ test('new runs accrue net salaries and salary payment has its own bank entry and
     .eq('org_id', ORG).eq('journal_entry_id', payment.journalEntryId);
   assert.ok(paymentLines?.some((line) => line.account_id === BANK && Number(line.credit) === run.totalNetCents));
   assert.ok(paymentLines?.some((line) => line.account_id === run.netPayAccountId && Number(line.debit) === run.totalNetCents));
-  await PayrollService.reversePayrollRun(ORG, runId, '2026-10-02', 'Wrong salary', OWNER);
+  await refused(PayrollService.reversePayrollRun(ORG, runId, '2026-10-02', 'Wrong salary', OWNER), /reverse that salary payment first/i);
   assert.equal((await PayrollService.getSalaryPayments(ORG, runId))[0].reversedAt, null);
   const reversal = await PayrollService.reverseSalaryPayment(ORG, runId, payment.id, '2026-10-03', 'Wrong bank payment', OWNER);
   assert.equal((await PayrollService.getSalaryPayments(ORG, runId))[0].reversedAt !== null, true);
   assert.deepEqual(await PayrollService.reverseSalaryPayment(ORG, runId, payment.id, '2026-10-03', 'Retry', OWNER), reversal);
+  const runReversal = await PayrollService.reversePayrollRun(ORG, runId, '2026-10-03', 'Wrong salary', OWNER);
+  assert.ok(runReversal.reversalJournalEntryId);
   await refused(PayrollService.paySalaries('00000000-0000-0000-0000-0000000000bb', runId, BANK, '2026-10-04', OWNER, uuid()), /organization|access|membership|not found/i);
 });
 
