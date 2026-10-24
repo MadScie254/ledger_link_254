@@ -4,6 +4,7 @@ import { apiRequest } from '../../utils/apiRequest';
 import { EmptyNote, buttonClass } from '../ledger/Page';
 import { Field } from '../ledger/Dialog';
 import { Amount } from '../ledger/Amount';
+import { localized, text } from '../../utils/language';
 
 interface MpesaSettings {
   configured: boolean;
@@ -36,12 +37,12 @@ interface MpesaPayment {
 type Edition = 'business' | 'church';
 
 const copy = {
-  heading: { church: { en: 'M-Pesa giving', sw: 'TODO-SW' }, business: { en: 'M-Pesa payments', sw: 'TODO-SW' } },
-  save: { en: 'Save M-Pesa settings', sw: 'TODO-SW' },
-  register: { en: 'Register URLs with Safaricom', sw: 'TODO-SW' },
+  heading: { church: localized('M-Pesa giving'), business: localized('M-Pesa payments') },
+  save: localized('Save M-Pesa settings'),
+  register: localized('Register URLs with Safaricom'),
   empty: {
-    church: { en: 'No M-Pesa settings yet. Enter the church\'s paybill and Daraja keys to start.', sw: 'TODO-SW' },
-    business: { en: 'No M-Pesa settings yet. Enter the business\'s paybill or till and Daraja keys to start.', sw: 'TODO-SW' },
+    church: localized('No M-Pesa settings yet. Enter the church\'s paybill and Daraja keys to start.'),
+    business: localized('No M-Pesa settings yet. Enter the business\'s paybill or till and Daraja keys to start.'),
   },
 };
 
@@ -147,7 +148,7 @@ export function IntegrationsPanel({ orgId, edition, baseCurrency }: { orgId: str
 
   return <section aria-labelledby="mpesa-heading" className="max-w-3xl space-y-5">
     <div className="border-t-2 border-ink-900 pt-5">
-      <h2 id="mpesa-heading" className="ll-heading text-[22px] text-ink-900">{copy.heading[edition].en}</h2>
+      <h2 id="mpesa-heading" className="ll-heading text-[22px] text-ink-900">{text(copy.heading[edition])}</h2>
       {isBusiness ? <p className="mt-2 text-[13.5px] text-graphite-600">
         When a customer pays the business&apos;s paybill or till, Safaricom sends the payment here. Ledger Link adds it once to the
         M-Pesa account&apos;s statement lines; the same receipt in a statement uploaded later is skipped. When the account number
@@ -162,7 +163,7 @@ export function IntegrationsPanel({ orgId, edition, baseCurrency }: { orgId: str
       <p className="mt-2 text-[13px] text-ink-900"><span className="font-semibold">Status:</span> {status}</p>
       {current.lastError && <p className="mt-1 text-[13px] text-ledger-red">Last attempt: {current.lastError}</p>}
     </div>
-    {!current.configured && <EmptyNote>{copy.empty[edition].en}</EmptyNote>}
+    {!current.configured && <EmptyNote>{text(copy.empty[edition])}</EmptyNote>}
 
     <form className="grid gap-4 sm:grid-cols-2" onSubmit={(event) => { event.preventDefault(); save.mutate(); }}>
       <Field label="Paybill or till number" hint={`The shortcode Safaricom gave the ${isBusiness ? 'business' : 'church'}.`}>
@@ -202,10 +203,10 @@ export function IntegrationsPanel({ orgId, edition, baseCurrency }: { orgId: str
         </Field>
       </div>
       <div className="flex flex-wrap items-center gap-3 sm:col-span-2">
-        <button type="submit" className={buttonClass.primary} disabled={save.isPending}>{copy.save.en}</button>
+        <button type="submit" className={buttonClass.primary} disabled={save.isPending}>{text(copy.save)}</button>
         <button type="button" className={buttonClass.secondary} disabled={!current.hasCredentials || register.isPending}
           onClick={() => register.mutate()}>
-          {register.isPending ? 'Asking Safaricom' : copy.register.en}
+          {register.isPending ? 'Asking Safaricom' : text(copy.register)}
         </button>
         <button type="button" className={buttonClass.quiet} disabled={!current.configured || issue.isPending}
           onClick={() => {

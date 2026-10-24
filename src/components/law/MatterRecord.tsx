@@ -18,6 +18,7 @@ import {
   FeeNoteBuilderDialog, FeeNotePaymentDialog, LogTimeDialog, OfficeDisbursementDialog,
 } from './LawDialogs';
 import { MatterStanding } from './MattersView';
+import { text } from '../../utils/language';
 
 type Tab = 'overview' | 'parties' | 'diary' | 'time' | 'disbursements' | 'feeNotes' | 'money';
 type Open =
@@ -67,7 +68,7 @@ export function MatterRecord({ matter, onBack, initialNotice = '' }: { matter: M
       <button type="button" className={buttonClass.quiet} onClick={onBack}>All matters</button>
       <PageHeading
         title={matter.title}
-        note={<><span className="ll-figure">{matter.matter_number}</span> · {clientName(matter)} · {MATTER_TYPES[matter.matter_type]?.en || matter.matter_type} · <MatterStanding matter={matter} /></>}
+        note={<><span className="ll-figure">{matter.matter_number}</span> · {clientName(matter)} · {text(MATTER_TYPES[matter.matter_type]) || matter.matter_type} · <MatterStanding matter={matter} /></>}
         actions={canPost && !closed && (
           <>
             <button type="button" className={buttonClass.secondary} onClick={() => setOpen({ kind: 'time' })}>Record time</button>
@@ -110,7 +111,7 @@ export function MatterRecord({ matter, onBack, initialNotice = '' }: { matter: M
           <div>
             <LedgerRow label="Client">{clientName(matter)}</LedgerRow>
             <LedgerRow label="Responsible advocate">{responsible?.email || 'Not yet assigned'}</LedgerRow>
-            <LedgerRow label="Billed by">{matter.billing_method ? BILLING_METHODS[matter.billing_method]?.en : 'Not set'}</LedgerRow>
+            <LedgerRow label="Billed by">{matter.billing_method ? text(BILLING_METHODS[matter.billing_method]) : 'Not set'}</LedgerRow>
             <LedgerRow label="Hourly rate">{matter.default_rate_cents != null ? <Amount cents={Number(matter.default_rate_cents)} currency={currency} tone="ink" size="sm" /> : '–'}</LedgerRow>
             {matter.fixed_fee_cents != null && <LedgerRow label="Fixed fee"><Amount cents={Number(matter.fixed_fee_cents)} currency={currency} tone="ink" size="sm" /></LedgerRow>}
             <LedgerRow label="Opened">{shortDate(matter.opened_on)}</LedgerRow>
@@ -131,13 +132,13 @@ export function MatterRecord({ matter, onBack, initialNotice = '' }: { matter: M
         <section>
           {canPost && <button type="button" className={buttonClass.secondary} onClick={() => setOpen({ kind: 'party' })}>Add a party</button>}
           {parties.isLoading ? <SkeletonRows label="Loading parties" rows={3} />
-            : !(parties.data?.parties.length) ? <EmptyNote>{COPY.noParties.en}</EmptyNote>
+            : !(parties.data?.parties.length) ? <EmptyNote>{text(COPY.noParties)}</EmptyNote>
               : (
                 <ul className="mt-2">
                   {parties.data.parties.map((party) => (
                     <li key={party.id} className="flex flex-wrap items-baseline justify-between gap-3 border-b border-feint py-2 text-[13.5px]">
                       <span className="text-ink-900">{party.name}</span>
-                      <span className="text-graphite-600">{PARTY_ROLES[party.role]?.en || party.role}{party.id_or_reg_number ? ` · ${party.id_or_reg_number}` : ''}{party.phone ? ` · ${party.phone}` : ''}</span>
+                      <span className="text-graphite-600">{text(PARTY_ROLES[party.role]) || party.role}{party.id_or_reg_number ? ` · ${party.id_or_reg_number}` : ''}{party.phone ? ` · ${party.phone}` : ''}</span>
                     </li>
                   ))}
                 </ul>
@@ -149,7 +150,7 @@ export function MatterRecord({ matter, onBack, initialNotice = '' }: { matter: M
         <section>
           {canPost && !closed && <button type="button" className={buttonClass.secondary} onClick={() => setOpen({ kind: 'time' })}>Record time</button>}
           {time.isLoading ? <SkeletonRows label="Loading time" rows={3} />
-            : !(time.data?.entries.length) ? <EmptyNote>{COPY.noTime.en}</EmptyNote>
+            : !(time.data?.entries.length) ? <EmptyNote>{text(COPY.noTime)}</EmptyNote>
               : (
                 <table className="mt-2 w-full text-[13.5px]">
                   <caption className="sr-only">Time on {matter.matter_number}</caption>
@@ -174,18 +175,18 @@ export function MatterRecord({ matter, onBack, initialNotice = '' }: { matter: M
         <section>
           {canPost && !closed && <button type="button" className={buttonClass.secondary} onClick={() => setOpen({ kind: 'event' })}>Add a court date</button>}
           {events.isLoading ? <SkeletonRows label="Loading court dates" rows={3} />
-            : !(events.data?.events.length) ? <EmptyNote>{COPY.noEvents.en}</EmptyNote>
+            : !(events.data?.events.length) ? <EmptyNote>{text(COPY.noEvents)}</EmptyNote>
               : (
                 <ul className="mt-2">
                   {events.data.events.map((event) => (
                     <li key={event.id} className="flex flex-wrap items-baseline justify-between gap-3 border-b border-feint py-2 text-[13.5px]">
                       <span>
                         <span className="ll-figure mr-2 text-ink-900">{printedDateTime(event.starts_at, timeZone)}</span>
-                        {EVENT_TYPES[event.event_type]?.en || event.event_type}{event.court ? ` · ${event.court}` : ''}{event.courtroom ? `, ${event.courtroom}` : ''}
+                        {text(EVENT_TYPES[event.event_type]) || event.event_type}{event.court ? ` · ${event.court}` : ''}{event.courtroom ? `, ${event.courtroom}` : ''}
                         {event.outcome && <span className="block text-[12.5px] text-graphite-600">{event.outcome}</span>}
                       </span>
                       <span className="flex items-center gap-3">
-                        <span className="text-[12.5px] text-graphite-600">{EVENT_STATUS[event.status]?.en || event.status}</span>
+                        <span className="text-[12.5px] text-graphite-600">{text(EVENT_STATUS[event.status]) || event.status}</span>
                         {canPost && event.status === 'SCHEDULED' && <button type="button" className={buttonClass.quiet} onClick={() => setOpen({ kind: 'outcome', event: { ...event, matters: { matter_number: matter.matter_number, title: matter.title } } })}>Record outcome</button>}
                       </span>
                     </li>
@@ -205,7 +206,7 @@ export function MatterRecord({ matter, onBack, initialNotice = '' }: { matter: M
             </div>
           )}
           {ledger.isLoading ? <SkeletonRows label="Loading the client ledger" rows={3} />
-            : entries.length === 0 ? <EmptyNote>{COPY.noMoney.en}</EmptyNote>
+            : entries.length === 0 ? <EmptyNote>{text(COPY.noMoney)}</EmptyNote>
               : (
                 <div className="mt-2">
                   <RunningLedger
@@ -246,7 +247,7 @@ export function MatterRecord({ matter, onBack, initialNotice = '' }: { matter: M
           {canPost && !closed && <button type="button" className={buttonClass.secondary} onClick={() => setOpen({ kind: 'feeNote' })}>Raise a fee note</button>}
           <div>
             {feeNotes.isLoading ? <SkeletonRows label="Loading fee notes" rows={2} />
-              : !(feeNotes.data?.feeNotes.length) ? <EmptyNote>{COPY.noFeeNotes.en}</EmptyNote>
+              : !(feeNotes.data?.feeNotes.length) ? <EmptyNote>{text(COPY.noFeeNotes)}</EmptyNote>
                 : <FeeNoteList notes={feeNotes.data.feeNotes} canPost={canPost} onPay={(note) => setOpen({ kind: 'feePayment', feeNote: note })} onEtims={(note) => setOpen({ kind: 'etims', feeNote: note })} />}
           </div>
         </section>
@@ -326,7 +327,7 @@ function AddPartyDialog({ matter, onClose, onDone }: { matter: Matter; onClose: 
         <Field label="Name"><input name="partyName" required value={name} onChange={(e) => setName(e.target.value)} /></Field>
         <Field label="Role">
           <select name="role" value={role} onChange={(e) => setRole(e.target.value)}>
-            {Object.entries(PARTY_ROLES).map(([id, label]) => <option key={id} value={id}>{label.en}</option>)}
+            {Object.entries(PARTY_ROLES).map(([id, label]) => <option key={id} value={id}>{text(label)}</option>)}
           </select>
         </Field>
         <Field label="ID or registration number" hint="Optional"><input name="idOrRegNumber" value={idNumber} onChange={(e) => setIdNumber(e.target.value)} /></Field>

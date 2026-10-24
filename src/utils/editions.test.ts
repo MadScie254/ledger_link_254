@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { BUSINESS_TYPES } from './businessTypes.ts';
 import { STANDARD_ACCOUNTS } from './accountChart.ts';
 import { KNOWN_VIEWS, PLANNED_SECTION_COPY } from './views.ts';
+import { SWAHILI } from './swahili.ts';
 import { businessTypeAllowedForEdition, editionDefinition, EDITIONS, navigationGroupsFor, type Edition } from './editions.ts';
 
 const STANDARD_CODES = new Set(STANDARD_ACCOUNTS.map((account) => account.code));
@@ -44,15 +45,17 @@ test('each edition has a distinct brand and the prescribed navigation groups', (
   assert.ok(editionDefinition('church').sidebar.flatMap((group) => group.items).every((item) => item.available !== false), 'church pages are open');
 });
 
-test('all sidebar labels have Swahili placeholders and every view has a renderer key', () => {
-  assert.equal(PLANNED_SECTION_COPY.sw, 'TODO-SW');
+test('all sidebar labels have Swahili and every view has a renderer key', () => {
+  assert.equal(PLANNED_SECTION_COPY.sw, SWAHILI[PLANNED_SECTION_COPY.en]);
   const known = new Set<string>(KNOWN_VIEWS);
   for (const edition of EDITIONS) {
     assert.ok(known.has(edition.defaultView));
     for (const group of edition.sidebar) {
-      assert.equal(group.label.sw, 'TODO-SW');
+      assert.ok(SWAHILI[group.label.en], `no Swahili for ${group.label.en}`);
+      assert.equal(group.label.sw, SWAHILI[group.label.en]);
       for (const item of group.items) {
-        assert.equal(item.name.sw, 'TODO-SW');
+        assert.ok(SWAHILI[item.name.en], `no Swahili for ${item.name.en}`);
+        assert.equal(item.name.sw, SWAHILI[item.name.en]);
         assert.ok(known.has(item.view), `${edition.id}: missing renderer for ${item.view}`);
       }
     }

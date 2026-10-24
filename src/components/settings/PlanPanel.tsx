@@ -1,9 +1,10 @@
 import { useQuery } from '@tanstack/react-query';
 import type { PlanSnapshot } from '../../server/plans';
 import { EmptyNote } from '../ledger/Page';
+import { localized, text } from '../../utils/language';
 
-const unavailable = { en: 'Plan details could not be loaded. Try opening this tab again.', sw: 'TODO-SW' };
-const missing = { en: 'No plan is assigned to these books.', sw: 'TODO-SW' };
+const unavailable = localized('Plan details could not be loaded. Try opening this tab again.');
+const missing = localized('No plan is assigned to these books.');
 
 const dateLabel = (value: string) => new Intl.DateTimeFormat('en-KE', {
   day: 'numeric', month: 'short', year: 'numeric', timeZone: 'Africa/Nairobi',
@@ -20,9 +21,9 @@ export function PlanPanel({ orgId }: { orgId: string }) {
     },
   });
   if (isLoading) return <p role="status" className="text-[13px] text-graphite-600">Opening plan details</p>;
-  if (isError) return <EmptyNote>{unavailable.en}</EmptyNote>;
+  if (isError) return <EmptyNote>{text(unavailable)}</EmptyNote>;
   const subscription = data?.subscription;
-  if (!subscription) return <EmptyNote>{missing.en}</EmptyNote>;
+  if (!subscription) return <EmptyNote>{text(missing)}</EmptyNote>;
 
   const { plan } = subscription;
   const reservedUsers = subscription.activeUsers + subscription.pendingInvitations;

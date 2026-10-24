@@ -1,6 +1,7 @@
 import { Banknote, CalendarDays, FileText, HandCoins, House, Menu, Plus, ReceiptText, Scale, Settings2, Users } from 'lucide-react';
 import { useAppStore } from '../../store';
 import { editionDefinition, navigationGroupsFor } from '../../utils/editions';
+import { text } from '../../utils/language';
 
 const PRIMARY_DESTINATIONS = [
   { view: 'Home / Dashboard', label: 'Home', icon: House },
@@ -31,7 +32,7 @@ export function MobileTabBar() {
     .slice(0, 3)
     .map((entry) => ({
       view: entry.view,
-      label: entry.name.en,
+      label: text(entry.name),
       icon: entry.view === 'Home / Dashboard' ? House
         : entry.view === 'Expenses & Bills' ? ReceiptText
           : entry.view === 'Law / Matters' ? Scale

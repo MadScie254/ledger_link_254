@@ -20,6 +20,7 @@ import { BrandMark } from '../components/ledger/BrandMark';
 import { ThemeToggle } from '../components/layout/ThemeToggle';
 import { BUSINESS_BRAND } from '../hooks/usePublicBrand';
 import type { PublicBrand } from '../utils/publicBrand';
+import { localized, text } from '../utils/language';
 
 /**
  * Ledger Link's public face: what the product does, how it works, and how to
@@ -136,8 +137,8 @@ export function LandingPage({ onSignIn, onSignUp, brand = BUSINESS_BRAND }: Land
     const summary = brand.edition === 'law'
       ? 'Matters, the court diary, time, client money and fee notes, in one set of double-entry books. Client money is kept apart from office money and can never be overdrawn.'
       : 'Members, giving, Sunday collections and funds, in one set of double-entry books. Each gift lands in its fund, and the treasurer\'s report comes from the same ledger.';
-    const startLabel = { en: 'Create account', sw: 'TODO-SW' };
-    const signInLabel = { en: 'Sign in', sw: 'TODO-SW' };
+    const startLabel = localized('Create account');
+    const signInLabel = localized('Sign in');
     return <main className="min-h-screen bg-canvas text-text">
       <header className="border-b border-border bg-surface/95">
         <div className="mx-auto flex h-16 max-w-6xl items-center justify-between px-5 sm:px-8">
@@ -147,7 +148,7 @@ export function LandingPage({ onSignIn, onSignUp, brand = BUSINESS_BRAND }: Land
           <div className="flex items-center gap-2">
             <ThemeToggle />
             <button type="button" onClick={onSignIn} className="rounded-lg px-3 py-2 text-[13.5px] font-semibold text-primary-ink hover:bg-primary-soft">
-              {signInLabel.en}
+              {text(signInLabel)}
             </button>
           </div>
         </div>
@@ -161,7 +162,7 @@ export function LandingPage({ onSignIn, onSignUp, brand = BUSINESS_BRAND }: Land
           <p className="mt-7 max-w-xl text-[16px] leading-relaxed text-graphite-600">{summary}</p>
           <button type="button" onClick={onSignUp}
             className="mt-9 inline-flex h-11 items-center gap-2 rounded-lg bg-primary px-5 text-[14px] font-semibold text-on-primary shadow-sm hover:bg-primary-hover">
-            {startLabel.en} <ArrowRight className="h-4 w-4" aria-hidden="true" />
+            {text(startLabel)} <ArrowRight className="h-4 w-4" aria-hidden="true" />
           </button>
           <p className="mt-4 text-[12px] text-graphite-600">powered by Ledger Link</p>
         </div>

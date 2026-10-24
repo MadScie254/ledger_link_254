@@ -2,10 +2,10 @@ import { useQuery, type QueryClient } from '@tanstack/react-query';
 import { create } from 'zustand';
 import { useAppStore } from '../../store';
 import { apiRequest } from '../../utils/apiRequest';
-import type { LocalizedLabel } from '../../utils/editions';
+import { localized, type LocalizedLabel } from '../../utils/language';
 
-/** Copy for the law screens, English now and Swahili to follow. */
-export const say = (en: string): LocalizedLabel => ({ en, sw: 'TODO-SW' });
+/** Copy for the law screens, in English and Swahili. */
+export const say = localized;
 
 export const MATTER_TYPES: Record<string, LocalizedLabel> = {
   LITIGATION: say('Litigation'), CONVEYANCING: say('Conveyancing'), CORPORATE: say('Corporate'),

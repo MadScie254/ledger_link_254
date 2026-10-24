@@ -2,10 +2,10 @@ import { useQuery, type QueryClient } from '@tanstack/react-query';
 import { useAppStore } from '../../store';
 import { apiRequest } from '../../utils/apiRequest';
 import { todayIn } from '../../utils/dates';
-import type { LocalizedLabel } from '../../utils/editions';
+import { localized, type LocalizedLabel } from '../../utils/language';
 
-/** Copy for the church screens, English now and Swahili to follow. */
-export const say = (en: string): LocalizedLabel => ({ en, sw: 'TODO-SW' });
+/** Copy for the church screens, in English and Swahili. */
+export const say = localized;
 
 export const MEMBER_STATUS: Record<string, LocalizedLabel> = {
   VISITOR: say('Visitor'), ADHERENT: say('Adherent'), MEMBER: say('Member'), BAPTISED_MEMBER: say('Baptised member'),
