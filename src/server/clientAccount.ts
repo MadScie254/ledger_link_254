@@ -25,6 +25,27 @@ export class ClientAccountService {
   }
 
   /**
+   * The client account reconciliation on a date (public.client_account_reconciliation):
+   * the bank statement from a completed reconciliation of the client bank
+   * account, the client cash book, client money held and the matter
+   * ledgers, and the signed record when there is one.
+   */
+  static async reconciliation(orgId: string, asOf: string): Promise<ClientAccountReconciliation> {
+    const { data, error } = await getSupabase().rpc('client_account_reconciliation', { p_org_id: orgId, p_as_of: asOf });
+    if (error) throw error;
+    return data as ClientAccountReconciliation;
+  }
+
+  /** Signs the reconciliation for a date (owners and admins); a difference needs an explanation. */
+  static async signReconciliation(orgId: string, actor: string, asOf: string, note: string | null): Promise<ClientAccountReconciliation> {
+    const { data, error } = await getSupabase().rpc('sign_client_account_reconciliation', {
+      p_org_id: orgId, p_as_of: asOf, p_note: note, p_actor: actor,
+    });
+    if (error) throw error;
+    return data as ClientAccountReconciliation;
+  }
+
+  /**
    * A matter's client ledger: its lines on client money held (2200), oldest
    * first, each with the balance held for the client after it.
    */
@@ -99,4 +120,21 @@ export class ClientAccountService {
     if (error) throw error;
     return data as string;
   }
+}
+
+export interface ClientAccountReconciliation {
+  asOf: string;
+  hasClientBankAccount: boolean;
+  bankReconciliationId: string | null;
+  statementBalanceCents: number | null;
+  unclearedReceiptsCents: number;
+  unpresentedPaymentsCents: number;
+  adjustedStatementCents: number | null;
+  cashBookCents: number;
+  clientHeldCents: number;
+  matterLedgersCents: number;
+  untaggedHeldCents: number;
+  matters: Array<{ matterId: string; matterNumber: string; title: string; client: string | null; heldCents: number }>;
+  agrees: boolean;
+  signed: null | { id: string; asOf: string; agrees: boolean; note: string | null; signedBy: string | null; signedAt: string };
 }

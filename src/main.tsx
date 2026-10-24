@@ -29,6 +29,12 @@ if (payLink) {
   void import('./components/public/PublicInvoicePage').then(({ PublicInvoicePage }) => {
     root.render(<StrictMode><PublicInvoicePage token={payLink[1]} /></StrictMode>);
   });
+} else if (/^\/give\/[0-9a-f]{64}\/?$/.test(window.location.pathname)) {
+  // A church's giving page, shared with the congregation.
+  const token = window.location.pathname.split('/')[2];
+  void import('./components/public/PublicGivingPage').then(({ PublicGivingPage }) => {
+    root.render(<StrictMode><PublicGivingPage token={token} /></StrictMode>);
+  });
 } else if (import.meta.env.MODE === 'development' && window.location.pathname.startsWith('/__preview')) {
   void import('./dev/PreviewHarness').then(({ mountPreview }) => mountPreview(root));
 } else {

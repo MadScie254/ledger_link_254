@@ -7,12 +7,19 @@ import { FeeNoteService } from '../../src/server/feeNotes';
 import { assertLawEdition } from '../../src/server/lawAccess';
 import { bodyOf, respondError } from '../http';
 import { isoDate, uuid } from '../schemas';
+import { z } from 'zod';
+
+const clientReconciliationSignSchema = z.object({
+  asOf: isoDate,
+  note: z.string().trim().max(1000, 'The explanation is at most 1,000 characters.').nullable().optional()
+    .transform((value) => value || null),
+});
 import { clientPaymentSchema, clientReceiptSchema, clientTransferSchema,
   conflictQuerySchema, courtEventSchema, courtEventUpdateSchema,
   feeNoteEtimsSchema, feeNotePaymentSchema, feeNoteSchema, matterCreateSchema,
   matterListSchema, matterPartySchema, matterUpdateSchema,
   officeDisbursementSchema } from '../lawSchemas';
-import type { Variables } from '../auth';
+import { requireOrganizationAdministrator, type Variables } from '../auth';
 import type { Api } from './types';
 
 async function requireLawEdition(c: Context<{ Variables: Variables }>, next: Next) {
@@ -127,6 +134,17 @@ export function registerLawRoutes(api: Api) {
   api.get('/client-account/position', async (c) => {
     try {
       return c.json(await ClientAccountService.position(c.get('orgId'), isoDate.parse(c.req.query('asOf'))));
+    } catch (err) { return respondError(c, err); }
+  });
+  api.get('/client-account/reconciliation', async (c) => {
+    try {
+      return c.json(await ClientAccountService.reconciliation(c.get('orgId'), isoDate.parse(c.req.query('asOf'))));
+    } catch (err) { return respondError(c, err); }
+  });
+  api.post('/client-account/reconciliation', requireOrganizationAdministrator, async (c) => {
+    try {
+      const body = clientReconciliationSignSchema.parse(await bodyOf(c));
+      return c.json(await ClientAccountService.signReconciliation(c.get('orgId'), c.get('userId'), body.asOf as string, body.note ?? null));
     } catch (err) { return respondError(c, err); }
   });
   api.get('/client-account/entries', async (c) => {

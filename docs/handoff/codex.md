@@ -59,6 +59,17 @@
   - Interface: Sales, Invoices has Share on sent invoices: copy the link, or open WhatsApp, text messages or email with the message filled in (`src/utils/invoiceShare.ts`), with how often the link was opened and a Withdraw action. `/pay/<token>` renders `PublicInvoicePage` outside the app: the invoice, Save as PDF, Pay with M-Pesa (checks the request every 4 seconds for 3 minutes) and the paybill. Ledger Link itself sends no email or SMS: that needs a provider and its keys (for example Resend and Africa's Talking), which the owner has to choose.
   - Tests: `tests/db/invoice_share_links.test.sql`, `tests/integration/invoice_links.test.ts` (share, open, pay through a Daraja stand-in, settle, withdraw), `src/utils/invoiceShare.test.ts`. The page was checked at 390 px wide with a fixture.
 
+- Package 13 (Claude, 24 October 2026): Mizani client account reconciliation. Migration `20261024000800_client_account_reconciliation.sql`:
+  - The client account screen already compared the client bank account (1060), client money held (2200) and the matter ledgers, and client money cannot be overdrawn. The bank statement leg was missing. `public.client_account_reconciliation(org, date)` takes the statement balance from a completed bank reconciliation of 1060 on that date, adds receipts and subtracts payments not yet on the statement (the unticked lines of that reconciliation), and sets the result beside the cash book, client money held and the matter ledgers.
+  - `public.sign_client_account_reconciliation` (owners and admins) keeps a permanent record per date (`client_account_reconciliations`, trigger-protected); a difference is signed only with an explanation; a date is signed once.
+  - Worker: `GET /api/client-account/reconciliation?asOf=` and `POST /api/client-account/reconciliation` (owners and admins). Interface: Client account, "Reconciliation to the bank statement".
+  - Tests: `tests/db/client_account_reconciliation.test.sql`, `tests/integration/client_reconciliation.test.ts`.
+- Package 14 (Claude, 24 October 2026): Kundi giving page. Migration `20261024000900_church_giving_page.sql`:
+  - One public link per church (`church_giving_links`, owners and admins share or withdraw it). `public.open_giving_page` returns the church's name, its paybill once the C2B link is registered, one way to give per account number from the active EXACT and PREFIX giving rules plus the member-number rule tried first, and the open campaigns with what has been given (from `church_campaign_progress`). It names no member and shows no gift.
+  - Worker: `POST` and `DELETE /api/church/giving-page`; public `GET /api/public/give/:token` (300 an hour per caller). `/give/<token>` renders `PublicGivingPage`. Giving has a "Giving page" button for owners and admins with copy, WhatsApp and withdraw.
+  - Not built: asking a member's phone to pay a church (M-Pesa Express is for businesses, package 10), and Ledger Link sending SMS itself (needs a provider and keys).
+  - Tests: `tests/db/church_giving_page.test.sql`, `tests/integration/church_giving_page.test.ts`; the page checked at 390 px wide.
+
 ## In progress
 
 - No code is half done. Packages 8 to 10 are on branch `claude/payroll-close-review-and-live-mpesa`, made in a session that could not push to GitHub (the repository was not among its authorised sources); they were handed over as a git bundle and a patch series. GitHub Actions remain locked by the account's billing issue, so no CI job has run on PR #11 or on this branch. The local runs above stand in for CI until the lock is lifted.

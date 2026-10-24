@@ -17,6 +17,7 @@ import {
 } from './LawDialogs';
 import { FeeNoteList } from './MatterRecord';
 import { MattersView } from './MattersView';
+import { ClientReconciliation } from './ClientReconciliation';
 
 const COPY = {
   diary: say('Court diary'),
@@ -191,6 +192,7 @@ export function ClientAccountView() {
   const { orgId, currency, timeZone, canPost } = useLawOrg();
   const today = todayIn(timeZone);
   const setActiveView = useAppStore((state) => state.setActiveView);
+  const activeRole = useAppStore((state) => state.activeCompany?.role);
   const focus = useMatterFocus((state) => state.focus);
   const [asOf, setAsOf] = useState(today);
   const [receiving, setReceiving] = useState(false);
@@ -252,6 +254,9 @@ export function ClientAccountView() {
           </div>
         </section>
       )}
+
+      <ClientReconciliation orgId={orgId} asOf={asOf} dateLabel={shortDate(asOf)} currency={currency}
+        canSign={activeRole === 'owner' || activeRole === 'admin'} />
 
       {balances.isLoading ? <SkeletonRows label="Loading client balances" />
         : balances.isError ? <LoadProblem what="client balances" path="/api/client-account/balances" onRetry={() => balances.refetch()} />
