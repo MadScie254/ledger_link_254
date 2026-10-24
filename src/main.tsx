@@ -23,7 +23,13 @@ const root = createRoot(document.getElementById('root')!);
 // Gated on MODE, not DEV: DEV follows NODE_ENV, and a NODE_ENV=development in
 // .env turns DEV true inside `vite build`. MODE is "production" for every build,
 // so this branch and the harness module are removed from the bundle.
-if (import.meta.env.MODE === 'development' && window.location.pathname.startsWith('/__preview')) {
+const payLink = /^\/pay\/([0-9a-f]{64})\/?$/.exec(window.location.pathname);
+if (payLink) {
+  // A customer opening a shared invoice: no sign-in, no app shell.
+  void import('./components/public/PublicInvoicePage').then(({ PublicInvoicePage }) => {
+    root.render(<StrictMode><PublicInvoicePage token={payLink[1]} /></StrictMode>);
+  });
+} else if (import.meta.env.MODE === 'development' && window.location.pathname.startsWith('/__preview')) {
   void import('./dev/PreviewHarness').then(({ mountPreview }) => mountPreview(root));
 } else {
   const queryClient = new QueryClient();

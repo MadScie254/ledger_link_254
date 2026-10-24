@@ -28,6 +28,7 @@ import { CashTransactionsPanel } from '../common/CashTransactionsPanel';
 import { CreditsPanel } from '../common/CreditsPanel';
 import { RecurringPanel } from '../common/RecurringPanel';
 import { MpesaRequestDialog } from './MpesaRequestDialog';
+import { ShareInvoiceDialog } from './ShareInvoiceDialog';
 
 type SalesTab = 'Invoices' | 'Payments' | 'Recurring' | 'Receipts' | 'Credits' | 'Estimates' | 'Orders';
 
@@ -49,6 +50,7 @@ export function SalesView() {
   const [selectedInvoice, setSelectedInvoice] = useState<any | null>(null);
   const [paymentInvoice, setPaymentInvoice] = useState<any | null>(null);
   const [mpesaInvoice, setMpesaInvoice] = useState<any | null>(null);
+  const [shareInvoice, setShareInvoice] = useState<any | null>(null);
   const [paymentAmount, setPaymentAmount] = useState('');
   const [paymentWithheld, setPaymentWithheld] = useState<Withheld>(NO_WITHHOLDING);
   const [paymentForeign, setPaymentForeign] = useState({ foreign: '', rate: '', base: '' });
@@ -97,6 +99,8 @@ export function SalesView() {
     queryFn: () => apiRequest<{ ready: boolean }>('/api/integrations/mpesa/express-status'),
     enabled: Boolean(currentOrgId) && isBusiness && canPost,
   });
+  // A sent invoice can be shared with the customer as a link.
+  const canShare = (inv: any) => canPost && inv.status !== 'DRAFT' && inv.status !== 'VOID';
   const canAskByMpesa = (inv: any) => Boolean(expressStatus?.ready) && canPost
     && ['SENT', 'PARTIALLY_PAID'].includes(inv.status) && Number(inv.amountDueCents || 0) >= 100
     && String(inv.currency || baseCurrency).toUpperCase() === baseCurrency.toUpperCase();
@@ -495,6 +499,9 @@ export function SalesView() {
                     {canAskByMpesa(inv) && (
                       <button type="button" onClick={() => setMpesaInvoice(inv)} className={buttonClass.quiet}>Ask by M-Pesa</button>
                     )}
+                    {canShare(inv) && (
+                      <button type="button" onClick={() => setShareInvoice(inv)} className={buttonClass.quiet}>Share</button>
+                    )}
                     <PrintButton kind="invoice" id={inv.id} number={inv.invoiceNo} />
                   </span>
                   {inv.dueDate && <span className="text-[12px] text-graphite-600">Due {format(new Date(inv.dueDate), 'dd/MM/yyyy')}</span>}
@@ -525,6 +532,9 @@ export function SalesView() {
                   )}
                   {canAskByMpesa(inv) && (
                     <button type="button" onClick={() => setMpesaInvoice(inv)} className={buttonClass.quiet}>Ask by M-Pesa</button>
+                  )}
+                  {canShare(inv) && (
+                    <button type="button" onClick={() => setShareInvoice(inv)} className={buttonClass.quiet}>Share</button>
                   )}
                   <PrintButton kind="invoice" id={inv.id} number={inv.invoiceNo} />
                 </>
@@ -557,6 +567,16 @@ export function SalesView() {
       )}
       </>
       )}
+
+      <ShareInvoiceDialog
+        invoice={shareInvoice ? invoices.find((inv: any) => inv.id === shareInvoice.id) || shareInvoice : null}
+        customerName={shareInvoice ? customerName(shareInvoice.customerId) || '' : ''}
+        customerPhone={shareInvoice ? customersData?.customers?.find((c: any) => c.id === shareInvoice.customerId)?.phone || null : null}
+        customerEmail={shareInvoice ? customersData?.customers?.find((c: any) => c.id === shareInvoice.customerId)?.email || null : null}
+        companyName={activeCompany?.name || ''}
+        currency={baseCurrency}
+        onClose={() => setShareInvoice(null)}
+      />
 
       <MpesaRequestDialog
         // The list's copy, so a payment that settles it shows at once.
