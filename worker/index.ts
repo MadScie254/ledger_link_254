@@ -30,6 +30,7 @@ import { registerCustomerPaymentRoutes } from './routes/customerPayments';
 import { registerLawRoutes } from './routes/law';
 import { registerMpesaPublicRoutes, registerMpesaRoutes } from './routes/mpesa';
 import { registerChurchRoutes } from './routes/church';
+import { registerInvoiceLinkPublicRoutes, registerInvoiceLinkRoutes } from './routes/invoiceLinks';
 import { CourtEventService } from '../src/server/courtEvents';
 import { AttachmentService } from '../src/server/attachments';
 import { RecurringService } from '../src/server/recurring';
@@ -81,6 +82,8 @@ app.get('/api/court-events/calendar.ics', async (c) => {
 });
 // Safaricom's C2B callbacks carry their own token and are answered outside sign-in.
 registerMpesaPublicRoutes(app);
+// The customer's invoice page carries its own token and is read outside sign-in.
+registerInvoiceLinkPublicRoutes(app);
 api.use('*', requireAuthenticationAndOrganization);
 // Employee and payroll records are personal data: not for the read-only member role.
 api.use('/employees', requirePayrollAccess);
@@ -118,6 +121,7 @@ registerImportRoutes(api);
 registerAttachmentRoutes(api);
 registerTrackingRoutes(api);
 registerDocumentRoutes(api);
+registerInvoiceLinkRoutes(api);
 registerCustomerPaymentRoutes(api);
 registerLawRoutes(api);
 registerMpesaRoutes(api);
