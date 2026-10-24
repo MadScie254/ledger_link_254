@@ -1,3 +1,5 @@
+import { GivingPageDialog } from './GivingPageDialog';
+import { useAppStore } from '../../store';
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '../../context/AuthProvider';
@@ -37,6 +39,9 @@ function Notice({ message }: { message: string }) {
 
 export function GivingView({ initialTab = 'today' }: { initialTab?: Tab }) {
   const { canPost } = useChurchOrg();
+  const activeCompany = useAppStore((state) => state.activeCompany);
+  const canShareGivingPage = activeCompany?.role === 'owner' || activeCompany?.role === 'admin';
+  const [givingPageOpen, setGivingPageOpen] = useState(false);
   const [tab, setTab] = useState<Tab>(initialTab);
   const [dialog, setDialog] = useState<'gift' | 'statement' | 'count' | null>(null);
   const [notice, setNotice] = useState('');
@@ -52,12 +57,13 @@ export function GivingView({ initialTab = 'today' }: { initialTab?: Tab }) {
         note={tab === 'cash' ? 'Each service\'s cash, counted by two people, then banked.' : tab === 'campaigns'
           ? say('Commitments and posted gifts to each campaign fund.').en : tab === 'plans'
             ? say('Monthly intentions compared with posted member gifts.').en : 'Gifts by M-Pesa, cash, bank and cheque, each posted to its fund.'}
-        actions={canPost && tab !== 'campaigns' && tab !== 'plans' && (
+        actions={(canPost || canShareGivingPage) && (
           <>
-            {tab === 'queue' && <button type="button" className={buttonClass.secondary} onClick={() => setDialog('statement')}>{COPY.upload.en}</button>}
-            {tab === 'cash'
+            {canShareGivingPage && <button type="button" className={buttonClass.secondary} onClick={() => setGivingPageOpen(true)}>Giving page</button>}
+            {canPost && tab !== 'campaigns' && tab !== 'plans' && tab === 'queue' && <button type="button" className={buttonClass.secondary} onClick={() => setDialog('statement')}>{COPY.upload.en}</button>}
+            {canPost && tab !== 'campaigns' && tab !== 'plans' && (tab === 'cash'
               ? <button type="button" className={buttonClass.primary} onClick={() => setDialog('count')}>{COPY.startCount.en}</button>
-              : <button type="button" className={buttonClass.primary} onClick={() => setDialog('gift')}>{COPY.recordGift.en}</button>}
+              : <button type="button" className={buttonClass.primary} onClick={() => setDialog('gift')}>{COPY.recordGift.en}</button>)}
           </>
         )} />
       <IndexTabs label="Giving" active={tab} onChange={(id) => { setTab(id); setNotice(''); }}
@@ -71,6 +77,7 @@ export function GivingView({ initialTab = 'today' }: { initialTab?: Tab }) {
       {dialog === 'gift' && <GiftDialog onClose={() => setDialog(null)} onDone={done} />}
       {dialog === 'statement' && <StatementUploadDialog onClose={() => setDialog(null)} onDone={done} />}
       {dialog === 'count' && <StartCountDialog onClose={() => setDialog(null)} onDone={done} />}
+      <GivingPageDialog open={givingPageOpen} churchName={activeCompany?.name || ''} onClose={() => setGivingPageOpen(false)} />
     </div>
   );
 }

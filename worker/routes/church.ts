@@ -15,6 +15,9 @@ import {
   queueAssignSchema, queueIgnoreSchema,
 } from '../churchSchemas';
 import { requireChurchEdition } from './mpesa';
+import { GivingPageService } from '../../src/server/givingPage';
+import { MpesaC2bService } from '../../src/server/mpesaC2b';
+import { requireOrganizationAdministrator } from '../auth';
 import type { Api } from './types';
 
 // The project compiles without strictNullChecks, so Zod's parsed types come
@@ -27,6 +30,16 @@ export function registerChurchRoutes(api: Api) {
     '/giving/*', '/contributions', '/collections', '/collections/*', '/church-reports/*', '/church/*']) {
     api.use(path, requireChurchEdition);
   }
+  // The church's public giving page: made or read, and withdrawn (owners and admins).
+  api.post('/church/giving-page', requireOrganizationAdministrator, async (c) => {
+    try {
+      return c.json(await GivingPageService.share(c.get('orgId'), c.get('userId'), MpesaC2bService.callbackOrigin(c.req.url)));
+    } catch (err) { return respondError(c, err); }
+  });
+  api.delete('/church/giving-page', requireOrganizationAdministrator, async (c) => {
+    try { return c.json(await GivingPageService.withdraw(c.get('orgId'), c.get('userId'))); }
+    catch (err) { return respondError(c, err); }
+  });
 
   // --- Members and households ---
   api.get('/members', async (c) => {

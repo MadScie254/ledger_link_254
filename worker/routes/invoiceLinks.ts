@@ -1,6 +1,7 @@
 import type { Hono } from 'hono';
 import { z } from 'zod';
 import { InvoiceLinkService } from '../../src/server/invoiceLinks';
+import { GivingPageService } from '../../src/server/givingPage';
 import { MpesaC2bService } from '../../src/server/mpesaC2b';
 import { bodyOf, enforceRateLimits, HOUR, respondError } from '../http';
 import { uuid } from '../schemas';
@@ -36,6 +37,15 @@ export function registerInvoiceLinkPublicRoutes(app: Hono<any>) {
       await enforceRateLimits([{ key: `pay-view:ip:${callerIp(c)}`, limit: 300, windowSeconds: HOUR }],
         'Too many pages opened from here. Try again later.');
       return c.json(await InvoiceLinkService.view(token.parse(c.req.param('token'))), 200, { 'Cache-Control': 'no-store' });
+    } catch (err) { return respondError(c, err); }
+  });
+
+  // A church's giving page: the paybill, an account number per fund and its open campaigns.
+  app.get('/api/public/give/:token', async (c) => {
+    try {
+      await enforceRateLimits([{ key: `give-view:ip:${callerIp(c)}`, limit: 300, windowSeconds: HOUR }],
+        'Too many pages opened from here. Try again later.');
+      return c.json(await GivingPageService.view(c.req.param('token') || ''), 200, { 'Cache-Control': 'no-store' });
     } catch (err) { return respondError(c, err); }
   });
 
