@@ -69,6 +69,7 @@
   - Worker: `POST` and `DELETE /api/church/giving-page`; public `GET /api/public/give/:token` (300 an hour per caller). `/give/<token>` renders `PublicGivingPage`. Giving has a "Giving page" button for owners and admins with copy, WhatsApp and withdraw.
   - Not built: asking a member's phone to pay a church (M-Pesa Express is for businesses, package 10), and Ledger Link sending SMS itself (needs a provider and keys).
   - Tests: `tests/db/church_giving_page.test.sql`, `tests/integration/church_giving_page.test.ts`; the page checked at 390 px wide.
+- Package 15 (Claude, 24 October 2026): migration `20261024001000_drop_seed_loader_helpers.sql` drops `private.ll_insert`, `ll_locate`, `ll_patch`, `ll_rpc`, `ll_sig`, `ll_subst`, `ll_walk` and the table `private.ll_seed_stage`. They were made by hand in production to replay the demo organizations once (no migration created them), had no `search_path` (seven Supabase advisor warnings), and nothing called them. The demo rows stay. On a database built from the migrations the drops do nothing. Checked locally against stand-ins with the production signatures: all eight objects go, and a second run is a no-op.
 
 ## In progress
 
