@@ -132,6 +132,11 @@ export const stockAdjustmentSchema = z.object({
   idempotencyKey,
 });
 
+export const stockValuationStartSchema = z.object({
+  startDate: isoDate,
+  costs: z.array(z.object({ itemId: uuid, unitCostCents: cents })).max(5000).default([]),
+});
+
 export const projectSchema = z.object({
   name: requiredText(200, 'A project name'),
   customerId: optionalUuid,

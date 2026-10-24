@@ -3,7 +3,8 @@ import { ProjectService } from '../../src/server/projects';
 import { MatterService } from '../../src/server/matters';
 import { assertLawEdition } from '../../src/server/lawAccess';
 import { bodyOf, respondError } from '../http';
-import { itemSchema, itemUpdateSchema, projectSchema, projectUpdateSchema, stockAdjustmentSchema, timeEntrySchema, uuid } from '../schemas';
+import { itemSchema, itemUpdateSchema, projectSchema, projectUpdateSchema, stockAdjustmentSchema, stockValuationStartSchema, timeEntrySchema, uuid } from '../schemas';
+import { requireOrganizationAdministrator } from '../auth';
 import { lawTimeSchema } from '../lawSchemas';
 import type { Api } from './types';
 
@@ -12,6 +13,20 @@ export function registerOperationsRoutes(api: Api) {
   api.get('/inventory', async (c) => {
     try {
       return c.json({ items: await InventoryService.getItems(c.get('orgId')) });
+    } catch (err) { return respondError(c, err); }
+  });
+
+  // Registered before /inventory/:id so the path is not read as an item id.
+  api.get('/inventory/valuation', async (c) => {
+    try { return c.json(await InventoryService.getValuation(c.get('orgId'))); }
+    catch (err) { return respondError(c, err); }
+  });
+
+  api.post('/inventory/valuation/start', requireOrganizationAdministrator, async (c) => {
+    try {
+      const body = stockValuationStartSchema.parse(await bodyOf(c));
+      return c.json(await InventoryService.startValuation(c.get('orgId'), c.get('userId'), body.startDate as string,
+        body.costs as Array<{ itemId: string; unitCostCents: number }>));
     } catch (err) { return respondError(c, err); }
   });
 

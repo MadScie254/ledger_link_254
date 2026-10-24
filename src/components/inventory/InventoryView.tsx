@@ -11,8 +11,9 @@ import { useConfirm } from '../../hooks/useConfirm';
 import { inParts } from '../../utils/apiRequest';
 import { StockCountDialog } from './StockCountDialog';
 import { ImportRecordsDialog } from '../common/ImportRecordsDialog';
+import { StockValuationPanel } from './StockValuationPanel';
 
-type Tab = 'Items' | 'Reorder';
+type Tab = 'Items' | 'Reorder' | 'Value';
 
 export function InventoryView() {
   const [activeTab, setActiveTab] = useState<Tab>('Items');
@@ -122,10 +123,19 @@ export function InventoryView() {
         tabs={[
           { id: 'Items', name: 'Stock items', count: items.length },
           { id: 'Reorder', name: 'Below reorder point', count: lowItems.length },
+          { id: 'Value', name: 'Stock value' },
         ]}
       />
 
-      {inventory.isError ? (
+      {activeTab === 'Value' ? (
+        <StockValuationPanel
+          orgId={currentOrgId}
+          currency={baseCurrency}
+          timeZone={activeCompany?.timeZone}
+          canStart={activeCompany?.role === 'owner' || activeCompany?.role === 'admin'}
+          stockItems={items.filter(isStocked)}
+        />
+      ) : inventory.isError ? (
         <LoadProblem what="stock items" path="/api/inventory" onRetry={() => inventory.refetch()} />
       ) : inventory.isLoading ? (
         <SkeletonRows label="Loading stock items" />

@@ -18,6 +18,7 @@ export const STANDARD_ACCOUNTS = [
   { code: '2140', name: 'Affordable Housing Levy Payable', type: 'LIABILITY' as const },
   { code: '2165', name: 'Net Salaries Payable', type: 'LIABILITY' as const },
   { code: '3000', name: "Owner's Equity / Share Capital", type: 'EQUITY' as const },
+  { code: '3050', name: 'Opening Balance Equity', type: 'EQUITY' as const },
   { code: '3100', name: 'Retained Earnings', type: 'EQUITY' as const },
   { code: '4000', name: 'Sales Revenue & Billing', type: 'INCOME' as const },
   { code: '4100', name: 'Consulting & Service Income', type: 'INCOME' as const },
