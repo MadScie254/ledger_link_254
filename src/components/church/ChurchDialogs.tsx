@@ -17,6 +17,7 @@ import {
   MEMBER_STATUS, memberLabel, refreshChurch, say, shortDate, useChurchOrg, useFunds, useHouseholds, useMembers,
   useMoneyAccounts, type Member,
 } from './churchData';
+import { text } from '../../utils/language';
 
 type Done = (message: string) => void;
 
@@ -110,7 +111,7 @@ export function MemberDialog({ member, onClose, onDone }: { member?: Member | nu
   return (
     <Dialog open onClose={onClose} title={member ? `Member ${member.member_number}` : 'Add a member'} width="lg"
       note="The member number is also the M-Pesa account reference the member gives."
-      footer={<Footer onClose={onClose} busy={post.isPending} label={COPY.saveMember.en} form="member-form" />}>
+      footer={<Footer onClose={onClose} busy={post.isPending} label={text(COPY.saveMember)} form="member-form" />}>
       <form id="member-form" className="grid gap-4 sm:grid-cols-2" onSubmit={(event) => {
         event.preventDefault();
         const body = {
@@ -125,7 +126,7 @@ export function MemberDialog({ member, onClose, onDone }: { member?: Member | nu
         <Field label="Member number"><input required value={form.memberNumber} onChange={set('memberNumber')} maxLength={20} name="memberNumber" /></Field>
         <Field label="Status">
           <select value={form.status} onChange={set('status')} name="status">
-            {MEMBER_STATUSES.map((status) => <option key={status} value={status}>{MEMBER_STATUS[status].en}</option>)}
+            {MEMBER_STATUSES.map((status) => <option key={status} value={status}>{text(MEMBER_STATUS[status])}</option>)}
           </select>
         </Field>
         <Field label="First name"><input required value={form.firstName} onChange={set('firstName')} maxLength={100} name="firstName" /></Field>
@@ -158,7 +159,7 @@ export function HouseholdDialog({ onClose, onDone }: { onClose: () => void; onDo
   const [form, setForm] = useState({ name: '', address: '', phone: '' });
   const post = useChurchPost(onDone);
   return (
-    <Dialog open onClose={onClose} title="Add a household" footer={<Footer onClose={onClose} busy={post.isPending} label={COPY.saveHousehold.en} form="household-form" />}>
+    <Dialog open onClose={onClose} title="Add a household" footer={<Footer onClose={onClose} busy={post.isPending} label={text(COPY.saveHousehold)} form="household-form" />}>
       <form id="household-form" className="space-y-4" onSubmit={(event) => {
         event.preventDefault();
         post.mutate({ path: '/api/households', keyed: false, body: { name: form.name, address: form.address || null, phone: form.phone || null }, message: `Household ${form.name.trim()} added.` });
@@ -215,7 +216,7 @@ export function ImportMembersDialog({ onClose, onDone }: { onClose: () => void; 
   return (
     <Dialog open onClose={onClose} title="Import members from CSV" width="xl"
       note="One member per row, with a header row. A phone number or email is imported only with a consent column saying how the member agreed."
-      footer={<Footer onClose={onClose} busy={post.isPending} label={read ? `${COPY.importMembers.en} (${read.members.length})` : COPY.importMembers.en}
+      footer={<Footer onClose={onClose} busy={post.isPending} label={read ? `${text(COPY.importMembers)} (${read.members.length})` : text(COPY.importMembers)}
         form="member-import-form" disabled={!read || read.members.length === 0} />}>
       <form id="member-import-form" className="space-y-4" onSubmit={(event) => {
         event.preventDefault();
@@ -280,7 +281,7 @@ export function GiftDialog({ memberId, onClose, onDone }: { memberId?: string; o
   const cents = centsFromAmountText(form.amount);
   return (
     <Dialog open onClose={onClose} title="Record a gift" note="Cash handed in outside a service count, a bank transfer or a cheque. M-Pesa gifts arrive by themselves or from a statement."
-      footer={<Footer onClose={onClose} busy={post.isPending} label={COPY.postGift.en} form="gift-form" disabled={!cents} />}>
+      footer={<Footer onClose={onClose} busy={post.isPending} label={text(COPY.postGift)} form="gift-form" disabled={!cents} />}>
       <form id="gift-form" className="space-y-4" onSubmit={(event) => {
         event.preventDefault();
         if (!cents) return;
@@ -328,7 +329,7 @@ export function AssignReceiptDialog({ item, onClose, onDone }: { item: QueueItem
   return (
     <Dialog open onClose={onClose} title={`Place M-Pesa receipt ${item.transId}`}
       note={<>Reference {item.billRefNumber ? `"${item.billRefNumber}"` : 'left blank'}{item.firstName ? `, paid by ${item.firstName}` : ''}. <Amount cents={item.amountCents} currency={currency} /></>}
-      footer={<Footer onClose={onClose} busy={post.isPending} label={COPY.postAssigned.en} form="assign-form" />}>
+      footer={<Footer onClose={onClose} busy={post.isPending} label={text(COPY.postAssigned)} form="assign-form" />}>
       <form id="assign-form" className="space-y-4" onSubmit={(event) => {
         event.preventDefault();
         post.mutate({ path: `/api/giving/queue/${item.id}/assign`, keyed: false, body: { memberId: memberId || null, fundId }, message: `M-Pesa receipt ${item.transId} posted as giving.` });
@@ -359,7 +360,7 @@ export function SetAsideDialog({ item, onClose, onDone }: { item: QueueItem; onC
   const post = useChurchPost(onDone);
   return (
     <Dialog open onClose={onClose} title={`Set aside ${item.transId}`} note="For a payment that is not giving: a refund, a test, or money for something else. It can go back to the queue later."
-      footer={<Footer onClose={onClose} busy={post.isPending} label={COPY.setAside.en} form="set-aside-form" />}>
+      footer={<Footer onClose={onClose} busy={post.isPending} label={text(COPY.setAside)} form="set-aside-form" />}>
       <form id="set-aside-form" className="space-y-4" onSubmit={(event) => {
         event.preventDefault();
         post.mutate({ path: `/api/giving/queue/${item.id}/ignore`, keyed: false, body: { reason }, message: `M-Pesa receipt ${item.transId} set aside.` });
@@ -384,7 +385,7 @@ export function StatementUploadDialog({ onClose, onDone }: { onClose: () => void
   return (
     <Dialog open onClose={onClose} title="Upload an M-Pesa statement" width="xl"
       note="The statement CSV from the M-Pesa org portal. Each receipt is kept once, however often it is uploaded; Safaricom's charges post to bank and M-Pesa charges (6400)."
-      footer={<Footer onClose={onClose} busy={post.isPending} label={COPY.upload.en} form="statement-form" disabled={!read || (read.gifts.length + read.charges.length) === 0} />}>
+      footer={<Footer onClose={onClose} busy={post.isPending} label={text(COPY.upload)} form="statement-form" disabled={!read || (read.gifts.length + read.charges.length) === 0} />}>
       <form id="statement-form" className="space-y-4" onSubmit={(event) => {
         event.preventDefault();
         if (!read) return;
@@ -486,7 +487,7 @@ export function StartCountDialog({ onClose, onDone }: { onClose: () => void; onD
   return (
     <Dialog open onClose={onClose} title="Start a cash count" width="lg"
       note="The first counter saves the count. A second person confirms it from their own sign-in, and only then does the cash post."
-      footer={<Footer onClose={onClose} busy={post.isPending} label={COPY.saveCount.en} form="count-form" disabled={!total || Boolean(problem)} />}>
+      footer={<Footer onClose={onClose} busy={post.isPending} label={text(COPY.saveCount)} form="count-form" disabled={!total || Boolean(problem)} />}>
       <form id="count-form" className="space-y-4" onSubmit={(event) => {
         event.preventDefault();
         post.mutate({
@@ -513,7 +514,7 @@ export function ConfirmCountDialog({ collection, onClose, onDone }: { collection
   return (
     <Dialog open onClose={onClose} title={`Second count of ${collection.collection_number}`} width="lg"
       note={`${collection.service_name}, ${shortDate(collection.service_date)}. Count the cash again yourself; the first count is not shown. It posts only if both counts agree.`}
-      footer={<Footer onClose={onClose} busy={post.isPending} label={COPY.confirmCount.en} form="confirm-count-form" disabled={!countTotalCents(counts) || Boolean(problem)} />}>
+      footer={<Footer onClose={onClose} busy={post.isPending} label={text(COPY.confirmCount)} form="confirm-count-form" disabled={!countTotalCents(counts) || Boolean(problem)} />}>
       <form id="confirm-count-form" className="space-y-4" onSubmit={(event) => {
         event.preventDefault();
         post.mutate({ path: `/api/collections/${collection.id}/confirm`, body: { counts }, message: (result) => `Cash count ${result.number} confirmed and posted to cash on hand (1040).` });
@@ -538,7 +539,7 @@ export function BankCountDialog({ collection, onClose, onDone }: { collection: a
   return (
     <Dialog open onClose={onClose} title={`Bank ${collection.collection_number}`}
       note={<>Counted: <Amount cents={Number(collection.total_cents)} currency={currency} />. Enter what the bank slip shows.</>}
-      footer={<Footer onClose={onClose} busy={post.isPending} label={COPY.bank.en} form="bank-count-form" disabled={!cents || !form.bankAccountId} />}>
+      footer={<Footer onClose={onClose} busy={post.isPending} label={text(COPY.bank)} form="bank-count-form" disabled={!cents || !form.bankAccountId} />}>
       <form id="bank-count-form" className="space-y-4" onSubmit={(event) => {
         event.preventDefault();
         if (!cents) return;
@@ -577,7 +578,7 @@ export function FundDialog({ fund, onClose, onDone }: { fund?: any; onClose: () 
   return (
     <Dialog open onClose={onClose} title={fund ? `The ${fund.name}` : 'Add a fund'}
       note="A restricted fund holds money given for one purpose; it is spent only on that purpose."
-      footer={<Footer onClose={onClose} busy={post.isPending} label={COPY.saveFund.en} form="fund-form" />}>
+      footer={<Footer onClose={onClose} busy={post.isPending} label={text(COPY.saveFund)} form="fund-form" />}>
       <form id="fund-form" className="space-y-4" onSubmit={(event) => {
         event.preventDefault();
         post.mutate(fund
@@ -614,7 +615,7 @@ export function GivingRuleDialog({ onClose, onDone }: { onClose: () => void; onD
   const post = useChurchPost(onDone);
   return (
     <Dialog open onClose={onClose} title="Add a giving rule" note="Rules are tried from the lowest priority number up; the first that fits a reference decides the fund."
-      footer={<Footer onClose={onClose} busy={post.isPending} label={COPY.saveRule.en} form="rule-form" />}>
+      footer={<Footer onClose={onClose} busy={post.isPending} label={text(COPY.saveRule)} form="rule-form" />}>
       <form id="rule-form" className="space-y-4" onSubmit={(event) => {
         event.preventDefault();
         post.mutate({

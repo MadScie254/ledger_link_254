@@ -9,6 +9,7 @@ import { BrandMark } from '../ledger/BrandMark';
 import { editionDefinition } from '../../utils/editions';
 import { useAuth } from '../../context/AuthProvider';
 import { useOnboarding } from '../onboarding/OnboardingProvider';
+import { text } from '../../utils/language';
 
 /** The plain name each view goes by in the drill path. */
 const SECTION_NAMES: Record<string, string> = {
@@ -41,8 +42,8 @@ export function Header() {
 
   const avatarLetter = (user?.user_metadata?.full_name || user?.email || 'A').charAt(0).toUpperCase();
   const edition = editionDefinition(activeCompany?.edition);
-  const editionName = edition.sidebar.flatMap((group) => group.items)
-    .find((item) => item.view === activeView)?.name.en;
+  const editionName = text(edition.sidebar.flatMap((group) => group.items)
+    .find((item) => item.view === activeView)?.name);
   const sectionName = edition.id === 'business'
     ? SECTION_NAMES[activeView] || activeView : editionName || activeView;
 

@@ -4,6 +4,29 @@ import { useAppStore } from '../../store';
 import { CompanyMark } from '../ledger/CompanyMark';
 import { BrandMark } from '../ledger/BrandMark';
 import { editionDefinition, navigationGroupsFor } from '../../utils/editions';
+import { SWAHILI_INTERFACE, localized, text, type Language } from '../../utils/language';
+
+const PLANNED = localized('Planned');
+const NEW = localized('New');
+const COLLAPSE = localized('Collapse');
+const LANGUAGE = localized('Language');
+
+/** English or Kiswahili for this browser. Shown once the Swahili text is reviewed. */
+function LanguageChoice() {
+  const language = useAppStore((state) => state.language);
+  const setLanguage = useAppStore((state) => state.setLanguage);
+  const choices: Array<{ id: Language; name: string }> = [{ id: 'en', name: 'English' }, { id: 'sw', name: 'Kiswahili' }];
+  return (
+    <div role="group" aria-label={text(LANGUAGE)} className="mt-2 flex gap-1 px-3">
+      {choices.map((choice) => (
+        <button key={choice.id} type="button" onClick={() => setLanguage(choice.id)} aria-pressed={language === choice.id}
+          className={`h-8 flex-1 rounded-md text-[12.5px] ${language === choice.id ? 'bg-primary-soft font-semibold text-primary-ink' : 'text-text-2 hover:bg-hover'}`}>
+          {choice.name}
+        </button>
+      ))}
+    </div>
+  );
+}
 
 const STORAGE_KEY = 'ledgerlink.sidebar.collapsed';
 const ICONS: Record<string, LucideIcon> = {
@@ -36,7 +59,7 @@ export function Sidebar() {
   const navGroups = groups.filter((group) => group.label.en !== 'Settings' && group.label.en !== 'Help');
   const settingsItems = edition.id === 'business'
     ? groups.find((group) => group.label.en === 'Settings')?.items || []
-    : [{ view: 'Settings', name: { en: 'Organization', sw: 'TODO-SW' as const } }];
+    : [{ view: 'Settings', name: localized('Organization') }];
 
   const toggleRail = () => {
     const next = !collapsed;
@@ -71,14 +94,14 @@ export function Sidebar() {
         <button type="button" onClick={() => { setNewMenuOpen(true); setMobileSidebarOpen(false); }}
           disabled={!activeCompany} aria-label="New"
           className="flex h-10 w-full items-center justify-center gap-2 rounded-md bg-primary px-3 text-[14px] font-semibold text-on-primary shadow-sm hover:bg-primary-hover disabled:cursor-not-allowed disabled:opacity-50">
-          <Plus className="h-4 w-4" aria-hidden="true" />{!rail && <span>New</span>}
+          <Plus className="h-4 w-4" aria-hidden="true" />{!rail && <span>{text(NEW)}</span>}
         </button>
       </div>
 
       <nav data-tour="sidebar-index" aria-label="Sections" className="flex-1 overflow-y-auto px-2 pb-4">
         {navGroups.map((group) => (
-          <section key={group.label.en} className="mt-4 first:mt-1">
-            {!rail && <h2 className="px-3 pb-1.5 text-[11px] font-semibold uppercase tracking-wide text-text-3">{group.label.en}</h2>}
+          <section key={text(group.label)} className="mt-4 first:mt-1">
+            {!rail && <h2 className="px-3 pb-1.5 text-[11px] font-semibold uppercase tracking-wide text-text-3">{text(group.label)}</h2>}
             {rail && <div className="mx-3 mb-2 border-t border-border" />}
             <ul className="space-y-0.5">
               {group.items.filter((item) => item.view !== 'Settings').map((item) => {
@@ -87,18 +110,18 @@ export function Sidebar() {
                 const indent = item.childOf && !rail;
                 return <li key={item.view}>
                   {item.available === false ? (
-                    <span aria-disabled="true" title={item.name.en}
+                    <span aria-disabled="true" title={text(item.name)}
                       className={`flex h-9 items-center gap-2.5 rounded-md px-3 text-[13px] text-text-3 ${indent ? 'pl-8' : ''}`}>
                       <Icon className="h-[18px] w-[18px] shrink-0" aria-hidden="true" />
-                      {!rail && <><span className="truncate">{item.name.en}</span><span className="ml-auto text-[10px]">Planned</span></>}
+                      {!rail && <><span className="truncate">{text(item.name)}</span><span className="ml-auto text-[10px]">{text(PLANNED)}</span></>}
                     </span>
                   ) : (
                     <button type="button" onClick={() => handleNavigate(item.view)}
-                      aria-label={item.name.en} title={rail ? item.name.en : undefined}
+                      aria-label={text(item.name)} title={rail ? text(item.name) : undefined}
                       aria-current={isOpen ? 'page' : undefined}
                       className={`flex h-9 w-full items-center gap-2.5 rounded-md px-3 text-left text-[13.5px] ${rail ? 'justify-center' : ''} ${indent ? 'pl-8' : ''} ${isOpen ? 'bg-primary-soft font-semibold text-primary-ink' : 'text-text-2 hover:bg-hover hover:text-text'}`}>
                       <Icon className="h-[18px] w-[18px] shrink-0" aria-hidden="true" />
-                      {!rail && <span className="truncate">{item.name.en}</span>}
+                      {!rail && <span className="truncate">{text(item.name)}</span>}
                     </button>
                   )}
                 </li>;
@@ -119,15 +142,16 @@ export function Sidebar() {
               event.currentTarget.closest('details')?.removeAttribute('open');
               handleNavigate(item.view);
             }} className="flex h-9 w-full items-center rounded-md px-3 text-left text-[13px] text-text hover:bg-hover">
-              {item.name.en}
+              {text(item.name)}
             </button>)}
           </div>
         </details>
         <button type="button" onClick={toggleRail} aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
           className="hidden h-10 w-full items-center gap-2.5 rounded-md px-3 text-left text-[13px] text-text-3 hover:bg-hover hover:text-text md:flex">
           {collapsed ? <PanelLeftOpen className="h-[18px] w-[18px]" aria-hidden="true" /> : <PanelLeftClose className="h-[18px] w-[18px]" aria-hidden="true" />}
-          {!rail && <span>Collapse</span>}
+          {!rail && <span>{text(COLLAPSE)}</span>}
         </button>
+        {SWAHILI_INTERFACE && !rail && <LanguageChoice />}
       </div>
     </div>
   );

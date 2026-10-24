@@ -16,6 +16,7 @@ import {
 import { COUNT_STATUS, GIFT_METHODS, refreshChurch, say, shortDate, useChurchOrg } from './churchData';
 import { CampaignsView } from './CampaignsView';
 import { GivingPlansView } from './GivingPlansView';
+import { text } from '../../utils/language';
 
 type Tab = 'today' | 'queue' | 'cash' | 'campaigns' | 'plans';
 
@@ -53,21 +54,21 @@ export function GivingView({ initialTab = 'today' }: { initialTab?: Tab }) {
   }, canPost);
   return (
     <div className="space-y-5">
-      <PageHeading title={tab === 'cash' ? 'Cash count' : tab === 'campaigns' ? say('Campaigns and pledges').en : tab === 'plans' ? say('Giving plans').en : COPY.giving.en}
+      <PageHeading title={tab === 'cash' ? 'Cash count' : tab === 'campaigns' ? text(say('Campaigns and pledges')) : tab === 'plans' ? text(say('Giving plans')) : text(COPY.giving)}
         note={tab === 'cash' ? 'Each service\'s cash, counted by two people, then banked.' : tab === 'campaigns'
-          ? say('Commitments and posted gifts to each campaign fund.').en : tab === 'plans'
-            ? say('Monthly intentions compared with posted member gifts.').en : 'Gifts by M-Pesa, cash, bank and cheque, each posted to its fund.'}
+          ? text(say('Commitments and posted gifts to each campaign fund.')) : tab === 'plans'
+            ? text(say('Monthly intentions compared with posted member gifts.')) : 'Gifts by M-Pesa, cash, bank and cheque, each posted to its fund.'}
         actions={(canPost || canShareGivingPage) && (
           <>
             {canShareGivingPage && <button type="button" className={buttonClass.secondary} onClick={() => setGivingPageOpen(true)}>Giving page</button>}
-            {canPost && tab !== 'campaigns' && tab !== 'plans' && tab === 'queue' && <button type="button" className={buttonClass.secondary} onClick={() => setDialog('statement')}>{COPY.upload.en}</button>}
+            {canPost && tab !== 'campaigns' && tab !== 'plans' && tab === 'queue' && <button type="button" className={buttonClass.secondary} onClick={() => setDialog('statement')}>{text(COPY.upload)}</button>}
             {canPost && tab !== 'campaigns' && tab !== 'plans' && (tab === 'cash'
-              ? <button type="button" className={buttonClass.primary} onClick={() => setDialog('count')}>{COPY.startCount.en}</button>
-              : <button type="button" className={buttonClass.primary} onClick={() => setDialog('gift')}>{COPY.recordGift.en}</button>)}
+              ? <button type="button" className={buttonClass.primary} onClick={() => setDialog('count')}>{text(COPY.startCount)}</button>
+              : <button type="button" className={buttonClass.primary} onClick={() => setDialog('gift')}>{text(COPY.recordGift)}</button>)}
           </>
         )} />
       <IndexTabs label="Giving" active={tab} onChange={(id) => { setTab(id); setNotice(''); }}
-        tabs={[{ id: 'today', name: 'Today' }, { id: 'queue', name: 'Queue' }, { id: 'cash', name: 'Cash count' }, { id: 'campaigns', name: say('Campaigns').en }, { id: 'plans', name: say('Plans').en }]} />
+        tabs={[{ id: 'today', name: 'Today' }, { id: 'queue', name: 'Queue' }, { id: 'cash', name: 'Cash count' }, { id: 'campaigns', name: text(say('Campaigns')) }, { id: 'plans', name: text(say('Plans')) }]} />
       <Notice message={notice} />
       {tab === 'today' && <TodayTab />}
       {tab === 'queue' && <QueueTab onDone={setNotice} />}
@@ -102,13 +103,13 @@ function TodayTab() {
       </label>
       {day.isError ? <LoadProblem what="the day's giving" path="/api/giving/day" onRetry={() => day.refetch()} />
         : day.isLoading || !day.data ? <SkeletonRows label="Loading the day's giving" rows={4} />
-          : day.data.gifts.length === 0 ? <EmptyNote>{COPY.noGifts.en}</EmptyNote> : (
+          : day.data.gifts.length === 0 ? <EmptyNote>{text(COPY.noGifts)}</EmptyNote> : (
             <>
               <dl className="grid grid-cols-2 border-b border-feint-strong sm:grid-cols-5">
                 <div className="py-3"><dt className="ll-printed text-[10.5px] text-graphite-600">Total</dt><dd className="mt-1"><Amount cents={day.data.totalCents} currency={currency} size="lg" /></dd></div>
                 {['MPESA', 'CASH', 'BANK', 'CHEQUE'].map((method) => (
                   <div key={method} className="border-l border-feint py-3 pl-4">
-                    <dt className="ll-printed text-[10.5px] text-graphite-600">{GIFT_METHODS[method].en}</dt>
+                    <dt className="ll-printed text-[10.5px] text-graphite-600">{text(GIFT_METHODS[method])}</dt>
                     <dd className="mt-1"><Amount cents={day.data!.byMethod[method] || 0} currency={currency} /></dd>
                   </div>
                 ))}
@@ -129,7 +130,7 @@ function TodayTab() {
                     <tr key={gift.id}>
                       <td className="py-1.5">{gift.members ? `${gift.members.member_number} · ${[gift.members.first_name, gift.members.last_name].filter(Boolean).join(' ')}` : gift.collection_id ? 'Service collection' : 'No member named'}</td>
                       <td className="py-1.5">{gift.funds?.name}</td>
-                      <td className="py-1.5">{GIFT_METHODS[gift.method]?.en}{gift.reference ? ` · ${gift.reference}` : ''}</td>
+                      <td className="py-1.5">{text(GIFT_METHODS[gift.method])}{gift.reference ? ` · ${gift.reference}` : ''}</td>
                       <td className="py-1.5 text-right"><Amount cents={Number(gift.amount_cents)} currency={currency} /></td>
                     </tr>
                   ))}
@@ -162,26 +163,26 @@ function QueueTab({ onDone }: { onDone: (message: string) => void }) {
   const summary = mpesaExceptionSummary(waiting, today);
   const shown = reasonFilter ? waiting.filter((item) => mpesaExceptionKey(item.reason) === reasonFilter) : waiting;
   const reasonNames: Record<MpesaExceptionKey, string> = {
-    NO_REFERENCE: say('No reference').en, NO_RULE: say('No matching rule').en,
-    UNKNOWN_MEMBER: say('Unknown member').en, CLOSED_FUND: say('Closed fund').en, OTHER: say('Needs review').en,
+    NO_REFERENCE: text(say('No reference')), NO_RULE: text(say('No matching rule')),
+    UNKNOWN_MEMBER: text(say('Unknown member')), CLOSED_FUND: text(say('Closed fund')), OTHER: text(say('Needs review')),
   };
   return (
     <div className="space-y-5">
       <p className="max-w-2xl text-[13px] text-graphite-600">M-Pesa receipts the giving rules could not place. Place each with its member and fund, or set it aside if it is not giving.</p>
       <section aria-label="M-Pesa exceptions" className="rounded-xl border border-border bg-surface p-4">
         <div className="flex flex-wrap gap-6 text-[13px]">
-          <div><span className="block text-text-2">{say('Waiting receipts').en}</span><strong className="text-lg">{waiting.length}</strong></div>
-          <div><span className="block text-text-2">{say('Waiting amount').en}</span><Amount cents={summary.totalCents} currency={currency} /></div>
-          <div><span className="block text-text-2">{say('Older than seven days').en}</span><strong className="text-lg">{summary.olderThanSevenDays}</strong></div>
-          <div><span className="block text-text-2">{say('Recent set aside').en}</span><strong className="text-lg">{setAside.length}</strong></div>
+          <div><span className="block text-text-2">{text(say('Waiting receipts'))}</span><strong className="text-lg">{waiting.length}</strong></div>
+          <div><span className="block text-text-2">{text(say('Waiting amount'))}</span><Amount cents={summary.totalCents} currency={currency} /></div>
+          <div><span className="block text-text-2">{text(say('Older than seven days'))}</span><strong className="text-lg">{summary.olderThanSevenDays}</strong></div>
+          <div><span className="block text-text-2">{text(say('Recent set aside'))}</span><strong className="text-lg">{setAside.length}</strong></div>
         </div>
         {summary.groups.length > 0 && <div className="mt-3 flex flex-wrap gap-2">
-          <button type="button" className={buttonClass.quiet} aria-pressed={reasonFilter === null} onClick={() => setReasonFilter(null)}>{say('All waiting').en}</button>
+          <button type="button" className={buttonClass.quiet} aria-pressed={reasonFilter === null} onClick={() => setReasonFilter(null)}>{text(say('All waiting'))}</button>
           {summary.groups.map((group) => <button key={group.key} type="button" className={buttonClass.quiet}
             aria-pressed={reasonFilter === group.key} onClick={() => setReasonFilter(group.key)}>{reasonNames[group.key]} · {group.count}</button>)}
         </div>}
       </section>
-      {waiting.length === 0 ? <EmptyNote>{COPY.queueEmpty.en}</EmptyNote> : (
+      {waiting.length === 0 ? <EmptyNote>{text(COPY.queueEmpty)}</EmptyNote> : (
         <table className="w-full text-[13.5px]">
           <caption className="sr-only">M-Pesa receipts waiting</caption>
           <thead>
@@ -254,12 +255,12 @@ function CashTab({ onDone }: { onDone: (message: string) => void }) {
     <div className="space-y-4">
       <p className="max-w-2xl text-[13px] text-graphite-600">Two people count every collection. The first saves the count; the second counts again from their own sign-in, and the cash posts only when both agree. Banking then moves it from cash on hand to the bank.</p>
       <section aria-label="Service to deposit review" className="grid gap-3 rounded-xl border border-border bg-surface p-4 text-[13px] sm:grid-cols-4">
-        <div><span className="block text-text-2">{say('Awaiting second count').en}</span><strong>{review.awaitingSecondCount}</strong></div>
-        <div><span className="block text-text-2">{say('Counted, not banked').en}</span><strong>{review.awaitingBanking}</strong><span className="block"><Amount cents={review.unbankedCents} currency={currency} /></span></div>
-        <div><span className="block text-text-2">{say('Banked, awaiting statement match').en}</span><strong>{review.awaitingStatementMatch}</strong></div>
-        <div><span className="block text-text-2">{say('Matched to statement').en}</span><strong>{review.matched}</strong></div>
+        <div><span className="block text-text-2">{text(say('Awaiting second count'))}</span><strong>{review.awaitingSecondCount}</strong></div>
+        <div><span className="block text-text-2">{text(say('Counted, not banked'))}</span><strong>{review.awaitingBanking}</strong><span className="block"><Amount cents={review.unbankedCents} currency={currency} /></span></div>
+        <div><span className="block text-text-2">{text(say('Banked, awaiting statement match'))}</span><strong>{review.awaitingStatementMatch}</strong></div>
+        <div><span className="block text-text-2">{text(say('Matched to statement'))}</span><strong>{review.matched}</strong></div>
       </section>
-      {list.length === 0 ? <EmptyNote>{COPY.noCounts.en}</EmptyNote> : (
+      {list.length === 0 ? <EmptyNote>{text(COPY.noCounts)}</EmptyNote> : (
         <table className="w-full text-[13.5px]">
           <caption className="sr-only">Cash counts</caption>
           <thead>
@@ -269,8 +270,8 @@ function CashTab({ onDone }: { onDone: (message: string) => void }) {
               <th scope="col" className="hidden pr-3 text-left sm:table-cell">Fund</th>
               <th scope="col" className="pr-3 text-left">Where it stands</th>
               <th scope="col" className="pr-3 text-right">Counted</th>
-              <th scope="col" className="hidden pr-3 text-right md:table-cell">{say('Banked').en}</th>
-              <th scope="col" className="hidden pr-3 text-left lg:table-cell">{say('Statement').en}</th>
+              <th scope="col" className="hidden pr-3 text-right md:table-cell">{text(say('Banked'))}</th>
+              <th scope="col" className="hidden pr-3 text-left lg:table-cell">{text(say('Statement'))}</th>
               <th scope="col" className="text-left"><span className="sr-only">Actions</span></th>
             </tr>
           </thead>
@@ -282,13 +283,13 @@ function CashTab({ onDone }: { onDone: (message: string) => void }) {
                   <td className="py-2 pr-3 ll-figure">{collection.collection_number}</td>
                   <td className="py-2 pr-3">{collection.service_name}<span className="block text-[12px] text-graphite-600">{shortDate(collection.service_date)}</span></td>
                   <td className="hidden py-2 pr-3 sm:table-cell">{collection.funds?.name}</td>
-                  <td className="py-2 pr-3">{COUNT_STATUS[collection.status]?.en}
+                  <td className="py-2 pr-3">{text(COUNT_STATUS[collection.status])}
                     {collection.status === 'BANKED' && Number(collection.variance_cents) !== 0 && (
                       <span className="block text-[12px] text-ledger-red">Bank received <Amount cents={Number(collection.banked_cents)} currency={currency} />, {Number(collection.variance_cents) < 0 ? 'short' : 'over'} by <Amount cents={Math.abs(Number(collection.variance_cents))} currency={currency} /></span>
                     )}</td>
                   <td className="py-2 pr-3 text-right"><Amount cents={Number(collection.total_cents)} currency={currency} /></td>
                   <td className="hidden py-2 pr-3 text-right md:table-cell">{collection.banked_cents == null ? '—' : <Amount cents={Number(collection.banked_cents)} currency={currency} />}</td>
-                  <td className="hidden py-2 pr-3 lg:table-cell">{collection.status !== 'BANKED' ? '—' : collection.statementMatched ? say('Matched').en : say('Awaiting match').en}</td>
+                  <td className="hidden py-2 pr-3 lg:table-cell">{collection.status !== 'BANKED' ? '—' : collection.statementMatched ? text(say('Matched')) : text(say('Awaiting match'))}</td>
                   <td className="py-2">
                     {canPost && collection.status === 'AWAITING_SECOND_COUNT' && (firstCounter
                       ? <span className="text-[12.5px] text-graphite-600">You made the first count. Another person confirms it.</span>

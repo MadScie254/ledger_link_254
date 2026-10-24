@@ -121,7 +121,7 @@ export function OnboardingProvider({ children }: { children: ReactNode }) {
   const setActiveView = useAppStore((state) => state.setActiveView);
   const activeCompany = useAppStore((state) => state.activeCompany);
   const [state, setState] = useState<OnboardingState | null>(null);
-  const [language, setLanguage] = useState<Language>('en');
+  const [language, setLanguage] = useState<Language>(() => useAppStore.getState().language);
   const [persistenceProblem, setPersistenceProblem] = useState('');
   const [appReady, setAppReady] = useState(false);
   const persistQueue = useRef<Promise<void>>(Promise.resolve());

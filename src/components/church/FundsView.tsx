@@ -11,6 +11,7 @@ import { EmptyNote, LoadProblem, PageHeading, SkeletonRows, buttonClass } from '
 import { useAppStore } from '../../store';
 import { FundDialog, GivingRuleDialog } from './ChurchDialogs';
 import { RULE_TYPES, refreshChurch, say, shortDate, useChurchOrg, useFunds } from './churchData';
+import { text } from '../../utils/language';
 
 const COPY = {
   funds: say('Funds'),
@@ -86,13 +87,13 @@ export function FundsView() {
   const balanceOf = new Map((balances.data?.funds || []).map((row) => [row.fundId, row]));
   return (
     <div className="space-y-6">
-      <PageHeading title={COPY.funds.en} note="Every gift and every cost belongs to a fund. Money in a restricted fund is spent only on its purpose."
-        actions={canPost && <button type="button" className={buttonClass.primary} onClick={() => setDialog({ kind: 'fund' })}>{COPY.addFund.en}</button>} />
+      <PageHeading title={text(COPY.funds)} note="Every gift and every cost belongs to a fund. Money in a restricted fund is spent only on its purpose."
+        actions={canPost && <button type="button" className={buttonClass.primary} onClick={() => setDialog({ kind: 'fund' })}>{text(COPY.addFund)}</button>} />
       <Notice message={notice} />
       <section aria-labelledby="fund-budgets" className="space-y-3">
         <div className="flex flex-wrap items-end justify-between gap-3">
-          <h2 id="fund-budgets" className="ll-heading text-[17px] text-ink-900">{COPY.fundBudgets.en}</h2>
-          <label className="text-[12.5px]">{COPY.budgetYear.en}<input type="number" min="2000" max="2100" name="budget-year" value={budgetYear}
+          <h2 id="fund-budgets" className="ll-heading text-[17px] text-ink-900">{text(COPY.fundBudgets)}</h2>
+          <label className="text-[12.5px]">{text(COPY.budgetYear)}<input type="number" min="2000" max="2100" name="budget-year" value={budgetYear}
             onChange={(event) => setBudgetYear(Number(event.target.value) || budgetYear)} className="ml-2 h-9 w-24 rounded-lg border border-border px-2" /></label>
         </div>
         {budgets.isError ? <LoadProblem what="fund budgets" path="/api/church/fund-budgets" onRetry={() => budgets.refetch()} />
@@ -100,10 +101,10 @@ export function FundsView() {
             <>
               <p className="text-[12.5px] text-text-3">{shortDate(budgets.data.periodStart)} to {shortDate(budgets.data.periodEnd)}</p>
               <div className="overflow-x-auto"><table className="w-full min-w-[600px] text-[13.5px]">
-                <caption className="sr-only">{COPY.fundBudgets.en}</caption>
-                <thead><tr><th scope="col" className="text-left">Fund</th><th scope="col" className="text-right">{COPY.incomeTarget.en}</th>
-                  <th scope="col" className="text-right">{COPY.actualIncome.en}</th><th scope="col" className="text-right">{COPY.expenseLimit.en}</th>
-                  <th scope="col" className="text-right">{COPY.actualExpense.en}</th><th scope="col" className="text-right">{COPY.remaining.en}</th><th scope="col" className="sr-only">Actions</th></tr></thead>
+                <caption className="sr-only">{text(COPY.fundBudgets)}</caption>
+                <thead><tr><th scope="col" className="text-left">Fund</th><th scope="col" className="text-right">{text(COPY.incomeTarget)}</th>
+                  <th scope="col" className="text-right">{text(COPY.actualIncome)}</th><th scope="col" className="text-right">{text(COPY.expenseLimit)}</th>
+                  <th scope="col" className="text-right">{text(COPY.actualExpense)}</th><th scope="col" className="text-right">{text(COPY.remaining)}</th><th scope="col" className="sr-only">Actions</th></tr></thead>
                 <tbody>{budgets.data.funds.map((row) => <tr key={row.fundId} className="border-b border-border">
                   <td className="py-2">{row.name}<RestrictedNote restricted={row.restricted} /></td>
                   <td className="py-2 text-right">{row.budgetId ? <Amount cents={row.incomeTargetCents} currency={currency} /> : 'Not set'}</td>
@@ -112,7 +113,7 @@ export function FundsView() {
                   <td className="py-2 text-right"><Amount cents={row.expenseCents} currency={currency} /></td>
                   <td className="py-2 text-right">{row.budgetId ? <Amount cents={row.expenseRemainingCents} currency={currency} /> : '—'}</td>
                   <td className="py-2 text-right">{isAdmin && row.isActive && <button type="button" className={buttonClass.quiet}
-                    onClick={() => setDialog({ kind: 'budget', fund: row, budget: row })}>{COPY.editBudget.en}</button>}</td>
+                    onClick={() => setDialog({ kind: 'budget', fund: row, budget: row })}>{text(COPY.editBudget)}</button>}</td>
                 </tr>)}</tbody>
               </table></div>
             </>
@@ -120,7 +121,7 @@ export function FundsView() {
       </section>
       {funds.isError ? <LoadProblem what="the funds" path="/api/funds" onRetry={() => funds.refetch()} />
         : funds.isLoading ? <SkeletonRows label="Loading the funds" rows={4} />
-          : (funds.data?.funds || []).length === 0 ? <EmptyNote>{COPY.noFunds.en}</EmptyNote> : (
+          : (funds.data?.funds || []).length === 0 ? <EmptyNote>{text(COPY.noFunds)}</EmptyNote> : (
             <table className="w-full text-[13.5px]">
               <caption className="sr-only">Funds, balances since {shortDate(year.from)}</caption>
               <thead>
@@ -154,15 +155,15 @@ export function FundsView() {
       <section aria-labelledby="giving-rules" className="space-y-2">
         <div className="flex flex-wrap items-baseline justify-between gap-3 border-b border-feint-strong pb-1">
           <h2 id="giving-rules" className="ll-heading text-[17px] text-ink-900">Giving rules for M-Pesa</h2>
-          {canPost && <button type="button" className={buttonClass.quiet} onClick={() => setDialog({ kind: 'rule' })}>{COPY.addRule.en}</button>}
+          {canPost && <button type="button" className={buttonClass.quiet} onClick={() => setDialog({ kind: 'rule' })}>{text(COPY.addRule)}</button>}
         </div>
         <p className="max-w-2xl text-[13px] text-graphite-600">How an M-Pesa account reference finds its fund. Tried from the lowest priority up; a receipt no rule fits waits in Giving, Queue.</p>
         {rules.isError ? <LoadProblem what="the giving rules" path="/api/giving-rules" onRetry={() => rules.refetch()} />
-          : (rules.data?.rules || []).length === 0 ? <EmptyNote>{COPY.noRules.en}</EmptyNote> : (
+          : (rules.data?.rules || []).length === 0 ? <EmptyNote>{text(COPY.noRules)}</EmptyNote> : (
             <ul>
               {(rules.data?.rules || []).map((rule) => (
                 <li key={rule.id} className={`flex flex-wrap items-baseline justify-between gap-2 border-b border-feint py-2 text-[13.5px] ${rule.is_active ? '' : 'text-graphite-600'}`}>
-                  <span><span className="ll-figure mr-2">{rule.priority}</span>{RULE_TYPES[rule.match_type]?.en}{rule.pattern ? ` "${rule.pattern}"` : ''}: {rule.funds?.name}
+                  <span><span className="ll-figure mr-2">{rule.priority}</span>{text(RULE_TYPES[rule.match_type])}{rule.pattern ? ` "${rule.pattern}"` : ''}: {rule.funds?.name}
                     {rule.accounts && <span className="text-graphite-600"> via {rule.accounts.code} {rule.accounts.name}</span>}
                     {!rule.is_active && <span className="ml-2">(off)</span>}</span>
                   {canPost && <button type="button" className={buttonClass.quiet} disabled={toggleRule.isPending} onClick={() => toggleRule.mutate(rule)}>{rule.is_active ? 'Turn off' : 'Turn on'}</button>}
@@ -192,16 +193,16 @@ function FundBudgetDialog({ fund, budget, year, onClose, onDone }: { fund: any; 
   });
   return <Dialog open onClose={onClose} title={`${fund.name} · ${year}`} note={`Plan for this fund in ${currency}. No journal entry is posted.`}
     footer={<><button type="button" className={buttonClass.secondary} onClick={onClose}>Cancel</button>
-      <button type="submit" form="fund-budget-form" className={buttonClass.primary} disabled={save.isPending}>{COPY.saveBudget.en}</button></>}>
+      <button type="submit" form="fund-budget-form" className={buttonClass.primary} disabled={save.isPending}>{text(COPY.saveBudget)}</button></>}>
     <form id="fund-budget-form" className="space-y-4" onSubmit={(event) => {
       event.preventDefault();
       const incomeTargetCents = centsFromAmountText(income);
       const expenseLimitCents = centsFromAmountText(expense);
-      if (incomeTargetCents === null || expenseLimitCents === null) { setError(COPY.invalidAmount.en); return; }
+      if (incomeTargetCents === null || expenseLimitCents === null) { setError(text(COPY.invalidAmount)); return; }
       setError(''); save.mutate({ year, incomeTargetCents, expenseLimitCents });
     }}>
-      <Field label={`${COPY.incomeTarget.en} (${currency})`}><input required inputMode="decimal" value={income} onChange={(event) => setIncome(event.target.value)} name="income-target" /></Field>
-      <Field label={`${COPY.expenseLimit.en} (${currency})`}><input required inputMode="decimal" value={expense} onChange={(event) => setExpense(event.target.value)} name="expense-limit" /></Field>
+      <Field label={`${text(COPY.incomeTarget)} (${currency})`}><input required inputMode="decimal" value={income} onChange={(event) => setIncome(event.target.value)} name="income-target" /></Field>
+      <Field label={`${text(COPY.expenseLimit)} (${currency})`}><input required inputMode="decimal" value={expense} onChange={(event) => setExpense(event.target.value)} name="expense-limit" /></Field>
       {error && <p role="alert" className="text-[13px] text-negative">{error}</p>}
     </form>
   </Dialog>;
@@ -254,7 +255,7 @@ export function FundBalancesView() {
   };
   return (
     <div className="space-y-5">
-      <PageHeading title={COPY.fundBalances.en} note={`${companyName} · ${shortDate(from)} to ${shortDate(to)} · Figures in ${currency}`}
+      <PageHeading title={text(COPY.fundBalances)} note={`${companyName} · ${shortDate(from)} to ${shortDate(to)} · Figures in ${currency}`}
         actions={
           <div className="flex flex-wrap items-end gap-2 no-print">
             <label className="text-[12.5px]">From <input type="date" value={from} onChange={(e) => setFrom(e.target.value)} className="ml-1 h-9 border px-2" name="from" /></label>
@@ -282,7 +283,7 @@ export function FundBalancesView() {
                   <tr key={row.fundId}>
                     <th scope="row" className="py-2 pr-3 text-left font-normal">{row.name}<RestrictedNote restricted={row.restricted} />
                       <button type="button" className={buttonClass.quiet} onClick={() => setSelectedFundId(row.fundId)}
-                        aria-label={`${say('View fund report').en} for ${row.name}`}>{say('View report').en}</button></th>
+                        aria-label={`${text(say('View fund report'))} for ${row.name}`}>{text(say('View report'))}</button></th>
                     <td className="py-2 pr-3 text-right"><Amount cents={row.openingCents} currency={currency} /></td>
                     <td className="py-2 pr-3 text-right"><Amount cents={row.incomeCents} currency={currency} /></td>
                     <td className="py-2 pr-3 text-right"><Amount cents={row.expenseCents} currency={currency} /></td>
@@ -313,12 +314,12 @@ export function FundBalancesView() {
             {selectedFundId && <section aria-label="Fund project report" className="max-w-4xl space-y-3 rounded-xl border border-border bg-surface p-4">
               {detail.isError ? <LoadProblem what="the fund report" path="/api/church-reports/funds" onRetry={() => detail.refetch()} />
                 : detail.isLoading || !detail.data ? <SkeletonRows label="Loading the fund report" rows={4} /> : <>
-                  <div className="flex flex-wrap items-center justify-between gap-2"><h2 className="font-semibold">{detail.data.fund.name} · {say('Fund project report').en}</h2>
-                    <button type="button" className={buttonClass.secondary} onClick={exportFundPdf}>{say('Export fund PDF').en}</button></div>
-                  <p className="text-[13px] text-text-2">{say('Posted income and expenses by account for the selected period.').en}</p>
+                  <div className="flex flex-wrap items-center justify-between gap-2"><h2 className="font-semibold">{detail.data.fund.name} · {text(say('Fund project report'))}</h2>
+                    <button type="button" className={buttonClass.secondary} onClick={exportFundPdf}>{text(say('Export fund PDF'))}</button></div>
+                  <p className="text-[13px] text-text-2">{text(say('Posted income and expenses by account for the selected period.'))}</p>
                   {([['Income', detail.data.incomeByAccount], ['Expenses', detail.data.expensesByAccount]] as const).map(([title, accountRows]) =>
                     <div key={title}><h3 className="text-[13px] font-semibold">{title}</h3>
-                      {accountRows.length === 0 ? <p className="text-[13px] text-text-2">{say('No posted entries in this period.').en}</p>
+                      {accountRows.length === 0 ? <p className="text-[13px] text-text-2">{text(say('No posted entries in this period.'))}</p>
                         : accountRows.map((account) => <div key={account.code} className="flex justify-between border-b border-border py-1 text-[13px]">
                           <span>{account.code} {account.name}</span><Amount cents={account.amountCents} currency={currency} /></div>)}</div>)}
                 </>}

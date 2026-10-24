@@ -4,6 +4,7 @@ import { useQuery } from '@tanstack/react-query';
 import { useAppStore } from '../../store';
 import { Amount } from '../ledger/Amount';
 import { editionDefinition, navigationGroupsFor } from '../../utils/editions';
+import { text } from '../../utils/language';
 
 type Section = 'Pages' | 'Reports' | 'Invoices' | 'Bills' | 'Customers' | 'Vendors' | 'Stock' | 'Accounts';
 
@@ -121,8 +122,8 @@ export function CommandPalette() {
 
     const pages = edition.id === 'business' ? PAGES : visibleItems.map((entry) => {
       const businessPage = PAGES.find((page) => page.view === entry.view);
-      return { view: entry.view, title: entry.name.en,
-        subtitle: businessPage?.subtitle || `Open ${entry.name.en.toLowerCase()}`,
+      return { view: entry.view, title: text(entry.name),
+        subtitle: businessPage?.subtitle || `Open ${text(entry.name).toLowerCase()}`,
         shortcut: businessPage?.shortcut };
     });
     const items: SearchItem[] = [

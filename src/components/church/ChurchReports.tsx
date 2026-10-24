@@ -10,6 +10,7 @@ import { EmptyNote, LoadProblem, PageHeading, SkeletonRows, buttonClass } from '
 import { Mark } from '../ledger/Mark';
 import { RestrictedNote } from './FundsView';
 import { GIFT_METHODS, say, shortDate, useChurchOrg } from './churchData';
+import { text } from '../../utils/language';
 
 const COPY = {
   treasurer: say("Treasurer's report"),
@@ -111,14 +112,14 @@ export function TreasurerReportView() {
   };
   return (
     <div className="space-y-5 pb-16">
-      <PageHeading title={COPY.treasurer.en} note={`${companyName} · ${monthName(month)} · Figures in ${currency}`}
+      <PageHeading title={text(COPY.treasurer)} note={`${companyName} · ${monthName(month)} · Figures in ${currency}`}
         actions={
           <div className="flex flex-wrap items-end gap-2 no-print">
             <label className="text-[12.5px]">Month <input type="month" value={month} onChange={(e) => setMonth(e.target.value || today.slice(0, 7))} className="ml-1 h-9 border px-2" name="month" /></label>
             <button type="button" className={buttonClass.secondary} onClick={() => window.print()}>Print</button>
             <button type="button" className={buttonClass.primary} onClick={exportPdf} disabled={!data}>Export PDF</button>
             <button type="button" className={buttonClass.secondary} onClick={exportCouncilPack}
-              disabled={!data || !budgets.data}>{say('Council pack PDF').en}</button>
+              disabled={!data || !budgets.data}>{text(say('Council pack PDF'))}</button>
           </div>
         } />
       {budgets.isError && <LoadProblem what="the council pack budgets" path="/api/church/fund-budgets" onRetry={() => budgets.refetch()} />}
@@ -207,7 +208,7 @@ export function ChurchHomeView() {
   const data = home.data;
   return (
     <div className="space-y-5">
-      <PageHeading title={date} note={COPY.home.en} />
+      <PageHeading title={date} note={text(COPY.home)} />
       {home.isLoading || !data ? <SkeletonRows label="Loading the church Home" rows={6} /> : (
         <>
           <dl className="grid grid-cols-2 gap-4 lg:grid-cols-4">
@@ -219,7 +220,7 @@ export function ChurchHomeView() {
           <div className="grid gap-8 lg:grid-cols-2">
             <section aria-labelledby="home-funds">
               <h2 id="home-funds" className="ll-heading border-b border-feint-strong pb-1 text-[17px] text-ink-900">Giving this month by fund</h2>
-              {data.monthGivingCents === 0 ? <EmptyNote>{COPY.noGiving.en}</EmptyNote> : (
+              {data.monthGivingCents === 0 ? <EmptyNote>{text(COPY.noGiving)}</EmptyNote> : (
                 <ul>
                   {data.monthByFund.filter((fund: any) => fund.givingCents > 0).map((fund: any) => (
                     <li key={fund.fundId} className="flex justify-between border-b border-feint py-2 text-[13.5px]"><span>{fund.name}<RestrictedNote restricted={fund.restricted} /></span><Amount cents={fund.givingCents} currency={currency} /></li>
@@ -234,7 +235,7 @@ export function ChurchHomeView() {
                 {data.sundayGivingCents === 0 ? <p className="py-3 text-[13.5px] text-graphite-600">No giving recorded for that Sunday yet.</p> : (
                   <ul>
                     {Object.entries(data.sundayByMethod as Record<string, number>).map(([method, cents]) => (
-                      <li key={method} className="flex justify-between border-b border-feint py-2 text-[13.5px]"><span>{GIFT_METHODS[method]?.en}</span><Amount cents={cents} currency={currency} /></li>
+                      <li key={method} className="flex justify-between border-b border-feint py-2 text-[13.5px]"><span>{text(GIFT_METHODS[method])}</span><Amount cents={cents} currency={currency} /></li>
                     ))}
                   </ul>
                 )}

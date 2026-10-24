@@ -13,6 +13,7 @@ import {
   useCustomers, useLawOrg, useMatterFocus, useMatters, useTeamMembers, type Matter,
 } from './lawData';
 import { MatterRecord } from './MatterRecord';
+import { text } from '../../utils/language';
 
 const COPY = {
   title: say('Matters'),
@@ -59,8 +60,8 @@ export function MattersView() {
   return (
     <div className="space-y-4">
       <PageHeading
-        title={COPY.title.en}
-        note={COPY.note.en}
+        title={text(COPY.title)}
+        note={text(COPY.note)}
         actions={canPost && <button type="button" className={buttonClass.primary} onClick={() => setOpening(true)}>Open a matter</button>}
       />
       {notice && <p role="status" className="text-[13.5px] text-ink-900">{notice}</p>}
@@ -92,8 +93,8 @@ export function MattersView() {
 
       {matters.isLoading ? <SkeletonRows label="Loading matters" />
         : matters.isError ? <LoadProblem what="the matters" path="/api/matters" onRetry={() => matters.refetch()} />
-          : all.length === 0 ? <EmptyNote action={canPost && <button type="button" className={buttonClass.quiet} onClick={() => setOpening(true)}>Open the first matter</button>}>{COPY.empty.en}</EmptyNote>
-            : shown.length === 0 ? <EmptyNote>{COPY.noMatch.en}</EmptyNote>
+          : all.length === 0 ? <EmptyNote action={canPost && <button type="button" className={buttonClass.quiet} onClick={() => setOpening(true)}>Open the first matter</button>}>{text(COPY.empty)}</EmptyNote>
+            : shown.length === 0 ? <EmptyNote>{text(COPY.noMatch)}</EmptyNote>
               : (
                 <div className="relative overflow-x-auto">
                   <table className="w-full text-[13.5px]">
@@ -117,7 +118,7 @@ export function MattersView() {
                             </button>
                           </td>
                           <td className="pr-4">{clientName(matter)}</td>
-                          <td className="hidden pr-4 text-graphite-600 sm:table-cell">{MATTER_TYPES[matter.matter_type]?.en || matter.matter_type}</td>
+                          <td className="hidden pr-4 text-graphite-600 sm:table-cell">{text(MATTER_TYPES[matter.matter_type]) || matter.matter_type}</td>
                           <td className="hidden pr-4 text-graphite-600 md:table-cell">{[matter.court, matter.case_number].filter(Boolean).join(', ') || '–'}</td>
                           <td className="pr-4"><MatterStanding matter={matter} /></td>
                           <td className="hidden whitespace-nowrap text-graphite-600 sm:table-cell">{shortDate(matter.opened_on)}</td>
@@ -141,7 +142,7 @@ export function MattersView() {
 export function MatterStanding({ matter }: { matter: Pick<Matter, 'status' | 'stage'> }) {
   if (matter.status === 'CLOSED') return <span className="text-[12.5px] text-graphite-600">Closed</span>;
   if (matter.status === 'ON_HOLD') return <Mark kind="query" label={matter.stage ? `On hold, ${matter.stage}` : 'On hold'} />;
-  return <span className="text-[13px] text-ink-900">{matter.stage || MATTER_STATUS.OPEN.en}</span>;
+  return <span className="text-[13px] text-ink-900">{matter.stage || text(MATTER_STATUS.OPEN)}</span>;
 }
 
 type ConflictHit = { source: string; name: string; matter_id: string | null; matter_number: string | null; score: number };
@@ -167,7 +168,7 @@ function ConflictResults({ results }: { results: Array<{ name: string; matches: 
             )}
         </div>
       ))}
-      <p className="text-graphite-600">{COPY.conflictNote.en}</p>
+      <p className="text-graphite-600">{text(COPY.conflictNote)}</p>
     </div>
   );
 }
@@ -271,13 +272,13 @@ function OpenMatterDialog({ onClose, onOpened }: { onClose: () => void; onOpened
         <div className="sm:col-span-2"><Field label="Matter title" hint="For example: Otieno v Kamau, land dispute."><input name="title" required maxLength={200} value={title} onChange={(e) => setTitle(e.target.value)} /></Field></div>
         <Field label="Type">
           <select name="matterType" value={matterType} onChange={(e) => setMatterType(e.target.value)}>
-            {Object.entries(MATTER_TYPES).map(([id, name]) => <option key={id} value={id}>{name.en}</option>)}
+            {Object.entries(MATTER_TYPES).map(([id, name]) => <option key={id} value={id}>{text(name)}</option>)}
           </select>
         </Field>
         <Field label="Opened on"><input type="date" name="openedOn" required value={openedOn} onChange={(e) => setOpenedOn(e.target.value)} /></Field>
         <Field label="Billed by">
           <select name="billingMethod" value={billingMethod} onChange={(e) => setBillingMethod(e.target.value)}>
-            {Object.entries(BILLING_METHODS).map(([id, name]) => <option key={id} value={id}>{name.en}</option>)}
+            {Object.entries(BILLING_METHODS).map(([id, name]) => <option key={id} value={id}>{text(name)}</option>)}
           </select>
         </Field>
         {billingMethod === 'FIXED'

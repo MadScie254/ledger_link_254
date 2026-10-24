@@ -8,9 +8,12 @@ import { useAppStore } from '../../store';
 
 export function AppLayout({ children }: { children: React.ReactNode }) {
   const activeCompany = useAppStore((state) => state.activeCompany);
+  // Labels read the interface language as they render, so a change of
+  // language draws the shell again.
+  const language = useAppStore((state) => state.language);
 
   return (
-    <div className="app-shell min-h-screen flex flex-col md:flex-row">
+    <div key={language} className="app-shell min-h-screen flex flex-col md:flex-row">
       <CommandPalette />
       <NewMenu />
       <Sidebar />

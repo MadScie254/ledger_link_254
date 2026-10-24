@@ -18,6 +18,7 @@ import {
 import { FeeNoteList } from './MatterRecord';
 import { MattersView } from './MattersView';
 import { ClientReconciliation } from './ClientReconciliation';
+import { text } from '../../utils/language';
 
 const COPY = {
   diary: say('Court diary'),
@@ -93,7 +94,7 @@ export function CourtDiaryView() {
 
   return (
     <div className="space-y-4">
-      <PageHeading title={COPY.diary.en} note={COPY.diaryNote.en}
+      <PageHeading title={text(COPY.diary)} note={text(COPY.diaryNote)}
         actions={canPost && <button type="button" className={buttonClass.primary} onClick={() => setAdding(true)}>Add a court date</button>} />
       <Notice message={notice} />
       <div className="flex flex-wrap items-center gap-3 border-b border-feint pb-3 text-[13px] text-graphite-600">
@@ -124,7 +125,7 @@ export function CourtDiaryView() {
 
       {events.isLoading ? <SkeletonRows label="Loading the diary" />
         : events.isError ? <LoadProblem what="the diary" path="/api/court-events" onRetry={() => events.refetch()} />
-          : byDay.length === 0 ? <EmptyNote>{all.length ? 'Nothing in the diary for this advocate or court on these days.' : COPY.diaryEmpty.en}</EmptyNote>
+          : byDay.length === 0 ? <EmptyNote>{all.length ? 'Nothing in the diary for this advocate or court on these days.' : text(COPY.diaryEmpty)}</EmptyNote>
             : (
               <div className="space-y-4">
                 {byDay.map(([day, list]) => (
@@ -140,7 +141,7 @@ export function CourtDiaryView() {
 
       <section className="border-t border-feint-strong pt-4 text-[13.5px]" aria-labelledby="calendar-feed">
         <h2 id="calendar-feed" className="ll-heading text-[17px] text-ink-900">Your court dates in your calendar</h2>
-        <p className="mt-1 max-w-2xl text-graphite-600">{COPY.feedNote.en}</p>
+        <p className="mt-1 max-w-2xl text-graphite-600">{text(COPY.feedNote)}</p>
         {feed ? (
           <p className="mt-2 flex flex-wrap items-center gap-3">
             <input readOnly aria-label="Calendar link" value={feed} className="h-9 w-full max-w-xl border px-2 text-[13px]" onFocus={(e) => e.target.select()} />
@@ -170,14 +171,14 @@ function DiaryList({ events, canPost, onOutcome }: { events: any[]; canPost: boo
         <li key={event.id} className="flex flex-wrap items-baseline justify-between gap-3 border-b border-feint py-2 text-[13.5px]">
           <span className="min-w-0">
             <span className="ll-figure mr-2 text-ink-900">{zonedParts(event.starts_at, timeZone).time}</span>
-            <span className="font-semibold text-ink-900">{EVENT_TYPES[event.event_type]?.en || event.event_type}</span>
+            <span className="font-semibold text-ink-900">{text(EVENT_TYPES[event.event_type]) || event.event_type}</span>
             {' · '}{event.matters?.matter_number} {event.matters?.title}
             <span className="block text-[12.5px] text-graphite-600">{[event.court, event.courtroom, event.judicial_officer].filter(Boolean).join(', ') || 'Court not recorded'}{event.outcome ? ` · ${event.outcome}` : ''}</span>
           </span>
           <span className="flex items-center gap-3">
             {event.status === 'SCHEDULED' && event.starts_at < now
               ? <Mark kind="query" label="Outcome not recorded" />
-              : <span className="text-[12.5px] text-graphite-600">{EVENT_STATUS[event.status]?.en}</span>}
+              : <span className="text-[12.5px] text-graphite-600">{text(EVENT_STATUS[event.status])}</span>}
             {canPost && event.status === 'SCHEDULED' && <button type="button" className={buttonClass.quiet} onClick={() => onOutcome(event)}>Record outcome</button>}
           </span>
         </li>
@@ -228,7 +229,7 @@ export function ClientAccountView() {
 
   return (
     <div className="space-y-4">
-      <PageHeading title={COPY.account.en} note={COPY.accountNote.en}
+      <PageHeading title={text(COPY.account)} note={text(COPY.accountNote)}
         actions={canPost && <button type="button" className={buttonClass.primary} onClick={() => setReceiving(true)}>Receive client money</button>} />
       <Notice message={notice} />
       <div className="flex flex-wrap items-center gap-3 border-b border-feint pb-3 text-[13px] text-graphite-600">
@@ -260,7 +261,7 @@ export function ClientAccountView() {
 
       {balances.isLoading ? <SkeletonRows label="Loading client balances" />
         : balances.isError ? <LoadProblem what="client balances" path="/api/client-account/balances" onRetry={() => balances.refetch()} />
-          : held.length === 0 ? <EmptyNote>{COPY.accountEmpty.en}</EmptyNote>
+          : held.length === 0 ? <EmptyNote>{text(COPY.accountEmpty)}</EmptyNote>
             : (
               <table className="w-full text-[13.5px]">
                 <caption className="sr-only">Client money held by client and matter as at {shortDate(asOf)}</caption>
@@ -313,7 +314,7 @@ export function FeeNotesView() {
 
   return (
     <div className="space-y-4">
-      <PageHeading title={COPY.feeNotes.en} note={COPY.feeNotesNote.en}
+      <PageHeading title={text(COPY.feeNotes)} note={text(COPY.feeNotesNote)}
         actions={canPost && (
           <span className="flex flex-wrap items-center gap-2">
             <select aria-label="Matter to bill" value={choose} onChange={(e) => setChoose(e.target.value)} className="h-9 border px-2 text-[13.5px]">
@@ -333,7 +334,7 @@ export function FeeNotesView() {
       </div>
       {notes.isLoading ? <SkeletonRows label="Loading fee notes" />
         : notes.isError ? <LoadProblem what="fee notes" path="/api/fee-notes" onRetry={() => notes.refetch()} />
-          : shown.length === 0 ? <EmptyNote>{all.length ? 'Nothing is owing on any fee note.' : COPY.feeNotesEmpty.en}</EmptyNote>
+          : shown.length === 0 ? <EmptyNote>{all.length ? 'Nothing is owing on any fee note.' : text(COPY.feeNotesEmpty)}</EmptyNote>
             : <FeeNoteList notes={shown} canPost={canPost} onPay={setPaying} onEtims={setEtims}
                 matterOf={(note) => { const matter = byId.get(note.matter_id); return matter ? `${matter.matter_number} · ${clientName(matter)}` : ''; }} />}
       {builderFor && <FeeNoteBuilderDialog matter={builderFor} onClose={() => setBuilderFor(null)} onDone={done} />}
@@ -362,7 +363,7 @@ export function TimeView() {
   const unbilled = entries.filter((entry) => entry.billable && !entry.invoice_id).reduce((sum, entry) => sum + Number(entry.amount_cents || 0), 0);
   return (
     <div className="space-y-4">
-      <PageHeading title={COPY.time.en} note={COPY.timeNote.en}
+      <PageHeading title={text(COPY.time)} note={text(COPY.timeNote)}
         actions={canPost && <button type="button" className={buttonClass.primary} onClick={() => setLogging(true)}>Record time</button>} />
       <Notice message={notice} />
       <div className="flex flex-wrap items-center gap-3 border-b border-feint pb-3 text-[13px] text-graphite-600">
@@ -373,7 +374,7 @@ export function TimeView() {
           </select></label>
         {matterId && time.isSuccess && <span>{Math.round(hours * 100) / 100} hours · unbilled <Amount cents={unbilled} currency={currency} size="sm" tone="ink" /></span>}
       </div>
-      {!matterId ? <EmptyNote>{list.length ? COPY.timeChoose.en : COPY.noMatters.en}</EmptyNote>
+      {!matterId ? <EmptyNote>{list.length ? text(COPY.timeChoose) : text(COPY.noMatters)}</EmptyNote>
         : time.isLoading ? <SkeletonRows label="Loading time" />
           : entries.length === 0 ? <EmptyNote>No time recorded on {byId.get(matterId)?.matter_number}.</EmptyNote>
             : (
@@ -411,13 +412,13 @@ export function DisbursementsView() {
   const unbilled = all.filter((cost) => cost.paid_from === 'OFFICE' && !cost.invoice_id).reduce((sum, cost) => sum + Number(cost.amount_cents), 0);
   return (
     <div className="space-y-4">
-      <PageHeading title={COPY.disbursements.en} note={COPY.disbursementsNote.en}
+      <PageHeading title={text(COPY.disbursements)} note={text(COPY.disbursementsNote)}
         actions={canPost && <button type="button" className={buttonClass.primary} onClick={() => setRecording(true)}>Record an office disbursement</button>} />
       <Notice message={notice} />
       <p className="border-b border-feint pb-3 text-[13px] text-graphite-600">Paid by the firm and not yet billed: <Amount cents={unbilled} currency={currency} size="sm" tone="ink" /></p>
       {costs.isLoading ? <SkeletonRows label="Loading disbursements" />
         : costs.isError ? <LoadProblem what="disbursements" path="/api/disbursements" onRetry={() => costs.refetch()} />
-          : all.length === 0 ? <EmptyNote>{COPY.disbursementsEmpty.en}</EmptyNote>
+          : all.length === 0 ? <EmptyNote>{text(COPY.disbursementsEmpty)}</EmptyNote>
             : (
               <table className="w-full text-[13.5px]">
                 <caption className="sr-only">Disbursements</caption>
@@ -469,7 +470,7 @@ export function LawHomeView() {
 
   return (
     <div className="space-y-5">
-      <PageHeading title={date} note={COPY.home.en} />
+      <PageHeading title={date} note={text(COPY.home)} />
       <Notice message={notice} />
       <dl className="grid grid-cols-2 gap-4 lg:grid-cols-4">
         <div className="min-w-0 rounded-xl border border-border bg-surface p-5 shadow-sm"><dt className="text-[13px] font-medium text-text-2">Open matters</dt><dd className="mt-3 font-display text-[24px] font-bold leading-7 text-text">{matters.isSuccess ? list.filter((matter) => matter.status === 'OPEN').length : '–'}</dd></div>
@@ -479,7 +480,7 @@ export function LawHomeView() {
       </dl>
 
       {matters.isSuccess && list.length === 0 ? (
-        <EmptyNote action={canPost && <button type="button" className={buttonClass.quiet} onClick={() => setActiveView('Law / Matters')}>Open the first matter</button>}>{COPY.noMatters.en}</EmptyNote>
+        <EmptyNote action={canPost && <button type="button" className={buttonClass.quiet} onClick={() => setActiveView('Law / Matters')}>Open the first matter</button>}>{text(COPY.noMatters)}</EmptyNote>
       ) : (
         <div className="grid gap-8 lg:grid-cols-2">
           <section aria-labelledby="home-today">
@@ -494,7 +495,7 @@ export function LawHomeView() {
                   {later.slice(0, 8).map((event) => (
                     <li key={event.id} className="border-b border-feint py-2 text-[13.5px]">
                       <span className="ll-figure mr-2 text-ink-900">{printedDateTime(event.starts_at, timeZone)}</span>
-                      {EVENT_TYPES[event.event_type]?.en} · {event.matters?.matter_number} {event.matters?.title}
+                      {text(EVENT_TYPES[event.event_type])} · {event.matters?.matter_number} {event.matters?.title}
                     </li>
                   ))}
                 </ul>

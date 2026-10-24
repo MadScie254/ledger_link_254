@@ -11,6 +11,7 @@ import { buttonClass } from '../ledger/Page';
 import {
   EVENT_TYPES, matterLabel, refreshLaw, shortDate, useLawOrg, useMatters, useOfficeAccounts, type Matter,
 } from './lawData';
+import { text } from '../../utils/language';
 
 type Done = (message: string) => void;
 
@@ -329,7 +330,7 @@ export function CourtEventDialog({ matter, onClose, onDone }: { matter?: Matter 
     post.mutate({
       path: '/api/court-events',
       body: { matterId, eventType, startsAt, court: court.trim() || undefined, courtroom: courtroom.trim() || undefined, judicialOfficer: officer.trim() || undefined },
-      message: `${EVENT_TYPES[eventType].en} set for ${when.slice(8, 10)}/${when.slice(5, 7)}/${when.slice(0, 4)} at ${when.slice(11, 16)}.`,
+      message: `${text(EVENT_TYPES[eventType])} set for ${when.slice(8, 10)}/${when.slice(5, 7)}/${when.slice(0, 4)} at ${when.slice(11, 16)}.`,
     });
   };
   return (
@@ -339,7 +340,7 @@ export function CourtEventDialog({ matter, onClose, onDone }: { matter?: Matter 
         {!matter && <div className="sm:col-span-2"><MatterPicker value={matterId} onChange={setMatterId} /></div>}
         <Field label="What">
           <select name="eventType" value={eventType} onChange={(e) => setEventType(e.target.value)}>
-            {Object.entries(EVENT_TYPES).map(([id, name]) => <option key={id} value={id}>{name.en}</option>)}
+            {Object.entries(EVENT_TYPES).map(([id, name]) => <option key={id} value={id}>{text(name)}</option>)}
           </select>
         </Field>
         <Field label="Date and time" hint={`On the firm's clock (${timeZone}).`}><input type="datetime-local" name="startsAt" required value={when} onChange={(e) => setWhen(e.target.value)} /></Field>
@@ -408,7 +409,7 @@ export function CourtOutcomeDialog({ event, onClose, onDone }: { event: any; onC
               <>
                 <Field label="Next for">
                   <select name="nextType" value={nextType} onChange={(e) => setNextType(e.target.value)}>
-                    {Object.entries(EVENT_TYPES).map(([id, name]) => <option key={id} value={id}>{name.en}</option>)}
+                    {Object.entries(EVENT_TYPES).map(([id, name]) => <option key={id} value={id}>{text(name)}</option>)}
                   </select>
                 </Field>
                 <Field label="Next date and time"><input type="datetime-local" name="nextStartsAt" value={nextWhen} onChange={(e) => setNextWhen(e.target.value)} /></Field>

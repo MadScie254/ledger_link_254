@@ -1,3 +1,5 @@
+import { localized } from './language.ts';
+
 /** View keys that App.tsx renders. These are stable store values, not display labels. */
 export const BUSINESS_VIEWS = [
   'Home / Dashboard', 'Banking', 'Sales', 'Customer Hub', 'Expenses & Bills',
@@ -29,10 +31,7 @@ export const PLANNED_EDITION_VIEWS: Record<string, string> = {};
 
 export type PlannedEditionView = string;
 export const KNOWN_VIEWS = [...BUSINESS_VIEWS, ...LAW_VIEWS, ...CHURCH_VIEWS, ...Object.keys(PLANNED_EDITION_VIEWS)] as const;
-export const PLANNED_SECTION_COPY = {
-  en: 'This section is not available yet. The team is building it for the edition pilot.',
-  sw: 'TODO-SW',
-} as const;
+export const PLANNED_SECTION_COPY = localized('This section is not available yet. The team is building it for the edition pilot.');
 
 export function isPlannedEditionView(view: string): view is PlannedEditionView {
   return Object.prototype.hasOwnProperty.call(PLANNED_EDITION_VIEWS, view);

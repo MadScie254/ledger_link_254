@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import type { BusinessType } from './utils/businessTypes';
 import type { Edition } from './utils/editions';
 import { applyThemeAccent, type ThemeAccent } from './utils/themeAccents';
+import { LANGUAGE_STORAGE_KEY, interfaceLanguage, setInterfaceLanguage, type Language } from './utils/language';
 
 const THEME_STORAGE_KEY = 'll-theme';
 
@@ -101,6 +102,8 @@ interface AppState {
   setLocked: (locked: boolean) => void;
   theme: 'light' | 'dark';
   setTheme: (theme: 'light' | 'dark') => void;
+  language: Language;
+  setLanguage: (language: Language) => void;
 }
 
 export const useAppStore = create<AppState>((set) => ({
@@ -162,5 +165,15 @@ export const useAppStore = create<AppState>((set) => ({
       // ignore write failures, theme just won't persist this session
     }
     set({ theme });
-  }
+  },
+  language: interfaceLanguage(),
+  setLanguage: (language) => {
+    const applied = setInterfaceLanguage(language);
+    try {
+      localStorage.setItem(LANGUAGE_STORAGE_KEY, applied);
+    } catch {
+      // the choice lasts for this session
+    }
+    set({ language: applied });
+  },
 }));

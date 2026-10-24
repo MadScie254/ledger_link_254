@@ -70,6 +70,11 @@
   - Not built: asking a member's phone to pay a church (M-Pesa Express is for businesses, package 10), and Ledger Link sending SMS itself (needs a provider and keys).
   - Tests: `tests/db/church_giving_page.test.sql`, `tests/integration/church_giving_page.test.ts`; the page checked at 390 px wide.
 - Package 15 (Claude, 24 October 2026): migration `20261024001000_drop_seed_loader_helpers.sql` drops `private.ll_insert`, `ll_locate`, `ll_patch`, `ll_rpc`, `ll_sig`, `ll_subst`, `ll_walk` and the table `private.ll_seed_stage`. They were made by hand in production to replay the demo organizations once (no migration created them), had no `search_path` (seven Supabase advisor warnings), and nothing called them. The demo rows stay. On a database built from the migrations the drops do nothing. Checked locally against stand-ins with the production signatures: all eight objects go, and a second run is a no-op.
+- Package 16 (Claude, 24 October 2026): Swahili for every `TODO-SW` label, and an English/Kiswahili switch that stays off until the Swahili is reviewed.
+  - The owner chose Google Translate for the text. `src/utils/swahili.ts` maps each English label to its Swahili (263 labels: sidebar and page names, Mizani and Kundi screens, M-Pesa settings, plan panel, home page buttons, the sidebar's New, Collapse and Language). `docs/i18n/swahili-review.csv` lists them for review with where each is used.
+  - `src/utils/language.ts`: `localized(en)` builds a label (the old `say` and `label` helpers now are it), `text(label)` reads it in the interface language, and `SWAHILI_INTERFACE` (false) keeps that language English. The store holds `language`, remembered per browser under `ll-language`; `AppLayout` draws the shell again when it changes. Screens that showed `label.en` now show `text(label)`. The sidebar shows the English/Kiswahili choice only when the flag is on, and the product tour opens in the interface language.
+  - Still English on any setting: text written straight into components rather than as labels (most business screens, many buttons and messages). PRODUCT.md asks for onboarding, sidebar, primary buttons and empty states in Swahili; the tour and the sidebar labels have it, the rest of those buttons and empty states do not yet.
+  - Tests: `src/utils/language.test.ts` fails if a source file keeps a `TODO-SW` placeholder or any `say`, `label`, `localized` or sidebar item has no Swahili, and checks labels stay English while the flag is off. `src/utils/editions.test.ts` now expects each sidebar label's Swahili.
 
 ## In progress
 
@@ -81,7 +86,7 @@
 - Lift the GitHub Actions billing lock and let CI run on the review branch before merging it.
 - Production already holds migrations 20261011000100 to 000700 if Supabase applied them with the merge of PR #11. `supabase migration list` shows whether it did; the review migration then applies on top.
 - Before telling a business that invoices settle on their own: run the Daraja sandbox check in `docs/mpesa-c2b-fields.md` for a business, and set `MPESA_CALLBACK_IPS` from Safaricom's current list. Safaricom does not sign callbacks, so a forged confirmation with a valid token could settle an invoice; reconciling the M-Pesa account shows it.
-- The Integrations settings copy keeps its `sw: 'TODO-SW'` placeholders; real Swahili has to come from a person (PRODUCT.md, Brand Commitments).
+- Swahili interface (package 16): a fluent speaker reads `docs/i18n/swahili-review.csv`, fills the Corrected Swahili column where Google Translate is wrong, the corrections are copied into `src/utils/swahili.ts`, and then `SWAHILI_INTERFACE` in `src/utils/language.ts` is set to `true`. Until then the switch is hidden and every label shows English (PRODUCT.md, Brand Commitments: no machine translation on screen).
 
 ## Open questions and unverified figures
 

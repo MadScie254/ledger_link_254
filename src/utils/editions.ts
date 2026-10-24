@@ -1,7 +1,8 @@
 import { businessTypeDefinition, type BusinessType, type BusinessTypeAccount } from './businessTypes.ts';
+import { localized, type LocalizedLabel } from './language.ts';
 
 export type Edition = 'business' | 'law' | 'church';
-export interface LocalizedLabel { en: string; sw: 'TODO-SW' }
+export type { LocalizedLabel };
 export interface SidebarItem {
   view: string;
   name: LocalizedLabel;
@@ -20,7 +21,7 @@ export interface EditionDefinition {
   extraAccounts: BusinessTypeAccount[];
 }
 
-const label = (en: string): LocalizedLabel => ({ en, sw: 'TODO-SW' });
+const label = localized;
 const item = (view: string, en: string, available = true): SidebarItem =>
   ({ view, name: label(en), ...(available ? {} : { available: false }) });
 

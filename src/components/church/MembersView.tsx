@@ -13,6 +13,7 @@ import { GiftDialog, HouseholdDialog, ImportMembersDialog, MemberDialog } from '
 import {
   GIFT_METHODS, MEMBER_STATUS, memberName, say, shortDate, useChurchOrg, useHouseholds, useMembers, type Member,
 } from './churchData';
+import { text } from '../../utils/language';
 
 const COPY = {
   members: say('Members'),
@@ -67,11 +68,11 @@ export function MembersView() {
 
   return (
     <div className="space-y-5">
-      <PageHeading title={COPY.members.en} note="The church register. A member's number is also their M-Pesa account reference."
+      <PageHeading title={text(COPY.members)} note="The church register. A member's number is also their M-Pesa account reference."
         actions={canPost && (
           <>
-            <button type="button" className={buttonClass.secondary} onClick={() => setDialog('import')}>{COPY.importCsv.en}</button>
-            <button type="button" className={buttonClass.primary} onClick={() => setDialog('add')}>{COPY.addMember.en}</button>
+            <button type="button" className={buttonClass.secondary} onClick={() => setDialog('import')}>{text(COPY.importCsv)}</button>
+            <button type="button" className={buttonClass.primary} onClick={() => setDialog('add')}>{text(COPY.addMember)}</button>
           </>
         )} />
       <Notice message={notice} />
@@ -85,15 +86,15 @@ export function MembersView() {
           <span className="block font-semibold text-ink-900">Status</span>
           <select value={status} onChange={(e) => setStatus(e.target.value)} className="mt-1 h-9 border px-2 text-[14px]" name="status">
             <option value="">Every status</option>
-            {MEMBER_STATUSES.map((value) => <option key={value} value={value}>{MEMBER_STATUS[value].en}</option>)}
+            {MEMBER_STATUSES.map((value) => <option key={value} value={value}>{text(MEMBER_STATUS[value])}</option>)}
           </select>
         </label>
       </div>
       {members.isError ? <LoadProblem what="the register" path="/api/members" onRetry={() => members.refetch()} />
         : members.isLoading ? <SkeletonRows label="Loading the register" />
           : list.length === 0 ? (
-            <EmptyNote action={canPost && !search && !status && <button type="button" className={buttonClass.quiet} onClick={() => setDialog('add')}>{COPY.addMember.en}</button>}>
-              {search || status ? COPY.noMatch.en : COPY.noMembers.en}
+            <EmptyNote action={canPost && !search && !status && <button type="button" className={buttonClass.quiet} onClick={() => setDialog('add')}>{text(COPY.addMember)}</button>}>
+              {search || status ? text(COPY.noMatch) : text(COPY.noMembers)}
             </EmptyNote>
           ) : (
             <>
@@ -117,7 +118,7 @@ export function MembersView() {
                         <button type="button" className={buttonClass.quiet} onClick={() => focus.focus(member.id)}>{memberName(member)}</button>
                       </td>
                       <td className="hidden py-2 pr-4 sm:table-cell">{member.households?.name || ''}</td>
-                      <td className="py-2 pr-4">{MEMBER_STATUS[member.status]?.en}</td>
+                      <td className="py-2 pr-4">{text(MEMBER_STATUS[member.status])}</td>
                       <td className="hidden py-2 md:table-cell text-graphite-600">{member.phone || member.email ? 'Kept, with consent' : 'None kept'}</td>
                     </tr>
                   ))}
@@ -148,29 +149,29 @@ export function MemberRecord({ memberId, onBack }: { memberId: string; onBack: (
   const validPeriod = from <= to;
   const statement = validPeriod ? givingStatement(giving, from, to) : { gifts: [], totalCents: 0 };
   const downloadStatement = () => FinancialPDFEngine.exportFinancialStatement(
-    { title: COPY.statement.en, subtitle: memberName(member), period: `${shortDate(from)} to ${shortDate(to)}`,
+    { title: text(COPY.statement), subtitle: memberName(member), period: `${shortDate(from)} to ${shortDate(to)}`,
       companyName, kraPin, currency, filename: `giving-statement-${member.member_number}-${from}-${to}.pdf` },
     [
-      { title: COPY.postedGifts.en, headers: ['Received', 'Fund', 'How', 'Reference', currency],
+      { title: text(COPY.postedGifts), headers: ['Received', 'Fund', 'How', 'Reference', currency],
         rows: statement.gifts.map((gift: any) => [shortDate(gift.received_on), gift.funds?.name || '',
-          GIFT_METHODS[gift.method]?.en || gift.method, gift.reference || '', figureText(Number(gift.amount_cents))]) },
-      { title: 'Total', headers: ['', currency], rows: [[COPY.periodTotal.en, figureText(statement.totalCents)]] },
+          text(GIFT_METHODS[gift.method]) || gift.method, gift.reference || '', figureText(Number(gift.amount_cents))]) },
+      { title: 'Total', headers: ['', currency], rows: [[text(COPY.periodTotal), figureText(statement.totalCents)]] },
     ],
   );
   const downloadReceipt = (gift: any) => FinancialPDFEngine.exportFinancialStatement(
-    { title: COPY.receipt.en, subtitle: memberName(member), period: shortDate(gift.received_on),
+    { title: text(COPY.receipt), subtitle: memberName(member), period: shortDate(gift.received_on),
       companyName, kraPin, currency, filename: `giving-receipt-${gift.id}.pdf` },
-    [{ title: COPY.postedGift.en, headers: ['Detail', 'Value'], rows: [
+    [{ title: text(COPY.postedGift), headers: ['Detail', 'Value'], rows: [
       ['Member', `${member.member_number} · ${memberName(member)}`],
-      ['Fund', gift.funds?.name || ''], ['Method', GIFT_METHODS[gift.method]?.en || gift.method],
-      ['Reference', gift.reference || 'Not recorded'], [COPY.giftId.en, gift.id],
-      [COPY.journalEntry.en, gift.journal_entry_id], ['Amount', `${currency} ${figureText(Number(gift.amount_cents))}`],
+      ['Fund', gift.funds?.name || ''], ['Method', text(GIFT_METHODS[gift.method]) || gift.method],
+      ['Reference', gift.reference || 'Not recorded'], [text(COPY.giftId), gift.id],
+      [text(COPY.journalEntry), gift.journal_entry_id], ['Amount', `${currency} ${figureText(Number(gift.amount_cents))}`],
     ] }],
   );
   return (
     <div className="space-y-5">
       <button type="button" className={buttonClass.quiet} onClick={onBack}>All members</button>
-      <PageHeading title={memberName(member)} note={`Member ${member.member_number} · ${MEMBER_STATUS[member.status]?.en}`}
+      <PageHeading title={memberName(member)} note={`Member ${member.member_number} · ${text(MEMBER_STATUS[member.status])}`}
         actions={canPost && (
           <>
             <button type="button" className={buttonClass.secondary} onClick={() => setDialog('edit')}>Edit details</button>
@@ -194,27 +195,27 @@ export function MemberRecord({ memberId, onBack }: { memberId: string; onBack: (
       <section aria-labelledby="member-giving">
         <div className="flex items-baseline justify-between border-b border-feint-strong pb-1">
           <h2 id="member-giving" className="ll-heading text-[17px] text-ink-900">Giving</h2>
-          <span className="text-[13px] text-graphite-600">{COPY.allTime.en} <Amount cents={givingTotalCents} currency={currency} /></span>
+          <span className="text-[13px] text-graphite-600">{text(COPY.allTime)} <Amount cents={givingTotalCents} currency={currency} /></span>
         </div>
         <div className="my-3 flex flex-wrap items-end gap-3 no-print">
-          <label className="text-[12.5px]">{COPY.from.en}<input type="date" name="statement-from" value={from} onChange={(event) => setFrom(event.target.value || from)} className="mt-1 block h-9 rounded-lg border border-border px-2" /></label>
-          <label className="text-[12.5px]">{COPY.to.en}<input type="date" name="statement-to" value={to} onChange={(event) => setTo(event.target.value || to)} className="mt-1 block h-9 rounded-lg border border-border px-2" /></label>
-          {canPost && <button type="button" className={buttonClass.secondary} onClick={downloadStatement} disabled={!validPeriod || !statement.gifts.length}>{COPY.downloadStatement.en}</button>}
-          <span className="text-[13px]">{COPY.statement.en}: <Amount cents={statement.totalCents} currency={currency} /></span>
+          <label className="text-[12.5px]">{text(COPY.from)}<input type="date" name="statement-from" value={from} onChange={(event) => setFrom(event.target.value || from)} className="mt-1 block h-9 rounded-lg border border-border px-2" /></label>
+          <label className="text-[12.5px]">{text(COPY.to)}<input type="date" name="statement-to" value={to} onChange={(event) => setTo(event.target.value || to)} className="mt-1 block h-9 rounded-lg border border-border px-2" /></label>
+          {canPost && <button type="button" className={buttonClass.secondary} onClick={downloadStatement} disabled={!validPeriod || !statement.gifts.length}>{text(COPY.downloadStatement)}</button>}
+          <span className="text-[13px]">{text(COPY.statement)}: <Amount cents={statement.totalCents} currency={currency} /></span>
         </div>
-        {!validPeriod && <p role="alert" className="text-[13px] text-negative">{COPY.invalidPeriod.en}</p>}
-        {statement.gifts.length === 0 ? <p className="py-3 text-[13.5px] text-graphite-600">{giving.length ? COPY.noGivingInPeriod.en : COPY.noGiving.en}</p> : (
+        {!validPeriod && <p role="alert" className="text-[13px] text-negative">{text(COPY.invalidPeriod)}</p>}
+        {statement.gifts.length === 0 ? <p className="py-3 text-[13.5px] text-graphite-600">{giving.length ? text(COPY.noGivingInPeriod) : text(COPY.noGiving)}</p> : (
           <table className="w-full text-[13.5px]">
             <caption className="sr-only">Giving by this member</caption>
-            <thead><tr><th scope="col" className="text-left">Received</th><th scope="col" className="text-left">Fund</th><th scope="col" className="text-left">How</th><th scope="col" className="text-right">Amount</th><th scope="col" className="text-right no-print">{COPY.receiptColumn.en}</th></tr></thead>
+            <thead><tr><th scope="col" className="text-left">Received</th><th scope="col" className="text-left">Fund</th><th scope="col" className="text-left">How</th><th scope="col" className="text-right">Amount</th><th scope="col" className="text-right no-print">{text(COPY.receiptColumn)}</th></tr></thead>
             <tbody>
               {statement.gifts.map((gift) => (
                 <tr key={gift.id}>
                   <td className="py-1.5 ll-figure">{shortDate(gift.received_on)}</td>
                   <td className="py-1.5">{gift.funds?.name}</td>
-                  <td className="py-1.5">{GIFT_METHODS[gift.method]?.en}{gift.reference ? ` · ${gift.reference}` : ''}</td>
+                  <td className="py-1.5">{text(GIFT_METHODS[gift.method])}{gift.reference ? ` · ${gift.reference}` : ''}</td>
                   <td className="py-1.5 text-right"><Amount cents={Number(gift.amount_cents)} currency={currency} /></td>
-                  <td className="py-1.5 text-right no-print">{canPost && <button type="button" className={buttonClass.quiet} onClick={() => downloadReceipt(gift)} aria-label={`${COPY.downloadReceipt.en} for ${shortDate(gift.received_on)}`}>{COPY.downloadReceipt.en}</button>}</td>
+                  <td className="py-1.5 text-right no-print">{canPost && <button type="button" className={buttonClass.quiet} onClick={() => downloadReceipt(gift)} aria-label={`${text(COPY.downloadReceipt)} for ${shortDate(gift.received_on)}`}>{text(COPY.downloadReceipt)}</button>}</td>
                 </tr>
               ))}
             </tbody>
@@ -239,12 +240,12 @@ export function HouseholdsView() {
   const list = households.data?.households || [];
   return (
     <div className="space-y-5">
-      <PageHeading title={COPY.households.en} note="Members who live together."
-        actions={canPost && <button type="button" className={buttonClass.primary} onClick={() => setAdding(true)}>{COPY.addHousehold.en}</button>} />
+      <PageHeading title={text(COPY.households)} note="Members who live together."
+        actions={canPost && <button type="button" className={buttonClass.primary} onClick={() => setAdding(true)}>{text(COPY.addHousehold)}</button>} />
       <Notice message={notice} />
       {households.isError ? <LoadProblem what="the households" path="/api/households" onRetry={() => households.refetch()} />
         : households.isLoading ? <SkeletonRows label="Loading households" />
-          : list.length === 0 ? <EmptyNote>{COPY.noHouseholds.en}</EmptyNote> : (
+          : list.length === 0 ? <EmptyNote>{text(COPY.noHouseholds)}</EmptyNote> : (
             <div className="grid gap-6 lg:grid-cols-2">
               <ul className="border-t border-feint-strong">
                 {list.map((item) => (
@@ -261,7 +262,7 @@ export function HouseholdsView() {
                     {(members.data?.members || []).map((member) => (
                       <li key={member.id} className="border-b border-feint py-2 text-[13.5px]">
                         <span className="ll-figure mr-2">{member.member_number}</span>
-                        {memberName(member)} <span className="text-graphite-600">· {MEMBER_STATUS[member.status]?.en}</span>
+                        {memberName(member)} <span className="text-graphite-600">· {text(MEMBER_STATUS[member.status])}</span>
                         <button type="button" className={`${buttonClass.quiet} ml-2`} onClick={() => { focus.focus(member.id); setActiveView('Church / Members'); }}>Open</button>
                       </li>
                     ))}
