@@ -165,7 +165,7 @@ export class InventoryService {
     const supabase = getSupabase();
     const { data, error } = await supabase
       .from('inventory_movements')
-      .select('id, quantity, quantity_after, source_type, source_id, note, created_by, created_at')
+      .select('id, quantity, quantity_after, source_type, source_id, note, created_by, created_at, value_cents, value_after_cents')
       .eq('org_id', orgId)
       .eq('item_id', itemId)
       .order('created_at', { ascending: false })
@@ -181,6 +181,53 @@ export class InventoryService {
       note: row.note,
       createdBy: row.created_by,
       createdAt: row.created_at,
+      valueCents: row.value_cents === null ? null : Number(row.value_cents),
+      valueAfterCents: row.value_after_cents === null ? null : Number(row.value_after_cents),
     }));
   }
+
+  /**
+   * Stock value in the books (public.stock_valuation): when valuation began,
+   * each item's quantity, value and average cost, and the Inventory
+   * accounts' balance beside the items' total.
+   */
+  static async getValuation(orgId: string): Promise<StockValuation> {
+    const { data, error } = await getSupabase().rpc('stock_valuation', { p_org_id: orgId });
+    if (error) throw error;
+    const report = (data ?? {}) as any;
+    return {
+      startDate: report.startDate ?? null,
+      itemsValueCents: Number(report.itemsValueCents ?? 0),
+      ledgerValueCents: Number(report.ledgerValueCents ?? 0),
+      items: (report.items ?? []).map((item: any) => ({
+        itemId: item.itemId, name: item.name, sku: item.sku ?? null, quantity: Number(item.quantity),
+        valueCents: Number(item.valueCents),
+        averageCostCents: item.averageCostCents === null || item.averageCostCents === undefined ? null : Number(item.averageCostCents),
+        lastCostCents: Number(item.lastCostCents ?? 0),
+      })),
+    };
+  }
+
+  /**
+   * Turns on stock valuation from a date (owners and admins): the stock on
+   * hand that day is valued at each item's cost price, or at the cost given,
+   * and posted to Inventory against Opening Balance Equity.
+   */
+  static async startValuation(orgId: string, actor: string, startDate: string, costs: Array<{ itemId: string; unitCostCents: number }>) {
+    const { data, error } = await getSupabase().rpc('start_stock_valuation', {
+      p_org_id: orgId, p_start_date: startDate, p_costs: costs, p_actor: actor,
+    });
+    if (error) throw error;
+    return data as { startDate: string; items: number; valueCents: number; journalEntryId: string | null; alreadyOn: boolean };
+  }
+}
+
+export interface StockValuation {
+  startDate: string | null;
+  itemsValueCents: number;
+  ledgerValueCents: number;
+  items: Array<{
+    itemId: string; name: string; sku: string | null; quantity: number;
+    valueCents: number; averageCostCents: number | null; lastCostCents: number;
+  }>;
 }

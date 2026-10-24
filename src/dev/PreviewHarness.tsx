@@ -223,6 +223,17 @@ const FIXTURES: Record<string, unknown> = {
       { id: 'i-4', name: 'Crown emulsion, white 20L', type: 'Physical Product', incomeAccountId: 'a-4000', sku: 'PNT-CRW-20', unitOfMeasure: 'tins', unitPriceCents: 780_000, costPriceCents: 640_000, quantityOnHand: 9, reorderPoint: 12 },
     ],
   },
+  '/api/inventory/valuation': {
+    startDate: null, itemsValueCents: 0, ledgerValueCents: 0, items: [],
+  },
+  '/api/inventory/valuation?on': {
+    startDate: '2026-10-01', itemsValueCents: 47_180_000, ledgerValueCents: 47_180_000,
+    items: [
+      { itemId: 'i-1', name: 'Cement 50kg, Bamburi', sku: 'CEM-50-BAM', quantity: 340, valueCents: 24_480_000, averageCostCents: 72_000, lastCostCents: 74_000 },
+      { itemId: 'i-3', name: 'Iron sheets, gauge 30, 3m', sku: 'ROF-G30-3', quantity: 210, valueCents: 16_940_000, averageCostCents: 80_667, lastCostCents: 76_000 },
+      { itemId: 'i-4', name: 'Crown emulsion, white 20L', sku: 'PNT-CRW-20', quantity: 9, valueCents: 5_760_000, averageCostCents: 640_000, lastCostCents: 640_000 },
+    ],
+  },
   '/api/sales-orders': {
     orders: [
       salesOrder('so-7', 'SO-2026-00007', 'c-1', '2026-09-30', '2026-10-03', 'OPEN', [
@@ -446,7 +457,9 @@ function installFixtureFetch() {
       return new Response(JSON.stringify(state), { status: 200, headers: { 'Content-Type': 'application/json' } });
     }
     const payslips = /^\/api\/payroll\/runs\/[^/]+\/payslips$/.test(url.pathname) ? PAYSLIPS : undefined;
-    const body = method === 'GET' ? payslips ?? FIXTURES[url.pathname + url.search] ?? FIXTURES[url.pathname] ?? {} : previewWrite(url.pathname, init?.body);
+    // ?stock=on shows stock valuation turned on.
+    const stockOn = url.pathname === '/api/inventory/valuation' && new URLSearchParams(window.location.search).get('stock') === 'on';
+    const body = method === 'GET' ? payslips ?? (stockOn ? FIXTURES['/api/inventory/valuation?on'] : undefined) ?? FIXTURES[url.pathname + url.search] ?? FIXTURES[url.pathname] ?? {} : previewWrite(url.pathname, init?.body);
     await new Promise((resolve) => setTimeout(resolve, 120));
     return new Response(JSON.stringify(body), { status: 200, headers: { 'Content-Type': 'application/json' } });
   };
