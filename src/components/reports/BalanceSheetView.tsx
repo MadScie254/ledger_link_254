@@ -39,6 +39,7 @@ export function BalanceSheetView({ onBack }: { onBack: () => void }) {
   const asAt = format(new Date(asOfDate), 'd MMMM yyyy');
 
   const handleExportPDF = () => {
+    const fmt = (cents: number) => FinancialPDFEngine.formatAmount(shown(cents), currency);
     FinancialPDFEngine.exportFinancialStatement(
       {
         title: 'Balance Sheet Statement',
@@ -46,29 +47,29 @@ export function BalanceSheetView({ onBack }: { onBack: () => void }) {
         period: `As at ${asAt}`,
         companyName: activeCompany?.legalName || activeCompany?.name,
         kraPin: activeCompany?.taxId,
-        currency: 'KES',
+        currency,
         filename: `balance_sheet_${format(new Date(), 'yyyyMMdd')}.pdf`,
       },
       [
         {
           title: '1. ASSETS',
-          headers: ['Asset Category / Account', 'Amount (KES)'],
+          headers: ['Asset Category / Account', `Amount (${currency})`],
           rows: [
-            ...currentAssets.map((i: any) => [`  ${i.name}`, FinancialPDFEngine.formatKES(i.amountCents)]),
-            ['Total Current Assets', FinancialPDFEngine.formatKES(totalCurrentAssets)],
-            ...nonCurrentAssets.map((i: any) => [`  ${i.name}`, FinancialPDFEngine.formatKES(i.amountCents)]),
-            ['TOTAL ASSETS', FinancialPDFEngine.formatKES(totalAssets)],
+            ...currentAssets.map((i: any) => [`  ${i.name}`, fmt(i.amountCents)]),
+            ['Total Current Assets', fmt(totalCurrentAssets)],
+            ...nonCurrentAssets.map((i: any) => [`  ${i.name}`, fmt(i.amountCents)]),
+            ['TOTAL ASSETS', fmt(totalAssets)],
           ],
         },
         {
           title: '2. LIABILITIES & SHAREHOLDERS EQUITY',
-          headers: ['Liability & Equity Category', 'Amount (KES)'],
+          headers: ['Liability & Equity Category', `Amount (${currency})`],
           rows: [
-            ...currentLiabilities.map((i: any) => [`  ${i.name}`, FinancialPDFEngine.formatKES(i.amountCents)]),
-            ['Total Current Liabilities', FinancialPDFEngine.formatKES(totalLiabilities)],
-            ...equity.map((i: any) => [`  ${i.name}`, FinancialPDFEngine.formatKES(i.amountCents)]),
-            ['Total Equity', FinancialPDFEngine.formatKES(totalEquity)],
-            ['TOTAL LIABILITIES & EQUITY', FinancialPDFEngine.formatKES(totalLiabilitiesAndEquity)],
+            ...currentLiabilities.map((i: any) => [`  ${i.name}`, fmt(i.amountCents)]),
+            ['Total Current Liabilities', fmt(totalLiabilities)],
+            ...equity.map((i: any) => [`  ${i.name}`, fmt(i.amountCents)]),
+            ['Total Equity', fmt(totalEquity)],
+            ['TOTAL LIABILITIES & EQUITY', fmt(totalLiabilitiesAndEquity)],
           ],
         },
       ],
@@ -77,20 +78,20 @@ export function BalanceSheetView({ onBack }: { onBack: () => void }) {
 
   const handleExportCsv = () => {
     const rows = [
-      ['Account Name', 'Amount (KES)'],
+      ['Account Name', `Amount (${currency})`],
       ['CURRENT ASSETS', ''],
-      ...currentAssets.map((i: any) => [i.name, i.amountCents / 100]),
-      ['Total Current Assets', totalCurrentAssets / 100],
+      ...currentAssets.map((i: any) => [i.name, shown(i.amountCents) / 100]),
+      ['Total Current Assets', shown(totalCurrentAssets) / 100],
       ['NON-CURRENT ASSETS', ''],
-      ...nonCurrentAssets.map((i: any) => [i.name, i.amountCents / 100]),
-      ['TOTAL ASSETS', totalAssets / 100],
+      ...nonCurrentAssets.map((i: any) => [i.name, shown(i.amountCents) / 100]),
+      ['TOTAL ASSETS', shown(totalAssets) / 100],
       ['CURRENT LIABILITIES', ''],
-      ...currentLiabilities.map((i: any) => [i.name, i.amountCents / 100]),
-      ['Total Current Liabilities', totalLiabilities / 100],
+      ...currentLiabilities.map((i: any) => [i.name, shown(i.amountCents) / 100]),
+      ['Total Current Liabilities', shown(totalLiabilities) / 100],
       ['EQUITY', ''],
-      ...equity.map((i: any) => [i.name, i.amountCents / 100]),
-      ['Total Equity', totalEquity / 100],
-      ['TOTAL LIABILITIES & EQUITY', totalLiabilitiesAndEquity / 100],
+      ...equity.map((i: any) => [i.name, shown(i.amountCents) / 100]),
+      ['Total Equity', shown(totalEquity) / 100],
+      ['TOTAL LIABILITIES & EQUITY', shown(totalLiabilitiesAndEquity) / 100],
     ];
     downloadCsv('balance_sheet.csv', rows);
   };
