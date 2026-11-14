@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { normalizeKenyanPhone } from '../../utils/mpesaExpress';
 import { printedMoney, printedQuantity, printFileName, type PrintDocument } from '../../utils/printDocument';
+import { BUSINESS_BRAND, usePublicBrand } from '../../hooks/usePublicBrand';
 
 interface PublicInvoice {
   document: PrintDocument;
@@ -31,6 +32,7 @@ async function readJson<T>(response: Response, fallback: string): Promise<T> {
  * the invoice as printed, a PDF to save, and how to pay it by M-Pesa.
  */
 export function PublicInvoicePage({ token }: { token: string }) {
+  const { data: brand = BUSINESS_BRAND } = usePublicBrand();
   const [invoice, setInvoice] = useState<PublicInvoice | null>(null);
   const [loadProblem, setLoadProblem] = useState('');
   const [phone, setPhone] = useState('');
@@ -247,7 +249,11 @@ export function PublicInvoicePage({ token }: { token: string }) {
       </section>
 
       {doc.notes && <p className="mt-8 whitespace-pre-wrap text-[13.5px] text-graphite-600">{doc.notes}</p>}
-      <p className="mt-10 text-[12px] text-graphite-600">Sent with Ledger Link</p>
+      <p className="mt-10 text-[12px] text-graphite-600">
+        <a href="/" className="underline decoration-feint-strong underline-offset-[3px] hover:decoration-current">
+          {brand.poweredBy ? 'Powered by Ledger Link — get paid faster' : 'Sent with Ledger Link — get paid faster'}
+        </a>
+      </p>
     </main>
   );
 }

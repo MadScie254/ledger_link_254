@@ -10,6 +10,8 @@ export interface ReportExportOptions {
   period?: string;
   currency?: string;
   filename?: string;
+  /** The product name in the page footer. Defaults to "Ledger Link". */
+  brandName?: string;
 }
 
 export interface PDFTableRow {
@@ -39,6 +41,7 @@ export class FinancialPDFEngine {
     const company = options.companyName || 'YOUR COMPANY';
     const kraPin = options.kraPin || 'Not set';
     const currency = options.currency || 'KES';
+    const brand = options.brandName || 'Ledger Link';
     const period = options.period || 'Year-to-date 2026';
     const generatedDate = format(new Date(), 'dd MMMM yyyy, HH:mm');
 
@@ -146,7 +149,7 @@ export class FinancialPDFEngine {
           doc.setFont('helvetica', 'normal');
           doc.setFontSize(7.5);
           doc.setTextColor(148, 163, 184); // Slate 400
-          doc.text('Ledgerline Engine • Confidential & Legally Binding Financial Record', margin, footerY);
+          doc.text(`${brand} • Confidential & Legally Binding Financial Record`, margin, footerY);
           doc.text(`Page ${pageNum} of ${pageCount}`, pageWidth - margin, footerY, { align: 'right' });
         }
       });
@@ -188,10 +191,16 @@ export class FinancialPDFEngine {
   }
 
   /**
-   * Helper to format numbers with KES commas
+   * Formats cents as a grouped decimal amount, currency-agnostic: callers
+   * convert to the display currency first and label the column themselves.
    */
-  static formatKES(cents: number): string {
+  static formatAmount(cents: number): string {
     const val = cents / 100;
     return val.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  }
+
+  /** @deprecated Use formatAmount; this name wrongly implied KES-only figures. */
+  static formatKES(cents: number): string {
+    return FinancialPDFEngine.formatAmount(cents);
   }
 }
