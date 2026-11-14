@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
+import { AlertCircle, CheckCircle2, Loader2 } from 'lucide-react';
 import { normalizeKenyanPhone } from '../../utils/mpesaExpress';
 import { printedMoney, printedQuantity, printFileName, type PrintDocument } from '../../utils/printDocument';
 
@@ -122,7 +123,7 @@ export function PublicInvoicePage({ token }: { token: string }) {
   };
 
   return (
-    <main className="mx-auto max-w-2xl px-4 pb-16 pt-8 text-ink-900">
+    <main className="mx-auto max-w-2xl px-4 sm:px-6 pb-16 pt-8 text-ink-900">
       <div className="h-1.5 w-full" style={{ background: doc.accent }} aria-hidden="true" />
       <header className="mt-5 flex flex-wrap items-start justify-between gap-4">
         <div>
@@ -211,14 +212,29 @@ export function PublicInvoicePage({ token }: { token: string }) {
             {phone && !normalizedPhone && <p className="text-[13px] text-ledger-red">That is not a Safaricom number. Use the form 0712 345 678.</p>}
             {amount && !amountValid && <p className="text-[13px] text-ledger-red">Enter whole shillings from 1 to {wholeDue.toLocaleString('en-KE')}.</p>}
             <button type="submit" disabled={!normalizedPhone || !amountValid || request.stage === 'sending' || request.stage === 'waiting'}
-              className="h-11 px-5 text-[15px] font-semibold text-white disabled:opacity-60" style={{ background: doc.accent }}>
-              {request.stage === 'sending' ? 'Sending' : request.stage === 'waiting' ? 'Waiting for your phone' : 'Send payment request'}
+              className="flex min-h-[44px] items-center justify-center gap-2 px-5 text-[15px] font-semibold text-white transition-opacity disabled:opacity-60" style={{ background: doc.accent }}>
+              {request.stage === 'sending' && <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />}
+              {request.stage === 'waiting' && <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />}
+              {request.stage === 'sending' ? 'Sending prompt' : request.stage === 'waiting' ? 'Waiting for your phone' : 'Send payment request'}
             </button>
-            <p role="status" className="text-[14px]">
-              {request.stage === 'waiting' && (request.message || 'Check your phone and enter your M-Pesa PIN.')}
-              {request.stage === 'paid' && 'Payment received. Thank you.'}
-            </p>
-            {request.stage === 'failed' && <p role="alert" className="text-[14px] text-ledger-red">{request.message}</p>}
+            {request.stage === 'waiting' && (
+              <div role="status" className="flex items-center gap-2.5 rounded-sm border border-feint bg-paper-100 p-3 text-[14px] text-ink-900">
+                <Loader2 className="h-4 w-4 shrink-0 animate-spin text-graphite-600" aria-hidden="true" />
+                <span>{request.message || 'Check your phone and enter your M-Pesa PIN.'}</span>
+              </div>
+            )}
+            {request.stage === 'paid' && (
+              <div role="status" className="flex items-center gap-2.5 rounded-sm border border-emerald-500/30 bg-emerald-50 p-3 text-[14px] font-medium text-emerald-800">
+                <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-600" aria-hidden="true" />
+                <span>Payment received. Thank you.</span>
+              </div>
+            )}
+            {request.stage === 'failed' && (
+              <div role="alert" className="flex items-center gap-2.5 rounded-sm border border-ledger-red/30 bg-paper-100 p-3 text-[14px] text-ledger-red">
+                <AlertCircle className="h-4 w-4 shrink-0" aria-hidden="true" />
+                <span>{request.message}</span>
+              </div>
+            )}
           </form>
         )}
 
@@ -241,13 +257,18 @@ export function PublicInvoicePage({ token }: { token: string }) {
         )}
 
         <button type="button" onClick={() => void savePdf()} disabled={saving}
-          className="mt-6 h-11 border border-ink-900 px-5 text-[14.5px] font-semibold">
+          className="mt-6 flex min-h-[44px] items-center justify-center border border-ink-900 px-5 text-[14.5px] font-semibold">
           {saving ? 'Preparing the PDF' : 'Save as PDF'}
         </button>
       </section>
 
       {doc.notes && <p className="mt-8 whitespace-pre-wrap text-[13.5px] text-graphite-600">{doc.notes}</p>}
-      <p className="mt-10 text-[12px] text-graphite-600">Sent with Ledger Link</p>
+      <footer className="mt-12 text-center text-[12px] text-graphite-600">
+        Powered by{' '}
+        <a href="/" className="font-medium underline underline-offset-2 hover:text-ink-900">
+          Ledger Link
+        </a>
+      </footer>
     </main>
   );
 }

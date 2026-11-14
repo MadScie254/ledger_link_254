@@ -45,7 +45,7 @@ function RankedReport<Row extends { name: string }>({
     queryFn: () => apiRequest<any>(`${endpoint}?dateRange=${encodeURIComponent(dateRange)}`, { fallback: `Failed to fetch ${title.toLowerCase()}` }),
   });
   const rows: Row[] = report.data?.rows || [];
-  const headers = [nameLabel, ...columns.map((c) => c.label)];
+  const headers = [nameLabel, ...columns.map((c) => (c.cents ? `${c.label} (${currency})` : c.label))];
   const cell = (row: Row, column: Column<Row>) => (column.cents ? column.cents(row) : column.text!(row));
 
   return (
@@ -58,15 +58,15 @@ function RankedReport<Row extends { name: string }>({
       controls={<PeriodSelect value={dateRange} onChange={setDateRange} />}
       onCsv={() => downloadCsv(`${queryKey}.csv`, [
         headers,
-        ...rows.map((row) => [row.name, ...columns.map((c) => (c.cents ? c.cents(row) / 100 : c.text!(row)))]),
+        ...rows.map((row) => [row.name, ...columns.map((c) => (c.cents ? shown(c.cents(row)) / 100 : c.text!(row)))]),
       ])}
       onPdf={() => FinancialPDFEngine.exportFinancialStatement(
-        { title, period: rangeText(report.data?.range), companyName: activeCompany?.legalName || activeCompany?.name, kraPin: activeCompany?.taxId, currency: 'KES', filename: `${queryKey}.pdf` },
+        { title, period: rangeText(report.data?.range), companyName: activeCompany?.legalName || activeCompany?.name, kraPin: activeCompany?.taxId, currency, filename: `${queryKey}.pdf` },
         [{
           headers,
           rows: [
-            ...rows.map((row) => [row.name, ...columns.map((c) => (c.cents ? kes(c.cents(row)) : c.text!(row)))]),
-            [totalLabel, ...columns.map((c) => (c.total ? kes(totalOf(report.data)) : ''))],
+            ...rows.map((row) => [row.name, ...columns.map((c) => (c.cents ? FinancialPDFEngine.formatAmount(shown(c.cents(row)), currency) : c.text!(row)))]),
+            [totalLabel, ...columns.map((c) => (c.total ? FinancialPDFEngine.formatAmount(shown(totalOf(report.data)), currency) : ''))],
           ],
         }],
       )}
@@ -244,8 +244,8 @@ export function MonthlyProfitAndLossView({ onBack }: { onBack: () => void }) {
       controls={<PeriodSelect value={dateRange} onChange={setDateRange} />}
       onCsv={() => downloadCsv('profit_and_loss_by_month.csv', csvRows)}
       onPdf={() => FinancialPDFEngine.exportFinancialStatement(
-        { title: 'Profit and loss by month', period: rangeText(data?.range), companyName: activeCompany?.legalName || activeCompany?.name, kraPin: activeCompany?.taxId, currency: 'KES', filename: 'profit_and_loss_by_month.pdf' },
-        [{ headers: csvRows[0] as string[], rows: csvRows.slice(1).map((row) => row.map((value) => (typeof value === 'number' ? kes(Math.round(value * 100)) : value))) }],
+        { title: 'Profit and loss by month', period: rangeText(data?.range), companyName: activeCompany?.legalName || activeCompany?.name, kraPin: activeCompany?.taxId, currency, filename: 'profit_and_loss_by_month.pdf' },
+        [{ headers: csvRows[0] as string[], rows: csvRows.slice(1).map((row) => row.map((value) => (typeof value === 'number' ? FinancialPDFEngine.formatAmount(Math.round(value * 100), currency) : value))) }],
       )}
     >
       {isEmpty ? (
@@ -306,7 +306,7 @@ export function PartyStatementView({ onBack, partyType }: { onBack: () => void; 
   const data = report.data;
   const title = isCustomer ? 'Customer statement' : 'Supplier statement';
   const period = data ? `${longDate(data.from)} to ${longDate(data.to)}` : '';
-  const headers = ['Date', 'Particulars', 'Reference', isCustomer ? 'Charged' : 'Billed', isCustomer ? 'Paid or credited' : 'Paid or credited', 'Balance'];
+  const headers = ['Date', 'Particulars', 'Reference', isCustomer ? `Charged (${currency})` : `Billed (${currency})`, 'Paid or credited', `Balance (${currency})`];
 
   const exportPdf = () => data && FinancialPDFEngine.exportFinancialStatement(
     {
@@ -315,23 +315,23 @@ export function PartyStatementView({ onBack, partyType }: { onBack: () => void; 
       period,
       companyName: activeCompany?.legalName || activeCompany?.name,
       kraPin: activeCompany?.taxId,
-      currency: 'KES',
+      currency,
       filename: `statement_${data.party.name.replace(/[^A-Za-z0-9]+/g, '_')}_${data.to}.pdf`,
     },
     [
       {
         headers,
         rows: [
-          [shortDate(data.from), 'Balance brought forward', '', '', '', kes(data.openingBalanceCents)],
-          ...data.lines.map((l: any) => [shortDate(l.date), `${l.kind}${l.particulars ? `: ${l.particulars}` : ''}`, l.reference || '', l.chargeCents ? kes(l.chargeCents) : '', l.creditCents ? kes(l.creditCents) : '', kes(l.balanceCents)]),
-          [shortDate(data.to), isCustomer ? 'Balance due' : 'Balance owed', '', '', '', kes(data.closingBalanceCents)],
+          [shortDate(data.from), 'Balance brought forward', '', '', '', FinancialPDFEngine.formatAmount(shown(data.openingBalanceCents), currency)],
+          ...data.lines.map((l: any) => [shortDate(l.date), `${l.kind}${l.particulars ? `: ${l.particulars}` : ''}`, l.reference || '', l.chargeCents ? FinancialPDFEngine.formatAmount(shown(l.chargeCents), currency) : '', l.creditCents ? FinancialPDFEngine.formatAmount(shown(l.creditCents), currency) : '', FinancialPDFEngine.formatAmount(shown(l.balanceCents), currency)]),
+          [shortDate(data.to), isCustomer ? 'Balance due' : 'Balance owed', '', '', '', FinancialPDFEngine.formatAmount(shown(data.closingBalanceCents), currency)],
         ],
         columnStyles: { 3: { halign: 'right' }, 4: { halign: 'right' }, 5: { halign: 'right', fontStyle: 'bold' } },
       },
       ...(data.openDocuments.length ? [{
         title: isCustomer ? 'Invoices still open' : 'Bills still open',
-        headers: ['Number', 'Date', 'Due', 'Total', 'Still due'],
-        rows: data.openDocuments.map((d: any) => [d.number, shortDate(d.date), shortDate(d.dueDate), kes(d.totalCents), kes(d.amountDueCents)]),
+        headers: ['Number', 'Date', 'Due', `Total (${currency})`, `Still due (${currency})`],
+        rows: data.openDocuments.map((d: any) => [d.number, shortDate(d.date), shortDate(d.dueDate), FinancialPDFEngine.formatAmount(shown(d.totalCents), currency), FinancialPDFEngine.formatAmount(shown(d.amountDueCents), currency)]),
         columnStyles: { 3: { halign: 'right' }, 4: { halign: 'right', fontStyle: 'bold' } },
       }] : []),
     ],
@@ -361,9 +361,9 @@ export function PartyStatementView({ onBack, partyType }: { onBack: () => void; 
       }
       onCsv={data ? () => downloadCsv(`statement_${data.to}.csv`, [
         headers,
-        [data.from, 'Balance brought forward', '', '', '', data.openingBalanceCents / 100],
-        ...data.lines.map((l: any) => [l.date, `${l.kind}${l.particulars ? `: ${l.particulars}` : ''}`, l.reference || '', l.chargeCents / 100, l.creditCents / 100, l.balanceCents / 100]),
-        [data.to, isCustomer ? 'Balance due' : 'Balance owed', '', '', '', data.closingBalanceCents / 100],
+        [data.from, 'Balance brought forward', '', '', '', shown(data.openingBalanceCents) / 100],
+        ...data.lines.map((l: any) => [l.date, `${l.kind}${l.particulars ? `: ${l.particulars}` : ''}`, l.reference || '', l.chargeCents ? shown(l.chargeCents) / 100 : '', l.creditCents ? shown(l.creditCents) / 100 : '', shown(l.balanceCents) / 100]),
+        [data.to, isCustomer ? 'Balance due' : 'Balance owed', '', '', '', shown(data.closingBalanceCents) / 100],
       ]) : undefined}
       onPdf={data ? exportPdf : undefined}
     >
@@ -478,8 +478,8 @@ export function ProfitAndLossByTagView({ onBack, kind }: { onBack: () => void; k
       controls={<PeriodSelect value={dateRange} onChange={setDateRange} />}
       onCsv={() => downloadCsv(`${kind === 'CLASS' ? 'pnl_by_class' : 'pnl_by_location'}.csv`, csvRows)}
       onPdf={() => FinancialPDFEngine.exportFinancialStatement(
-        { title, period: rangeText(data?.range), companyName: activeCompany?.legalName || activeCompany?.name, kraPin: activeCompany?.taxId, currency: 'KES', filename: `${kind === 'CLASS' ? 'pnl_by_class' : 'pnl_by_location'}.pdf` },
-        [{ headers: csvRows[0] as string[], rows: csvRows.slice(1).map((row) => row.map((value) => (typeof value === 'number' ? kes(Math.round(value * 100)) : value))) }],
+        { title, period: rangeText(data?.range), companyName: activeCompany?.legalName || activeCompany?.name, kraPin: activeCompany?.taxId, currency, filename: `${kind === 'CLASS' ? 'pnl_by_class' : 'pnl_by_location'}.pdf` },
+        [{ headers: csvRows[0] as string[], rows: csvRows.slice(1).map((row) => row.map((value) => (typeof value === 'number' ? FinancialPDFEngine.formatAmount(Math.round(value * 100), currency) : value))) }],
       )}
     >
       {columns.length <= 1 && data ? (

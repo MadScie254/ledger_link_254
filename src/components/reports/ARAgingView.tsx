@@ -49,19 +49,19 @@ export function AgingReport({ onBack, title, endpoint, partyLabel, queryKey }: A
         period: `As at ${today}`,
         companyName: activeCompany?.legalName || activeCompany?.name,
         kraPin: activeCompany?.taxId,
-        currency: 'KES',
+        currency,
         filename: `${queryKey}_${format(new Date(), 'yyyyMMdd')}.pdf`,
       },
       [
         {
-          headers: ['Reference', partyLabel, 'Due Date', 'Days Past Due', 'Bucket', 'Amount Due (KES)'],
+          headers: ['Reference', partyLabel, 'Due Date', 'Days Past Due', 'Bucket', `Amount Due (${currency})`],
           rows: rows.map((r: any) => [
             r.referenceNo,
             r.partyName,
             r.dueDate ? format(new Date(r.dueDate), 'dd/MM/yyyy') : '-',
             r.daysPastDue,
             BUCKET_LABELS[r.bucket] || r.bucket,
-            FinancialPDFEngine.formatKES(r.amountDueCents),
+            FinancialPDFEngine.formatAmount(shown(r.amountDueCents), currency),
           ]),
           columnStyles: { 5: { halign: 'right', fontStyle: 'bold' } },
         },
@@ -71,8 +71,8 @@ export function AgingReport({ onBack, title, endpoint, partyLabel, queryKey }: A
 
   const handleExportCsv = () => {
     const excelRows = [
-      ['Reference', partyLabel, 'Due Date', 'Days Past Due', 'Bucket', 'Amount Due (KES)'],
-      ...rows.map((r: any) => [r.referenceNo, r.partyName, r.dueDate || '', r.daysPastDue, BUCKET_LABELS[r.bucket] || r.bucket, r.amountDueCents / 100]),
+      ['Reference', partyLabel, 'Due Date', 'Days Past Due', 'Bucket', `Amount Due (${currency})`],
+      ...rows.map((r: any) => [r.referenceNo, r.partyName, r.dueDate || '', r.daysPastDue, BUCKET_LABELS[r.bucket] || r.bucket, shown(r.amountDueCents) / 100]),
     ];
     downloadCsv(`${queryKey}.csv`, excelRows);
   };
