@@ -9,6 +9,9 @@ import { Mark } from '../ledger/Mark';
 
 export function TaxSummaryView({ onBack }: { onBack: () => void }) {
   const { currentOrgId, activeCompany } = useAppStore();
+  // KRA's VAT return is filed in the organization's own functional currency,
+  // never translated to a display currency chosen for reading other reports.
+  const currency = activeCompany?.baseCurrency || 'KES';
   const [period, setPeriod] = useState(() => format(new Date(), 'MMMM yyyy'));
   const taxPeriods = Array.from({ length: 12 }, (_, index) => format(subMonths(new Date(), index), 'MMMM yyyy'));
 
@@ -49,39 +52,39 @@ export function TaxSummaryView({ onBack }: { onBack: () => void }) {
         period,
         companyName: activeCompany?.legalName || activeCompany?.name,
         kraPin: kraPin || 'Not set',
-        currency: 'KES',
+        currency,
         filename: `kra_vat_summary_${format(new Date(), 'yyyyMMdd')}.pdf`,
       },
       [
         {
           title: '1. OUTPUT TAX (Sales & Invoicing)',
-          headers: ['Tax Bracket / Description', 'Taxable Base (KES)', 'Rate', 'Output VAT (KES)'],
+          headers: ['Tax Bracket / Description', `Taxable Base (${currency})`, 'Rate', `Output VAT (${currency})`],
           rows: [
-            ['Standard Rated Supplies (16%)', FinancialPDFEngine.formatKES(outputVat.standardRatedSalesCents), '16%', FinancialPDFEngine.formatKES(outputVat.taxAmountCents)],
-            ['Zero-rated or exempt supplies', FinancialPDFEngine.formatKES(outputVat.zeroRatedOrExemptSalesCents), '0%', FinancialPDFEngine.formatKES(0)],
-            ...['INVOICE', 'SALES_RECEIPT', 'CREDIT_NOTE'].map((source) => [`  ${SOURCE_LABEL[source]}`, '', '', FinancialPDFEngine.formatKES(vatFrom(source))]),
-            ['TOTAL OUTPUT TAX (A)', '', '', FinancialPDFEngine.formatKES(outputVat.taxAmountCents)],
+            ['Standard Rated Supplies (16%)', FinancialPDFEngine.formatAmount(outputVat.standardRatedSalesCents), '16%', FinancialPDFEngine.formatAmount(outputVat.taxAmountCents)],
+            ['Zero-rated or exempt supplies', FinancialPDFEngine.formatAmount(outputVat.zeroRatedOrExemptSalesCents), '0%', FinancialPDFEngine.formatAmount(0)],
+            ...['INVOICE', 'SALES_RECEIPT', 'CREDIT_NOTE'].map((source) => [`  ${SOURCE_LABEL[source]}`, '', '', FinancialPDFEngine.formatAmount(vatFrom(source))]),
+            ['TOTAL OUTPUT TAX (A)', '', '', FinancialPDFEngine.formatAmount(outputVat.taxAmountCents)],
           ],
           columnStyles: { 0: { cellWidth: 'auto' }, 1: { halign: 'right' }, 2: { halign: 'center' }, 3: { halign: 'right', fontStyle: 'bold' } },
         },
         {
           title: '2. INPUT TAX (Purchases & Expenses)',
-          headers: ['Tax Bracket / Description', 'Claimable Base (KES)', 'Rate', 'Input VAT (KES)'],
+          headers: ['Tax Bracket / Description', `Claimable Base (${currency})`, 'Rate', `Input VAT (${currency})`],
           rows: [
-            ['Standard Rated Local Purchases', FinancialPDFEngine.formatKES(inputVat.claimablePurchasesCents), '16%', FinancialPDFEngine.formatKES(inputVat.taxAmountCents)],
-            ...['BILL', 'EXPENSE', 'SUPPLIER_CREDIT'].map((source) => [`  ${SOURCE_LABEL[source]}`, '', '', FinancialPDFEngine.formatKES(vatFrom(source))]),
-            ['Withholding VAT Deductions (2%)', '', '2%', FinancialPDFEngine.formatKES(withholdingTaxVat.withheldAmountCents)],
-            ['TOTAL INPUT TAX & DEDUCTIONS (B)', '', '', FinancialPDFEngine.formatKES(totalDeductions)],
+            ['Standard Rated Local Purchases', FinancialPDFEngine.formatAmount(inputVat.claimablePurchasesCents), '16%', FinancialPDFEngine.formatAmount(inputVat.taxAmountCents)],
+            ...['BILL', 'EXPENSE', 'SUPPLIER_CREDIT'].map((source) => [`  ${SOURCE_LABEL[source]}`, '', '', FinancialPDFEngine.formatAmount(vatFrom(source))]),
+            ['Withholding VAT Deductions (2%)', '', '2%', FinancialPDFEngine.formatAmount(withholdingTaxVat.withheldAmountCents)],
+            ['TOTAL INPUT TAX & DEDUCTIONS (B)', '', '', FinancialPDFEngine.formatAmount(totalDeductions)],
           ],
           columnStyles: { 0: { cellWidth: 'auto' }, 1: { halign: 'right' }, 2: { halign: 'center' }, 3: { halign: 'right', fontStyle: 'bold' } },
         },
         {
           title: '3. NET TAX PAYABLE / (REFUND CLAIM)',
-          headers: ['Calculation Line', 'Amount (KES)'],
+          headers: ['Calculation Line', `Amount (${currency})`],
           rows: [
-            ['Total Output Tax (A)', FinancialPDFEngine.formatKES(outputVat.taxAmountCents)],
-            ['Less: Total Deductible Input Tax (B)', `(${FinancialPDFEngine.formatKES(totalDeductions)})`],
-            ['NET VAT PAYABLE TO KRA', FinancialPDFEngine.formatKES(netVatPayableCents)],
+            ['Total Output Tax (A)', FinancialPDFEngine.formatAmount(outputVat.taxAmountCents)],
+            ['Less: Total Deductible Input Tax (B)', `(${FinancialPDFEngine.formatAmount(totalDeductions)})`],
+            ['NET VAT PAYABLE TO KRA', FinancialPDFEngine.formatAmount(netVatPayableCents)],
           ],
         },
       ],
@@ -90,7 +93,7 @@ export function TaxSummaryView({ onBack }: { onBack: () => void }) {
 
   const handleExportCsv = () => {
     const excelRows = [
-      ['Tax Section', 'Base Amount (KES)', 'Tax Rate', 'Tax Amount (KES)'],
+      ['Tax Section', `Base Amount (${currency})`, 'Tax Rate', `Tax Amount (${currency})`],
       ['Standard Rated Sales (Output VAT)', outputVat.standardRatedSalesCents / 100, '16%', outputVat.taxAmountCents / 100],
       ['Zero-rated or exempt sales', outputVat.zeroRatedOrExemptSalesCents / 100, '0%', 0],
       ...breakdown.map((row) => [SOURCE_LABEL[row.source] || row.source, row.taxableCents / 100, '', row.taxCents / 100]),

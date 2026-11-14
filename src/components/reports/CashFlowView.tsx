@@ -4,10 +4,11 @@ import { useQuery } from '@tanstack/react-query';
 import { downloadCsv } from '../../utils/exportCsv';
 import { useAppStore } from '../../store';
 import { FinancialPDFEngine } from '../../utils/pdfExport';
-import { StatementPage, StatementSection, StatementLine, StatementSubtotal, StatementResult } from '../ledger/Statement';
+import { StatementPage, StatementSection, StatementLine, StatementSubtotal, StatementResult, useStatementFigures } from '../ledger/Statement';
 
 export function CashFlowView({ onBack }: { onBack: () => void }) {
   const { currentOrgId, activeCompany } = useAppStore();
+  const { currency, shown } = useStatementFigures();
   const [dateRange, setDateRange] = useState('This Year-to-date');
 
   const report = useQuery({
@@ -39,29 +40,29 @@ export function CashFlowView({ onBack }: { onBack: () => void }) {
         period: dateRange,
         companyName: activeCompany?.legalName || activeCompany?.name,
         kraPin: activeCompany?.taxId,
-        currency: 'KES',
+        currency,
         filename: `cash_flow_${format(new Date(), 'yyyyMMdd')}.pdf`,
       },
       [
         {
           title: '1. CASH FLOW FROM OPERATING ACTIVITIES',
-          headers: ['Operating Item', 'Amount (KES)'],
-          rows: [...operating.map((i: any) => [`  ${i.name}`, FinancialPDFEngine.formatKES(i.amountCents)]), ['Net Cash from Operating Activities', FinancialPDFEngine.formatKES(totalOperating)]],
+          headers: ['Operating Item', `Amount (${currency})`],
+          rows: [...operating.map((i: any) => [`  ${i.name}`, FinancialPDFEngine.formatAmount(shown(i.amountCents))]), ['Net Cash from Operating Activities', FinancialPDFEngine.formatAmount(shown(totalOperating))]],
         },
         {
           title: '2. CASH FLOW FROM INVESTING ACTIVITIES',
-          headers: ['Investing Item', 'Amount (KES)'],
-          rows: [...investing.map((i: any) => [`  ${i.name}`, FinancialPDFEngine.formatKES(i.amountCents)]), ['Net Cash from Investing Activities', FinancialPDFEngine.formatKES(totalInvesting)]],
+          headers: ['Investing Item', `Amount (${currency})`],
+          rows: [...investing.map((i: any) => [`  ${i.name}`, FinancialPDFEngine.formatAmount(shown(i.amountCents))]), ['Net Cash from Investing Activities', FinancialPDFEngine.formatAmount(shown(totalInvesting))]],
         },
         {
           title: '3. CASH FLOW FROM FINANCING ACTIVITIES',
-          headers: ['Financing Item', 'Amount (KES)'],
+          headers: ['Financing Item', `Amount (${currency})`],
           rows: [
-            ...financing.map((i: any) => [`  ${i.name}`, FinancialPDFEngine.formatKES(i.amountCents)]),
-            ['Net Cash from Financing Activities', FinancialPDFEngine.formatKES(totalFinancing)],
-            ['NET CHANGE IN CASH EQUIVALENTS', FinancialPDFEngine.formatKES(netCashChange)],
-            ['Beginning Cash Balance', FinancialPDFEngine.formatKES(beginningCashCents)],
-            ['ENDING CASH & BANK BALANCE', FinancialPDFEngine.formatKES(endingCashCents)],
+            ...financing.map((i: any) => [`  ${i.name}`, FinancialPDFEngine.formatAmount(shown(i.amountCents))]),
+            ['Net Cash from Financing Activities', FinancialPDFEngine.formatAmount(shown(totalFinancing))],
+            ['NET CHANGE IN CASH EQUIVALENTS', FinancialPDFEngine.formatAmount(shown(netCashChange))],
+            ['Beginning Cash Balance', FinancialPDFEngine.formatAmount(shown(beginningCashCents))],
+            ['ENDING CASH & BANK BALANCE', FinancialPDFEngine.formatAmount(shown(endingCashCents))],
           ],
         },
       ],
@@ -70,19 +71,19 @@ export function CashFlowView({ onBack }: { onBack: () => void }) {
 
   const handleExportCsv = () => {
     const rows = [
-      ['Item Description', 'Amount (KES)'],
+      ['Item Description', `Amount (${currency})`],
       ['OPERATING ACTIVITIES', ''],
-      ...operating.map((i: any) => [i.name, i.amountCents / 100]),
-      ['Net Cash from Operating Activities', totalOperating / 100],
+      ...operating.map((i: any) => [i.name, shown(i.amountCents) / 100]),
+      ['Net Cash from Operating Activities', shown(totalOperating) / 100],
       ['INVESTING ACTIVITIES', ''],
-      ...investing.map((i: any) => [i.name, i.amountCents / 100]),
-      ['Net Cash from Investing Activities', totalInvesting / 100],
+      ...investing.map((i: any) => [i.name, shown(i.amountCents) / 100]),
+      ['Net Cash from Investing Activities', shown(totalInvesting) / 100],
       ['FINANCING ACTIVITIES', ''],
-      ...financing.map((i: any) => [i.name, i.amountCents / 100]),
-      ['Net Cash from Financing Activities', totalFinancing / 100],
-      ['Net Change in Cash', netCashChange / 100],
-      ['Beginning Cash Balance', beginningCashCents / 100],
-      ['Ending Cash Balance', endingCashCents / 100],
+      ...financing.map((i: any) => [i.name, shown(i.amountCents) / 100]),
+      ['Net Cash from Financing Activities', shown(totalFinancing) / 100],
+      ['Net Change in Cash', shown(netCashChange) / 100],
+      ['Beginning Cash Balance', shown(beginningCashCents) / 100],
+      ['Ending Cash Balance', shown(endingCashCents) / 100],
     ];
     downloadCsv('cash_flow.csv', rows);
   };

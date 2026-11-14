@@ -36,15 +36,15 @@ export function TrialBalanceView({ onBack }: { onBack: () => void }) {
         period: `As at ${today}`,
         companyName: activeCompany?.legalName || activeCompany?.name,
         kraPin: activeCompany?.taxId,
-        currency: 'KES',
+        currency,
         filename: `trial_balance_${format(new Date(), 'yyyyMMdd')}.pdf`,
       },
       [
         {
-          headers: ['Account Code', 'Account Description', 'Type', 'Debit (KES)', 'Credit (KES)'],
+          headers: ['Account Code', 'Account Description', 'Type', `Debit (${currency})`, `Credit (${currency})`],
           rows: [
-            ...rows.map((r: any) => [r.code, r.name, r.type, r.debitCents ? FinancialPDFEngine.formatKES(r.debitCents) : '-', r.creditCents ? FinancialPDFEngine.formatKES(r.creditCents) : '-']),
-            ['', 'TOTALS & EQUALITY CHECK', isBalanced ? 'BALANCED' : 'UNBALANCED', FinancialPDFEngine.formatKES(totalDebit), FinancialPDFEngine.formatKES(totalCredit)],
+            ...rows.map((r: any) => [r.code, r.name, r.type, r.debitCents ? FinancialPDFEngine.formatAmount(shown(r.debitCents)) : '-', r.creditCents ? FinancialPDFEngine.formatAmount(shown(r.creditCents)) : '-']),
+            ['', 'TOTALS & EQUALITY CHECK', isBalanced ? 'BALANCED' : 'UNBALANCED', FinancialPDFEngine.formatAmount(shown(totalDebit)), FinancialPDFEngine.formatAmount(shown(totalCredit))],
           ],
           columnStyles: { 0: { cellWidth: 25 }, 1: { cellWidth: 'auto' }, 2: { cellWidth: 22 }, 3: { halign: 'right', fontStyle: 'bold' }, 4: { halign: 'right', fontStyle: 'bold' } },
         },
@@ -54,9 +54,9 @@ export function TrialBalanceView({ onBack }: { onBack: () => void }) {
 
   const handleExportCsv = () => {
     const excelRows = [
-      ['Account Code', 'Account Name', 'Type', 'Debit (KES)', 'Credit (KES)'],
-      ...rows.map((r: any) => [r.code, r.name, r.type, (r.debitCents || 0) / 100, (r.creditCents || 0) / 100]),
-      ['', 'TOTALS', isBalanced ? 'BALANCED' : 'UNBALANCED', totalDebit / 100, totalCredit / 100],
+      ['Account Code', 'Account Name', 'Type', `Debit (${currency})`, `Credit (${currency})`],
+      ...rows.map((r: any) => [r.code, r.name, r.type, shown(r.debitCents || 0) / 100, shown(r.creditCents || 0) / 100]),
+      ['', 'TOTALS', isBalanced ? 'BALANCED' : 'UNBALANCED', shown(totalDebit) / 100, shown(totalCredit) / 100],
     ];
     downloadCsv('trial_balance.csv', excelRows);
   };
