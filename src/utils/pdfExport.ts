@@ -146,7 +146,7 @@ export class FinancialPDFEngine {
           doc.setFont('helvetica', 'normal');
           doc.setFontSize(7.5);
           doc.setTextColor(148, 163, 184); // Slate 400
-          doc.text('Ledgerline Engine • Confidential & Legally Binding Financial Record', margin, footerY);
+          doc.text('Ledger Link • Confidential Financial Record', margin, footerY);
           doc.text(`Page ${pageNum} of ${pageCount}`, pageWidth - margin, footerY, { align: 'right' });
         }
       });
@@ -188,10 +188,21 @@ export class FinancialPDFEngine {
   }
 
   /**
-   * Helper to format numbers with KES commas
+   * Format an amount in the given currency using Intl.NumberFormat.
    */
-  static formatKES(cents: number): string {
+  static formatAmount(cents: number, currency = 'KES'): string {
     const val = cents / 100;
-    return val.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    try {
+      return new Intl.NumberFormat('en-US', { style: 'currency', currency, currencyDisplay: 'code' })
+        .format(val)
+        .replace(/^[A-Z]{3}\s*/, ''); // strip the currency code prefix, keep just digits
+    } catch {
+      return val.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    }
+  }
+
+  /** @deprecated Use formatAmount(cents, 'KES') */
+  static formatKES(cents: number): string {
+    return FinancialPDFEngine.formatAmount(cents, 'KES');
   }
 }
