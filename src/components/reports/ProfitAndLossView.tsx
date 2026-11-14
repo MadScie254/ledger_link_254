@@ -4,13 +4,14 @@ import { useQuery } from '@tanstack/react-query';
 import { downloadCsv } from '../../utils/exportCsv';
 import { useAppStore } from '../../store';
 import { FinancialPDFEngine } from '../../utils/pdfExport';
-import { StatementPage, StatementSection, StatementLine, StatementSubtotal, StatementResult } from '../ledger/Statement';
+import { StatementPage, StatementSection, StatementLine, StatementSubtotal, StatementResult, useStatementFigures } from '../ledger/Statement';
 import { Dialog } from '../ledger/Dialog';
 import { RunningLedger } from '../ledger/RunningLedger';
 import { EmptyNote, SkeletonRows, LoadProblem } from '../ledger/Page';
 
 export function ProfitAndLossView({ onBack }: { onBack: () => void }) {
   const { currentOrgId, activeCompany } = useAppStore();
+  const { currency, shown } = useStatementFigures();
   const [dateRange, setDateRange] = useState('This Year-to-date');
   const [drillDownAccount, setDrillDownAccount] = useState<string | null>(null);
   const yearEnds = useQuery({
@@ -54,6 +55,7 @@ export function ProfitAndLossView({ onBack }: { onBack: () => void }) {
 
   const handleExportPDF = () => {
     if (!data) return;
+    const fmt = (cents: number) => FinancialPDFEngine.formatAmount(shown(cents), currency);
     FinancialPDFEngine.exportFinancialStatement(
       {
         title: 'Profit & Loss Statement',
@@ -61,31 +63,31 @@ export function ProfitAndLossView({ onBack }: { onBack: () => void }) {
         period: periodLabel,
         companyName: activeCompany?.legalName || activeCompany?.name,
         kraPin: activeCompany?.taxId,
-        currency: 'KES',
+        currency,
         filename: `profit_and_loss_${format(new Date(), 'yyyyMMdd')}.pdf`,
       },
       [
         {
           title: '1. OPERATING REVENUE',
-          headers: ['Revenue Category / Account', 'Amount (KES)'],
-          rows: [...income.map((i: any) => [`  ${i.name}`, FinancialPDFEngine.formatKES(i.amountCents)]), ['Total Operating Revenue', FinancialPDFEngine.formatKES(totalIncome)]],
+          headers: ['Revenue Category / Account', `Amount (${currency})`],
+          rows: [...income.map((i: any) => [`  ${i.name}`, fmt(i.amountCents)]), ['Total Operating Revenue', fmt(totalIncome)]],
         },
         {
           title: '2. COST OF SALES & DIRECT EXPENSES',
-          headers: ['Cost of Sales Account', 'Amount (KES)'],
+          headers: ['Cost of Sales Account', `Amount (${currency})`],
           rows: [
-            ...costOfSales.map((i: any) => [`  ${i.name}`, FinancialPDFEngine.formatKES(i.amountCents)]),
-            ['Total Cost of Sales', FinancialPDFEngine.formatKES(totalCostOfSales)],
-            ['GROSS OPERATING PROFIT', FinancialPDFEngine.formatKES(grossProfit)],
+            ...costOfSales.map((i: any) => [`  ${i.name}`, fmt(i.amountCents)]),
+            ['Total Cost of Sales', fmt(totalCostOfSales)],
+            ['GROSS OPERATING PROFIT', fmt(grossProfit)],
           ],
         },
         {
           title: '3. OPERATING EXPENSES (OPEX)',
-          headers: ['Expense Category', 'Amount (KES)'],
+          headers: ['Expense Category', `Amount (${currency})`],
           rows: [
-            ...expenses.map((i: any) => [`  ${i.name}`, FinancialPDFEngine.formatKES(i.amountCents)]),
-            ['Total Operating Expenses', FinancialPDFEngine.formatKES(totalExpenses)],
-            ['NET PROFIT FOR THE PERIOD', FinancialPDFEngine.formatKES(netProfit)],
+            ...expenses.map((i: any) => [`  ${i.name}`, fmt(i.amountCents)]),
+            ['Total Operating Expenses', fmt(totalExpenses)],
+            ['NET PROFIT FOR THE PERIOD', fmt(netProfit)],
           ],
         },
       ],
